@@ -1,0 +1,9 @@
+[workspace]
+
+members = [
+        "propane",
+        "propane_codegen",
+        "propane_core",
+        "propane_cli",
+        "example"
+        ]

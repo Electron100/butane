@@ -1,0 +1,44 @@
+* Desired Syntax
+** Blog Example
+	 #+BEGIN_SRC rust
+	 #[model]
+	 struct Blog {
+	   id: i64,
+		 name: String
+	 }
+	 
+	 #[model]
+	 struct Post {
+	   id: i64,
+		 title: String,
+		 body: String,
+		 published: bool,
+		 tags: ManyToMany<Tag>,
+		 blog: ForeignKey<Blog>
+	 }
+	 
+	 #[model]
+	 struct Tag {
+	   #[pk]
+		 tag: String,
+	 }
+
+	 use crate::propane::prelude::*;
+
+	 fn query() {
+	   let conn = establish_connection();
+		 let specific_post = Post::get(conn, 1);
+		 let published_posts = Post::objects(conn).where!(published = true).limit(5);
+		 let tagged_posts = Post::objects(conn).where!(tags.contains("dinosaurs"));
+		 let tagged_posts2 = Post::objects(conn).where!(tags.contains(tag = "dinosaurs"));
+		 let blog = Blog::objects(conn).find!(name = "Bears").expect();
+		 let posts_in_blog = Post::objects().where!(blog = {blog})
+	 }
+	 #+END_SRC
+	 struct Posts
+	 CREATE TABLE posts (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR NOT NULL,
+  body TEXT NOT NULL,
+  published BOOLEAN NOT NULL DEFAULT 'f'
+)

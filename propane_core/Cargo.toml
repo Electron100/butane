@@ -1,0 +1,11 @@
+[package]
+name = "propane_core"
+version = "0.1.0"
+authors = ["James Oakley <james@electronstudio.org>"]
+edition = "2018"
+
+[dependencies]
+failure = "0.1.5"
+log = "0.4"
+serde = { version = "1.0", features=["derive"] }
+serde_json = "1.0"

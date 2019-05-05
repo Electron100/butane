@@ -1,0 +1,15 @@
+[package]
+name = "propane_codegen"
+version = "0.1.0"
+authors = ["James Oakley <james@electronstudio.org>"]
+edition = "2018"
+
+[dependencies]
+failure="0.1.5"
+proc-macro2 = "0.4"
+propane_core = { path = "../propane_core", version = "0.1.0" }
+quote = "0.6.0"
+syn = { version = "0.15.0", features = ["full", "extra-traits"] }
+
+[lib]
+proc-macro = true

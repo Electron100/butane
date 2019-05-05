@@ -1,0 +1,8 @@
+[package]
+name = "example"
+version = "0.1.0"
+authors = ["James Oakley <james@electronstudio.org>"]
+edition = "2018"
+
+[dependencies]
+propane = { path="../propane", version="0.1" }

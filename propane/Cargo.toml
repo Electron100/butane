@@ -1,0 +1,9 @@
+[package]
+name = "propane"
+version = "0.1.0"
+authors = ["James Oakley <james@electronstudio.org>"]
+edition = "2018"
+
+[dependencies]
+propane_codegen = { path = "../propane_codegen", version = "0.1.0" }
+propane_core = { path = "../propane_core", version = "0.1.0" }

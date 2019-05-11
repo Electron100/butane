@@ -1,8 +1,8 @@
 use super::*;
-use crate::adb::{AColumn, ATable, Operation, ADB};
+use crate::adb::{AColumn, ATable, AType, Operation, ADB};
 use log::warn;
 
-struct SQLiteBackend {}
+pub struct SQLiteBackend {}
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
         SQLiteBackend {}
@@ -43,7 +43,50 @@ fn create_table(table: &ATable) -> String {
 }
 
 fn define_column(col: &AColumn) -> String {
-    format!("todo")
+    let mut constraints: Vec<String> = Vec::new();
+    if !col.nullable {
+        constraints.push("NOT NULL".to_string());
+    }
+    if col.pk {
+        constraints.push("PRIMARY KEY".to_string());
+    }
+    if let Some(defval) = &col.default {
+        constraints.push(format!("DEFAULT {}", default_string(defval.clone())));
+    }
+    format!(
+        "{} {} {}",
+        &col.name,
+        sqltype(col.sqltype),
+        constraints.join(" ")
+    )
+}
+
+fn default_string(d: adb::DefVal) -> String {
+    match d {
+        adb::DefVal::Bool(b) => {
+            if b {
+                "1".to_string()
+            } else {
+                "0".to_string()
+            }
+        }
+        adb::DefVal::Int(i) => i.to_string(),
+        adb::DefVal::Real(f) => f.to_string(),
+        adb::DefVal::Text(t) => t,
+    }
+}
+
+fn sqltype(ty: AType) -> &'static str {
+    match ty {
+        AType::Bool => "INTEGER",
+        AType::Int => "INTEGER",
+        AType::BigInt => "INTEGER",
+        AType::Real => "REAL",
+        AType::Text => "TEXT",
+        AType::Date => "INTEGER",
+        AType::Timestamp => "INTEGER",
+        AType::Blob => "BLOB",
+    }
 }
 
 fn drop_table(name: &str) -> String {
@@ -51,7 +94,7 @@ fn drop_table(name: &str) -> String {
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> String {
-    format!("todo")
+    format!("ALTER TABLE {} ADD COLUMN {}", tbl_name, define_column(col))
 }
 
 fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {

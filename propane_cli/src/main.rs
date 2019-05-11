@@ -1,8 +1,8 @@
-se chrono::Utc;
+use chrono::Utc;
 use clap;
 use clap::{Arg, ArgMatches};
-use propane::migrations;
 use propane::migrations::Migrations;
+use propane::{db, migrations};
 
 type Result<T> = std::result::Result<T, failure::Error>;
 
@@ -21,11 +21,12 @@ fn main() {
     match args.subcommand() {
         ("makemigration", sub_args) => handle_error(make_migration(sub_args)),
         ("migrate", _) => handle_error(migrate()),
+        (_, _) => eprintln!("Unknown command"),
     }
 }
 
 fn default_name() -> String {
-    Utc::now().format("%Y%m%d_%H%M%S%2f").to_string()
+    Utc::now().format("%Y%m%d_%H%M%S%3f").to_string()
 }
 
 fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
@@ -33,22 +34,29 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
         .and_then(|a| a.value_of("name").and_then(|s| Some(s.to_string())))
         .unwrap_or_else(|| default_name());
     let ms = get_migrations()?;
-    ms.create_migration(
-        name,
-        ms.get_latest()
-            .map_or(migrations::ADB::new(), |m| m.get_db()),
-        ms.get_current().get_db(),
-    );
-    Ok
+    let m = ms.create_migration_sql(
+        db::sqlite_backend(),
+        &name,
+        ms.get_latest(),
+        &ms.get_current(),
+    )?;
+    match m {
+        Some(m) => println!("Created migration {}", m.get_name()),
+        None => println!("No changes to migrate"),
+    }
+    Ok(())
 }
 
 fn migrate() -> Result<()> {
     let m = get_migrations()?;
-    Ok
+    //todo
+    Ok(())
 }
 
 fn get_migrations() -> Result<Migrations> {
-    migrations::from_root(std::env::current_dir()?.join("propane").join("migrations"));
+    Ok(migrations::from_root(
+        std::env::current_dir()?.join("propane").join("migrations"),
+    ))
 }
 
 fn handle_error(r: Result<()>) {

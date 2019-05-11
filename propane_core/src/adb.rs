@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ADB {
     pub tables: HashSet<ATable>,
 }
@@ -20,7 +20,7 @@ impl ADB {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ATable {
     pub name: String,
     pub columns: HashSet<AColumn>,
@@ -51,7 +51,7 @@ impl PartialEq for ATable {
 }
 impl Eq for ATable {}
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AType {
     Bool,
     Int,    // 4 bytes
@@ -93,6 +93,7 @@ impl PartialEq for AColumn {
 }
 impl Eq for AColumn {}
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Operation {
     //TODO support renames
     //TODO support changed default
@@ -134,9 +135,13 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
         ));
     }
     for col in new.columns.intersection(&old.columns) {
+        let old_col = old.columns.get(col).expect("no columnn");
+        if col == old_col {
+            continue;
+        }
         ops.push(Operation::ChangeColumn(
             new.name.clone(),
-            old.columns.get(col).expect("no columnn").clone(),
+            old_col.clone(),
             col.clone(),
         ));
     }

@@ -86,6 +86,16 @@ impl Migration {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct MigrationsState {
+    latest: Option<String>,
+}
+impl MigrationsState {
+    fn new() -> Self {
+        MigrationsState { latest: None }
+    }
+}
+
 pub struct Migrations {
     root: PathBuf,
 }
@@ -101,7 +111,12 @@ impl Migrations {
     }
 
     pub fn get_latest(&self) -> Option<Migration> {
-        self.get_latest_helper().unwrap_or(None)
+        self.get_state()
+            .map(|state| match state.latest {
+                None => None,
+                Some(name) => Some(self.get_migration(&name)),
+            })
+            .unwrap_or(None)
     }
 
     /// Create a migration `from` -> `to` from may be None, in which
@@ -128,37 +143,33 @@ impl Migrations {
         // And write the undo
         let sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db));
         m.write_sql(&format!("{}_down", backend.get_name()), &sql)?;
-        m.write_info(&MigrationInfo { from_name })?;
+        m.write_info(&MigrationInfo {
+            from_name: from_name.clone(),
+        })?;
 
+        // Update state
+        let mut state = self.get_state()?;
+        if state.latest.is_none() || state.latest == from_name {
+            state.latest = Some(m.get_name().to_string());
+            self.save_state(&state)?;
+        }
 
         Ok(Some(m))
     }
 
-    fn get_latest_helper(&self) -> std::io::Result<Option<Migration>> {
-        let mut names: Vec<String> = fs::read_dir(&self.root)?
-            .filter_map(|entry| {
-                if entry.is_err() {
-                    return None;
-                }
-                let entry = entry.unwrap();
-                if entry.file_name() == "current" {
-                    return None;
-                }
-                if let Ok(ty) = entry.file_type() {
-                    if ty.is_dir() {
-                        if let Ok(s) = entry.file_name().into_string() {
-                            return Some(s);
-                        }
-                    }
-                }
-                None
-            })
-            .collect();
-        names.sort();
-        match names.last() {
-            Some(name) => Ok(Some(self.get_migration(name))),
-            _ => Ok(None),
+    fn get_state(&self) -> Result<MigrationsState> {
+        let path = self.root.join("state.json");
+        if !path.exists() {
+            return Ok(MigrationsState::new());
         }
+        serde_json::from_reader(fs::File::open(path)?).map_err(|e| e.into())
+    }
+
+    fn save_state(&self, state: &MigrationsState) -> Result<()> {
+        let path = self.root.join("state.json");
+        let mut f = fs::File::create(path)?;
+        f.write_all(serde_json::to_string(state)?.as_bytes())
+            .map_err(|e| e.into())
     }
 }
 

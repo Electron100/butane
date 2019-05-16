@@ -1,6 +1,8 @@
 use super::*;
 use crate::adb::{AColumn, ATable, AType, Operation, ADB};
+use crate::Result;
 use log::warn;
+use rusqlite;
 
 pub struct SQLiteBackend {}
 impl SQLiteBackend {
@@ -20,7 +22,23 @@ impl Backend for SQLiteBackend {
             .collect::<Vec<String>>()
             .join("\n")
     }
+
+    fn connect_box(&self, path: &str) -> Result<Box<Connection>> {
+        Ok(Box::new(SQLiteConnection::open(Path::new(path))?))
+    }
 }
+
+pub struct SQLiteConnection {
+    conn: rusqlite::Connection,
+}
+impl SQLiteConnection {
+    fn open(path: impl AsRef<Path>) -> Result<Self> {
+        rusqlite::Connection::open(path)
+            .map(|conn| SQLiteConnection { conn })
+            .map_err(|e| e.into())
+    }
+}
+impl Connection for SQLiteConnection {}
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> String {
     match op {

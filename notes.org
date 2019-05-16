@@ -42,3 +42,6 @@
   body TEXT NOT NULL,
   published BOOLEAN NOT NULL DEFAULT 'f'
 )
+* Roadmap
+	+ Documentation
+	+ Optional dependencies

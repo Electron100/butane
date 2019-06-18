@@ -5,4 +5,5 @@ authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
 
 [dependencies]
+failure = "0.1.5"
 propane = { path="../propane", version="0.1" }

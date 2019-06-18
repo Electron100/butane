@@ -1,13 +1,22 @@
+use super::helper;
 use super::*;
 use crate::adb::{AColumn, ATable, AType, Operation, ADB};
-use crate::Result;
+use crate::query;
+use crate::{Result, SqlVal};
+use hex;
 use log::warn;
 use rusqlite;
+use std::fmt::Write;
 
 pub struct SQLiteBackend {}
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
         SQLiteBackend {}
+    }
+}
+impl SQLiteBackend {
+    fn connect(&self, path: &str) -> Result<SQLiteConnection> {
+        SQLiteConnection::open(Path::new(path))
     }
 }
 impl Backend for SQLiteBackend {
@@ -23,8 +32,10 @@ impl Backend for SQLiteBackend {
             .join("\n")
     }
 
-    fn connect_box(&self, path: &str) -> Result<Box<Connection>> {
-        Ok(Box::new(SQLiteConnection::open(Path::new(path))?))
+    fn connect(&self, path: &str) -> Result<Connection> {
+        Ok(Connection {
+            conn: Box::new(self.connect(path)?),
+        })
     }
 }
 
@@ -38,7 +49,71 @@ impl SQLiteConnection {
             .map_err(|e| e.into())
     }
 }
-impl Connection for SQLiteConnection {}
+impl BackendConnection for SQLiteConnection {
+    fn execute(&self, sql: &str) -> Result<()> {
+        self.conn.execute_batch(sql.as_ref())?;
+        Ok(())
+    }
+    fn query(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+    ) -> Result<RawQueryResult> {
+        let mut sqlquery = String::new();
+        helper::sql_select(columns, table, &mut sqlquery);
+        if let Some(expr) = expr {
+            sqlquery.write_str("WHERE ").unwrap();
+            sql_for_expr(query::Expr::Condition(Box::new(expr)), &mut sqlquery);
+        }
+        if let Some(limit) = limit {
+            helper::sql_limit(limit, &mut sqlquery)
+        }
+        let mut stmt = self.conn.prepare(&sqlquery)?;
+        let rows = stmt.query_and_then(rusqlite::NO_PARAMS, |row| {
+            Ok(row_from_rusqlite(row, columns)?)
+        })?;
+        rows.collect()
+    }
+}
+
+fn row_from_rusqlite(row: &rusqlite::Row, cols: &[Column]) -> Result<Row> {
+    let mut vals: Vec<SqlVal> = Vec::new();
+    if cols.len() != row.column_count() {
+        panic!(
+            "sqlite returns columns {} doesn't match requested columns {}",
+            row.column_count(),
+            cols.len()
+        )
+    }
+    vals.reserve(cols.len());
+    for i in 0..cols.len() {
+        let ty = cols.get(i).unwrap().ty();
+        vals.push(sql_val_from_rusqlite(row.get_raw(i), ty)?);
+    }
+    Ok(Row::new(vals))
+}
+
+pub fn sql_for_expr<W>(expr: query::Expr, w: &mut W)
+where
+    W: Write,
+{
+    helper::sql_for_expr(expr, &sql_for_expr, w)
+}
+
+fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, ty: adb::AType) -> Result<SqlVal> {
+    Ok(match ty {
+        AType::Bool => SqlVal::Bool(val.as_i64()? != 0),
+        AType::Int => SqlVal::Int(val.as_i64()?),
+        AType::BigInt => SqlVal::Int(val.as_i64()?),
+        AType::Real => SqlVal::Real(val.as_f64()?),
+        AType::Text => SqlVal::Text(val.as_str()?.to_string()),
+        AType::Date => SqlVal::Int(val.as_i64()?),
+        AType::Timestamp => SqlVal::Int(val.as_i64()?),
+        AType::Blob => SqlVal::Blob(val.as_blob()?.into()),
+    })
+}
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> String {
     match op {
@@ -79,18 +154,19 @@ fn define_column(col: &AColumn) -> String {
     )
 }
 
-fn default_string(d: adb::DefVal) -> String {
+fn default_string(d: SqlVal) -> String {
     match d {
-        adb::DefVal::Bool(b) => {
+        SqlVal::Bool(b) => {
             if b {
                 "1".to_string()
             } else {
                 "0".to_string()
             }
         }
-        adb::DefVal::Int(i) => i.to_string(),
-        adb::DefVal::Real(f) => f.to_string(),
-        adb::DefVal::Text(t) => t,
+        SqlVal::Int(i) => i.to_string(),
+        SqlVal::Real(f) => f.to_string(),
+        SqlVal::Text(t) => format!("'{}'", t),
+        SqlVal::Blob(b) => format!("x'{}'", hex::encode(b)),
     }
 }
 

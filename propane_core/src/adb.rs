@@ -1,3 +1,4 @@
+use crate::SqlVal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -63,21 +64,13 @@ pub enum AType {
     Blob,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum DefVal {
-    Bool(bool),
-    Int(i64),
-    Real(f64),
-    Text(String),
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AColumn {
     pub name: String,
     pub sqltype: AType,
     pub nullable: bool,
     pub pk: bool,
-    pub default: Option<DefVal>,
+    pub default: Option<SqlVal>,
 }
 impl Hash for AColumn {
     fn hash<H: Hasher>(&self, state: &mut H) {

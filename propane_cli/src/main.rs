@@ -67,6 +67,7 @@ fn init<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
     let spec = db::ConnectionSpec::new(name, connstr);
     db::connect(&spec)?; // ensure we can
     spec.save(&base_dir()?)?;
+
     Ok(())
 }
 
@@ -89,8 +90,13 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
 }
 
 fn migrate() -> Result<()> {
-    let m = get_migrations()?;
-    //todo
+    let spec = db::ConnectionSpec::load(&base_dir()?)?;
+    let conn = db::connect(&spec)?;
+    // todo check already applied migrations, store migrations in db
+    let to_apply = get_migrations()?.get_all_migrations()?;
+    for m in to_apply {
+        conn.execute(m.get_up_sql(&spec.backend_name)?)?;
+    }
     Ok(())
 }
 

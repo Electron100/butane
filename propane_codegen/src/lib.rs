@@ -34,7 +34,6 @@ fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<(), Error> {
     );
     dir.push("propane");
     dir.push("migrations");
-    println!("writing to {}", dir.to_str().expect("valid string"));
     migrations::from_root(&dir)
         .get_migration("current")
         .write_table(&create_atable(ast_struct))
@@ -85,7 +84,7 @@ fn has_attr(attrs: &Vec<Attribute>, name: &str) -> bool {
         .is_some()
 }
 
-fn get_default(field: &Field) -> Option<DefVal> {
+fn get_default(field: &Field) -> Option<SqlVal> {
     // TODO support default values
     None
 }

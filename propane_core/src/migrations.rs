@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 pub use crate::adb::ADB;
@@ -19,6 +19,7 @@ struct MigrationInfo {
     from_name: Option<String>,
 }
 
+#[derive(Clone)]
 pub struct Migration {
     root: PathBuf,
 }
@@ -44,6 +45,7 @@ impl Migration {
         Ok(db)
     }
 
+    /// Get the migration before this one (if any).
     pub fn get_from_migration(&self) -> Result<Option<Migration>> {
         let info: MigrationInfo =
             serde_json::from_reader(fs::File::open(self.root.join("info.json"))?)?;
@@ -66,12 +68,26 @@ impl Migration {
         self.root.file_name().unwrap().to_string_lossy()
     }
 
+    pub fn get_up_sql(&self, backend_name: &str) -> Result<String> {
+        self.read_sql(&format!("{}_up", backend_name))
+    }
+
+    pub fn get_down_sql(&self, backend_name: &str) -> Result<String> {
+        self.read_sql(&format!("{}_down", backend_name))
+    }
+
     fn write_info(&self, info: &MigrationInfo) -> Result<()> {
         self.write_contents("info.json", serde_json::to_string(info)?.as_bytes())
     }
 
-    fn write_sql(&self, backend_name: &str, sql: &str) -> Result<()> {
-        self.write_contents(&format!("{}.sql", backend_name), sql.as_bytes())
+    fn write_sql(&self, name: &str, sql: &str) -> Result<()> {
+        self.write_contents(&format!("{}.sql", name), sql.as_bytes())
+    }
+
+    fn read_sql(&self, name: &str) -> Result<String> {
+        let mut buf = String::new();
+        fs::File::open(self.root.join(&format!("{}.sql", name)))?.read_to_string(&mut buf)?;
+        Ok(buf)
     }
 
     fn write_contents(&self, fname: &str, contents: &[u8]) -> Result<()> {
@@ -85,6 +101,12 @@ impl Migration {
         fs::create_dir_all(&self.root).map_err(|e| e.into())
     }
 }
+impl PartialEq for Migration {
+    fn eq(&self, other: &Migration) -> bool {
+        self.get_name() == other.get_name()
+    }
+}
+impl Eq for Migration {}
 
 #[derive(Serialize, Deserialize)]
 struct MigrationsState {
@@ -155,6 +177,31 @@ impl Migrations {
         }
 
         Ok(Some(m))
+    }
+
+    pub fn get_migrations_since(&self, since: &Migration) -> Result<Vec<Migration>> {
+        let mut last = self.get_latest();
+        let mut accum: Vec<Migration> = Vec::new();
+        while let Some(m) = last {
+            if m != *since {
+                last = m.get_from_migration()?;
+                accum.push(m);
+                continue;
+            }
+
+            return Ok(accum.into_iter().rev().collect());
+        }
+        Err(format_err!("Migration not in chain"))
+    }
+
+    pub fn get_all_migrations(&self) -> Result<Vec<Migration>> {
+        let mut last = self.get_latest();
+        let mut accum: Vec<Migration> = Vec::new();
+        while let Some(m) = last {
+            last = m.get_from_migration()?;
+            accum.push(m);
+        }
+        Ok(accum.into_iter().rev().collect())
     }
 
     fn get_state(&self) -> Result<MigrationsState> {

@@ -1,8 +1,8 @@
 use super::helper;
 use super::*;
-use crate::adb::{AColumn, ATable, AType, Operation, ADB};
+use crate::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
-use crate::{Result, SqlVal};
+use crate::{Result, SqlType, SqlVal};
 use hex;
 use log::warn;
 use rusqlite;
@@ -102,16 +102,16 @@ where
     helper::sql_for_expr(expr, &sql_for_expr, w)
 }
 
-fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, ty: adb::AType) -> Result<SqlVal> {
+fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, ty: SqlType) -> Result<SqlVal> {
     Ok(match ty {
-        AType::Bool => SqlVal::Bool(val.as_i64()? != 0),
-        AType::Int => SqlVal::Int(val.as_i64()?),
-        AType::BigInt => SqlVal::Int(val.as_i64()?),
-        AType::Real => SqlVal::Real(val.as_f64()?),
-        AType::Text => SqlVal::Text(val.as_str()?.to_string()),
-        AType::Date => SqlVal::Int(val.as_i64()?),
-        AType::Timestamp => SqlVal::Int(val.as_i64()?),
-        AType::Blob => SqlVal::Blob(val.as_blob()?.into()),
+        SqlType::Bool => SqlVal::Bool(val.as_i64()? != 0),
+        SqlType::Int => SqlVal::Int(val.as_i64()?),
+        SqlType::BigInt => SqlVal::Int(val.as_i64()?),
+        SqlType::Real => SqlVal::Real(val.as_f64()?),
+        SqlType::Text => SqlVal::Text(val.as_str()?.to_string()),
+        SqlType::Date => SqlVal::Int(val.as_i64()?),
+        SqlType::Timestamp => SqlVal::Int(val.as_i64()?),
+        SqlType::Blob => SqlVal::Blob(val.as_blob()?.into()),
     })
 }
 
@@ -170,16 +170,16 @@ fn default_string(d: SqlVal) -> String {
     }
 }
 
-fn sqltype(ty: AType) -> &'static str {
+fn sqltype(ty: SqlType) -> &'static str {
     match ty {
-        AType::Bool => "INTEGER",
-        AType::Int => "INTEGER",
-        AType::BigInt => "INTEGER",
-        AType::Real => "REAL",
-        AType::Text => "TEXT",
-        AType::Date => "INTEGER",
-        AType::Timestamp => "INTEGER",
-        AType::Blob => "BLOB",
+        SqlType::Bool => "INTEGER",
+        SqlType::Int => "INTEGER",
+        SqlType::BigInt => "INTEGER",
+        SqlType::Real => "REAL",
+        SqlType::Text => "TEXT",
+        SqlType::Date => "INTEGER",
+        SqlType::Timestamp => "INTEGER",
+        SqlType::Blob => "BLOB",
     }
 }
 

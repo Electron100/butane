@@ -1,5 +1,5 @@
 use crate::{Error::TypeMismatch, Result};
-use failure::format_err;
+use failure;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -11,7 +11,6 @@ pub enum SqlVal {
     Text(String),
     Blob(Vec<u8>),
 }
-
 impl SqlVal {
     pub fn bool(&self) -> Result<bool> {
         match self {
@@ -103,22 +102,42 @@ pub trait FromSql {
     where
         Self: Sized;
 }
-impl FromSql for bool {
-    fn from_sql(val: SqlVal) -> Result<Self> {
-        if let SqlVal::Bool(b) = val {
-            Ok(b)
-        } else {
-            Err(format_err!("Type mismatch"))
+
+macro_rules! impl_basic_from_sql {
+    ($prim:ty, $variant:ident) => {
+        impl FromSql for $prim {
+            fn from_sql(val: SqlVal) -> Result<Self> {
+                if let SqlVal::$variant(val) = val {
+                    Ok(val as $prim)
+                } else {
+                    Err(crate::Error::TypeMismatch.into())
+                }
+            }
         }
-    }
+    };
 }
-impl FromSql for i64 {
-    fn from_sql(val: SqlVal) -> Result<Self> {
-        if let SqlVal::Int(i) = val {
-            Ok(i)
-        } else {
-            Err(format_err!("Type mismatch"))
-        }
+
+impl_basic_from_sql!(bool, Bool);
+impl_basic_from_sql!(i64, Int);
+impl_basic_from_sql!(i32, Int);
+impl_basic_from_sql!(u32, Int);
+impl_basic_from_sql!(f64, Real);
+impl_basic_from_sql!(f32, Real);
+impl_basic_from_sql!(String, Text);
+impl_basic_from_sql!(Vec<u8>, Blob);
+
+// Cannot blanket impl TryInto for SqlVal because specialization is
+// not yet stable and there are conflicts with blanket impls in std.
+pub trait SqlInto<T> {
+    fn sql_into(self) -> Result<T>;
+}
+
+impl<T> SqlInto<T> for SqlVal
+where
+    T: FromSql,
+{
+    fn sql_into(self) -> Result<T> {
+        T::from_sql(self)
     }
 }
 

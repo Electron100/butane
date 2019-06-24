@@ -29,7 +29,7 @@
 	 fn query() {
 	   let conn = establish_connection();
 		 let specific_post = Post::get(&conn, 1);
-		 let published_posts = query!(Post, published = true)).limit(5).load(&conn);
+		 let published_posts = query!(Post, published = true).limit(5).load(&conn);
 		 let unliked_posts = query!(Post, published = true && likes < 5)).load(&conn);
 		 let tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn);
 		 let tagged_posts2 = query!(Post, tags.contains(tag = "dinosaurs")).load(&conn);

@@ -1,20 +1,19 @@
+//The quote macro can require a high recursion limit
+#![recursion_limit = "256"]
+
 extern crate proc_macro;
 
 use failure::Error;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use proc_macro2::{Ident, Span, TokenTree};
-use quote::{quote, ToTokens};
-use std::collections::HashSet;
-use std::path::PathBuf;
-use std::result::Result;
-use syn::parse_quote;
-use syn::{
-    Attribute, Field, FnArg, ItemStruct, LitStr, Pat, TraitItem, TraitItemMethod, Type, TypePath,
-};
-
-use propane_core::migrations;
+use proc_macro2::{Ident, Span};
 use propane_core::*;
+use quote::{quote, ToTokens};
+use syn::parse_quote;
+use syn::{Field, ItemStruct, LitStr};
+
+mod dbobj;
+mod migration;
 
 #[proc_macro_attribute]
 pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
@@ -23,76 +22,36 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     // Read the struct name and all fields
     let ast_struct: ItemStruct = syn::parse(input).unwrap();
 
-    write_table_to_disk(&ast_struct).unwrap();
+    migration::write_table_to_disk(&ast_struct).unwrap();
+
+    result.extend(dbobj::add_fieldexprs_to_impl(&ast_struct));
+    result.extend(dbobj::impl_dbobject(&ast_struct));
 
     result.into()
 }
 
-fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<(), Error> {
-    let mut dir = PathBuf::from(
-        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR expected to be set"),
-    );
-    dir.push("propane");
-    dir.push("migrations");
-    migrations::from_root(&dir)
-        .get_migration("current")
-        .write_table(&create_atable(ast_struct))
-}
-
-fn create_atable(ast_struct: &ItemStruct) -> ATable {
-    let columns: HashSet<AColumn> = ast_struct
-        .fields
-        .iter()
-        .map(|f| AColumn {
-            name: f
-                .ident
-                .clone()
-                .expect("db object fields must be named")
-                .to_string(),
-            sqltype: get_sql_type(&f),
-            nullable: is_nullable(&f),
-            pk: is_pk(&f),
-            default: get_default(&f),
-        })
-        .collect();
-
-    ATable {
-        name: ast_struct.ident.to_string(),
-        columns,
+fn tokens_for_sqltype(ty: SqlType) -> TokenStream2 {
+    match ty {
+        SqlType::Bool => quote!(propane::SqlType::Bool),
+        SqlType::Int => quote!(propane::SqlType::Int),
+        SqlType::BigInt => quote!(propane::SqlType::BigInt),
+        SqlType::Real => quote!(propane::SqlType::Real),
+        SqlType::Text => quote!(propane::SqlType::Text),
+        SqlType::Date => quote!(propane::SqlType::Date),
+        SqlType::Timestamp => quote!(propane::SqlType::Timestamp),
+        SqlType::Blob => quote!(propane::SqlType::Blob),
     }
 }
 
-fn is_nullable(field: &Field) -> bool {
-    let option: TypePath = parse_quote!(std::option::Option);
-    match &field.ty {
-        Type::Path(tp) => option == *tp,
-        _ => false,
-    }
+fn make_ident_literal_str(ident: &Ident) -> LitStr {
+    let as_str = format!("{}", ident);
+    LitStr::new(&as_str, Span::call_site())
 }
 
-fn is_pk(field: &Field) -> bool {
-    has_attr(&field.attrs, "pk")
-}
-
-fn has_attr(attrs: &Vec<Attribute>, name: &str) -> bool {
-    attrs
-        .iter()
-        .find(|a| match a.parse_meta() {
-            Ok(m) => m.name().to_string() == name,
-            _ => false,
-        })
-        .is_some()
-}
-
-fn get_default(field: &Field) -> Option<SqlVal> {
-    // TODO support default values
-    None
-}
-
-fn get_sql_type(field: &Field) -> AType {
+fn get_sql_type(field: &Field) -> SqlType {
     // Todo support Date, Tmestamp, and Blob
     if field.ty == parse_quote!(bool) {
-        AType::Bool
+        SqlType::Bool
     } else if field.ty == parse_quote!(u8)
         || field.ty == parse_quote!(i8)
         || field.ty == parse_quote!(u16)
@@ -100,13 +59,13 @@ fn get_sql_type(field: &Field) -> AType {
         || field.ty == parse_quote!(u16)
         || field.ty == parse_quote!(i32)
     {
-        AType::Int
+        SqlType::Int
     } else if field.ty == parse_quote!(u64) || field.ty == parse_quote!(i64) {
-        AType::BigInt
+        SqlType::BigInt
     } else if field.ty == parse_quote!(f32) || field.ty == parse_quote!(f64) {
-        AType::Real
+        SqlType::Real
     } else if field.ty == parse_quote!(String) {
-        AType::Text
+        SqlType::Text
     } else {
         panic!(
             "Unsupported type {} for field '{}'",

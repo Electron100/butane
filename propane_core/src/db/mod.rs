@@ -1,7 +1,6 @@
-use super::Result;
-use super::{Error::BoundsError, Error::ValueAlreadyRetrieved};
+use super::Error::BoundsError;
 use crate::query::BoolExpr;
-use crate::{adb, SqlVal};
+use crate::{adb, Result, SqlType, SqlVal};
 use failure::format_err;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -27,40 +26,38 @@ pub trait BackendConnection: Send + 'static {
 
 pub struct Column {
     name: &'static str,
-    ty: adb::AType,
+    ty: SqlType,
 }
 impl Column {
-    pub const fn new(name: &'static str, ty: adb::AType) -> Self {
+    pub const fn new(name: &'static str, ty: SqlType) -> Self {
         Column { name, ty }
     }
     pub fn name(&self) -> &str {
         self.name
     }
-    pub fn ty(&self) -> adb::AType {
+    pub fn ty(&self) -> SqlType {
         self.ty
     }
 }
 
 pub struct Row {
-    vals: Vec<Option<SqlVal>>,
+    vals: Vec<SqlVal>,
 }
 impl Row {
     fn new(vals: Vec<SqlVal>) -> Self {
-        Row {
-            vals: vals.into_iter().map(|v| Some(v)).collect(),
-        }
+        Row { vals }
+    }
+    pub fn len(&self) -> usize {
+        self.vals.len()
     }
     pub fn get<'a>(&'a self, idx: usize) -> Result<&'a SqlVal> {
-        self.vals
-            .get(idx)
-            .ok_or(failure::Error::from(BoundsError))?
-            .as_ref()
-            .ok_or(ValueAlreadyRetrieved.into())
+        self.vals.get(idx).ok_or(failure::Error::from(BoundsError))
     }
+    /*
     /// Extracts an owned value out of the row. Can only be done once
     /// for each value (subsequent attempts will return ValueAlreadyRetrieved)
     pub fn retrieve(&mut self, idx: usize) -> Result<SqlVal> {
-        let mut val: &mut Option<SqlVal> = self
+        let val: &mut Option<SqlVal> = self
             .vals
             .get_mut(idx)
             .ok_or(failure::Error::from(BoundsError))?;
@@ -70,7 +67,7 @@ impl Row {
         let mut tmp = None;
         std::mem::swap(val, &mut tmp);
         Ok(tmp.unwrap())
-    }
+    }*/
     pub fn get_int(&self, idx: usize) -> Result<i64> {
         self.get(idx)?.integer()
     }
@@ -80,11 +77,19 @@ impl Row {
     pub fn get_real(&self, idx: usize) -> Result<f64> {
         self.get(idx)?.real()
     }
-    pub fn retrieve_text(&mut self, idx: usize) -> Result<String> {
+
+    /*pub fn retrieve_text(&mut self, idx: usize) -> Result<String> {
         self.retrieve(idx)?.owned_text()
     }
     pub fn retrieve_blob(&mut self, idx: usize) -> Result<Vec<u8>> {
         self.retrieve(idx)?.owned_blob()
+    }*/
+}
+impl IntoIterator for Row {
+    type Item = SqlVal;
+    type IntoIter = std::vec::IntoIter<SqlVal>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.vals.into_iter()
     }
 }
 

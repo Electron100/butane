@@ -1,4 +1,4 @@
-use crate::SqlVal;
+use crate::{SqlType, SqlVal};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -52,22 +52,10 @@ impl PartialEq for ATable {
 }
 impl Eq for ATable {}
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum AType {
-    Bool,
-    Int,    // 4 bytes
-    BigInt, // 8 bytes
-    Real,   // 8 byte float
-    Text,
-    Date,
-    Timestamp,
-    Blob,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AColumn {
     pub name: String,
-    pub sqltype: AType,
+    pub sqltype: SqlType,
     pub nullable: bool,
     pub pk: bool,
     pub default: Option<SqlVal>,

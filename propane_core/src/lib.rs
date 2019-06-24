@@ -1,12 +1,13 @@
 use failure;
 use failure::Fail;
+use serde::{Deserialize, Serialize};
 
 pub mod adb;
 pub mod db;
 pub mod field;
 pub mod migrations;
 pub mod query;
-mod sqlval;
+pub mod sqlval;
 
 pub use adb::*;
 pub use query::Query;
@@ -34,6 +35,16 @@ pub enum Error {
     BoundsError,
     #[fail(display = "Type mismatch")]
     TypeMismatch,
-    #[fail(display = "Value already retrieved")]
-    ValueAlreadyRetrieved,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SqlType {
+    Bool,
+    Int,    // 4 bytes
+    BigInt, // 8 bytes
+    Real,   // 8 byte float
+    Text,
+    Date,
+    Timestamp,
+    Blob,
 }

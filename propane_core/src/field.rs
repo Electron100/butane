@@ -2,14 +2,6 @@ use crate::query::{BoolExpr, Expr};
 use crate::sqlval::SqlVal;
 use std::marker::PhantomData;
 
-struct Field<T> {
-    val: T,
-}
-
-struct FieldRef<'a, T> {
-    val: &'a T,
-}
-
 macro_rules! binary_op {
     ($func_name:ident, $bound:path, $cond:ident) => {
         pub fn $func_name(&self, val: impl Into<T>) -> BoolExpr

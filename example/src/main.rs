@@ -45,7 +45,7 @@ struct Tag {
 fn query() -> Result<()> {
     let conn = establish_connection()?;
     let _specific_post = Post::get(&conn, 1);
-    let published_posts = query!(Post, published = true).limit(5).load(&conn);
+    //let published_posts = query!(Post, published = true).limit(5).load(&conn);
     Ok(())
     /*
     let published_posts = Post::objects().where!(published = true).limit(5);

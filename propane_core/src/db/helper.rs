@@ -15,6 +15,7 @@ where
         Placeholder => w.write_str("?"),
         Condition(c) => match *c {
             Eq(col, ex) => write!(w, "{} = ", col).and_then(|_| Ok(f(ex, w))),
+            Ne(col, ex) => write!(w, "{} <> ", col).and_then(|_| Ok(f(ex, w))),
             Lt(col, ex) => write!(w, "{} < ", col).and_then(|_| Ok(f(ex, w))),
             Gt(col, ex) => write!(w, "{} > ", col).and_then(|_| Ok(f(ex, w))),
             Le(col, ex) => write!(w, "{} <= ", col).and_then(|_| Ok(f(ex, w))),

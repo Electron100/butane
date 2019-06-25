@@ -10,9 +10,10 @@ use proc_macro2::{Ident, Span};
 use propane_core::*;
 use quote::{quote, ToTokens};
 use syn::parse_quote;
-use syn::{Field, ItemStruct, LitStr};
+use syn::{Expr, Field, ItemStruct, LitStr};
 
 mod dbobj;
+mod filter;
 mod migration;
 
 #[proc_macro_attribute]
@@ -28,6 +29,17 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     result.extend(dbobj::impl_dbobject(&ast_struct));
 
     result.into()
+}
+
+#[proc_macro]
+pub fn filter(input: TokenStream) -> TokenStream {
+    let mut result: TokenStream2 = input.clone().into();
+    
+    let expr: Expr = match syn::parse(input) {
+        Ok(expr) => expr,
+        Err(e) => return e.to_compile_error().into()
+    }
+    filter::expr_for(expr).into()
 }
 
 fn tokens_for_sqltype(ty: SqlType) -> TokenStream2 {

@@ -33,7 +33,7 @@ where
     }
 
     binary_op!(eq, std::cmp::Eq, Eq);
-    binary_op!(eq, std::cmp::Ne, Ne);
+    binary_op!(ne, std::cmp::Eq, Ne);
     binary_op!(lt, std::cmp::Ord, Lt);
     binary_op!(gt, std::cmp::Ord, Gt);
     binary_op!(le, std::cmp::Ord, Le);

@@ -1,5 +1,5 @@
 use super::Column;
-use crate::query::BoolExpr::{And, Eq, Ge, Gt, Le, Lt, Not, Or};
+use crate::query::BoolExpr::{And, Eq, Ge, Gt, Le, Lt, Ne, Not, Or};
 use crate::query::Expr;
 use crate::query::Expr::{Condition, Placeholder, Val};
 use std::fmt::Write;

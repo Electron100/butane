@@ -12,6 +12,7 @@ pub enum Expr {
 #[derive(Clone)]
 pub enum BoolExpr {
     Eq(&'static str, Expr),
+    Ne(&'static str, Expr),
     Lt(&'static str, Expr),
     Gt(&'static str, Expr),
     Le(&'static str, Expr),

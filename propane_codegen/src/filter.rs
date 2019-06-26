@@ -1,26 +1,36 @@
-use syn::ExprBinary;
+use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
-use syn::{Expr, ExprBinary, ExprMethodCall, Field, ItemStruct, LitStr};
 use quote::{quote, quote_spanned, ToTokens};
+use syn;
+use syn::{BinOp, Expr, ExprBinary, ExprMethodCall, ExprPath, Field, Ident, ItemStruct, LitStr};
 
-pub fn expr_for(expr: &Expr) -> TokenStream2 {
+pub fn for_expr(dbobj: &Ident, expr: &Expr) -> TokenStream2 {
+    eprintln!("Expr is {:?}", expr);
     match expr {
-        Expr::Binary(binop) => handle_bin_op(binop),
-        Expr::MethodCall(mcall) => handle_call(mcall),
+        Expr::Binary(binop) => handle_bin_op(dbobj, binop),
+        Expr::MethodCall(mcall) => handle_call(dbobj, mcall),
+        Expr::Path(path) => handle_path(dbobj, path),
+        Expr::Lit(lit) => lit.lit.clone().into_token_stream(),
         _ => {
-            let lit = LitStr::new(&format!("Unsupported filter expression", expr), Span::call_site())
-            quote!(compile_error!("Unsupported filter expression: "))
+            let lit = LitStr::new(
+                &format!(
+                    "Unsupported filter expression '{}'",
+                    expr.clone().into_token_stream(),
+                ),
+                Span::call_site(),
+            );
+            quote!(compile_error!(#lit))
         }
     }
 }
 
-fn ident(name: &str) {
+fn ident(name: &str) -> Ident {
     Ident::new(name, Span::call_site())
 }
 
-fn handle_bin_op(binop: &ExprBinary) -> TokenStream2 {
-    let left = expr_for(binop.left);
-    let right = expr_for(binop.right);
+fn handle_bin_op(dbobj: &Ident, binop: &ExprBinary) -> TokenStream2 {
+    let left = for_expr(dbobj, &binop.left);
+    let right = for_expr(dbobj, &binop.right);
     match binop.op {
         BinOp::Eq(_) => quote!(#left.eq(#right)),
         BinOp::Ne(_) => quote!(#left.ne(#right)),
@@ -30,10 +40,15 @@ fn handle_bin_op(binop: &ExprBinary) -> TokenStream2 {
         BinOp::Ge(_) => quote!(#left.ge(#right)),
         BinOp::And(_) => quote!(propane::query::BoolExpr::And(Box::new(#left), Box::new(#right))),
         BinOp::Or(_) => quote!(propane::query::BoolExpr::Or(Box::new(#left), Box::new(#right))),
-        _ => quote!(compile_error!(""))
+        _ => quote!(compile_error!("Unsupported binary operator")),
     }
 }
 
-fn handle_call(mcall: &ExprMethodCall) -> TokenStream2 {
+fn handle_call(dbobj: &Ident, mcall: &ExprMethodCall) -> TokenStream2 {
+    quote!(compile_error!("TODO support method call"))
+}
 
+fn handle_path(dbobj: &Ident, expr: &ExprPath) -> TokenStream2 {
+    let field = &expr.path;
+    quote!(#dbobj::fieldexpr_#field())
 }

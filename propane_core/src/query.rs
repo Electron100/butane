@@ -1,5 +1,6 @@
 use crate::db::{BackendConnection, QueryResult};
-use crate::{DBObject, Result, SqlVal};
+use crate::{DBObject, DBResult, Result, SqlVal};
+use std::marker::PhantomData;
 
 #[derive(Clone)]
 pub enum Expr {
@@ -44,29 +45,31 @@ where
 }
 
 #[derive(Clone)]
-pub struct Query {
+pub struct Query<T: DBResult> {
     table: &'static str,
     filter: Option<BoolExpr>,
     limit: Option<i32>,
+    phantom: PhantomData<T>,
 }
-impl Query {
-    pub fn new(table: &'static str) -> Query {
+impl<T: DBResult> Query<T> {
+    pub fn new(table: &'static str) -> Query<T> {
         Query {
             table,
             filter: None,
             limit: None,
+            phantom: PhantomData,
         }
     }
-    pub fn filter(mut self, expr: BoolExpr) -> Query {
+    pub fn filter(mut self, expr: BoolExpr) -> Query<T> {
         self.filter = Some(expr);
         self
     }
-    pub fn limit(mut self, lim: i32) -> Query {
+    pub fn limit(mut self, lim: i32) -> Query<T> {
         self.limit = Some(lim);
         self
     }
 
-    pub fn load<T: DBObject>(self, conn: &impl BackendConnection) -> Result<QueryResult<T>> {
+    pub fn load(self, conn: &impl BackendConnection) -> Result<QueryResult<T>> {
         conn.query(self.table, T::COLUMNS, self.filter, self.limit)?
             .into_iter()
             .map(|row| T::from_row(row))

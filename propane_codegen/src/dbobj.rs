@@ -26,11 +26,23 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
     let rowslen = rows.len();
 
     quote!(
-        impl propane::DBObject for #tyname {
-            type PKType = #pktype;
+        impl propane::DBResult for #tyname {
+            type DBO = #tyname;
             const COLUMNS: &'static [propane::db::Column] = &[
                 #columns
             ];
+            fn from_row(mut row: propane::db::Row) -> propane::Result<Self> {
+                if row.len() != #rowslen {
+                    return Err(propane::Error::BoundsError.into());
+                }
+                let mut it = row.into_iter();
+                Ok(#tyname {
+                    #(#rows),*
+                })
+            }
+        }
+        impl propane::DBObject for #tyname {
+            type PKType = #pktype;
             fn get(
                 conn: &impl BackendConnection,
                 id: Self::PKType,
@@ -43,17 +55,8 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                     .nth(0)
                     .ok_or(propane::Error::NoSuchObject.into())
             }
-            fn query() -> Query {
+            fn query() -> Query<Self> {
                 Query::new(#table_lit)
-            }
-            fn from_row(mut row: propane::db::Row) -> propane::Result<Self> {
-                if row.len() != #rowslen {
-                    return Err(propane::Error::BoundsError.into());
-                }
-                let mut it = row.into_iter();
-                Ok(#tyname {
-                    #(#rows),*
-                })
             }
         }
     )

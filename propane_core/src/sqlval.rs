@@ -1,5 +1,4 @@
 use crate::{Error::TypeMismatch, Result};
-use failure;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

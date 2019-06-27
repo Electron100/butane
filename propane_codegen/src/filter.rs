@@ -50,5 +50,6 @@ fn handle_call(dbobj: &Ident, mcall: &ExprMethodCall) -> TokenStream2 {
 
 fn handle_path(dbobj: &Ident, expr: &ExprPath) -> TokenStream2 {
     let field = &expr.path;
-    quote!(#dbobj::fieldexpr_#field())
+    let fieldexpr_ident = ident(&format!("fieldexpr_{}", field.clone().into_token_stream()));
+    quote!(#dbobj::#fieldexpr_ident())
 }

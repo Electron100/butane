@@ -124,6 +124,11 @@ fn columns(ast_struct: &ItemStruct) -> TokenStream2 {
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
     // todo support #[pk] attribute
+    let pk_by_attribute = ast_struct.fields.iter()
+        .find(|f| f.attrs.iter().find(|attr| attr.path.is_ident("pk")).is_some());
+    if let Some(id_field) = pk_by_attribute {
+        return Some(id_field.clone())
+    }
     let pk_by_name = ast_struct.fields.iter().find(|f| match &f.ident {
         Some(ident) => "id" == ident.to_string(),
         None => false,

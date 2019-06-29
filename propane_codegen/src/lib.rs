@@ -21,7 +21,7 @@ mod migration;
 
 #[proc_macro_attribute]
 pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut result: TokenStream2 = input.clone().into();
+    let mut result: TokenStream2 = strip_propane_attrs(input.clone().into());
 
     // Read the struct name and all fields
     let ast_struct: ItemStruct = syn::parse(input).unwrap();
@@ -54,6 +54,10 @@ pub fn filter(input: TokenStream) -> TokenStream {
     let expr: TokenStream2 = args.into_iter().skip(2).collect();
     let expr: Expr = syn::parse2(expr).expect("Expected filter!(Type, expression)");
     filter::for_expr(&tyid, &expr).into()
+}
+
+fn strip_propane_attrs(mut ast_struct: ItemStruct) -> TokenStream2 {
+    ast_struct.fields.iter()
 }
 
 fn tokens_for_sqltype(ty: SqlType) -> TokenStream2 {

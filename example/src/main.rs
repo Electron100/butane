@@ -34,14 +34,12 @@ fn published_posts(conn: &impl BackendConnection) -> Result<Vec<Post>> {
         .load(conn)
 }
 
-/*
-// TODO support pk attribute
+
 #[model]
 struct Tag {
     #[pk]
     tag: String,
 }
-*/
 
 fn query() -> Result<()> {
     let conn = establish_connection()?;

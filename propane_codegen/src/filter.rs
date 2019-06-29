@@ -5,7 +5,6 @@ use syn;
 use syn::{BinOp, Expr, ExprBinary, ExprMethodCall, ExprPath, Field, Ident, ItemStruct, LitStr};
 
 pub fn for_expr(dbobj: &Ident, expr: &Expr) -> TokenStream2 {
-    eprintln!("Expr is {:?}", expr);
     match expr {
         Expr::Binary(binop) => handle_bin_op(dbobj, binop),
         Expr::MethodCall(mcall) => handle_call(dbobj, mcall),

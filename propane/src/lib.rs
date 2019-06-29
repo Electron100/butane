@@ -12,6 +12,7 @@ pub use propane_codegen::filter;
 
 pub mod prelude {
     pub use filter;
+    pub use propane_codegen::Model;
     pub use propane_core::sqlval::SqlInto;
     pub use propane_core::DBObject;
 }

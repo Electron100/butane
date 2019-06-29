@@ -1,6 +1,6 @@
 use super::*;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Field, ItemStruct};
 
 // implement the DBObject trait
@@ -48,7 +48,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 id: Self::PKType,
             ) -> propane::Result<Self> {
                 Self::query()
-                    .filter(BoolExpr::Eq(#pklit, Expr::Val(#pkident.into())))
+                    .filter(BoolExpr::Eq(#pklit, Expr::Val(id.into())))
                     .limit(1)
                     .load(conn)?
                     .into_iter()
@@ -124,10 +124,14 @@ fn columns(ast_struct: &ItemStruct) -> TokenStream2 {
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
     // todo support #[pk] attribute
-    let pk_by_attribute = ast_struct.fields.iter()
-        .find(|f| f.attrs.iter().find(|attr| attr.path.is_ident("pk")).is_some());
+    let pk_by_attribute = ast_struct.fields.iter().find(|f| {
+        f.attrs
+            .iter()
+            .find(|attr| attr.path.is_ident("pk"))
+            .is_some()
+    });
     if let Some(id_field) = pk_by_attribute {
-        return Some(id_field.clone())
+        return Some(id_field.clone());
     }
     let pk_by_name = ast_struct.fields.iter().find(|f| match &f.ident {
         Some(ident) => "id" == ident.to_string(),

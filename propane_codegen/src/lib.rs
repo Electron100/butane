@@ -11,9 +11,8 @@ use proc_macro_hack::proc_macro_hack;
 use propane_core::*;
 use quote::{quote, ToTokens};
 use syn;
-use syn::parse_macro_input;
 use syn::parse_quote;
-use syn::{punctuated::Punctuated, token::Comma, Expr, Field, ItemStruct, LitStr};
+use syn::{Expr, Field, ItemStruct, LitStr};
 
 mod dbobj;
 mod filter;
@@ -21,7 +20,20 @@ mod migration;
 
 #[proc_macro_attribute]
 pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut result: TokenStream2 = strip_propane_attrs(input.clone().into());
+    // Transform into a derive because derives can have helper
+    // attributes but proc macro attributes can't yet (nor can they
+    // create field attributes)
+    let ast_struct: ItemStruct = syn::parse(input).unwrap();
+    quote!(
+        #[derive(Model)]
+        #ast_struct
+    )
+    .into()
+}
+
+#[proc_macro_derive(Model, attributes(pk))]
+pub fn derive_model(input: TokenStream) -> TokenStream {
+    let mut result: TokenStream2 = TokenStream2::new();
 
     // Read the struct name and all fields
     let ast_struct: ItemStruct = syn::parse(input).unwrap();
@@ -54,10 +66,6 @@ pub fn filter(input: TokenStream) -> TokenStream {
     let expr: TokenStream2 = args.into_iter().skip(2).collect();
     let expr: Expr = syn::parse2(expr).expect("Expected filter!(Type, expression)");
     filter::for_expr(&tyid, &expr).into()
-}
-
-fn strip_propane_attrs(mut ast_struct: ItemStruct) -> TokenStream2 {
-    ast_struct.fields.iter()
 }
 
 fn tokens_for_sqltype(ty: SqlType) -> TokenStream2 {

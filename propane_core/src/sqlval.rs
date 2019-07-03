@@ -1,4 +1,4 @@
-use crate::{Error::TypeMismatch, Result};
+use crate::{Error::TypeMismatch, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -96,14 +96,19 @@ impl From<String> for SqlVal {
     }
 }
 
+pub trait ToSql {
+    const Ty: SqlType;
+    fn to_sql(self) -> SqlVal;
+}
+
 pub trait FromSql {
     fn from_sql(val: SqlVal) -> Result<Self>
     where
         Self: Sized;
 }
 
-macro_rules! impl_basic_from_sql {
-    ($prim:ty, $variant:ident) => {
+macro_rules! impl_prim_sql {
+    ($prim:ty, $variant:ident, $sqltype:ident) => {
         impl FromSql for $prim {
             fn from_sql(val: SqlVal) -> Result<Self> {
                 if let SqlVal::$variant(val) = val {
@@ -113,17 +118,24 @@ macro_rules! impl_basic_from_sql {
                 }
             }
         }
+
+        impl ToSql for $prim {
+            const Ty: SqlType = SqlType::$sqltype;
+            fn to_sql(self) -> SqlVal {
+                SqlVal::$variant(self.into())
+            }
+        }
     };
 }
 
-impl_basic_from_sql!(bool, Bool);
-impl_basic_from_sql!(i64, Int);
-impl_basic_from_sql!(i32, Int);
-impl_basic_from_sql!(u32, Int);
-impl_basic_from_sql!(f64, Real);
-impl_basic_from_sql!(f32, Real);
-impl_basic_from_sql!(String, Text);
-impl_basic_from_sql!(Vec<u8>, Blob);
+impl_prim_sql!(bool, Bool, Bool);
+impl_prim_sql!(i64, Int, BigInt);
+impl_prim_sql!(i32, Int, Int);
+impl_prim_sql!(u32, Int, BigInt);
+impl_prim_sql!(f64, Real, Real);
+impl_prim_sql!(f32, Real, Real);
+impl_prim_sql!(String, Text, Text);
+impl_prim_sql!(Vec<u8>, Blob, Blob);
 
 // Cannot blanket impl TryInto for SqlVal because specialization is
 // not yet stable and there are conflicts with blanket impls in std.

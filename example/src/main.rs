@@ -1,7 +1,7 @@
 use failure;
 use propane::db::{BackendConnection, Connection, ConnectionSpec};
 use propane::model;
-use propane::query;
+use propane::{find, query};
 
 use propane::prelude::*;
 
@@ -46,11 +46,13 @@ fn query() -> Result<()> {
     let published_posts = query!(Post, published == true).limit(5).load(&conn)?;
     let unliked_posts = query!(Post, published == true && likes < 5).load(&conn)?;
     //let tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn);
+    //let tagged_posts2 = query!(Post, tags.contains(tag == "dinosaurs")).load(&conn);
+    let blog = find!(Blog, &conn, name == "Bears")?.unwrap();
+    //let posts_in_blog = query!(Post, blog == { blog }).load(&conn)?;
     Ok(())
     /*
         let tagged_posts = Post::objects().where!(tags.contains("dinosaurs"));
         let tagged_posts2 = Post::objects().where!(tags.contains(tag = "dinosaurs"));
-        let blog = Blog::objects.find!(name = "Bears").expect();
         let posts_in_blog = Post::objects().where!(blog = {blog})]
     */
 }

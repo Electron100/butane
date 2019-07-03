@@ -19,7 +19,17 @@ pub mod prelude {
 
 #[macro_export]
 macro_rules! query {
-    ($dbobj:ident, $filter:expr) => {
-        $dbobj::query().filter(filter!($dbobj, $filter))
+    ($model:ident, $filter:expr) => {
+        $model::query().filter(filter!($model, $filter))
+    };
+}
+
+#[macro_export]
+macro_rules! find {
+    ($model:ident, $conn:expr, $filter:expr) => {
+        query!($model, $filter)
+            .limit(1)
+            .load($conn)
+            .map(|v| v.first())
     };
 }

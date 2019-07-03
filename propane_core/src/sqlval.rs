@@ -97,7 +97,7 @@ impl From<String> for SqlVal {
 }
 
 pub trait ToSql {
-    const Ty: SqlType;
+    const SQLTYPE: SqlType;
     fn to_sql(self) -> SqlVal;
 }
 
@@ -120,7 +120,7 @@ macro_rules! impl_prim_sql {
         }
 
         impl ToSql for $prim {
-            const Ty: SqlType = SqlType::$sqltype;
+            const SQLTYPE: SqlType = SqlType::$sqltype;
             fn to_sql(self) -> SqlVal {
                 SqlVal::$variant(self.into())
             }

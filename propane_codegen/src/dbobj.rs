@@ -111,8 +111,8 @@ fn columns(ast_struct: &ItemStruct) -> TokenStream2 {
         .map(|f| match f.ident.clone() {
             Some(fname) => {
                 let ident = make_ident_literal_str(&fname);
-                let ty = tokens_for_sqltype(get_sql_type(&f));
-                quote!(propane::db::Column::new(#ident, #ty),)
+                let fty = &f.ty;
+                quote!(propane::db::Column::new(#ident, <#fty as propane::ToSql>::SQLTYPE),)
             }
             None => quote_spanned! {
                 f.span() =>

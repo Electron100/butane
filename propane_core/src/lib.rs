@@ -39,6 +39,8 @@ pub enum Error {
     BoundsError,
     #[fail(display = "Type mismatch")]
     TypeMismatch,
+    #[fail(display = "SqlType not known for {}", ty)]
+    UnknownSqlType { ty: String },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

@@ -21,16 +21,15 @@ fn create_atable(ast_struct: &ItemStruct) -> ATable {
     let columns: HashSet<AColumn> = ast_struct
         .fields
         .iter()
-        .map(|f| AColumn {
-            name: f
-                .ident
-                .clone()
-                .expect("db object fields must be named")
-                .to_string(),
-            sqltype: get_sql_type(&f),
-            nullable: is_nullable(&f),
-            pk: is_pk(&f),
-            default: get_default(&f),
+        .map(|f| {
+            let name = f.ident.clone().expect("db object fields must be named");
+            AColumn::new(
+                name.to_string(),
+                get_deferred_sql_type(&f),
+                is_nullable(&f),
+                is_pk(&f),
+                get_default(&f),
+            )
         })
         .collect();
 

@@ -1,16 +1,35 @@
-use crate::{SqlType, SqlVal};
+use crate::{Result, SqlType, SqlVal};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TypeResolver {
+    // The types of some columns may not be known right away
+    types: HashMap<String, SqlType>,
+}
+impl TypeResolver {
+    fn new() -> Self {
+        TypeResolver {
+            types: HashMap::new(),
+        }
+    }
+    fn find_type(&self, name: &str) -> Option<SqlType> {
+        self.types.get(name).map(|t| *t)
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ADB {
     pub tables: HashSet<ATable>,
+    // The types of some columns may not be known right away
+    pub types: TypeResolver,
 }
 impl ADB {
     pub fn new() -> Self {
         ADB {
             tables: HashSet::new(),
+            types: TypeResolver::new(),
         }
     }
     pub fn get_table<'a>(&'a self, name: &str) -> Option<&'a ATable> {
@@ -53,12 +72,65 @@ impl PartialEq for ATable {
 impl Eq for ATable {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum DeferredSqlType {
+    Known(SqlType),
+    Deferred(String),
+}
+impl DeferredSqlType {
+    fn resolve(&self, resolver: &TypeResolver) -> Result<SqlType> {
+        match self {
+            DeferredSqlType::Known(t) => Ok(*t),
+            DeferredSqlType::Deferred(key) => resolver
+                .find_type(&key)
+                .ok_or(crate::Error::UnknownSqlType { ty: key.clone() }.into()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AColumn {
-    pub name: String,
-    pub sqltype: SqlType,
-    pub nullable: bool,
-    pub pk: bool,
-    pub default: Option<SqlVal>,
+    name: String,
+    sqltype: DeferredSqlType,
+    nullable: bool,
+    pk: bool,
+    default: Option<SqlVal>,
+}
+impl AColumn {
+    pub fn new(
+        name: impl Into<String>,
+        sqltype: DeferredSqlType,
+        nullable: bool,
+        pk: bool,
+        default: Option<SqlVal>,
+    ) -> Self {
+        AColumn {
+            name: name.into(),
+            sqltype,
+            nullable,
+            pk,
+            default,
+        }
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn nullable(&self) -> bool {
+        self.nullable
+    }
+    pub fn is_pk(&self) -> bool {
+        self.pk
+    }
+    pub fn sqltype(&self) -> Result<SqlType> {
+        match &self.sqltype {
+            DeferredSqlType::Known(t) => Ok(*t),
+            DeferredSqlType::Deferred(t) => {
+                Err(crate::Error::UnknownSqlType { ty: t.clone() }.into())
+            }
+        }
+    }
+    pub fn default(&self) -> &Option<SqlVal> {
+        &self.default
+    }
 }
 impl Hash for AColumn {
     fn hash<H: Hasher>(&self, state: &mut H) {

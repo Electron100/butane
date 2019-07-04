@@ -1,8 +1,8 @@
 use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, ToTokens};
 use syn;
-use syn::{BinOp, Expr, ExprBinary, ExprMethodCall, ExprPath, Field, Ident, ItemStruct, LitStr};
+use syn::{BinOp, Expr, ExprBinary, ExprMethodCall, ExprPath, Ident, LitStr};
 
 pub fn for_expr(dbobj: &Ident, expr: &Expr) -> TokenStream2 {
     match expr {

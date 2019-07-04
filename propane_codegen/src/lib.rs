@@ -112,3 +112,7 @@ fn get_sql_type(field: &Field) -> SqlType {
         );
     }
 }
+
+fn get_deferred_sql_type(field: &Field) -> DeferredSqlType {
+    DeferredSqlType::Known(get_sql_type(field))
+}

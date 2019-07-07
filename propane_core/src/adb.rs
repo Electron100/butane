@@ -3,40 +3,103 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TypeResolver {
-    // The types of some columns may not be known right away
-    types: HashMap<String, SqlType>,
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+enum TypeKey {
+    /// Represents a type which is the primary key for a table with the given name
+    PK(String),
 }
-impl TypeResolver {
+impl TypeKey {
+    fn as_ref<'a>(&'a self) -> TypeKeyRef<'a> {
+        match self {
+            TypeKey::PK(s) => TypeKeyRef::PK(&s),
+        }
+    }
+}
+impl std::fmt::Display for TypeKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
+        self.as_ref().fmt(f)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum TypeKeyRef<'a> {
+    /// Represents a type which is the primary key for a table with the given name
+    PK(&'a str),
+}
+impl<'a> std::fmt::Display for TypeKeyRef<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
+        match self {
+            TypeKeyRef::PK(name) => write!(f, "PK({})", name),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct TypeResolver<'a> {
+    // The types of some columns may not be known right away
+    types: HashMap<TypeKeyRef<'a>, SqlType>,
+}
+impl<'a> TypeResolver<'a> {
     fn new() -> Self {
         TypeResolver {
             types: HashMap::new(),
         }
     }
-    fn find_type(&self, name: &str) -> Option<SqlType> {
-        self.types.get(name).map(|t| *t)
+    fn find_type(&self, key: &TypeKey) -> Option<SqlType> {
+        self.types.get(&key.as_ref()).map(|t| *t)
+    }
+    fn insert(&mut self, key: TypeKeyRef, ty: SqlType) -> bool {
+        if self.types.contains_key(&key) {
+            false
+        } else {
+            self.insert(key, ty);
+            true
+        }
+    }
+    fn insert_pk(&mut self, key: &str, ty: SqlType) -> bool {
+        // Would like to avoid the to_string clone. I think we can do this when NLL lands.
+        self.insert(TypeKey::PK(key.to_string()).as_ref(), ty)
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ADB {
-    pub tables: HashSet<ATable>,
-    // The types of some columns may not be known right away
-    pub types: TypeResolver,
+    tables: HashSet<ATable>,
 }
 impl ADB {
     pub fn new() -> Self {
-        ADB {
-            tables: HashSet::new(),
-            types: TypeResolver::new(),
-        }
+        ADB { tables: Vec::new() }
     }
     pub fn get_table<'a>(&'a self, name: &str) -> Option<&'a ATable> {
         self.tables.iter().find(|t| t.name == name)
     }
     pub fn replace_table(&mut self, table: ATable) {
         self.tables.replace(table);
+    }
+    /// Fixup as many DeferredSqlType::Deferred instances as possible
+    /// into DeferredSqlType::Known
+    pub fn resolve_types(&mut self) -> Result<()> {
+        let mut resolver = TypeResolver::new();
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for table in &mut self.tables {
+                let pktype = table.get_pk()?.sqltype();
+                if let Ok(pktype) = pktype {
+                    changed = resolver.insert_pk(&table.name, pktype)
+                }
+
+                table.columns = table
+                    .columns
+                    .into_iter()
+                    .map(|mut c| {
+                        c.resolve_type(&resolver);
+                        c
+                    })
+                    .collect()
+            }
+        }
+        Ok(())
     }
 }
 
@@ -54,6 +117,14 @@ impl ATable {
     }
     pub fn remove_column(&mut self, name: &str) {
         self.columns = self.columns.drain().filter(|c| c.name != name).collect();
+    }
+    pub fn get_pk(&self) -> Result<&AColumn> {
+        self.columns.iter().find(|c| c.is_pk()).ok_or(
+            crate::Error::NoPK {
+                table: self.name.clone(),
+            }
+            .into(),
+        )
     }
 }
 impl Hash for ATable {
@@ -74,15 +145,18 @@ impl Eq for ATable {}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum DeferredSqlType {
     Known(SqlType),
-    Deferred(String),
+    Deferred(TypeKey),
 }
 impl DeferredSqlType {
     fn resolve(&self, resolver: &TypeResolver) -> Result<SqlType> {
         match self {
             DeferredSqlType::Known(t) => Ok(*t),
-            DeferredSqlType::Deferred(key) => resolver
-                .find_type(&key)
-                .ok_or(crate::Error::UnknownSqlType { ty: key.clone() }.into()),
+            DeferredSqlType::Deferred(key) => resolver.find_type(&key).ok_or(
+                crate::Error::UnknownSqlType {
+                    ty: key.to_string(),
+                }
+                .into(),
+            ),
         }
     }
 }
@@ -124,9 +198,12 @@ impl AColumn {
         match &self.sqltype {
             DeferredSqlType::Known(t) => Ok(*t),
             DeferredSqlType::Deferred(t) => {
-                Err(crate::Error::UnknownSqlType { ty: t.clone() }.into())
+                Err(crate::Error::UnknownSqlType { ty: t.to_string() }.into())
             }
         }
+    }
+    fn resolve_type(&mut self, resolver: &'_ TypeResolver) {
+        self.sqltype.resolve(resolver);
     }
     pub fn default(&self) -> &Option<SqlVal> {
         &self.default

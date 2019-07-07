@@ -25,7 +25,7 @@ struct Post {
     likes: i32,
     // TODO support foreign key
     //tags: ManyToMany<Tag>,
-    //blog: ForeignKey<Blog>,
+    blog: ForeignKey<Blog>,
 }
 
 fn published_posts(conn: &impl BackendConnection) -> Result<Vec<Post>> {

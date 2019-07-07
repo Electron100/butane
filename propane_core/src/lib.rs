@@ -41,6 +41,8 @@ pub enum Error {
     TypeMismatch,
     #[fail(display = "SqlType not known for {}", ty)]
     UnknownSqlType { ty: String },
+    #[fail(display = "Table {} has no primary key", table)]
+    NoPK { table: String },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -53,4 +55,8 @@ pub enum SqlType {
     Date,
     Timestamp,
     Blob,
+}
+
+pub struct ForeignKey<T> {
+    val: T,
 }

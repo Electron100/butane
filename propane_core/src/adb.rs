@@ -1,10 +1,9 @@
 use crate::{Result, SqlType, SqlVal};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-enum TypeKey {
+pub enum TypeKey {
     /// Represents a type which is the primary key for a table with the given name
     PK(String),
 }
@@ -64,17 +63,17 @@ impl<'a> TypeResolver<'a> {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ADB {
-    tables: HashSet<ATable>,
+    tables: HashMap<String, ATable>,
 }
 impl ADB {
     pub fn new() -> Self {
-        ADB { tables: Vec::new() }
+        ADB { tables: HashMap::new() }
     }
     pub fn get_table<'a>(&'a self, name: &str) -> Option<&'a ATable> {
-        self.tables.iter().find(|t| t.name == name)
+        self.tables.get(name)
     }
     pub fn replace_table(&mut self, table: ATable) {
-        self.tables.replace(table);
+        self.tables.insert(table.name.clone(), table);
     }
     /// Fixup as many DeferredSqlType::Deferred instances as possible
     /// into DeferredSqlType::Known
@@ -83,20 +82,15 @@ impl ADB {
         let mut changed = true;
         while changed {
             changed = false;
-            for table in &mut self.tables {
+            for table in &mut self.tables.values_mut() {
                 let pktype = table.get_pk()?.sqltype();
                 if let Ok(pktype) = pktype {
                     changed = resolver.insert_pk(&table.name, pktype)
                 }
 
-                table.columns = table
-                    .columns
-                    .into_iter()
-                    .map(|mut c| {
-                        c.resolve_type(&resolver);
-                        c
-                    })
-                    .collect()
+                for col in table.columns.values_mut() {
+                    col.resolve_type(&resolver);
+                }
             }
         }
         Ok(())
@@ -106,20 +100,29 @@ impl ADB {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ATable {
     pub name: String,
-    pub columns: HashSet<AColumn>,
+    pub columns: HashMap<String, AColumn>,
 }
 impl ATable {
+    pub fn new(name: String) -> ATable {
+        ATable {
+            name,
+            columns: HashMap::new()
+        }
+    }
+    pub fn add_column(&mut self, col: AColumn) {
+        self.replace_column(col);
+    }
     pub fn get_column<'a>(&'a self, name: &str) -> Option<&'a AColumn> {
-        self.columns.iter().find(|c| c.name == name)
+        self.columns.get(name)
     }
     pub fn replace_column(&mut self, col: AColumn) {
-        self.columns.replace(col);
+        self.columns.insert(col.name.clone(), col);
     }
     pub fn remove_column(&mut self, name: &str) {
-        self.columns = self.columns.drain().filter(|c| c.name != name).collect();
+        self.columns.remove(name);
     }
     pub fn get_pk(&self) -> Result<&AColumn> {
-        self.columns.iter().find(|c| c.is_pk()).ok_or(
+        self.columns.values().find(|c| c.is_pk()).ok_or(
             crate::Error::NoPK {
                 table: self.name.clone(),
             }
@@ -127,22 +130,8 @@ impl ATable {
         )
     }
 }
-impl Hash for ATable {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-    }
-}
 
-// We implement Eq for purposes of HashSet. The eqivalence
-// relationship we are concerned with here is same name
-impl PartialEq for ATable {
-    fn eq(&self, other: &ATable) -> bool {
-        self.name == other.name
-    }
-}
-impl Eq for ATable {}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DeferredSqlType {
     Known(SqlType),
     Deferred(TypeKey),
@@ -161,7 +150,7 @@ impl DeferredSqlType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct AColumn {
     name: String,
     sqltype: DeferredSqlType,
@@ -202,26 +191,13 @@ impl AColumn {
             }
         }
     }
-    fn resolve_type(&mut self, resolver: &'_ TypeResolver) {
-        self.sqltype.resolve(resolver);
+    fn resolve_type(&mut self, resolver: &'_ TypeResolver) -> Option<SqlType> {
+        self.sqltype.resolve(resolver).ok()
     }
     pub fn default(&self) -> &Option<SqlVal> {
         &self.default
     }
 }
-impl Hash for AColumn {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-    }
-}
-// We implement Eq for purposes of HashSet. The eqivalence
-// relationship we are concerned with here is same name
-impl PartialEq for AColumn {
-    fn eq(&self, other: &AColumn) -> bool {
-        self.name == other.name
-    }
-}
-impl Eq for AColumn {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Operation {
@@ -236,17 +212,21 @@ pub enum Operation {
 
 pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
-    let new_tables = new.tables.difference(&old.tables);
+    let new_names: HashSet<&String> = new.tables.keys().collect();
+    let old_names: HashSet<&String> = old.tables.keys().collect();
+    let new_tables = new_names.difference(&old_names);
     for added in new_tables {
-        ops.push(Operation::AddTable((*added).clone()));
+        let added: &str = added.as_ref();
+        ops.push(Operation::AddTable(new.tables.get(added).expect("no table").clone()));
     }
-    for removed in old.tables.difference(&new.tables) {
-        ops.push(Operation::RemoveTable(removed.name.clone()));
+    for removed in old_names.difference(&new_names) {
+        ops.push(Operation::RemoveTable(removed.to_string()));
     }
-    for table in new.tables.intersection(&old.tables) {
+    for table in new_names.intersection(&old_names) {
+        let table: &str = table.as_ref();
         ops.append(&mut diff_table(
             old.tables.get(table).expect("no table"),
-            table,
+            new.tables.get(table).expect("no table"),
         ));
     }
     ops
@@ -254,18 +234,24 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
 
 fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
-    let new_columns = new.columns.difference(&old.columns);
-    for added in new_columns {
-        ops.push(Operation::AddColumn(new.name.clone(), added.clone()));
+    let new_names: HashSet<&String> = new.columns.keys().collect();
+    let old_names: HashSet<&String> = old.columns.keys().collect();
+    let added_names = new_names.difference(&old_names);
+    for added in added_names {
+        let added: &str = added.as_ref();
+        ops.push(Operation::AddColumn(new.name.clone(), 
+            new.columns.get(added).unwrap().clone()));
     }
-    for removed in old.columns.difference(&new.columns) {
+    for removed in old_names.difference(&new_names) {
         ops.push(Operation::RemoveColumn(
             old.name.clone(),
-            removed.name.clone(),
+            removed.to_string(),
         ));
     }
-    for col in new.columns.intersection(&old.columns) {
-        let old_col = old.columns.get(col).expect("no columnn");
+    for colname in new_names.intersection(&old_names) {
+        let colname: &str = colname.as_ref();
+        let col = new.columns.get(colname).unwrap();
+        let old_col = old.columns.get(colname).unwrap();
         if col == old_col {
             continue;
         }

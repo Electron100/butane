@@ -1,5 +1,5 @@
 use crate::db::{BackendConnection, QueryResult};
-use crate::{DBObject, DBResult, Result, SqlVal};
+use crate::{DBResult, Result, SqlVal};
 use std::marker::PhantomData;
 
 #[derive(Clone)]

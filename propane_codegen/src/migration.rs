@@ -1,6 +1,5 @@
 use super::*;
 use propane_core::migrations;
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::result::Result;
 use syn::parse_quote;
@@ -18,25 +17,19 @@ pub fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<(), Error> {
 }
 
 fn create_atable(ast_struct: &ItemStruct) -> ATable {
-    let columns: HashSet<AColumn> = ast_struct
-        .fields
-        .iter()
-        .map(|f| {
-            let name = f.ident.clone().expect("db object fields must be named");
-            AColumn::new(
-                name.to_string(),
-                get_deferred_sql_type(&f),
-                is_nullable(&f),
-                is_pk(&f),
-                get_default(&f),
-            )
-        })
-        .collect();
-
-    ATable {
-        name: ast_struct.ident.to_string(),
-        columns,
+    let mut table = ATable::new(ast_struct.ident.to_string());
+    for f in ast_struct.fields.iter() {
+        let name = f.ident.clone().expect("db object fields must be named").to_string();
+        let col = AColumn::new(
+            name,
+            get_deferred_sql_type(&f),
+            is_nullable(&f),
+            is_pk(&f),
+            get_default(&f),
+        );
+        table.add_column(col);
     }
+    table
 }
 
 fn is_nullable(field: &Field) -> bool {

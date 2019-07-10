@@ -2,6 +2,7 @@ use failure;
 use propane::db::{BackendConnection, Connection, ConnectionSpec};
 use propane::model;
 use propane::query;
+use propane::ForeignKey;
 
 use propane::prelude::*;
 

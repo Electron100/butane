@@ -18,13 +18,14 @@ pub fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<(), Error> {
 
 fn create_atable(ast_struct: &ItemStruct) -> ATable {
     let mut table = ATable::new(ast_struct.ident.to_string());
+    let pk = pk_field(ast_struct).expect("No primary key found. Expected 'id' field or field with #[pk] attribute.");
     for f in ast_struct.fields.iter() {
         let name = f.ident.clone().expect("db object fields must be named").to_string();
         let col = AColumn::new(
             name,
             get_deferred_sql_type(&f),
             is_nullable(&f),
-            is_pk(&f),
+            f == &pk,
             get_default(&f),
         );
         table.add_column(col);
@@ -38,20 +39,6 @@ fn is_nullable(field: &Field) -> bool {
         Type::Path(tp) => option == *tp,
         _ => false,
     }
-}
-
-fn is_pk(field: &Field) -> bool {
-    has_attr(&field.attrs, "pk")
-}
-
-fn has_attr(attrs: &Vec<Attribute>, name: &str) -> bool {
-    attrs
-        .iter()
-        .find(|a| match a.parse_meta() {
-            Ok(m) => m.name().to_string() == name,
-            _ => false,
-        })
-        .is_some()
 }
 
 fn get_default(field: &Field) -> Option<SqlVal> {

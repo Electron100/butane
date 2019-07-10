@@ -55,47 +55,6 @@ impl SqlVal {
     }
 }
 
-impl From<bool> for SqlVal {
-    fn from(val: bool) -> Self {
-        SqlVal::Bool(val)
-    }
-}
-impl From<i64> for SqlVal {
-    fn from(val: i64) -> Self {
-        SqlVal::Int(val)
-    }
-}
-impl From<i32> for SqlVal {
-    fn from(val: i32) -> Self {
-        SqlVal::Int(val.into())
-    }
-}
-impl From<i16> for SqlVal {
-    fn from(val: i16) -> Self {
-        SqlVal::Int(val.into())
-    }
-}
-impl From<i8> for SqlVal {
-    fn from(val: i8) -> Self {
-        SqlVal::Int(val.into())
-    }
-}
-impl From<f64> for SqlVal {
-    fn from(val: f64) -> Self {
-        SqlVal::Real(val)
-    }
-}
-impl From<f32> for SqlVal {
-    fn from(val: f32) -> Self {
-        SqlVal::Real(val.into())
-    }
-}
-impl From<String> for SqlVal {
-    fn from(val: String) -> Self {
-        SqlVal::Text(val)
-    }
-}
-
 pub trait ToSql {
     const SQLTYPE: SqlType;
     fn to_sql(self) -> SqlVal;
@@ -105,6 +64,12 @@ pub trait FromSql {
     fn from_sql(val: SqlVal) -> Result<Self>
     where
         Self: Sized;
+}
+
+impl <T> From<T> for SqlVal where T: ToSql {
+    fn from(val: T) -> Self {
+        val.to_sql()
+    }
 }
 
 macro_rules! impl_prim_sql {

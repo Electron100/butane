@@ -7,57 +7,40 @@ pub enum TypeKey {
     /// Represents a type which is the primary key for a table with the given name
     PK(String),
 }
-impl TypeKey {
-    fn as_ref<'a>(&'a self) -> TypeKeyRef<'a> {
-        match self {
-            TypeKey::PK(s) => TypeKeyRef::PK(&s),
-        }
-    }
-}
 impl std::fmt::Display for TypeKey {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
-        self.as_ref().fmt(f)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum TypeKeyRef<'a> {
-    /// Represents a type which is the primary key for a table with the given name
-    PK(&'a str),
-}
-impl<'a> std::fmt::Display for TypeKeyRef<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
         match self {
-            TypeKeyRef::PK(name) => write!(f, "PK({})", name),
+            TypeKey::PK(name) => write!(f, "PK({})", name),
         }
     }
 }
 
 #[derive(Debug)]
-struct TypeResolver<'a> {
+struct TypeResolver {
     // The types of some columns may not be known right away
-    types: HashMap<TypeKeyRef<'a>, SqlType>,
+    types: HashMap<TypeKey, SqlType>,
 }
-impl<'a> TypeResolver<'a> {
+impl TypeResolver {
     fn new() -> Self {
         TypeResolver {
             types: HashMap::new(),
         }
     }
     fn find_type(&self, key: &TypeKey) -> Option<SqlType> {
-        self.types.get(&key.as_ref()).map(|t| *t)
+        let found = self.types.get(key).map(|t| *t);
+        dbg!(found);
+        found
     }
-    fn insert(&mut self, key: TypeKeyRef, ty: SqlType) -> bool {
+    fn insert(&mut self, key: TypeKey, ty: SqlType) -> bool {
         if self.types.contains_key(&key) {
             false
         } else {
-            self.insert(key, ty);
+            self.types.insert(key, ty);
             true
         }
     }
     fn insert_pk(&mut self, key: &str, ty: SqlType) -> bool {
-        // Would like to avoid the to_string clone. I think we can do this when NLL lands.
-        self.insert(TypeKey::PK(key.to_string()).as_ref(), ty)
+        self.insert(TypeKey::PK(key.to_string()), ty)
     }
 }
 
@@ -81,6 +64,7 @@ impl ADB {
         let mut resolver = TypeResolver::new();
         let mut changed = true;
         while changed {
+            println!("resolve types iter");
             changed = false;
             for table in &mut self.tables.values_mut() {
                 let pktype = table.get_pk()?.sqltype();
@@ -192,7 +176,12 @@ impl AColumn {
         }
     }
     fn resolve_type(&mut self, resolver: &'_ TypeResolver) -> Option<SqlType> {
-        self.sqltype.resolve(resolver).ok()
+        if let Ok(ty) = self.sqltype.resolve(resolver) {
+            self.sqltype = DeferredSqlType::Known(ty);
+            Some(ty)
+        } else {
+            None
+        }
     }
     pub fn default(&self) -> &Option<SqlVal> {
         &self.default

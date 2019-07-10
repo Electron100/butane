@@ -4,7 +4,7 @@ pub use propane_core::db;
 pub use propane_core::field;
 pub use propane_core::migrations;
 pub use propane_core::query;
-pub use propane_core::{DBObject, DBResult, Error, FromSql, Result, SqlType, ToSql};
+pub use propane_core::{DBObject, DBResult, Error, FromSql, Result, SqlType, SqlVal, ToSql, ForeignKey};
 
 #[proc_macro_hack]
 pub use propane_codegen::filter;

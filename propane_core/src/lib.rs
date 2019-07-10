@@ -1,6 +1,7 @@
 use failure;
 use failure::Fail;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 
 pub mod adb;
 pub mod db;
@@ -24,7 +25,8 @@ pub trait DBResult: Sized {
 }
 
 pub trait DBObject: DBResult<DBO = Self> {
-    type PKType;
+    type PKType: ToSql;
+    fn pk(&self) -> SqlVal;
     fn get(conn: &impl db::BackendConnection, id: Self::PKType) -> Result<Self>
     where
         Self: Sized;
@@ -57,6 +59,21 @@ pub enum SqlType {
     Blob,
 }
 
-pub struct ForeignKey<T> {
-    val: T,
+pub struct ForeignKey<T> where T: DBObject {
+    valpk: SqlVal,
+    phantom: PhantomData<T>,
+}
+
+impl <T> ToSql for ForeignKey<T> where T: DBObject {
+    const SQLTYPE: SqlType = <T as DBObject>::PKType::SQLTYPE;
+    fn to_sql(self) -> SqlVal {
+        self.valpk
+    }
+}
+impl <T> FromSql for ForeignKey<T> where T: DBObject {
+    fn from_sql(val: SqlVal) -> Result<Self> {
+        Ok(ForeignKey{ 
+            valpk: val, 
+        phantom: PhantomData,})
+    }
 }

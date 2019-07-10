@@ -64,7 +64,6 @@ impl ADB {
         let mut resolver = TypeResolver::new();
         let mut changed = true;
         while changed {
-            println!("resolve types iter");
             changed = false;
             for table in &mut self.tables.values_mut() {
                 let pktype = table.get_pk()?.sqltype();

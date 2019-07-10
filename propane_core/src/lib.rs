@@ -1,11 +1,11 @@
 use failure;
 use failure::Fail;
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
 
 pub mod adb;
 pub mod db;
 pub mod field;
+pub mod fkey;
 pub mod migrations;
 pub mod query;
 pub mod sqlval;
@@ -25,8 +25,8 @@ pub trait DBResult: Sized {
 }
 
 pub trait DBObject: DBResult<DBO = Self> {
-    type PKType: ToSql;
-    fn pk(&self) -> SqlVal;
+    type PKType: ToSql + FromSql + Clone;
+    fn pk(&self) -> &Self::PKType;
     fn get(conn: &impl db::BackendConnection, id: Self::PKType) -> Result<Self>
     where
         Self: Sized;
@@ -45,6 +45,8 @@ pub enum Error {
     UnknownSqlType { ty: String },
     #[fail(display = "Table {} has no primary key", table)]
     NoPK { table: String },
+    #[fail(display = "Value has not been loaded from the database")]
+    ValueNotLoaded,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -57,23 +59,4 @@ pub enum SqlType {
     Date,
     Timestamp,
     Blob,
-}
-
-pub struct ForeignKey<T> where T: DBObject {
-    valpk: SqlVal,
-    phantom: PhantomData<T>,
-}
-
-impl <T> ToSql for ForeignKey<T> where T: DBObject {
-    const SQLTYPE: SqlType = <T as DBObject>::PKType::SQLTYPE;
-    fn to_sql(self) -> SqlVal {
-        self.valpk
-    }
-}
-impl <T> FromSql for ForeignKey<T> where T: DBObject {
-    fn from_sql(val: SqlVal) -> Result<Self> {
-        Ok(ForeignKey{ 
-            valpk: val, 
-        phantom: PhantomData,})
-    }
 }

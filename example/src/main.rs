@@ -46,6 +46,7 @@ fn query() -> Result<()> {
     let _specific_post = Post::get(&conn, 1);
     let published_posts = query!(Post, published == true).limit(5).load(&conn)?;
     let unliked_posts = query!(Post, published == true && likes < 5).load(&conn)?;
+    let blog: &Blog = unliked_posts.first().unwrap().blog.load(&conn)?;
     //let tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn);
     Ok(())
     /*

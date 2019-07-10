@@ -43,8 +43,8 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
         }
         impl propane::DBObject for #tyname {
             type PKType = #pktype;
-            fn pk(&self) -> propane::SqlVal {
-                propane::ToSql::to_sql(self.#pkident.clone())
+            fn pk(&self) -> &Self::PKType {
+                &self.#pkident
             }
             fn get(
                 conn: &impl BackendConnection,

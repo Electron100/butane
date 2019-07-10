@@ -1,10 +1,11 @@
 use proc_macro_hack::proc_macro_hack;
 pub use propane_codegen::model;
 pub use propane_core::db;
+pub use propane_core::fkey::ForeignKey;
 pub use propane_core::field;
 pub use propane_core::migrations;
 pub use propane_core::query;
-pub use propane_core::{DBObject, DBResult, Error, FromSql, Result, SqlType, SqlVal, ToSql, ForeignKey};
+pub use propane_core::{DBObject, DBResult, Error, FromSql, Result, SqlType, SqlVal, ToSql};
 
 #[proc_macro_hack]
 pub use propane_codegen::filter;

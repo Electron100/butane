@@ -21,8 +21,8 @@ pub enum BoolExpr {
     And(Box<BoolExpr>, Box<BoolExpr>),
     Or(Box<BoolExpr>, Box<BoolExpr>),
     Not(Box<BoolExpr>),
-    //TODO
-    //Subquery(&'static str, Expr),
+    // col, tbl2, tbl2_col
+    Subquery(&'static str, &'static str, &'static str, Box<BoolExpr>),
 }
 
 pub trait AsExpr {

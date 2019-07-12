@@ -1,6 +1,7 @@
 use failure;
 use failure::Fail;
 use serde::{Deserialize, Serialize};
+use std::default::Default;
 
 pub mod adb;
 pub mod db;
@@ -17,7 +18,8 @@ pub use sqlval::*;
 pub type Result<T> = std::result::Result<T, failure::Error>;
 
 pub trait DBResult: Sized {
-    type DBO;
+    type DBO: DBObject;
+    type Fields: Default;
     const COLUMNS: &'static [db::Column];
     fn from_row(row: db::Row) -> Result<Self>
     where
@@ -26,11 +28,17 @@ pub trait DBResult: Sized {
 
 pub trait DBObject: DBResult<DBO = Self> {
     type PKType: ToSql + FromSql + Clone;
+    const PKCOL: &'static str;
+    const TABLE: &'static str;
     fn pk(&self) -> &Self::PKType;
     fn get(conn: &impl db::BackendConnection, id: Self::PKType) -> Result<Self>
     where
         Self: Sized;
     fn query() -> Query<Self>;
+}
+
+pub trait ModelTyped {
+    type Model: DBObject;
 }
 
 #[derive(Debug, Fail)]

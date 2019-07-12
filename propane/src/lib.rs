@@ -23,3 +23,12 @@ macro_rules! query {
         $dbobj::query().filter(filter!($dbobj, $filter))
     };
 }
+
+
+#[macro_export]
+macro_rules! find {
+    ($dbobj:ident, $filter:expr, $conn:expr) => {
+        query!($dbobj, $filter).limit(1).load($conn)?
+            .pop().ok_or(failure::Error::from(propane::Error::NoSuchObject))
+    };
+}

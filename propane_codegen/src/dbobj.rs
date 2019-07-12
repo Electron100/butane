@@ -21,6 +21,8 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
     let pktype = pk_field.ty;
     let pkident = pk_field.ident.unwrap();
     let pklit = make_ident_literal_str(&pkident);
+    let fields_type = fields_type(tyname);
+    let tablelit = make_ident_literal_str(&tyname);
 
     let rows = rows_for_from(&ast_struct);
     let rowslen = rows.len();
@@ -28,6 +30,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
     quote!(
         impl propane::DBResult for #tyname {
             type DBO = #tyname;
+            type Fields = #fields_type;
             const COLUMNS: &'static [propane::db::Column] = &[
                 #columns
             ];
@@ -43,6 +46,8 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
         }
         impl propane::DBObject for #tyname {
             type PKType = #pktype;
+            const PKCOL: &'static str = #pklit;
+            const TABLE: &'static str = #tablelit;
             fn pk(&self) -> &Self::PKType {
                 &self.#pkident
             }
@@ -65,7 +70,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
     )
 }
 
-pub fn add_fieldexprs_to_impl(ast_struct: &ItemStruct) -> TokenStream2 {
+pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let fieldexprs: Vec<TokenStream2> = ast_struct
         .fields
@@ -84,18 +89,35 @@ pub fn add_fieldexprs_to_impl(ast_struct: &ItemStruct) -> TokenStream2 {
             let fnid = Ident::new(&format!("fieldexpr_{}", fid), f.span());
             let fty = &f.ty;
             quote!(
-                fn #fnid() -> propane::field::FieldExpr<#fty> {
+                fn #fnid(&self) -> propane::field::FieldExpr<#fty> {
                     propane::field::FieldExpr::<#fty>::new(#fidlit)
                 }
             )
         })
         .collect();
 
+    let fields_type = fields_type(tyname);
     quote!(
         impl #tyname {
+            pub fn fields() -> #fields_type {
+                #fields_type::default()
+            }
+        }
+        struct #fields_type {
+        }
+        impl #fields_type {
             #(#fieldexprs)*
         }
+        impl std::default::Default for #fields_type {
+            fn default() -> Self {
+                #fields_type{}
+            }
+        }
     )
+}
+
+fn fields_type(tyname: &Ident) -> Ident {
+    Ident::new(&format!("{}Fields", tyname), Span::call_site())
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {

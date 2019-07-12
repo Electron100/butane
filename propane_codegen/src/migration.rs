@@ -3,7 +3,7 @@ use propane_core::migrations;
 use std::path::PathBuf;
 use std::result::Result;
 use syn::parse_quote;
-use syn::{Attribute, Field, ItemStruct, Type, TypePath};
+use syn::{Field, ItemStruct, Type, TypePath};
 
 pub fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<(), Error> {
     let mut dir = PathBuf::from(

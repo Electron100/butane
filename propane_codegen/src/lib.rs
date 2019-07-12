@@ -14,6 +14,18 @@ use syn;
 use syn::parse_quote;
 use syn::{Expr, Field, ItemStruct, LitStr};
 
+#[macro_use]
+macro_rules! make_compile_error {
+    ($span:expr=> $($arg:tt)*) => ({
+        let lit = make_lit(&std::fmt::format(format_args!($($arg)*)));
+        quote_spanned!($span=> compile_error!(#lit))
+    });
+    ($($arg:tt)*) => ({
+        let lit = make_lit(&std::fmt::format(format_args!($($arg)*)));
+        quote!(compile_error!(#lit))
+    })
+}
+
 mod dbobj;
 mod filter;
 mod migration;
@@ -40,8 +52,8 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
 
     migration::write_table_to_disk(&ast_struct).unwrap();
 
-    result.extend(dbobj::add_fieldexprs_to_impl(&ast_struct));
     result.extend(dbobj::impl_dbobject(&ast_struct));
+    result.extend(dbobj::add_fieldexprs(&ast_struct));
 
     result.into()
 }
@@ -84,6 +96,10 @@ fn tokens_for_sqltype(ty: SqlType) -> TokenStream2 {
 fn make_ident_literal_str(ident: &Ident) -> LitStr {
     let as_str = format!("{}", ident);
     LitStr::new(&as_str, Span::call_site())
+}
+
+fn make_lit(s: &str) -> LitStr {
+    LitStr::new(s, Span::call_site())
 }
 
 /// If the field refers to a primitive, return its SqlType

@@ -14,6 +14,7 @@ pub fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<(), Error> {
     migrations::from_root(&dir)
         .get_migration("current")
         .write_table(&create_atable(ast_struct))
+        .map_err(|e| e.into())
 }
 
 fn create_atable(ast_struct: &ItemStruct) -> ATable {

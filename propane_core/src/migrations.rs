@@ -1,8 +1,7 @@
 use crate::adb;
 use crate::adb::*;
 use crate::db;
-use crate::Result;
-use failure::format_err;
+use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
@@ -56,7 +55,7 @@ impl Migration {
                 let m = from_root(
                     self.root
                         .parent()
-                        .ok_or(format_err!("migration path must have a parent"))?,
+                        .ok_or(Error::MigrationError("migration path must have a parent".to_string()))?,
                 )
                 .get_migration(&name);
                 Ok(Some(m))
@@ -192,7 +191,7 @@ impl Migrations {
 
             return Ok(accum.into_iter().rev().collect());
         }
-        Err(format_err!("Migration not in chain"))
+        Err(Error::MigrationError("Migration not in chain".to_string()))
     }
 
     pub fn get_all_migrations(&self) -> Result<Vec<Migration>> {

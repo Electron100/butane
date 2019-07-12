@@ -1,7 +1,6 @@
 use super::Error::BoundsError;
 use crate::query::BoolExpr;
-use crate::{adb, Result, SqlType, SqlVal};
-use failure::format_err;
+use crate::{adb, Error, Result, SqlType, SqlVal};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
@@ -51,7 +50,7 @@ impl Row {
         self.vals.len()
     }
     pub fn get<'a>(&'a self, idx: usize) -> Result<&'a SqlVal> {
-        self.vals.get(idx).ok_or(failure::Error::from(BoundsError))
+        self.vals.get(idx).ok_or(BoundsError)
     }
     /*
     /// Extracts an owned value out of the row. Can only be done once
@@ -171,6 +170,6 @@ pub fn get_backend(name: &str) -> Option<Box<Backend>> {
 
 pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     get_backend(&spec.backend_name)
-        .ok_or(format_err!("Unknown backend {}", &spec.backend_name))?
+        .ok_or(Error::UnknownBackend(spec.backend_name.clone()))?
         .connect(&spec.conn_str)
 }

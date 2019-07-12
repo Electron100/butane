@@ -1,5 +1,5 @@
 use crate::db::{BackendConnection, QueryResult};
-use crate::{DBObject, DBResult, Result, SqlVal};
+use crate::{DBResult, Result, SqlVal};
 use std::marker::PhantomData;
 
 #[derive(Clone)]
@@ -21,8 +21,8 @@ pub enum BoolExpr {
     And(Box<BoolExpr>, Box<BoolExpr>),
     Or(Box<BoolExpr>, Box<BoolExpr>),
     Not(Box<BoolExpr>),
-    //TODO
-    //Subquery(&'static str, Expr),
+    // col, tbl2, tbl2_col
+    Subquery(&'static str, &'static str, &'static str, Box<BoolExpr>),
 }
 
 pub trait AsExpr {

@@ -1,2 +1,6 @@
 *~
 /target
+expand.rs
+propanevsc.code-workspace
+propane.code_workspace.code-workspace
+.vscode/tasks.json

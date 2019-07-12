@@ -1,11 +1,11 @@
 use proc_macro_hack::proc_macro_hack;
 pub use propane_codegen::model;
-pub use propane_core::adb;
 pub use propane_core::db;
+pub use propane_core::fkey::ForeignKey;
 pub use propane_core::field;
 pub use propane_core::migrations;
 pub use propane_core::query;
-pub use propane_core::{DBObject, DBResult, Error, Result, SqlType};
+pub use propane_core::{DBObject, DBResult, Error, FromSql, Result, SqlType, SqlVal, ToSql};
 
 #[proc_macro_hack]
 pub use propane_codegen::filter;
@@ -26,10 +26,10 @@ macro_rules! query {
 
 #[macro_export]
 macro_rules! find {
-    ($model:ident, $conn:expr, $filter:expr) => {
-        query!($model, $filter)
+    ($dbobj:ident, $filter:expr, $conn:expr) => {
+        query!($dbobj, $filter)
             .limit(1)
-            .load($conn)
-            .map(|v| v.first())
+            .load($conn)?
+            .pop().ok_or(failure::Error::from(propane::Error::NoSuchObject))
     };
 }

@@ -42,6 +42,7 @@ impl Migration {
             let table: ATable = serde_json::from_reader(fs::File::open(entry.path())?)?;
             db.replace_table(table)
         }
+        db.resolve_types()?;
         Ok(db)
     }
 

@@ -14,6 +14,18 @@ use syn;
 use syn::parse_quote;
 use syn::{Expr, Field, ItemStruct, LitStr};
 
+#[macro_use]
+macro_rules! make_compile_error {
+    ($span:expr=> $($arg:tt)*) => ({
+        let lit = make_lit(&std::fmt::format(format_args!($($arg)*)));
+        quote_spanned!($span=> compile_error!(#lit))
+    });
+    ($($arg:tt)*) => ({
+        let lit = make_lit(&std::fmt::format(format_args!($($arg)*)));
+        quote!(compile_error!(#lit))
+    })
+}
+
 mod dbobj;
 mod filter;
 mod migration;
@@ -40,8 +52,8 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
 
     migration::write_table_to_disk(&ast_struct).unwrap();
 
-    result.extend(dbobj::add_fieldexprs_to_impl(&ast_struct));
     result.extend(dbobj::impl_dbobject(&ast_struct));
+    result.extend(dbobj::add_fieldexprs(&ast_struct));
 
     result.into()
 }
@@ -86,10 +98,15 @@ fn make_ident_literal_str(ident: &Ident) -> LitStr {
     LitStr::new(&as_str, Span::call_site())
 }
 
-fn get_sql_type(field: &Field) -> SqlType {
+fn make_lit(s: &str) -> LitStr {
+    LitStr::new(s, Span::call_site())
+}
+
+/// If the field refers to a primitive, return its SqlType
+fn get_primitive_sql_type(field: &Field) -> Option<DeferredSqlType> {
     // Todo support Date, Tmestamp, and Blob
     if field.ty == parse_quote!(bool) {
-        SqlType::Bool
+        Some(DeferredSqlType::Known(SqlType::Bool))
     } else if field.ty == parse_quote!(u8)
         || field.ty == parse_quote!(i8)
         || field.ty == parse_quote!(u16)
@@ -97,18 +114,75 @@ fn get_sql_type(field: &Field) -> SqlType {
         || field.ty == parse_quote!(u16)
         || field.ty == parse_quote!(i32)
     {
-        SqlType::Int
+        Some(DeferredSqlType::Known(SqlType::Int))
     } else if field.ty == parse_quote!(u64) || field.ty == parse_quote!(i64) {
-        SqlType::BigInt
+        Some(DeferredSqlType::Known(SqlType::BigInt))
     } else if field.ty == parse_quote!(f32) || field.ty == parse_quote!(f64) {
-        SqlType::Real
+        Some(DeferredSqlType::Known(SqlType::Real))
     } else if field.ty == parse_quote!(String) {
-        SqlType::Text
+        Some(DeferredSqlType::Known(SqlType::Text))
     } else {
-        panic!(
-            "Unsupported type {} for field '{}'",
-            field.ty.clone().into_token_stream(),
-            field.ident.clone().expect("model fields must be named")
-        );
+        None
     }
 }
+
+fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
+    let path = match &field.ty {
+        syn::Type::Path(path) => &path.path,
+        _ => return None
+    };
+    let seg = 
+        if path.segments.len() == 2 && path.segments.first().unwrap().value().ident == "propane" {
+            path.segments.last()
+        } else {
+            path.segments.first()
+        }?;
+    if seg.value().ident != "ForeignKey" {
+        return None;
+    }
+    let args = match &seg.value().arguments {
+        syn::PathArguments::AngleBracketed(args) => &args.args,
+        _ => return None
+    };
+    if args.len() != 1 {
+        panic!("ForeignKey should have a single type argument")
+    }
+    let typath = match args.last().unwrap().value() {
+        syn::GenericArgument::Type(syn::Type::Path(typath)) => &typath.path,
+        _ => panic!("ForeignKey argument should be a type.")
+    };
+    Some(DeferredSqlType::Deferred(TypeKey::PK(typath.segments.last()
+        .expect("ForeignKey must have an argument")
+        .value()
+        .ident.to_string())))
+}
+
+fn get_deferred_sql_type(field: &Field) -> DeferredSqlType {
+    get_primitive_sql_type(field)
+        .or(get_foreign_key_sql_type(field))
+        .expect(&format!("Unsupported type {} for field '{}'",
+            field.ty.clone().into_token_stream(),
+            field.ident.clone().expect("model fields must be named")))
+}
+
+fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
+    let pk_by_attribute = ast_struct.fields.iter().find(|f| {
+        f.attrs
+            .iter()
+            .find(|attr| attr.path.is_ident("pk"))
+            .is_some()
+    });
+    if let Some(id_field) = pk_by_attribute {
+        return Some(id_field.clone());
+    }
+    let pk_by_name = ast_struct.fields.iter().find(|f| match &f.ident {
+        Some(ident) => "id" == ident.to_string(),
+        None => false,
+    });
+    if let Some(id_field) = pk_by_name {
+        Some(id_field.clone())
+    } else {
+        None
+    }
+}
+

@@ -128,7 +128,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> String {
 fn create_table(table: &ATable) -> String {
     let coldefs = table
         .columns
-        .iter()
+        .values()
         .map(define_column)
         .collect::<Vec<String>>()
         .join(",\n");
@@ -137,19 +137,19 @@ fn create_table(table: &ATable) -> String {
 
 fn define_column(col: &AColumn) -> String {
     let mut constraints: Vec<String> = Vec::new();
-    if !col.nullable {
+    if !col.nullable() {
         constraints.push("NOT NULL".to_string());
     }
-    if col.pk {
+    if col.is_pk() {
         constraints.push("PRIMARY KEY".to_string());
     }
-    if let Some(defval) = &col.default {
+    if let Some(defval) = col.default() {
         constraints.push(format!("DEFAULT {}", default_string(defval.clone())));
     }
     format!(
         "{} {} {}",
-        &col.name,
-        sqltype(col.sqltype),
+        &col.name(),
+        col_sqltype(col),
         constraints.join(" ")
     )
 }
@@ -167,6 +167,15 @@ fn default_string(d: SqlVal) -> String {
         SqlVal::Real(f) => f.to_string(),
         SqlVal::Text(t) => format!("'{}'", t),
         SqlVal::Blob(b) => format!("x'{}'", hex::encode(b)),
+    }
+}
+
+fn col_sqltype(col: &AColumn) -> &'static str {
+    match col.sqltype() {
+        Ok(ty) => sqltype(ty),
+        // sqlite doesn't actually require that the column type be
+        // specified
+        Err(_) => "",
     }
 }
 
@@ -211,8 +220,8 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {
 fn copy_table(old: &ATable, new: &ATable) -> String {
     let column_names = new
         .columns
-        .iter()
-        .map(|col| col.name.as_str())
+        .values()
+        .map(|col| col.name())
         .collect::<Vec<&str>>()
         .join(", ");
     format!(
@@ -235,7 +244,8 @@ fn change_column(
     if table.is_none() {
         warn!(
             "Cannot alter column {} from table {} that does not exist",
-            &old.name, tbl_name
+            &old.name(),
+            tbl_name
         );
         return "".to_string();
     }
@@ -244,7 +254,7 @@ fn change_column(
     new_table.name = tmp_table_name(&new_table.name);
     match new {
         Some(col) => new_table.replace_column(col.clone()),
-        None => new_table.remove_column(&old.name),
+        None => new_table.remove_column(old.name()),
     }
     let result = [
         "BEGIN TRANSACTION;",

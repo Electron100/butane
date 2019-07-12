@@ -1,10 +1,12 @@
 use failure;
 use failure::Fail;
 use serde::{Deserialize, Serialize};
+use std::default::Default;
 
 pub mod adb;
 pub mod db;
 pub mod field;
+pub mod fkey;
 pub mod migrations;
 pub mod query;
 pub mod sqlval;
@@ -16,7 +18,8 @@ pub use sqlval::*;
 pub type Result<T> = std::result::Result<T, failure::Error>;
 
 pub trait DBResult: Sized {
-    type DBO;
+    type DBO: DBObject;
+    type Fields: Default;
     const COLUMNS: &'static [db::Column];
     fn from_row(row: db::Row) -> Result<Self>
     where
@@ -24,11 +27,18 @@ pub trait DBResult: Sized {
 }
 
 pub trait DBObject: DBResult<DBO = Self> {
-    type PKType;
+    type PKType: ToSql + FromSql + Clone;
+    const PKCOL: &'static str;
+    const TABLE: &'static str;
+    fn pk(&self) -> &Self::PKType;
     fn get(conn: &impl db::BackendConnection, id: Self::PKType) -> Result<Self>
     where
         Self: Sized;
     fn query() -> Query<Self>;
+}
+
+pub trait ModelTyped {
+    type Model: DBObject;
 }
 
 #[derive(Debug, Fail)]
@@ -39,6 +49,12 @@ pub enum Error {
     BoundsError,
     #[fail(display = "Type mismatch")]
     TypeMismatch,
+    #[fail(display = "SqlType not known for {}", ty)]
+    UnknownSqlType { ty: String },
+    #[fail(display = "Table {} has no primary key", table)]
+    NoPK { table: String },
+    #[fail(display = "Value has not been loaded from the database")]
+    ValueNotLoaded,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

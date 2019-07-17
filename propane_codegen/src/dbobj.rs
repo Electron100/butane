@@ -32,7 +32,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
         .iter()
         .map(|f| {
             let ident = f.ident.clone().unwrap();
-            quote!(values.push(propane::ToSql::to_sql(self.#ident));)
+            quote!(values.push(propane::ToSql::to_sql(&self.#ident));)
         })
         .collect();
 
@@ -77,9 +77,15 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
             }
             fn save(&mut self, conn: &impl propane::db::BackendConnection) -> propane::Result<()> {
                 //todo use an array on the stack for better perf
-                let values = Vec::with_capacity(#numfields);
+                let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numfields);
                 #(#values)*
-                conn.insert_or_replace(Self::TABLE, <Self as propane::DBResult>::COLUMNS, &values)
+                //conn.insert_or_replace(Self::TABLE, <Self as propane::DBResult>::COLUMNS, &values)
+                Ok(())
+            }
+            fn delete(&self, conn: &impl propane::db::BackendConnection) -> propane::Result<()> {
+                use propane::ToSql;
+                //conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
+                Ok(())
             }
         }
     )

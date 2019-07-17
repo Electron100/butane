@@ -36,7 +36,7 @@ pub trait DBObject: DBResult<DBO = Self> {
         Self: Sized;
     fn query() -> Query<Self>;
     fn save(&mut self, conn: &impl db::BackendConnection) -> Result<()>;
-    fn delete(&self) -> Result<()>;
+    fn delete(&self, conn: &impl db::BackendConnection) -> Result<()>;
 }
 
 pub trait ModelTyped {

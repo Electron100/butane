@@ -2,7 +2,7 @@ use super::helper;
 use super::*;
 use crate::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
-use crate::{Result, SqlType, SqlVal};
+use crate::{Result, SqlType, SqlVal, ToSql};
 use hex;
 use log::warn;
 use rusqlite;
@@ -88,17 +88,28 @@ impl BackendConnection for SQLiteConnection {
             .execute(&sql, &values.iter().collect::<Vec<_>>())?;
         Ok(())
     }
+    fn delete(&self,
+        table: &'static str,
+        pkcol: &'static str,
+        pk: &SqlVal) -> Result<()> {
+        
+        let mut sql = String::new();
+        helper::sql_delete_with_placeholder(table, pkcol, &mut sql);
+        self.conn.execute(&sql, &[&pk])?;
+        Ok(())
+    }
 }
 
 impl rusqlite::ToSql for SqlVal {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        match self {
-            SqlVal::Bool(b) => b.to_sql(),
-            SqlVal::Int(i) => i.to_sql(),
-            SqlVal::Real(r) => r.to_sql(),
-            SqlVal::Text(t) => t.to_sql(),
-            SqlVal::Blob(b) => b.to_sql(),
-        }
+        use rusqlite::types::{Value, ValueRef, ToSqlOutput::Owned, ToSqlOutput::Borrowed};
+        Ok(match self {
+            SqlVal::Bool(b) => Owned(Value::Integer(if *b {1} else {0})),
+            SqlVal::Int(i) => Owned(Value::Integer(*i)),
+            SqlVal::Real(r) => Owned(Value::Real(*r)),
+            SqlVal::Text(t) => Borrowed(ValueRef::Text(&t)),
+            SqlVal::Blob(b) => Borrowed(ValueRef::Blob(&b)),
+        })
     }
 }
 

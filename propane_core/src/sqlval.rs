@@ -57,7 +57,11 @@ impl SqlVal {
 
 pub trait ToSql {
     const SQLTYPE: SqlType;
-    fn to_sql(self) -> SqlVal;
+    fn into_sql(self) -> SqlVal;
+    fn to_sql(&self) -> SqlVal
+        where Self: Clone {
+        self.clone().into_sql()
+    }
 }
 
 pub trait FromSql {
@@ -68,7 +72,7 @@ pub trait FromSql {
 
 impl <T> From<T> for SqlVal where T: ToSql {
     fn from(val: T) -> Self {
-        val.to_sql()
+        val.into_sql()
     }
 }
 
@@ -86,7 +90,7 @@ macro_rules! impl_prim_sql {
 
         impl ToSql for $prim {
             const SQLTYPE: SqlType = SqlType::$sqltype;
-            fn to_sql(self) -> SqlVal {
+            fn into_sql(self) -> SqlVal {
                 SqlVal::$variant(self.into())
             }
         }

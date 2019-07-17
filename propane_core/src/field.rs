@@ -46,7 +46,7 @@ impl <F: DBObject> FieldExpr<ForeignKey<F>> {
         BoolExpr::Subquery(self.name, F::TABLE, F::PKCOL, Box::new(q))
     }
     pub fn subfilterpk(&self, pk: F::PKType) -> BoolExpr {
-        self.subfilter(BoolExpr::Eq(F::PKCOL, crate::query::Expr::Val(pk.to_sql())))
+        self.subfilter(BoolExpr::Eq(F::PKCOL, crate::query::Expr::Val(pk.into_sql())))
     }
     pub fn fields(&self) -> F::Fields {
         F::Fields::default()

@@ -24,11 +24,11 @@ impl <T: DBObject> ForeignKey<T> {
 
 impl <T> ToSql for ForeignKey<T> where T: DBObject {
     const SQLTYPE: SqlType = <T as DBObject>::PKType::SQLTYPE;
-    fn to_sql(self) -> SqlVal {
+    fn into_sql(self) -> SqlVal {
         match self.valpk.get() {
             Some(sqlval) => sqlval.clone(),
             None => match self.val.get() {
-                Some(val) => val.pk().clone().to_sql(),
+                Some(val) => val.pk().to_sql(),
                 None => panic!("Invalid foreign key state")
             }
         }

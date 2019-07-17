@@ -4,14 +4,18 @@ use crate::{adb, Error, Result, SqlType, SqlVal};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
-use std::ops::Deref;
 use std::fs;
 use std::io::Write;
+use std::ops::Deref;
 use std::path::Path;
 use std::vec::Vec;
 
 mod helper;
 mod sqlite;
+
+pub enum Modification {
+    InsertOnly,
+}
 
 pub trait BackendConnection: Send + 'static {
     fn execute(&self, sql: &str) -> Result<()>;
@@ -22,10 +26,12 @@ pub trait BackendConnection: Send + 'static {
         expr: Option<BoolExpr>,
         limit: Option<i32>,
     ) -> Result<RawQueryResult>;
-    fn insert(&self,
+    fn insert_or_replace(
+        &self,
         table: &'static str,
         columns: &[Column],
-        row: &Row) -> Result<SqlVal>;
+        values: &[SqlVal],
+    ) -> Result<()>;
 }
 
 pub struct Column {
@@ -121,6 +127,14 @@ impl BackendConnection for Connection {
         limit: Option<i32>,
     ) -> Result<RawQueryResult> {
         self.conn.query(table, columns, expr, limit)
+    }
+    fn insert_or_replace(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        self.conn.insert_or_replace(table, columns, values)
     }
 }
 

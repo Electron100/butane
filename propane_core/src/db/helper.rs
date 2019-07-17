@@ -44,17 +44,32 @@ where
 }
 
 pub fn sql_select(columns: &[Column], table: &'static str, w: &mut impl Write) {
-    let mut colnames: Vec<&'static str> = Vec::new();
-    columns.iter().for_each(|c| colnames.push(c.name));
-    write!(
-        w,
-        "SELECT {} from {}",
-        colnames.as_slice().join(", "),
-        table
-    )
-    .unwrap()
+    write!(w, "SELECT ").unwrap();
+    list_columns(columns, w);
+    write!(w, "FROM {}", table).unwrap();
+}
+
+pub fn sql_insert_or_replace_with_placeholders(
+    table: &'static str,
+    columns: &[Column],
+    w: &mut impl Write,
+) {
+    write!(w, "INSERT OR REPLACE INTO {} (", table).unwrap();
+    list_columns(columns, w);
+    write!(w, ") VALUES (").unwrap();
+    columns.iter().fold("", |sep, _| {
+        write!(w, "{}?", sep).unwrap();
+        ", "
+    });
+    write!(w, ")").unwrap();
 }
 
 pub fn sql_limit(limit: i32, w: &mut impl Write) {
     write!(w, "LIMIT {}", limit).unwrap();
+}
+
+fn list_columns(columns: &[Column], w: &mut impl Write) {
+    let mut colnames: Vec<&'static str> = Vec::new();
+    columns.iter().for_each(|c| colnames.push(c.name));
+    write!(w, "{}", colnames.as_slice().join(", ")).unwrap();
 }

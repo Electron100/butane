@@ -76,6 +76,30 @@ impl BackendConnection for SQLiteConnection {
         })?;
         rows.collect()
     }
+    fn insert_or_replace(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        let mut sql = String::new();
+        helper::sql_insert_or_replace_with_placeholders(table, columns, &mut sql);
+        self.conn
+            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
+        Ok(())
+    }
+}
+
+impl rusqlite::ToSql for SqlVal {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        match self {
+            SqlVal::Bool(b) => b.to_sql(),
+            SqlVal::Int(i) => i.to_sql(),
+            SqlVal::Real(r) => r.to_sql(),
+            SqlVal::Text(t) => t.to_sql(),
+            SqlVal::Blob(b) => b.to_sql(),
+        }
+    }
 }
 
 fn row_from_rusqlite(row: &rusqlite::Row, cols: &[Column]) -> Result<Row> {

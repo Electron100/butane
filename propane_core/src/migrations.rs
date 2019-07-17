@@ -141,7 +141,7 @@ impl Migrations {
             .unwrap_or(None)
     }
 
-    /// Create a migration `from` -> `to` from may be None, in which
+    /// Create a migration `from` -> `to`. From may be None, in which
     /// case the migration is created from an empty database.
     /// Returns None if `from` and `to` represent identical states
     pub fn create_migration_sql(

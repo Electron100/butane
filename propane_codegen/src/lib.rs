@@ -115,7 +115,8 @@ fn get_primitive_sql_type(field: &Field) -> Option<DeferredSqlType> {
         || field.ty == parse_quote!(i32)
     {
         Some(DeferredSqlType::Known(SqlType::Int))
-    } else if field.ty == parse_quote!(u64) || field.ty == parse_quote!(i64) {
+    } else if field.ty == parse_quote!(u32) || field.ty == parse_quote!(i64) {
+        // TODO better support unsigned integers here. Sqlite has no u64, though Postgres does
         Some(DeferredSqlType::Known(SqlType::BigInt))
     } else if field.ty == parse_quote!(f32) || field.ty == parse_quote!(f64) {
         Some(DeferredSqlType::Known(SqlType::Real))

@@ -4,6 +4,7 @@ use crate::{adb, Error, Result, SqlType, SqlVal};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
+use std::ops::Deref;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -21,6 +22,10 @@ pub trait BackendConnection: Send + 'static {
         expr: Option<BoolExpr>,
         limit: Option<i32>,
     ) -> Result<RawQueryResult>;
+    fn insert(&self,
+        table: &'static str,
+        columns: &[Column],
+        row: &Row) -> Result<SqlVal>;
 }
 
 pub struct Column {
@@ -155,6 +160,18 @@ pub trait Backend {
     fn get_name(&self) -> &'static str;
     fn create_migration_sql(&self, current: &adb::ADB, ops: &[adb::Operation]) -> String;
     fn connect(&self, conn_str: &str) -> Result<Connection>;
+}
+
+impl Backend for Box<dyn Backend> {
+    fn get_name(&self) -> &'static str {
+        self.deref().get_name()
+    }
+    fn create_migration_sql(&self, current: &adb::ADB, ops: &[adb::Operation]) -> String {
+        self.deref().create_migration_sql(current, ops)
+    }
+    fn connect(&self, conn_str: &str) -> Result<Connection> {
+        self.deref().connect(conn_str)
+    }
 }
 
 pub fn sqlite_backend() -> impl Backend {

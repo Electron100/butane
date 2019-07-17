@@ -35,6 +35,8 @@ pub trait DBObject: DBResult<DBO = Self> {
     where
         Self: Sized;
     fn query() -> Query<Self>;
+    fn save(&mut self) -> Result<()>;
+    fn delete(&self) -> Result<()>;
 }
 
 pub trait ModelTyped {

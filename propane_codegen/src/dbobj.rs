@@ -52,19 +52,19 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 &self.#pkident
             }
             fn get(
-                conn: &impl BackendConnection,
+                conn: &impl propane::db::BackendConnection,
                 id: Self::PKType,
             ) -> propane::Result<Self> {
                 Self::query()
-                    .filter(BoolExpr::Eq(#pklit, Expr::Val(id.into())))
+                    .filter(propane::query::BoolExpr::Eq(#pklit, propane::query::Expr::Val(id.into())))
                     .limit(1)
                     .load(conn)?
                     .into_iter()
                     .nth(0)
                     .ok_or(propane::Error::NoSuchObject.into())
             }
-            fn query() -> Query<Self> {
-                Query::new(#table_lit)
+            fn query() -> propane::query::Query<Self> {
+                propane::query::Query::new(#table_lit)
             }
         }
     )

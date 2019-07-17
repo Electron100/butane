@@ -6,9 +6,6 @@ use propane::ForeignKey;
 
 use propane::prelude::*;
 
-//temp for testing
-use propane::query::{BoolExpr, Expr, Query};
-
 pub type Result<T> = std::result::Result<T, failure::Error>;
 
 #[model]

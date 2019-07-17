@@ -35,7 +35,7 @@ pub trait DBObject: DBResult<DBO = Self> {
     where
         Self: Sized;
     fn query() -> Query<Self>;
-    fn save(&mut self) -> Result<()>;
+    fn save(&mut self, conn: &impl db::BackendConnection) -> Result<()>;
     fn delete(&self) -> Result<()>;
 }
 
@@ -70,7 +70,7 @@ pub enum Error {
     #[fail(display = "Sqlite error {}", 0)]
     SQLite(rusqlite::Error),
     #[fail(display = "{}", 0)]
-    Generic(failure::Error)
+    Generic(failure::Error),
 }
 
 impl From<serde_json::Error> for Error {
@@ -97,7 +97,7 @@ impl From<rusqlite::types::FromSqlError> for Error {
         match e {
             FromSqlError::InvalidType => Error::TypeMismatch,
             FromSqlError::OutOfRange(_) => Error::OutOfRange,
-            FromSqlError::Other(e2) => Error::Generic(failure::Error::from_boxed_compat(e2))
+            FromSqlError::Other(e2) => Error::Generic(failure::Error::from_boxed_compat(e2)),
         }
     }
 }

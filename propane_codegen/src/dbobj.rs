@@ -25,7 +25,16 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
     let tablelit = make_ident_literal_str(&tyname);
 
     let rows = rows_for_from(&ast_struct);
-    let rowslen = rows.len();
+    let numfields = rows.len();
+
+    let values: Vec<TokenStream2> = ast_struct
+        .fields
+        .iter()
+        .map(|f| {
+            let ident = f.ident.clone().unwrap();
+            quote!(values.push(propane::ToSql::to_sql(self.#ident));)
+        })
+        .collect();
 
     quote!(
         impl propane::DBResult for #tyname {
@@ -35,7 +44,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 #columns
             ];
             fn from_row(mut row: propane::db::Row) -> propane::Result<Self> {
-                if row.len() != #rowslen {
+                if row.len() != #numfields {
                     return Err(propane::Error::BoundsError.into());
                 }
                 let mut it = row.into_iter();
@@ -65,6 +74,12 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
             }
             fn query() -> propane::query::Query<Self> {
                 propane::query::Query::new(#table_lit)
+            }
+            fn save(&mut self, conn: &impl propane::db::BackendConnection) -> propane::Result<()> {
+                //todo use an array on the stack for better perf
+                let values = Vec::with_capacity(#numfields);
+                #(#values)*
+                conn.insert_or_replace(Self::TABLE, <Self as propane::DBResult>::COLUMNS, &values)
             }
         }
     )

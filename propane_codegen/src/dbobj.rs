@@ -79,13 +79,11 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 //todo use an array on the stack for better perf
                 let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numfields);
                 #(#values)*
-                //conn.insert_or_replace(Self::TABLE, <Self as propane::DBResult>::COLUMNS, &values)
-                Ok(())
+                conn.insert_or_replace(Self::TABLE, <Self as propane::DBResult>::COLUMNS, &values)
             }
             fn delete(&self, conn: &impl propane::db::BackendConnection) -> propane::Result<()> {
                 use propane::ToSql;
-                //conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
-                Ok(())
+                conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
             }
         }
     )

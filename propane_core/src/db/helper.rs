@@ -46,7 +46,7 @@ where
 pub fn sql_select(columns: &[Column], table: &'static str, w: &mut impl Write) {
     write!(w, "SELECT ").unwrap();
     list_columns(columns, w);
-    write!(w, "FROM {}", table).unwrap();
+    write!(w, " FROM {}", table).unwrap();
 }
 
 pub fn sql_insert_or_replace_with_placeholders(
@@ -69,11 +69,11 @@ pub fn sql_delete_with_placeholder(table: &'static str, pkcol: &'static str, w: 
 }
 
 pub fn sql_limit(limit: i32, w: &mut impl Write) {
-    write!(w, "LIMIT {}", limit).unwrap();
+    write!(w, " LIMIT {}", limit).unwrap();
 }
 
 fn list_columns(columns: &[Column], w: &mut impl Write) {
     let mut colnames: Vec<&'static str> = Vec::new();
     columns.iter().for_each(|c| colnames.push(c.name));
-    write!(w, "{}", colnames.as_slice().join(", ")).unwrap();
+    write!(w, "{}", colnames.as_slice().join(",")).unwrap();
 }

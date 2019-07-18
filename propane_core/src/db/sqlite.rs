@@ -2,7 +2,7 @@ use super::helper;
 use super::*;
 use crate::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
-use crate::{Result, SqlType, SqlVal, ToSql};
+use crate::{Result, SqlType, SqlVal};
 use hex;
 use log::warn;
 use rusqlite;
@@ -64,7 +64,7 @@ impl BackendConnection for SQLiteConnection {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
         if let Some(expr) = expr {
-            sqlquery.write_str("WHERE ").unwrap();
+            sqlquery.write_str(" WHERE ").unwrap();
             sql_for_expr(query::Expr::Condition(Box::new(expr)), &mut sqlquery);
         }
         if let Some(limit) = limit {
@@ -88,11 +88,7 @@ impl BackendConnection for SQLiteConnection {
             .execute(&sql, &values.iter().collect::<Vec<_>>())?;
         Ok(())
     }
-    fn delete(&self,
-        table: &'static str,
-        pkcol: &'static str,
-        pk: &SqlVal) -> Result<()> {
-        
+    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
         let mut sql = String::new();
         helper::sql_delete_with_placeholder(table, pkcol, &mut sql);
         self.conn.execute(&sql, &[&pk])?;
@@ -102,9 +98,9 @@ impl BackendConnection for SQLiteConnection {
 
 impl rusqlite::ToSql for SqlVal {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        use rusqlite::types::{Value, ValueRef, ToSqlOutput::Owned, ToSqlOutput::Borrowed};
+        use rusqlite::types::{ToSqlOutput::Borrowed, ToSqlOutput::Owned, Value, ValueRef};
         Ok(match self {
-            SqlVal::Bool(b) => Owned(Value::Integer(if *b {1} else {0})),
+            SqlVal::Bool(b) => Owned(Value::Integer(if *b { 1 } else { 0 })),
             SqlVal::Int(i) => Owned(Value::Integer(*i)),
             SqlVal::Real(r) => Owned(Value::Real(*r)),
             SqlVal::Text(t) => Borrowed(ValueRef::Text(&t)),

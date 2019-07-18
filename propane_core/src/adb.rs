@@ -27,9 +27,7 @@ impl TypeResolver {
         }
     }
     fn find_type(&self, key: &TypeKey) -> Option<SqlType> {
-        let found = self.types.get(key).map(|t| *t);
-        dbg!(found);
-        found
+        self.types.get(key).map(|t| *t)
     }
     fn insert(&mut self, key: TypeKey, ty: SqlType) -> bool {
         if self.types.contains_key(&key) {
@@ -50,7 +48,9 @@ pub struct ADB {
 }
 impl ADB {
     pub fn new() -> Self {
-        ADB { tables: HashMap::new() }
+        ADB {
+            tables: HashMap::new(),
+        }
     }
     pub fn get_table<'a>(&'a self, name: &str) -> Option<&'a ATable> {
         self.tables.get(name)
@@ -89,7 +89,7 @@ impl ATable {
     pub fn new(name: String) -> ATable {
         ATable {
             name,
-            columns: HashMap::new()
+            columns: HashMap::new(),
         }
     }
     pub fn add_column(&mut self, col: AColumn) {
@@ -205,7 +205,9 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     let new_tables = new_names.difference(&old_names);
     for added in new_tables {
         let added: &str = added.as_ref();
-        ops.push(Operation::AddTable(new.tables.get(added).expect("no table").clone()));
+        ops.push(Operation::AddTable(
+            new.tables.get(added).expect("no table").clone(),
+        ));
     }
     for removed in old_names.difference(&new_names) {
         ops.push(Operation::RemoveTable(removed.to_string()));
@@ -227,8 +229,10 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
     let added_names = new_names.difference(&old_names);
     for added in added_names {
         let added: &str = added.as_ref();
-        ops.push(Operation::AddColumn(new.name.clone(), 
-            new.columns.get(added).unwrap().clone()));
+        ops.push(Operation::AddColumn(
+            new.name.clone(),
+            new.columns.get(added).unwrap().clone(),
+        ));
     }
     for removed in old_names.difference(&new_names) {
         ops.push(Operation::RemoveColumn(

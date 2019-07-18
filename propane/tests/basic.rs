@@ -1,8 +1,8 @@
 use paste;
 use propane::db::{Connection, ConnectionSpec};
-use propane::migrations::Migration;
 use propane::model;
 use propane::prelude::*;
+use propane::{migrations::Migration, ForeignKey};
 
 #[model]
 #[derive(PartialEq, Eq, Debug)]
@@ -12,11 +12,27 @@ struct Foo {
     baz: String,
 }
 impl Foo {
-    fn new() -> Self {
+    fn new(id: i64) -> Self {
         Foo {
-            id: 0,
+            id: id,
             bar: 0,
             baz: String::new(),
+        }
+    }
+}
+
+#[model]
+#[derive(PartialEq, Eq, Debug)]
+struct Bar {
+    #[pk]
+    name: String,
+    foo: ForeignKey<Foo>,
+}
+impl Bar {
+    fn new(name: &str, foo: Foo) -> Self {
+        Bar {
+            name: name.to_string(),
+            foo: foo.into(),
         }
     }
 }
@@ -24,6 +40,7 @@ impl Foo {
 fn setup_db(spec: &ConnectionSpec) {
     let mut root = std::env::current_dir().unwrap();
     root.push("propane/migrations");
+    dbg!(&root);
     let migrations = propane::migrations::from_root(root);
     let current = migrations.get_current();
     let backend = propane::db::get_backend(&spec.backend_name)
@@ -37,8 +54,8 @@ fn setup_db(spec: &ConnectionSpec) {
     conn.execute(&sql).unwrap();
 }
 
-fn reset_db() {
-    std::fs::remove_file("test.db").ok();
+fn reset_db(connstr: String) {
+    std::fs::remove_file(connstr).ok();
 }
 
 macro_rules! maketest {
@@ -46,11 +63,13 @@ macro_rules! maketest {
         paste::item! {
             #[test]
             pub fn [<$fname _ $backend>]() {
-                reset_db();
+                dbg!($connstr);
+                reset_db($connstr);
                 let spec = ConnectionSpec::new(stringify!($backend), $connstr);
                 setup_db(&spec);
                 let conn = propane::db::connect(&spec).unwrap();
-                $fname(conn)
+                $fname(conn);
+                //reset_db($connstr);
             }
         }
     };
@@ -58,17 +77,16 @@ macro_rules! maketest {
 
 macro_rules! testall {
     ($fname:ident) => {
-        maketest!($fname, sqlite, "test.db");
+        maketest!($fname, sqlite, format!("test_{}.db", stringify!($fname)));
     };
 }
 
 fn basic_crud(conn: Connection) {
     //create
-    let mut foo = Foo::new();
-    foo.id = 1;
+    let mut foo = Foo::new(1);
     foo.bar = 42;
     foo.baz = "hello world".to_string();
-    assert!(foo.save(&conn).is_ok());
+    foo.save(&conn).unwrap();
 
     // read
     let mut foo2 = Foo::get(&conn, 1).unwrap();
@@ -76,7 +94,7 @@ fn basic_crud(conn: Connection) {
 
     // update
     foo2.bar = 43;
-    assert!(foo2.save(&conn).is_ok());
+    foo2.save(&conn).unwrap();
     let foo3 = Foo::get(&conn, 1).unwrap();
     assert_eq!(foo2, foo3);
 
@@ -88,3 +106,14 @@ fn basic_crud(conn: Connection) {
     }
 }
 testall!(basic_crud);
+
+fn string_pk(conn: Connection) {
+    let mut foo = Foo::new(1);
+    foo.save(&conn).unwrap();
+    let mut bar = Bar::new("tarzan", foo);
+    bar.save(&conn).unwrap();
+
+    let bar2 = Bar::get(&conn, "tarzan".to_string()).unwrap();
+    assert_eq!(bar, bar2);
+}
+testall!(string_pk);

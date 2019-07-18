@@ -46,7 +46,7 @@ fn setup_db(spec: &ConnectionSpec) {
     let backend = propane::db::get_backend(&spec.backend_name)
         .expect(&format!("couldn't get db backend '{}'", &spec.backend_name));
     let initial: Migration = migrations
-        .create_migration_sql(backend, "init", None, &current)
+        .create_migration_sql(backend, &format!("init_{}", spec.conn_str), None, &current)
         .expect("expected to create migration without error")
         .expect("expected non-None migration");
     let sql = initial.get_up_sql(&spec.backend_name).unwrap();
@@ -117,3 +117,8 @@ fn string_pk(conn: Connection) {
     assert_eq!(bar, bar2);
 }
 testall!(string_pk);
+
+fn foreign_key(conn: Connection) {
+
+}
+testall!(foreign_key);

@@ -5,7 +5,7 @@ use propane::prelude::*;
 use propane::{migrations::Migration, ForeignKey};
 
 #[model]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 struct Foo {
     id: i64,
     bar: u32,
@@ -45,6 +45,8 @@ fn setup_db(spec: &ConnectionSpec) {
     let current = migrations.get_current();
     let backend = propane::db::get_backend(&spec.backend_name)
         .expect(&format!("couldn't get db backend '{}'", &spec.backend_name));
+    // todo using different migration names to avoid race is hacky, should find way to use different
+    // migration directory for each test.
     let initial: Migration = migrations
         .create_migration_sql(backend, &format!("init_{}", spec.conn_str), None, &current)
         .expect("expected to create migration without error")
@@ -119,6 +121,16 @@ fn string_pk(conn: Connection) {
 testall!(string_pk);
 
 fn foreign_key(conn: Connection) {
+    let mut foo = Foo::new(1);
+    foo.save(&conn).unwrap();
+    let mut bar = Bar::new("tarzan", foo.clone());
+    bar.save(&conn).unwrap();
+    let bar2 = Bar::get(&conn, "tarzan".to_string()).unwrap();
+    
+    let foo2: &Foo = bar2.foo.load(&conn).unwrap();
+    assert_eq!(&foo, foo2);
 
+    let foo3: &Foo = bar2.foo.get().unwrap();
+    assert_eq!(foo2, foo3);
 }
 testall!(foreign_key);

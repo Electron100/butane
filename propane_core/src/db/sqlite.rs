@@ -63,18 +63,20 @@ impl BackendConnection for SQLiteConnection {
     ) -> Result<RawQueryResult> {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
-        let mut values: Vec<SqlVal> = Vec::new(); 
+        let mut values: Vec<SqlVal> = Vec::new();
         if let Some(expr) = expr {
             sqlquery.write_str(" WHERE ").unwrap();
-            sql_for_expr(query::Expr::Condition(Box::new(expr)), &mut values, &mut sqlquery);
+            sql_for_expr(
+                query::Expr::Condition(Box::new(expr)),
+                &mut values,
+                &mut sqlquery,
+            );
         }
         if let Some(limit) = limit {
             helper::sql_limit(limit, &mut sqlquery)
         }
         let mut stmt = self.conn.prepare(&sqlquery)?;
-        let rows = stmt.query_and_then(values, |row| {
-            Ok(row_from_rusqlite(row, columns)?)
-        })?;
+        let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
         rows.collect()
     }
     fn insert_or_replace(

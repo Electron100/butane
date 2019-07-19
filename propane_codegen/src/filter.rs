@@ -1,10 +1,9 @@
 use super::*;
-//use super::macros::make_compile_error;
 use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};
 use syn;
-use syn::{BinOp, Expr, ExprBinary, ExprMethodCall, ExprPath, Ident, LitStr, spanned::Spanned};
+use syn::{spanned::Spanned, BinOp, Expr, ExprBinary, ExprMethodCall, ExprPath, Ident, LitStr};
 
 pub fn for_expr(dbobj: &Ident, expr: &Expr) -> TokenStream2 {
     handle_expr(&quote!(#dbobj::fields()), expr)
@@ -56,12 +55,12 @@ fn handle_call(fields: &impl ToTokens, mcall: &ExprMethodCall) -> TokenStream2 {
             if mcall.args.len() != 1 {
                 return make_compile_error!(mcall.span()=> "expected one argument to '{}'", method);
             };
-        },
-        _ => ()
+        }
+        _ => (),
     };
     match method.as_str() {
         "matches" => handle_in(fields, &mcall.receiver, mcall.args.first().unwrap().value()),
-        _ => make_compile_error!("Unknown method call {}", method)
+        _ => make_compile_error!("Unknown method call {}", method),
     }
 }
 
@@ -71,7 +70,7 @@ fn handle_in(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStrea
         Expr::Lit(lit) => {
             // treat this as matching the primary key
             quote!(#fex.subfilterpk(#lit))
-        },
+        }
         _ => {
             // Arbitrary expression
             let q = handle_expr(&quote!(#fex.fields()), expr);
@@ -85,8 +84,10 @@ fn handle_path(fields: &impl ToTokens, expr: &ExprPath) -> TokenStream2 {
     fieldexpr(fields, &expr.path)
 }
 
-fn fieldexpr<F>(fields: &impl ToTokens, field: &F) -> TokenStream2 
-    where F: ToTokens + Spanned {
+fn fieldexpr<F>(fields: &impl ToTokens, field: &F) -> TokenStream2
+where
+    F: ToTokens + Spanned,
+{
     let fieldexpr_ident = ident(&format!("fieldexpr_{}", field.clone().into_token_stream()));
     let span = field.span();
     quote_spanned!(span=> #fields.#fieldexpr_ident())

@@ -19,9 +19,14 @@ pub fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<(), Error> {
 
 fn create_atable(ast_struct: &ItemStruct) -> ATable {
     let mut table = ATable::new(ast_struct.ident.to_string());
-    let pk = pk_field(ast_struct).expect("No primary key found. Expected 'id' field or field with #[pk] attribute.");
+    let pk = pk_field(ast_struct)
+        .expect("No primary key found. Expected 'id' field or field with #[pk] attribute.");
     for f in ast_struct.fields.iter() {
-        let name = f.ident.clone().expect("db object fields must be named").to_string();
+        let name = f
+            .ident
+            .clone()
+            .expect("db object fields must be named")
+            .to_string();
         let col = AColumn::new(
             name,
             get_deferred_sql_type(&f),

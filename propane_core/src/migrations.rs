@@ -52,11 +52,9 @@ impl Migration {
         match info.from_name {
             None => Ok(None),
             Some(name) => {
-                let m = from_root(
-                    self.root
-                        .parent()
-                        .ok_or(Error::MigrationError("migration path must have a parent".to_string()))?,
-                )
+                let m = from_root(self.root.parent().ok_or(Error::MigrationError(
+                    "migration path must have a parent".to_string(),
+                ))?)
                 .get_migration(&name);
                 Ok(Some(m))
             }

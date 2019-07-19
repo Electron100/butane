@@ -1,7 +1,7 @@
-use crate::DBObject;
 use crate::fkey::ForeignKey;
 use crate::query::{BoolExpr, Expr};
 use crate::sqlval::{SqlVal, ToSql};
+use crate::DBObject;
 use std::marker::PhantomData;
 
 macro_rules! binary_op {
@@ -41,12 +41,15 @@ where
     binary_op!(le, std::cmp::Ord, Le);
     binary_op!(ge, std::cmp::Ord, Ge);
 }
-impl <F: DBObject> FieldExpr<ForeignKey<F>> {
+impl<F: DBObject> FieldExpr<ForeignKey<F>> {
     pub fn subfilter(&self, q: BoolExpr) -> BoolExpr {
         BoolExpr::Subquery(self.name, F::TABLE, F::PKCOL, Box::new(q))
     }
     pub fn subfilterpk(&self, pk: F::PKType) -> BoolExpr {
-        self.subfilter(BoolExpr::Eq(F::PKCOL, crate::query::Expr::Val(pk.into_sql())))
+        self.subfilter(BoolExpr::Eq(
+            F::PKCOL,
+            crate::query::Expr::Val(pk.into_sql()),
+        ))
     }
     pub fn fields(&self) -> F::Fields {
         F::Fields::default()

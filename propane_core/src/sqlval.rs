@@ -59,7 +59,9 @@ pub trait ToSql {
     const SQLTYPE: SqlType;
     fn into_sql(self) -> SqlVal;
     fn to_sql(&self) -> SqlVal
-        where Self: Clone {
+    where
+        Self: Clone,
+    {
         self.clone().into_sql()
     }
 }
@@ -70,7 +72,10 @@ pub trait FromSql {
         Self: Sized;
 }
 
-impl <T> From<T> for SqlVal where T: ToSql {
+impl<T> From<T> for SqlVal
+where
+    T: ToSql,
+{
     fn from(val: T) -> Self {
         val.into_sql()
     }

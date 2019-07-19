@@ -130,9 +130,9 @@ fn get_primitive_sql_type(field: &Field) -> Option<DeferredSqlType> {
 fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
     let path = match &field.ty {
         syn::Type::Path(path) => &path.path,
-        _ => return None
+        _ => return None,
     };
-    let seg = 
+    let seg =
         if path.segments.len() == 2 && path.segments.first().unwrap().value().ident == "propane" {
             path.segments.last()
         } else {
@@ -143,27 +143,34 @@ fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
     }
     let args = match &seg.value().arguments {
         syn::PathArguments::AngleBracketed(args) => &args.args,
-        _ => return None
+        _ => return None,
     };
     if args.len() != 1 {
         panic!("ForeignKey should have a single type argument")
     }
     let typath = match args.last().unwrap().value() {
         syn::GenericArgument::Type(syn::Type::Path(typath)) => &typath.path,
-        _ => panic!("ForeignKey argument should be a type.")
+        _ => panic!("ForeignKey argument should be a type."),
     };
-    Some(DeferredSqlType::Deferred(TypeKey::PK(typath.segments.last()
-        .expect("ForeignKey must have an argument")
-        .value()
-        .ident.to_string())))
+    Some(DeferredSqlType::Deferred(TypeKey::PK(
+        typath
+            .segments
+            .last()
+            .expect("ForeignKey must have an argument")
+            .value()
+            .ident
+            .to_string(),
+    )))
 }
 
 fn get_deferred_sql_type(field: &Field) -> DeferredSqlType {
     get_primitive_sql_type(field)
         .or(get_foreign_key_sql_type(field))
-        .expect(&format!("Unsupported type {} for field '{}'",
+        .expect(&format!(
+            "Unsupported type {} for field '{}'",
             field.ty.clone().into_token_stream(),
-            field.ident.clone().expect("model fields must be named")))
+            field.ident.clone().expect("model fields must be named")
+        ))
 }
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
@@ -186,4 +193,3 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
         None
     }
 }
-

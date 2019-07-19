@@ -32,10 +32,7 @@ pub trait BackendConnection: Send + 'static {
         columns: &[Column],
         values: &[SqlVal],
     ) -> Result<()>;
-    fn delete(&self,
-        table: &'static str,
-        pkcol: &'static str,
-        pk: &SqlVal) -> Result<()>;
+    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()>;
 }
 
 pub struct Column {
@@ -140,11 +137,7 @@ impl BackendConnection for Connection {
     ) -> Result<()> {
         self.conn.insert_or_replace(table, columns, values)
     }
-    fn delete(&self,
-        table: &'static str,
-        pkcol: &'static str,
-        pk: &SqlVal) -> Result<()> {
-        
+    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
         self.conn.delete(table, pkcol, pk)
     }
 }

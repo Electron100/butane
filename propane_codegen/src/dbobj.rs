@@ -145,7 +145,7 @@ fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
 
 fn from_row_cell(f: &Field) -> TokenStream2 {
     let ident = f.ident.clone().unwrap();
-    quote!(#ident: it.next().unwrap().sql_into()?)
+    quote!(#ident: propane::SqlInto::sql_into(it.next().unwrap())?)
 }
 
 fn columns(ast_struct: &ItemStruct) -> TokenStream2 {

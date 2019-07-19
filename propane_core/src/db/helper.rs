@@ -15,7 +15,7 @@ where
         Val(v) => {
             values.push(v);
             w.write_str("?")
-        },
+        }
         Placeholder => w.write_str("?"),
         Condition(c) => match *c {
             Eq(col, ex) => write!(w, "{} = ", col).and_then(|_| Ok(f(ex, values, w))),

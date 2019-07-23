@@ -27,7 +27,7 @@ pub trait DBResult: Sized {
 }
 
 pub trait DBObject: DBResult<DBO = Self> {
-    type PKType: ToSql + FromSql + Clone;
+    type PKType: FieldType + Clone + PartialEq;
     const PKCOL: &'static str;
     const TABLE: &'static str;
     fn pk(&self) -> &Self::PKType;

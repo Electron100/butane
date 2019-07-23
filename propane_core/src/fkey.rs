@@ -89,10 +89,24 @@ impl<T> ToSql for ForeignKey<T>
 where
     T: DBObject,
 {
-    const SQLTYPE: SqlType = <T as DBObject>::PKType::SQLTYPE;
-    fn into_sql(self) -> SqlVal {
+    fn to_sql(&self) -> SqlVal {
         self.ensure_valpk().clone()
     }
+}
+impl<T> IntoSql for ForeignKey<T>
+where
+    T: DBObject,
+{
+    fn into_sql(self) -> SqlVal {
+        self.ensure_valpk();
+        self.valpk.into_inner().unwrap()
+    }
+}
+impl<T> FieldType for ForeignKey<T>
+where
+    T: DBObject,
+{
+    const SQLTYPE: SqlType = <T as DBObject>::PKType::SQLTYPE;
 }
 impl<T> FromSql for ForeignKey<T>
 where
@@ -103,5 +117,27 @@ where
             valpk: OnceCell::from(val),
             val: OnceCell::new(),
         })
+    }
+}
+impl<T> PartialEq<T> for ForeignKey<T>
+where
+    T: DBObject,
+{
+    fn eq(&self, other: &T) -> bool {
+        match self.val.get() {
+            Some(t) => return t.pk().eq(other.pk()),
+            None => match self.valpk.get() {
+                Some(valpk) => valpk.eq(&other.pk().to_sql()),
+                None => panic!("Invalid foreign key state"),
+            },
+        }
+    }
+}
+impl<T> PartialEq<&T> for ForeignKey<T>
+where
+    T: DBObject,
+{
+    fn eq(&self, other: &&T) -> bool {
+        self.eq(*other)
     }
 }

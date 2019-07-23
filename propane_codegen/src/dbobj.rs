@@ -12,10 +12,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
 
     let pk_field = pk_field(&ast_struct);
     if pk_field.is_none() {
-        return quote_spanned! {
-        ast_struct.span() =>
-            compile_error!("No pk field found");
-        };
+        return make_compile_error!(ast_struct.span() => "No pk field found");
     };
     let pk_field = pk_field.unwrap();
     let pktype = pk_field.ty;
@@ -84,6 +81,26 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
             fn delete(&self, conn: &impl propane::db::BackendConnection) -> propane::Result<()> {
                 use propane::ToSql;
                 conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
+            }
+        }
+        impl propane::ToSql for #tyname {
+            fn to_sql(&self) -> propane::SqlVal {
+                propane::ToSql::to_sql(self.pk())
+            }
+        }
+        impl propane::ToSql for &#tyname {
+            fn to_sql(&self) -> propane::SqlVal {
+                propane::ToSql::to_sql(self.pk())
+            }
+        }
+        impl PartialEq<ForeignKey<#tyname>> for #tyname {
+            fn eq(&self, other: &ForeignKey<#tyname>) -> bool {
+                other.eq(&self)
+            }
+        }
+        impl PartialEq<ForeignKey<#tyname>> for &#tyname {
+            fn eq(&self, other: &ForeignKey<#tyname>) -> bool {
+                other.eq(self)
             }
         }
     )
@@ -156,7 +173,7 @@ fn columns(ast_struct: &ItemStruct) -> TokenStream2 {
             Some(fname) => {
                 let ident = make_ident_literal_str(&fname);
                 let fty = &f.ty;
-                quote!(propane::db::Column::new(#ident, <#fty as propane::ToSql>::SQLTYPE),)
+                quote!(propane::db::Column::new(#ident, <#fty as propane::FieldType>::SQLTYPE),)
             }
             None => quote_spanned! {
                 f.span() =>

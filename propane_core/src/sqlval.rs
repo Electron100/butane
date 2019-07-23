@@ -56,13 +56,18 @@ impl SqlVal {
 }
 
 pub trait ToSql {
-    const SQLTYPE: SqlType;
+    fn to_sql(&self) -> SqlVal;
+}
+pub trait IntoSql {
     fn into_sql(self) -> SqlVal;
-    fn to_sql(&self) -> SqlVal
-    where
-        Self: Clone,
-    {
-        self.clone().into_sql()
+}
+
+impl<T> From<T> for SqlVal
+where
+    T: IntoSql,
+{
+    fn from(val: T) -> Self {
+        val.into_sql()
     }
 }
 
@@ -72,13 +77,9 @@ pub trait FromSql {
         Self: Sized;
 }
 
-impl<T> From<T> for SqlVal
-where
-    T: ToSql,
-{
-    fn from(val: T) -> Self {
-        val.into_sql()
-    }
+/// Type suitable for being a database column
+pub trait FieldType: ToSql + IntoSql + FromSql {
+    const SQLTYPE: SqlType;
 }
 
 macro_rules! impl_prim_sql {
@@ -92,12 +93,18 @@ macro_rules! impl_prim_sql {
                 }
             }
         }
-
-        impl ToSql for $prim {
-            const SQLTYPE: SqlType = SqlType::$sqltype;
+        impl IntoSql for $prim {
             fn into_sql(self) -> SqlVal {
                 SqlVal::$variant(self.into())
             }
+        }
+        impl ToSql for $prim {
+            fn to_sql(&self) -> SqlVal {
+                self.clone().into_sql()
+            }
+        }
+        impl FieldType for $prim {
+            const SQLTYPE: SqlType = SqlType::$sqltype;
         }
     };
 }
@@ -110,6 +117,12 @@ impl_prim_sql!(f64, Real, Real);
 impl_prim_sql!(f32, Real, Real);
 impl_prim_sql!(String, Text, Text);
 impl_prim_sql!(Vec<u8>, Blob, Blob);
+
+impl ToSql for &str {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Text(self.to_string())
+    }
+}
 
 // Cannot blanket impl TryInto for SqlVal because specialization is
 // not yet stable and there are conflicts with blanket impls in std.

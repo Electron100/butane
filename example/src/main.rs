@@ -1,5 +1,5 @@
 use failure;
-use propane::db::{BackendConnection, Connection, ConnectionSpec};
+use propane::db::{Connection, ConnectionSpec};
 use propane::model;
 use propane::ForeignKey;
 use propane::{find, query};
@@ -41,14 +41,10 @@ fn query() -> Result<()> {
     //let tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn);
     //let tagged_posts2 = query!(Post, tags.contains(tag = "dinosaurs")).load(&conn);
     let blog: Blog = find!(Blog, name == "Bears", &conn).unwrap();
-    //let posts_in_blog = query!(Post, blog == {blog}).load(&conn);
+    let posts_in_blog = query!(Post, blog == { &blog }).load(&conn);
+    let posts_in_blog2 = query!(Post, blog == { blog }).load(&conn);
     let posts_in_blog = query!(Post, blog.matches(name == "Bears")).load(&conn);
     Ok(())
-    /*
-
-        let blog = Blog::objects.find!(name = "Bears").expect();
-        let posts_in_blog = Post::objects().where!(blog = {blog})]
-    */
 }
 
 fn establish_connection() -> Result<Connection> {

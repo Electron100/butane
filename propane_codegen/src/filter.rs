@@ -15,11 +15,13 @@ pub fn handle_expr(fields: &impl ToTokens, expr: &Expr) -> TokenStream2 {
         Expr::MethodCall(mcall) => handle_call(fields, mcall),
         Expr::Path(path) => handle_path(fields, path),
         Expr::Lit(lit) => lit.lit.clone().into_token_stream(),
+        Expr::Block(block) => handle_block(&block.block),
         _ => {
             let lit = LitStr::new(
                 &format!(
-                    "Unsupported filter expression '{}'",
+                    "Unsupported filter expression '{}' {:?}",
                     expr.clone().into_token_stream(),
+                    expr
                 ),
                 Span::call_site(),
             );
@@ -30,6 +32,10 @@ pub fn handle_expr(fields: &impl ToTokens, expr: &Expr) -> TokenStream2 {
 
 fn ident(name: &str) -> Ident {
     Ident::new(name, Span::call_site())
+}
+
+fn handle_block(block: &syn::Block) -> TokenStream2 {
+    quote!(#block)
 }
 
 fn handle_bin_op(fields: &impl ToTokens, binop: &ExprBinary) -> TokenStream2 {

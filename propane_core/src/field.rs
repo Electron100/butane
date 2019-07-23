@@ -1,16 +1,16 @@
 use crate::fkey::ForeignKey;
 use crate::query::{BoolExpr, Expr};
-use crate::sqlval::{SqlVal, ToSql};
+use crate::sqlval::{IntoSql, SqlVal, ToSql};
 use crate::DBObject;
 use std::marker::PhantomData;
 
 macro_rules! binary_op {
     ($func_name:ident, $bound:path, $cond:ident) => {
-        pub fn $func_name(&self, val: impl Into<T>) -> BoolExpr
+        pub fn $func_name<U>(&self, val: U) -> BoolExpr
         where
-            T: $bound,
+            U: $bound + ToSql,
         {
-            BoolExpr::$cond(self.name, get_val(val))
+            BoolExpr::$cond(self.name, Expr::Val(val.to_sql()))
         }
     };
 }
@@ -34,12 +34,12 @@ where
         }
     }
 
-    binary_op!(eq, std::cmp::Eq, Eq);
-    binary_op!(ne, std::cmp::Eq, Ne);
-    binary_op!(lt, std::cmp::Ord, Lt);
-    binary_op!(gt, std::cmp::Ord, Gt);
-    binary_op!(le, std::cmp::Ord, Le);
-    binary_op!(ge, std::cmp::Ord, Ge);
+    binary_op!(eq, std::cmp::PartialEq<T>, Eq);
+    binary_op!(ne, std::cmp::PartialEq<T>, Ne);
+    binary_op!(lt, std::cmp::PartialOrd<T>, Lt);
+    binary_op!(gt, std::cmp::PartialOrd<T>, Gt);
+    binary_op!(le, std::cmp::PartialOrd<T>, Le);
+    binary_op!(ge, std::cmp::PartialOrd<T>, Ge);
 }
 impl<F: DBObject> FieldExpr<ForeignKey<F>> {
     pub fn subfilter(&self, q: BoolExpr) -> BoolExpr {
@@ -54,12 +54,4 @@ impl<F: DBObject> FieldExpr<ForeignKey<F>> {
     pub fn fields(&self) -> F::Fields {
         F::Fields::default()
     }
-}
-
-fn get_val<T>(val: impl Into<T>) -> Expr
-where
-    T: Into<SqlVal>,
-{
-    let val: T = val.into();
-    Expr::Val(val.into())
 }

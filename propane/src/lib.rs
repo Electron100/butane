@@ -6,7 +6,7 @@ pub use propane_core::fkey::ForeignKey;
 pub use propane_core::migrations;
 pub use propane_core::query;
 pub use propane_core::{
-    DBObject, DBResult, Error, FromSql, Result, SqlInto, SqlType, SqlVal, ToSql,
+    DBObject, DBResult, Error, FieldType, FromSql, IntoSql, Result, SqlInto, SqlType, SqlVal, ToSql,
 };
 
 #[proc_macro_hack]

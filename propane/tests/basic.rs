@@ -3,6 +3,8 @@ use propane::db::{Connection, ConnectionSpec};
 use propane::model;
 use propane::prelude::*;
 use propane::ForeignKey;
+use propane::find;
+use propane::query;
 
 mod common;
 
@@ -64,6 +66,46 @@ fn basic_crud(conn: Connection) {
     }
 }
 testall!(basic_crud);
+
+fn basic_find(conn: Connection) {
+    //create
+    let mut foo1 = Foo::new(1);
+    foo1.bar = 42;
+    foo1.baz = "hello world".to_string();
+    foo1.save(&conn).unwrap();
+    let mut foo2 = Foo::new(2);
+    foo2.bar = 43;
+    foo2.baz = "hello world".to_string();
+    foo2.save(&conn).unwrap();
+    
+    // find
+    let mut found = find!(Foo, bar == 43, &conn).unwrap();
+    assert_eq!(found, foo2);
+}
+testall!(basic_find);
+
+fn basic_query(conn: Connection) {
+    //create
+    let mut foo1 = Foo::new(1);
+    foo1.bar = 42;
+    foo1.baz = "hello world".to_string();
+    foo1.save(&conn).unwrap();
+    let mut foo2 = Foo::new(2);
+    foo2.bar = 43;
+    foo2.baz = "hello world".to_string();
+    foo2.save(&conn).unwrap();
+    
+    // query finds 1
+    let mut found = query!(Foo, bar == 42).load(&conn).unwrap();
+    assert_eq!(found.len(), 1);
+    assert_eq!(found.pop().unwrap(), foo1);
+
+
+    // query finds both
+    let found = query!(Foo, bar < 44).load(&conn).unwrap();
+    assert_eq!(found.len(), 2);
+}
+testall!(basic_query);
 
 fn string_pk(conn: Connection) {
     let mut foo = Foo::new(1);

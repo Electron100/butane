@@ -28,10 +28,9 @@ macro_rules! query {
 #[macro_export]
 macro_rules! find {
     ($dbobj:ident, $filter:expr, $conn:expr) => {
-        query!($dbobj, $filter)
+        propane::query!($dbobj, $filter)
             .limit(1)
-            .load($conn)?
-            .pop()
-            .ok_or(failure::Error::from(propane::Error::NoSuchObject))
+            .load($conn)
+            .and_then(|mut results| results.pop().ok_or(propane::Error::NoSuchObject))
     };
 }

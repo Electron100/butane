@@ -1,6 +1,8 @@
 use propane::db::ConnectionSpec;
 use propane::migrations::Migration;
 
+pub mod blog;
+
 pub fn setup_db(spec: &ConnectionSpec) {
     let mut root = std::env::current_dir().unwrap();
     root.push("propane/migrations");

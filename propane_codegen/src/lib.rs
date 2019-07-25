@@ -37,7 +37,7 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     // create field attributes)
     let ast_struct: ItemStruct = syn::parse(input).unwrap();
     quote!(
-        #[derive(Model)]
+        #[derive(propane::prelude::Model)]
         #ast_struct
     )
     .into()

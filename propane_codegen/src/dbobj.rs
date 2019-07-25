@@ -80,16 +80,19 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
             }
             fn delete(&self, conn: &impl propane::db::BackendConnection) -> propane::Result<()> {
                 use propane::ToSql;
+                use propane::prelude::DBObject;
                 conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
             }
         }
         impl propane::ToSql for #tyname {
             fn to_sql(&self) -> propane::SqlVal {
+                use propane::prelude::DBObject;
                 propane::ToSql::to_sql(self.pk())
             }
         }
         impl propane::ToSql for &#tyname {
             fn to_sql(&self) -> propane::SqlVal {
+                use propane::prelude::DBObject;
                 propane::ToSql::to_sql(self.pk())
             }
         }

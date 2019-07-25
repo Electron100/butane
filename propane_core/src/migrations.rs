@@ -1,15 +1,44 @@
 use crate::adb;
+pub use crate::adb::ADB;
 use crate::adb::*;
 use crate::db;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
-use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
-pub use crate::adb::ADB;
+pub trait Filesystem {
+    /// Ensure a directory exists, recursively creating missing components
+    fn ensure_dir(&self, path: &Path) -> std::io::Result<()>;
+    /// List all paths in a directory
+    fn list_dir(&self, path: &Path) -> std::io::Result<Vec<PathBuf>>;
+    /// Opens a file for writing. Creates it if it does not exist. Truncates it otherwise.
+    fn write(&self, path: &Path) -> std::io::Result<Box<dyn Write>>;
+    /// Opens a file for reading.
+    fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>>;
+}
+
+struct OsFilesystem {}
+
+impl Filesystem for OsFilesystem {
+    fn ensure_dir(&self, path: &Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(path)
+    }
+    fn list_dir(&self, path: &Path) -> std::io::Result<Vec<PathBuf>> {
+        std::fs::read_dir(path)?
+            .map(|entry| entry.map(|de| de.path()))
+            .collect()
+    }
+    fn write(&self, path: &Path) -> std::io::Result<Box<dyn Write>> {
+        std::fs::File::create(path).map(|f| Box::new(f) as Box<Write>)
+    }
+    fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>> {
+        std::fs::File::open(path).map(|f| Box::new(f) as Box<Read>)
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 struct MigrationInfo {
@@ -18,8 +47,8 @@ struct MigrationInfo {
     from_name: Option<String>,
 }
 
-#[derive(Clone)]
 pub struct Migration {
+    fs: Rc<Filesystem>,
     root: PathBuf,
 }
 impl Migration {
@@ -33,12 +62,17 @@ impl Migration {
     pub fn get_db(&self) -> Result<ADB> {
         let mut db = ADB::new();
         self.ensure_dir()?;
-        for entry in fs::read_dir(&self.root)? {
-            let entry = entry?;
-            if !entry.file_name().to_string_lossy().ends_with(".table") {
-                continue;
+        let entries = self.fs.list_dir(&self.root)?;
+        for entry in entries {
+            match entry.file_name() {
+                None => continue,
+                Some(name) => {
+                    if !name.to_string_lossy().ends_with(".table") {
+                        continue;
+                    }
+                }
             }
-            let table: ATable = serde_json::from_reader(fs::File::open(entry.path())?)?;
+            let table: ATable = serde_json::from_reader(self.fs.read(&entry)?)?;
             db.replace_table(table)
         }
         db.resolve_types()?;
@@ -48,7 +82,7 @@ impl Migration {
     /// Get the migration before this one (if any).
     pub fn get_from_migration(&self) -> Result<Option<Migration>> {
         let info: MigrationInfo =
-            serde_json::from_reader(fs::File::open(self.root.join("info.json"))?)?;
+            serde_json::from_reader(self.fs.read(&self.root.join("info.json"))?)?;
         match info.from_name {
             None => Ok(None),
             Some(name) => {
@@ -84,19 +118,23 @@ impl Migration {
 
     fn read_sql(&self, name: &str) -> Result<String> {
         let mut buf = String::new();
-        fs::File::open(self.root.join(&format!("{}.sql", name)))?.read_to_string(&mut buf)?;
+        self.fs
+            .read(&self.root.join(&format!("{}.sql", name)))?
+            .read_to_string(&mut buf)?;
         Ok(buf)
     }
 
     fn write_contents(&self, fname: &str, contents: &[u8]) -> Result<()> {
         self.ensure_dir()?;
         let path = self.root.join(fname);
-        let mut f = fs::File::create(path)?;
-        f.write_all(contents).map_err(|e| e.into())
+        self.fs
+            .write(&path)?
+            .write_all(contents)
+            .map_err(|e| e.into())
     }
 
     fn ensure_dir(&self) -> Result<()> {
-        fs::create_dir_all(&self.root).map_err(|e| e.into())
+        self.fs.ensure_dir(&self.root).map_err(|e| e.into())
     }
 }
 impl PartialEq for Migration {
@@ -117,13 +155,17 @@ impl MigrationsState {
 }
 
 pub struct Migrations {
+    fs: Rc<Filesystem>,
     root: PathBuf,
 }
 impl Migrations {
     pub fn get_migration(&self, name: &str) -> Migration {
         let mut dir = self.root.clone();
         dir.push(name);
-        Migration { root: dir }
+        Migration {
+            fs: self.fs.clone(),
+            root: dir,
+        }
     }
 
     pub fn get_current(&self) -> Migration {
@@ -207,12 +249,12 @@ impl Migrations {
         if !path.exists() {
             return Ok(MigrationsState::new());
         }
-        serde_json::from_reader(fs::File::open(path)?).map_err(|e| e.into())
+        serde_json::from_reader(self.fs.read(&path)?).map_err(|e| e.into())
     }
 
     fn save_state(&self, state: &MigrationsState) -> Result<()> {
         let path = self.root.join("state.json");
-        let mut f = fs::File::create(path)?;
+        let mut f = self.fs.write(&path)?;
         f.write_all(serde_json::to_string(state)?.as_bytes())
             .map_err(|e| e.into())
     }
@@ -220,6 +262,7 @@ impl Migrations {
 
 pub fn from_root<P: AsRef<Path>>(path: P) -> Migrations {
     Migrations {
+        fs: Rc::new(OsFilesystem {}),
         root: path.as_ref().to_path_buf(),
     }
 }

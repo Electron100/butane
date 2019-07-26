@@ -51,6 +51,7 @@ struct Tag {
 /// Sets up two blogs
 /// 1. "Cats"
 /// 2. "Mountains"
+#[allow(dead_code)] // only used by some test files
 pub fn setup_blog(conn: &Connection) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(conn).unwrap();

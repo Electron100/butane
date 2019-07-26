@@ -1,5 +1,5 @@
 use paste;
-use propane::db::{Connection, ConnectionSpec};
+use propane::db::Connection;
 use propane::find;
 use propane::model;
 use propane::prelude::*;

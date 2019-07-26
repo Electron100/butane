@@ -144,7 +144,7 @@ impl Migrations {
     /// Returns None if `from` and `to` represent identical states
     pub fn create_migration_sql(
         &self,
-        backend: impl db::Backend,
+        backend: &impl db::Backend,
         name: &str,
         from: Option<Migration>,
         to: &Migration,

@@ -40,6 +40,7 @@ where
             Subquery(col, tbl2, tbl2_col, ex) => {
                 write!(w, "{} IN (SELECT {} FROM {} WHERE ", col, tbl2_col, tbl2).unwrap();
                 f(Expr::Condition(ex), values, w);
+                write!(w, ")");
                 Ok(())
             }
         },

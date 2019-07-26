@@ -111,6 +111,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
 
 pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {
     let tyname = &ast_struct.ident;
+    let vis = &ast_struct.vis;
     let fieldexprs: Vec<TokenStream2> = ast_struct
         .fields
         .iter()
@@ -128,7 +129,7 @@ pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {
             let fnid = Ident::new(&format!("fieldexpr_{}", fid), f.span());
             let fty = &f.ty;
             quote!(
-                fn #fnid(&self) -> propane::field::FieldExpr<#fty> {
+                #vis fn #fnid(&self) -> propane::field::FieldExpr<#fty> {
                     propane::field::FieldExpr::<#fty>::new(#fidlit)
                 }
             )
@@ -142,7 +143,7 @@ pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {
                 #fields_type::default()
             }
         }
-        struct #fields_type {
+        #vis struct #fields_type {
         }
         impl #fields_type {
             #(#fieldexprs)*

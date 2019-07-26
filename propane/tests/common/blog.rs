@@ -3,9 +3,10 @@ use propane::prelude::*;
 use propane::{db::Connection, ForeignKey};
 
 #[model]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Blog {
-    id: i64,
-    name: String,
+    pub id: i64,
+    pub name: String,
 }
 impl Blog {
     pub fn new(id: i64, name: &str) -> Self {
@@ -17,15 +18,16 @@ impl Blog {
 }
 
 #[model]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Post {
-    id: i64,
-    title: String,
-    body: String,
-    published: bool,
-    likes: i32,
+    pub id: i64,
+    pub title: String,
+    pub body: String,
+    pub published: bool,
+    pub likes: i32,
     // TODO support ManyToMany
-    //tags: ManyToMany<Tag>,
-    blog: ForeignKey<Blog>,
+    //pub tags: ManyToMany<Tag>,
+    pub blog: ForeignKey<Blog>,
 }
 impl Post {
     pub fn new(id: i64, title: &str, body: &str, blog: &Blog) -> Self {
@@ -52,7 +54,7 @@ struct Tag {
 pub fn setup_blog(conn: &Connection) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(conn).unwrap();
-    let mut mountains_blog = Blog::new(1, "Mountains");
+    let mut mountains_blog = Blog::new(2, "Mountains");
     mountains_blog.save(conn).unwrap();
 
     let mut post = Post::new(
@@ -62,7 +64,7 @@ pub fn setup_blog(conn: &Connection) {
         &cats_blog,
     );
     post.published = true;
-    post.likes = 2;
+    post.likes = 4;
     post.save(conn).unwrap();
 
     let mut post = Post::new(
@@ -72,17 +74,17 @@ pub fn setup_blog(conn: &Connection) {
         &cats_blog,
     );
     post.published = true;
-    post.likes = 3;
+    post.likes = 20;
     post.save(conn).unwrap();
 
     let mut post = Post::new(
         3,
         "Mount Doom",
-        "Mount Doom is where you must throw evil rings",
+        "You must throw the ring into Mount Doom. Then you get to ride on a cool eagle.",
         &mountains_blog,
     );
     post.published = true;
-    post.likes = 4;
+    post.likes = 10;
     post.save(conn).unwrap();
 
     let mut post = Post::new(

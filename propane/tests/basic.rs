@@ -1,10 +1,10 @@
 use paste;
-use propane::db::{Connection, ConnectionSpec};
+use propane::db::Connection;
+use propane::find;
 use propane::model;
 use propane::prelude::*;
-use propane::ForeignKey;
-use propane::find;
 use propane::query;
+use propane::ForeignKey;
 
 mod common;
 
@@ -77,9 +77,9 @@ fn basic_find(conn: Connection) {
     foo2.bar = 43;
     foo2.baz = "hello world".to_string();
     foo2.save(&conn).unwrap();
-    
+
     // find
-    let mut found = find!(Foo, bar == 43, &conn).unwrap();
+    let found = find!(Foo, bar == 43, &conn).unwrap();
     assert_eq!(found, foo2);
 }
 testall!(basic_find);
@@ -94,12 +94,11 @@ fn basic_query(conn: Connection) {
     foo2.bar = 43;
     foo2.baz = "hello world".to_string();
     foo2.save(&conn).unwrap();
-    
+
     // query finds 1
     let mut found = query!(Foo, bar == 42).load(&conn).unwrap();
     assert_eq!(found.len(), 1);
     assert_eq!(found.pop().unwrap(), foo1);
-
 
     // query finds both
     let found = query!(Foo, bar < 44).load(&conn).unwrap();

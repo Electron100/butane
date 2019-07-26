@@ -73,7 +73,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 propane::query::Query::new(#table_lit)
             }
             fn save(&mut self, conn: &impl propane::db::BackendConnection) -> propane::Result<()> {
-                //todo use an array on the stack for better perf
+                //todo perf use an array on the stack for better
                 let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numfields);
                 #(#values)*
                 conn.insert_or_replace(Self::TABLE, <Self as propane::DBResult>::COLUMNS, &values)

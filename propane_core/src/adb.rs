@@ -52,6 +52,9 @@ impl ADB {
             tables: HashMap::new(),
         }
     }
+    pub fn tables(&self) -> impl Iterator<Item = &ATable> {
+        self.tables.values()
+    }
     pub fn get_table<'a>(&'a self, name: &str) -> Option<&'a ATable> {
         self.tables.get(name)
     }

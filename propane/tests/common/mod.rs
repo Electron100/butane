@@ -39,14 +39,24 @@ pub fn setup_db(backend: Box<Backend>, conn: &Connection) {
     let mut root = std::env::current_dir().unwrap();
     root.push("propane/migrations");
     let disk_migrations = propane::migrations::from_root(&root);
-    let current = disk_migrations.get_current();
+    let disk_current = disk_migrations.get_current();
+    // Create an in-memory Migrations and write only to that. This
+    // allows concurrent tests to avoid stomping on eachother and is
+    // also faster than real disk writes.
     let mem_migrations =
         propane::migrations::from_root_and_filesystem("/", MemoryFilesystem::new());
+    let mem_current = mem_migrations.get_current();
+
+    // Make mem_current have the same tables as disk_current
+    for table in disk_current.get_db().unwrap().tables() {
+        mem_current.write_table(table);
+    }
+
     let initial: Migration = mem_migrations
-        .create_migration_sql(&backend, &format!("init"), None, &current)
+        .create_migration(&backend, &format!("init"), None)
         .expect("expected to create migration without error")
         .expect("expected non-None migration");
-    let sql = initial.get_up_sql(backend.get_name()).unwrap();
+    let sql = initial.up_sql(backend.get_name()).unwrap();
     conn.execute(&sql).unwrap();
 }
 

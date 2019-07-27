@@ -100,12 +100,12 @@ impl Migration {
         self.root.file_name().unwrap().to_string_lossy()
     }
 
-    pub fn get_up_sql(&self, backend_name: &str) -> Result<String> {
-        self.read_sql(&format!("{}_up", backend_name))
+    pub fn up_sql(&self, backend_name: &str) -> Result<String> {
+        self.read_sql(backend_name, "up")
     }
 
-    pub fn get_down_sql(&self, backend_name: &str) -> Result<String> {
-        self.read_sql(&format!("{}_down", backend_name))
+    pub fn down_sql(&self, backend_name: &str) -> Result<String> {
+        self.read_sql(backend_name, "down")
     }
 
     fn write_info(&self, info: &MigrationInfo) -> Result<()> {
@@ -116,12 +116,15 @@ impl Migration {
         self.write_contents(&format!("{}.sql", name), sql.as_bytes())
     }
 
-    fn read_sql(&self, name: &str) -> Result<String> {
+    fn read_sql(&self, backend: &str, direction: &str) -> Result<String> {
+        let path = self.sql_path(backend, direction);
         let mut buf = String::new();
-        self.fs
-            .read(&self.root.join(&format!("{}.sql", name)))?
-            .read_to_string(&mut buf)?;
+        self.fs.read(&path)?.read_to_string(&mut buf)?;
         Ok(buf)
+    }
+
+    fn sql_path(&self, backend: &str, direction: &str) -> PathBuf {
+        self.root.join(&format!("{}_{}.sql", backend, direction))
     }
 
     fn write_contents(&self, fname: &str, contents: &[u8]) -> Result<()> {
@@ -159,19 +162,17 @@ pub struct Migrations {
     root: PathBuf,
 }
 impl Migrations {
-    pub fn get_migration(&self, name: &str) -> Migration {
-        let mut dir = self.root.clone();
-        dir.push(name);
-        Migration {
-            fs: self.fs.clone(),
-            root: dir,
-        }
-    }
-
+    /// Get a migration representing the current state as determined
+    /// by the last build of models. This does not necessarily match
+    /// the current state of the database if migrations have not yet been applied.
+    ///
+    /// This migration is named "current".
     pub fn get_current(&self) -> Migration {
         self.get_migration("current")
     }
 
+    /// Get the most recent migration other than "current" or None if
+    /// no migrations have been created.
     pub fn get_latest(&self) -> Option<Migration> {
         self.get_state()
             .map(|state| match state.latest {
@@ -181,20 +182,19 @@ impl Migrations {
             .unwrap_or(None)
     }
 
-    /// Create a migration `from` -> `to`. From may be None, in which
+    /// Create a migration `from` -> `current` named `name`. From may be None, in which
     /// case the migration is created from an empty database.
-    /// Returns None if `from` and `to` represent identical states
-    pub fn create_migration_sql(
+    /// Returns None if `from` and `current` represent identical states
+    pub fn create_migration(
         &self,
         backend: &impl db::Backend,
         name: &str,
         from: Option<Migration>,
-        to: &Migration,
     ) -> Result<Option<Migration>> {
         let empty_db = Ok(ADB::new());
         let from_name = from.as_ref().map(|m| m.get_name().to_string());
         let from_db = from.map_or(empty_db, |m| m.get_db())?;
-        let to_db = to.get_db()?;
+        let to_db = self.get_current().get_db()?;
         let ops = &adb::diff(&from_db, &to_db);
         if ops.is_empty() {
             return Ok(None);
@@ -242,6 +242,15 @@ impl Migrations {
             accum.push(m);
         }
         Ok(accum.into_iter().rev().collect())
+    }
+
+    fn get_migration(&self, name: &str) -> Migration {
+        let mut dir = self.root.clone();
+        dir.push(name);
+        Migration {
+            fs: self.fs.clone(),
+            root: dir,
+        }
     }
 
     fn get_state(&self) -> Result<MigrationsState> {

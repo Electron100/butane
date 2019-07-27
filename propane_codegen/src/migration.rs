@@ -12,7 +12,7 @@ pub fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<(), Error> {
     dir.push("propane");
     dir.push("migrations");
     migrations::from_root(&dir)
-        .get_migration("current")
+        .get_current()
         .write_table(&create_atable(ast_struct))
         .map_err(|e| e.into())
 }

@@ -124,22 +124,6 @@ impl ToSql for &str {
     }
 }
 
-//todo why not just use FromSql
-// Cannot blanket impl TryInto for SqlVal because specialization is
-// not yet stable and there are conflicts with blanket impls in std.
-pub trait SqlInto<T> {
-    fn sql_into(self) -> Result<T>;
-}
-
-impl<T> SqlInto<T> for SqlVal
-where
-    T: FromSql,
-{
-    fn sql_into(self) -> Result<T> {
-        T::from_sql(self)
-    }
-}
-
 impl fmt::Display for SqlVal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use SqlVal::*;

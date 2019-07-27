@@ -12,3 +12,4 @@ proc-macro-hack = "0.5"
 
 [dev-dependencies]
 paste = "0.1"
+rsfs = "0.4"

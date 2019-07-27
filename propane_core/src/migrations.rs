@@ -246,10 +246,17 @@ impl Migrations {
 
     fn get_state(&self) -> Result<MigrationsState> {
         let path = self.root.join("state.json");
-        if !path.exists() {
-            return Ok(MigrationsState::new());
+        let fr = self.fs.read(&path);
+        match fr {
+            Ok(f) => serde_json::from_reader(f).map_err(|e| e.into()),
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    Ok(MigrationsState::new())
+                } else {
+                    Err(e.into())
+                }
+            }
         }
-        serde_json::from_reader(self.fs.read(&path)?).map_err(|e| e.into())
     }
 
     fn save_state(&self, state: &MigrationsState) -> Result<()> {
@@ -260,9 +267,16 @@ impl Migrations {
     }
 }
 
-pub fn from_root<P: AsRef<Path>>(path: P) -> Migrations {
+pub fn from_root_and_filesystem<P: AsRef<Path>>(
+    path: P,
+    fs: impl Filesystem + 'static,
+) -> Migrations {
     Migrations {
-        fs: Rc::new(OsFilesystem {}),
+        fs: Rc::new(fs),
         root: path.as_ref().to_path_buf(),
     }
+}
+
+pub fn from_root<P: AsRef<Path>>(path: P) -> Migrations {
+    from_root_and_filesystem(path, OsFilesystem {})
 }

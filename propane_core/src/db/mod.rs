@@ -34,6 +34,7 @@ pub trait BackendConnection: Send + 'static {
         values: &[SqlVal],
     ) -> Result<()>;
     fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()>;
+    fn has_table(&self, table: &'static str) -> Result<bool>;
 }
 
 pub struct Column {
@@ -121,6 +122,9 @@ impl BackendConnection for Connection {
     }
     fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
         self.conn.delete(table, pkcol, pk)
+    }
+    fn has_table(&self, table: &'static str) -> Result<bool> {
+        self.conn.has_table(table)
     }
 }
 

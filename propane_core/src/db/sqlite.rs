@@ -100,6 +100,13 @@ impl BackendConnection for SQLiteConnection {
         self.conn.execute(&sql, &[&pk])?;
         Ok(())
     }
+    fn has_table(&self, table: &'static str) -> Result<bool> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
+        let mut rows = stmt.query(&[table])?;
+        Ok(rows.next()?.is_some())
+    }
 }
 
 impl rusqlite::ToSql for SqlVal {

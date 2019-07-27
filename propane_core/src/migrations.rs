@@ -266,13 +266,9 @@ impl Migrations {
         &self,
         conn: &impl db::BackendConnection,
     ) -> Result<Vec<Migration>> {
-        match self.get_last_applied_migration(conn) {
-            Ok(None) => self.get_all_migrations(),
-            Ok(Some(m)) => self.get_migrations_since(&m),
-            // todo properly detect when the propane_migrations table
-            // doesn't exist yet rather than assuming all failures
-            // mean this
-            Err(_) => self.get_all_migrations(),
+        match self.get_last_applied_migration(conn)? {
+            None => self.get_all_migrations(),
+            Some(m) => self.get_migrations_since(&m),
         }
     }
 
@@ -282,6 +278,9 @@ impl Migrations {
         &self,
         conn: &impl db::BackendConnection,
     ) -> Result<Option<Migration>> {
+        if !conn.has_table(PropaneMigration::TABLE)? {
+            return Ok(None);
+        }
         let migrations: Result<Vec<PropaneMigration>> = conn
             .query(
                 PropaneMigration::TABLE,

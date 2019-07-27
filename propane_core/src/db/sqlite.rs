@@ -50,6 +50,9 @@ impl SQLiteConnection {
     }
 }
 impl BackendConnection for SQLiteConnection {
+    fn backend_name(&self) -> &'static str {
+        "sqlite"
+    }
     fn execute(&self, sql: &str) -> Result<()> {
         self.conn.execute_batch(sql.as_ref())?;
         Ok(())

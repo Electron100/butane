@@ -1,8 +1,8 @@
 use crate::adb;
 pub use crate::adb::ADB;
 use crate::adb::*;
-use crate::db;
-use crate::{Error, Result};
+use crate::sqlval::{FromSql, SqlVal, ToSql};
+use crate::{db, query, DBObject, DBResult, Error, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
@@ -100,6 +100,16 @@ impl Migration {
         self.root.file_name().unwrap().to_string_lossy()
     }
 
+    pub fn apply(&self, conn: &impl db::BackendConnection) -> Result<()> {
+        // todo use a transaction
+        conn.execute(&self.up_sql(conn.backend_name())?)?;
+        conn.insert_or_replace(
+            PropaneMigration::TABLE,
+            PropaneMigration::COLUMNS,
+            &[self.get_name().as_ref().to_sql()],
+        )
+    }
+
     pub fn up_sql(&self, backend_name: &str) -> Result<String> {
         self.read_sql(backend_name, "up")
     }
@@ -193,13 +203,20 @@ impl Migrations {
     ) -> Result<Option<Migration>> {
         let empty_db = Ok(ADB::new());
         let from_name = from.as_ref().map(|m| m.get_name().to_string());
+        let from_none = from.is_none();
         let from_db = from.map_or(empty_db, |m| m.get_db())?;
         let to_db = self.get_current().get_db()?;
-        let ops = &adb::diff(&from_db, &to_db);
+        let mut ops = adb::diff(&from_db, &to_db);
         if ops.is_empty() {
             return Ok(None);
         }
-        let sql = backend.create_migration_sql(&from_db, ops);
+
+        if from_none {
+            // This is the first migration. Create the propane_migration table
+            ops.push(Operation::AddTable(migrations_table()));
+        }
+
+        let sql = backend.create_migration_sql(&from_db, &ops);
         let m = self.get_migration(name);
         m.write_sql(&format!("{}_up", backend.get_name()), &sql)?;
         // And write the undo
@@ -244,6 +261,51 @@ impl Migrations {
         Ok(accum.into_iter().rev().collect())
     }
 
+    /// Get migrations which have not yet been applied to the database
+    pub fn get_unapplied_migrations(
+        &self,
+        conn: &impl db::BackendConnection,
+    ) -> Result<Vec<Migration>> {
+        match self.get_last_applied_migration(conn) {
+            Ok(None) => self.get_all_migrations(),
+            Ok(Some(m)) => self.get_migrations_since(&m),
+            // todo properly detect when the propane_migrations table
+            // doesn't exist yet rather than assuming all failures
+            // mean this
+            Err(_) => self.get_all_migrations(),
+        }
+    }
+
+    /// Get the last migration that has been applied to the database or None
+    /// if no migrations have been applied
+    pub fn get_last_applied_migration(
+        &self,
+        conn: &impl db::BackendConnection,
+    ) -> Result<Option<Migration>> {
+        let migrations: Result<Vec<PropaneMigration>> = conn
+            .query(
+                PropaneMigration::TABLE,
+                PropaneMigration::COLUMNS,
+                None,
+                None,
+            )?
+            .into_iter()
+            .map(|row| PropaneMigration::from_row(row))
+            .collect();
+        let migrations = migrations?;
+
+        let mut m_opt = self.get_latest();
+        while let Some(m) = m_opt {
+            if !migrations.contains(&PropaneMigration {
+                name: m.get_name().to_string(),
+            }) {
+                return Ok(Some(m));
+            }
+            m_opt = m.get_from_migration()?;
+        }
+        Ok(None)
+    }
+
     fn get_migration(&self, name: &str) -> Migration {
         let mut dir = self.root.clone();
         dir.push(name);
@@ -276,6 +338,19 @@ impl Migrations {
     }
 }
 
+fn migrations_table() -> ATable {
+    let mut table = ATable::new("propane_migrations".to_string());
+    let col = AColumn::new(
+        "name",
+        DeferredSqlType::Known(SqlType::Text),
+        false,
+        true,
+        None,
+    );
+    table.add_column(col);
+    table
+}
+
 pub fn from_root_and_filesystem<P: AsRef<Path>>(
     path: P,
     fs: impl Filesystem + 'static,
@@ -288,4 +363,51 @@ pub fn from_root_and_filesystem<P: AsRef<Path>>(
 
 pub fn from_root<P: AsRef<Path>>(path: P) -> Migrations {
     from_root_and_filesystem(path, OsFilesystem {})
+}
+
+#[derive(PartialEq)]
+struct PropaneMigration {
+    name: String,
+}
+impl DBResult for PropaneMigration {
+    type DBO = Self;
+    type Fields = (); // we don't need Fields as we never filter
+    const COLUMNS: &'static [db::Column] = &[db::Column::new("name", SqlType::Text)];
+    fn from_row(row: db::Row) -> Result<Self> {
+        if row.len() != 1usize {
+            return Err(Error::BoundsError.into());
+        }
+        let mut it = row.into_iter();
+        Ok(PropaneMigration {
+            name: FromSql::from_sql(it.next().unwrap())?,
+        })
+    }
+}
+impl DBObject for PropaneMigration {
+    type PKType = String;
+    const PKCOL: &'static str = "name";
+    const TABLE: &'static str = "propane_migrations";
+    fn pk(&self) -> &String {
+        &self.name
+    }
+    fn get(conn: &impl db::BackendConnection, id: Self::PKType) -> Result<Self> {
+        Self::query()
+            .filter(query::BoolExpr::Eq("name", query::Expr::Val(id.into())))
+            .limit(1)
+            .load(conn)?
+            .into_iter()
+            .nth(0)
+            .ok_or(Error::NoSuchObject.into())
+    }
+    fn query() -> query::Query<Self> {
+        query::Query::new("propane_migrations")
+    }
+    fn save(&mut self, conn: &impl db::BackendConnection) -> Result<()> {
+        let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);
+        values.push(self.name.to_sql());
+        conn.insert_or_replace(Self::TABLE, <Self as DBResult>::COLUMNS, &values)
+    }
+    fn delete(&self, conn: &impl db::BackendConnection) -> Result<()> {
+        conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
+    }
 }

@@ -1,5 +1,4 @@
 use propane::db::{Backend, Connection};
-use propane::migrations::Migration;
 use rsfs;
 use rsfs::{DirEntry, GenFS};
 use std::io::{Read, Write};
@@ -49,15 +48,18 @@ pub fn setup_db(backend: Box<Backend>, conn: &Connection) {
 
     // Make mem_current have the same tables as disk_current
     for table in disk_current.get_db().unwrap().tables() {
-        mem_current.write_table(table);
+        mem_current.write_table(table).unwrap();
     }
 
-    let initial: Migration = mem_migrations
+    mem_migrations
         .create_migration(&backend, &format!("init"), None)
         .expect("expected to create migration without error")
         .expect("expected non-None migration");
-    let sql = initial.up_sql(backend.get_name()).unwrap();
-    conn.execute(&sql).unwrap();
+    let to_apply = mem_migrations.get_unapplied_migrations(conn).unwrap();
+    for m in to_apply {
+        println!("Applying migration {}", m.get_name());
+        m.apply(conn).unwrap();
+    }
 }
 
 #[macro_export]

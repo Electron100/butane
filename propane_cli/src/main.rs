@@ -92,10 +92,10 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
 fn migrate() -> Result<()> {
     let spec = db::ConnectionSpec::load(&base_dir()?)?;
     let conn = db::connect(&spec)?;
-    // todo check already applied migrations, store migrations in db
-    let to_apply = get_migrations()?.get_all_migrations()?;
+    let to_apply = get_migrations()?.get_unapplied_migrations(&conn);
     for m in to_apply {
-        conn.execute(m.get_up_sql(&spec.backend_name)?)?;
+        println!("Applying migration {}", m.get_name());
+        m.apply(&conn)?;
     }
     Ok(())
 }

@@ -18,6 +18,7 @@ pub enum Modification {
 }
 
 pub trait BackendConnection: Send + 'static {
+    fn backend_name(&self) -> &'static str;
     fn execute(&self, sql: &str) -> Result<()>;
     fn query(
         &self,
@@ -64,21 +65,6 @@ impl Row {
     pub fn get<'a>(&'a self, idx: usize) -> Result<&'a SqlVal> {
         self.vals.get(idx).ok_or(BoundsError)
     }
-    /*
-    /// Extracts an owned value out of the row. Can only be done once
-    /// for each value (subsequent attempts will return ValueAlreadyRetrieved)
-    pub fn retrieve(&mut self, idx: usize) -> Result<SqlVal> {
-        let val: &mut Option<SqlVal> = self
-            .vals
-            .get_mut(idx)
-            .ok_or(failure::Error::from(BoundsError))?;
-        if val.is_none() {
-            return Err(ValueAlreadyRetrieved.into());
-        }
-        let mut tmp = None;
-        std::mem::swap(val, &mut tmp);
-        Ok(tmp.unwrap())
-    }*/
     pub fn get_int(&self, idx: usize) -> Result<i64> {
         self.get(idx)?.integer()
     }
@@ -88,13 +74,6 @@ impl Row {
     pub fn get_real(&self, idx: usize) -> Result<f64> {
         self.get(idx)?.real()
     }
-
-    /*pub fn retrieve_text(&mut self, idx: usize) -> Result<String> {
-        self.retrieve(idx)?.owned_text()
-    }
-    pub fn retrieve_blob(&mut self, idx: usize) -> Result<Vec<u8>> {
-        self.retrieve(idx)?.owned_blob()
-    }*/
 }
 impl IntoIterator for Row {
     type Item = SqlVal;
@@ -117,6 +96,9 @@ impl Connection {
     }
 }
 impl BackendConnection for Connection {
+    fn backend_name(&self) -> &'static str {
+        self.conn.backend_name()
+    }
     fn execute(&self, sql: &str) -> Result<()> {
         self.conn.execute(sql)
     }

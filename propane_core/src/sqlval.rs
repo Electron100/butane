@@ -124,6 +124,7 @@ impl ToSql for &str {
     }
 }
 
+//todo why not just use FromSql
 // Cannot blanket impl TryInto for SqlVal because specialization is
 // not yet stable and there are conflicts with blanket impls in std.
 pub trait SqlInto<T> {

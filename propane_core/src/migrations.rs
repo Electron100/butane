@@ -1,6 +1,7 @@
 use crate::adb;
 pub use crate::adb::ADB;
 use crate::adb::*;
+use crate::db::ConnectionMethods;
 use crate::sqlval::{FromSql, SqlVal, ToSql};
 use crate::{db, query, DBObject, DBResult, Error, Result, SqlType};
 use serde::{Deserialize, Serialize};
@@ -100,14 +101,15 @@ impl Migration {
         self.root.file_name().unwrap().to_string_lossy()
     }
 
-    pub fn apply(&self, conn: &impl db::BackendConnection) -> Result<()> {
-        // todo use a transaction
-        conn.execute(&self.up_sql(conn.backend_name())?)?;
-        conn.insert_or_replace(
+    pub fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
+        let tx = conn.transaction()?;
+        tx.execute(&self.up_sql(tx.backend_name())?)?;
+        tx.insert_or_replace(
             PropaneMigration::TABLE,
             PropaneMigration::COLUMNS,
             &[self.get_name().as_ref().to_sql()],
-        )
+        )?;
+        tx.commit()
     }
 
     pub fn up_sql(&self, backend_name: &str) -> Result<String> {
@@ -264,7 +266,7 @@ impl Migrations {
     /// Get migrations which have not yet been applied to the database
     pub fn get_unapplied_migrations(
         &self,
-        conn: &impl db::BackendConnection,
+        conn: &impl db::ConnectionMethods,
     ) -> Result<Vec<Migration>> {
         match self.get_last_applied_migration(conn)? {
             None => self.get_all_migrations(),
@@ -276,7 +278,7 @@ impl Migrations {
     /// if no migrations have been applied
     pub fn get_last_applied_migration(
         &self,
-        conn: &impl db::BackendConnection,
+        conn: &impl db::ConnectionMethods,
     ) -> Result<Option<Migration>> {
         if !conn.has_table(PropaneMigration::TABLE)? {
             return Ok(None);
@@ -389,7 +391,7 @@ impl DBObject for PropaneMigration {
     fn pk(&self) -> &String {
         &self.name
     }
-    fn get(conn: &impl db::BackendConnection, id: Self::PKType) -> Result<Self> {
+    fn get(conn: &impl db::ConnectionMethods, id: Self::PKType) -> Result<Self> {
         Self::query()
             .filter(query::BoolExpr::Eq("name", query::Expr::Val(id.into())))
             .limit(1)
@@ -401,12 +403,12 @@ impl DBObject for PropaneMigration {
     fn query() -> query::Query<Self> {
         query::Query::new("propane_migrations")
     }
-    fn save(&mut self, conn: &impl db::BackendConnection) -> Result<()> {
+    fn save(&mut self, conn: &impl db::ConnectionMethods) -> Result<()> {
         let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);
         values.push(self.name.to_sql());
         conn.insert_or_replace(Self::TABLE, <Self as DBResult>::COLUMNS, &values)
     }
-    fn delete(&self, conn: &impl db::BackendConnection) -> Result<()> {
+    fn delete(&self, conn: &impl db::ConnectionMethods) -> Result<()> {
         conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
     }
 }

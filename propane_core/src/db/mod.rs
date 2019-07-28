@@ -6,18 +6,22 @@ use serde_json;
 use std::borrow::Cow;
 use std::fs;
 use std::io::Write;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::vec::Vec;
 
 mod helper;
+mod macros;
 mod sqlite;
+
+// Macros are always exported at the root of the crate
+use crate::connection_method_wrapper;
 
 pub enum Modification {
     InsertOnly,
 }
 
-pub trait BackendConnection: Send + 'static {
+pub trait ConnectionMethods {
     fn backend_name(&self) -> &'static str;
     fn execute(&self, sql: &str) -> Result<()>;
     fn query(
@@ -34,7 +38,12 @@ pub trait BackendConnection: Send + 'static {
         values: &[SqlVal],
     ) -> Result<()>;
     fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()>;
+    /// Tests if a table exists in the database.
     fn has_table(&self, table: &'static str) -> Result<bool>;
+}
+
+pub trait BackendConnection: ConnectionMethods + Send + 'static {
+    fn transaction<'c>(&'c mut self) -> Result<Transaction<'c>>;
 }
 
 pub struct Column {
@@ -97,36 +106,11 @@ impl Connection {
     }
 }
 impl BackendConnection for Connection {
-    fn backend_name(&self) -> &'static str {
-        self.conn.backend_name()
-    }
-    fn execute(&self, sql: &str) -> Result<()> {
-        self.conn.execute(sql)
-    }
-    fn query(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        expr: Option<BoolExpr>,
-        limit: Option<i32>,
-    ) -> Result<RawQueryResult> {
-        self.conn.query(table, columns, expr, limit)
-    }
-    fn insert_or_replace(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()> {
-        self.conn.insert_or_replace(table, columns, values)
-    }
-    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
-        self.conn.delete(table, pkcol, pk)
-    }
-    fn has_table(&self, table: &'static str) -> Result<bool> {
-        self.conn.has_table(table)
+    fn transaction(&mut self) -> Result<Transaction> {
+        self.conn.transaction()
     }
 }
+connection_method_wrapper!(Connection);
 
 #[derive(Serialize, Deserialize)]
 pub struct ConnectionSpec {
@@ -193,4 +177,56 @@ pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     get_backend(&spec.backend_name)
         .ok_or(Error::UnknownBackend(spec.backend_name.clone()))?
         .connect(&spec.conn_str)
+}
+
+trait BackendTransaction<'c>: ConnectionMethods {
+    /// Commit the transaction Unfortunately because we use this as a
+    /// trait object, we can't consume self. It should be understood
+    /// that no methods should be called after commit. This trait is
+    /// not public, and that behavior is enforced by Transaction
+    fn commit(&mut self) -> Result<()>;
+}
+
+pub struct Transaction<'c> {
+    trans: Box<dyn BackendTransaction<'c> + 'c>,
+}
+impl<'c> Transaction<'c> {
+    fn new(trans: Box<dyn BackendTransaction<'c> + 'c>) -> Self {
+        Transaction { trans }
+    }
+    /// Commit the transaction
+    pub fn commit(mut self) -> Result<()> {
+        self.trans.deref_mut().commit()
+    }
+}
+impl ConnectionMethods for Transaction<'_> {
+    fn backend_name(&self) -> &'static str {
+        self.trans.backend_name()
+    }
+    fn execute(&self, sql: &str) -> Result<()> {
+        self.trans.execute(sql)
+    }
+    fn query(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+    ) -> Result<RawQueryResult> {
+        self.trans.query(table, columns, expr, limit)
+    }
+    fn insert_or_replace(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        self.trans.insert_or_replace(table, columns, values)
+    }
+    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
+        self.trans.delete(table, pkcol, pk)
+    }
+    fn has_table(&self, table: &'static str) -> Result<bool> {
+        self.trans.has_table(table)
+    }
 }

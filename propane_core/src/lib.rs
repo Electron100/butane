@@ -31,12 +31,12 @@ pub trait DBObject: DBResult<DBO = Self> {
     const PKCOL: &'static str;
     const TABLE: &'static str;
     fn pk(&self) -> &Self::PKType;
-    fn get(conn: &impl db::BackendConnection, id: Self::PKType) -> Result<Self>
+    fn get(conn: &impl db::ConnectionMethods, id: Self::PKType) -> Result<Self>
     where
         Self: Sized;
     fn query() -> Query<Self>;
-    fn save(&mut self, conn: &impl db::BackendConnection) -> Result<()>;
-    fn delete(&self, conn: &impl db::BackendConnection) -> Result<()>;
+    fn save(&mut self, conn: &impl db::ConnectionMethods) -> Result<()>;
+    fn delete(&self, conn: &impl db::ConnectionMethods) -> Result<()>;
 }
 
 pub trait ModelTyped {
@@ -63,6 +63,8 @@ pub enum Error {
     UnknownBackend(String),
     #[fail(display = "Range error")]
     OutOfRange,
+    #[fail(display = "Internal logic error")]
+    Internal,
     #[fail(display = "(De)serialization error {}", 0)]
     SerdeJson(serde_json::Error),
     #[fail(display = "IO error {}", 0)]

@@ -50,11 +50,50 @@ impl SQLiteConnection {
     }
 }
 impl BackendConnection for SQLiteConnection {
+    fn transaction<'c>(&'c mut self) -> Result<Transaction<'c>> {
+        let trans: rusqlite::Transaction<'_> = self.conn.transaction()?;
+        let trans = Box::new(SqliteTransaction::new(trans));
+        Ok(Transaction::new(trans))
+    }
+}
+impl ConnectionMethods for SQLiteConnection {
+    fn backend_name(&self) -> &'static str {
+        self.conn.backend_name()
+    }
+    fn execute(&self, sql: &str) -> Result<()> {
+        <rusqlite::Connection as ConnectionMethods>::execute(&self.conn, sql)
+    }
+    fn query(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+    ) -> Result<RawQueryResult> {
+        self.conn.query(table, columns, expr, limit)
+    }
+    fn insert_or_replace(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        self.conn.insert_or_replace(table, columns, values)
+    }
+    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
+        self.conn.delete(table, pkcol, pk)
+    }
+    fn has_table(&self, table: &'static str) -> Result<bool> {
+        self.conn.has_table(table)
+    }
+}
+
+impl ConnectionMethods for rusqlite::Connection {
     fn backend_name(&self) -> &'static str {
         "sqlite"
     }
     fn execute(&self, sql: &str) -> Result<()> {
-        self.conn.execute_batch(sql.as_ref())?;
+        self.execute_batch(sql.as_ref())?;
         Ok(())
     }
     fn query(
@@ -78,7 +117,7 @@ impl BackendConnection for SQLiteConnection {
         if let Some(limit) = limit {
             helper::sql_limit(limit, &mut sqlquery)
         }
-        let mut stmt = self.conn.prepare(&sqlquery)?;
+        let mut stmt = self.prepare(&sqlquery)?;
         let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
         rows.collect()
     }
@@ -90,22 +129,74 @@ impl BackendConnection for SQLiteConnection {
     ) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_or_replace_with_placeholders(table, columns, &mut sql);
-        self.conn
-            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
+        self.execute(&sql, &values.iter().collect::<Vec<_>>())?;
         Ok(())
     }
     fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
         let mut sql = String::new();
         helper::sql_delete_with_placeholder(table, pkcol, &mut sql);
-        self.conn.execute(&sql, &[&pk])?;
+        self.execute(&sql, &[&pk])?;
         Ok(())
     }
     fn has_table(&self, table: &'static str) -> Result<bool> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
+        let mut stmt =
+            self.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
         let mut rows = stmt.query(&[table])?;
         Ok(rows.next()?.is_some())
+    }
+}
+
+struct SqliteTransaction<'c> {
+    trans: Option<rusqlite::Transaction<'c>>,
+}
+impl<'c> SqliteTransaction<'c> {
+    fn new(trans: rusqlite::Transaction<'c>) -> Self {
+        SqliteTransaction { trans: Some(trans) }
+    }
+    fn get(&self) -> Result<&rusqlite::Transaction<'c>> {
+        match &self.trans {
+            None => Err(Error::Internal),
+            Some(trans) => Ok(trans),
+        }
+    }
+}
+impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
+    fn commit(&mut self) -> Result<()> {
+        match self.trans.take() {
+            None => Err(Error::Internal),
+            Some(trans) => Ok(trans.commit()?),
+        }
+    }
+}
+impl ConnectionMethods for SqliteTransaction<'_> {
+    fn backend_name(&self) -> &'static str {
+        "sqlite"
+    }
+    fn execute(&self, sql: &str) -> Result<()> {
+        <rusqlite::Connection as ConnectionMethods>::execute(self.get()?.deref(), sql)
+    }
+    fn query(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+    ) -> Result<RawQueryResult> {
+        self.get()?.query(table, columns, expr, limit)
+    }
+    fn insert_or_replace(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        self.get()?.insert_or_replace(table, columns, values)
+    }
+    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
+        self.get()?.delete(table, pkcol, pk)
+    }
+    fn has_table(&self, table: &'static str) -> Result<bool> {
+        self.get()?.has_table(table)
     }
 }
 

@@ -34,7 +34,7 @@ impl propane::migrations::Filesystem for MemoryFilesystem {
     }
 }
 
-pub fn setup_db(backend: Box<Backend>, conn: &Connection) {
+pub fn setup_db(backend: Box<Backend>, conn: &mut Connection) {
     let mut root = std::env::current_dir().unwrap();
     root.push("propane/migrations");
     let disk_migrations = propane::migrations::from_root(&root);
@@ -69,8 +69,8 @@ macro_rules! maketest {
             #[test]
             pub fn [<$fname _ $backend>]() {
                 let backend = propane::db::get_backend(&stringify!($backend)).unwrap();
-                let conn = backend.connect(&$connstr).unwrap();
-                crate::common::setup_db(backend, &conn);
+                let mut conn = backend.connect(&$connstr).unwrap();
+                crate::common::setup_db(backend, &mut conn);
                 $fname(conn);
             }
         }

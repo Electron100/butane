@@ -58,7 +58,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 &self.#pkident
             }
             fn get(
-                conn: &impl propane::db::BackendConnection,
+                conn: &impl propane::db::ConnectionMethods,
                 id: Self::PKType,
             ) -> propane::Result<Self> {
                 Self::query()
@@ -72,13 +72,13 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
             fn query() -> propane::query::Query<Self> {
                 propane::query::Query::new(#table_lit)
             }
-            fn save(&mut self, conn: &impl propane::db::BackendConnection) -> propane::Result<()> {
+            fn save(&mut self, conn: &impl propane::db::ConnectionMethods) -> propane::Result<()> {
                 //todo perf use an array on the stack for better
                 let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numfields);
                 #(#values)*
                 conn.insert_or_replace(Self::TABLE, <Self as propane::DBResult>::COLUMNS, &values)
             }
-            fn delete(&self, conn: &impl propane::db::BackendConnection) -> propane::Result<()> {
+            fn delete(&self, conn: &impl propane::db::ConnectionMethods) -> propane::Result<()> {
                 use propane::ToSql;
                 use propane::prelude::DBObject;
                 conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())

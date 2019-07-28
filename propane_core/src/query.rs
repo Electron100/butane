@@ -1,4 +1,4 @@
-use crate::db::{BackendConnection, QueryResult};
+use crate::db::{ConnectionMethods, QueryResult};
 use crate::{DBResult, Result, SqlVal};
 use std::marker::PhantomData;
 
@@ -69,7 +69,7 @@ impl<T: DBResult> Query<T> {
         self
     }
 
-    pub fn load(self, conn: &impl BackendConnection) -> Result<QueryResult<T>> {
+    pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
         conn.query(self.table, T::COLUMNS, self.filter, self.limit)?
             .into_iter()
             .map(|row| T::from_row(row))

@@ -1,3 +1,5 @@
+//! Not expected to be used directly.
+
 use crate::fkey::ForeignKey;
 use crate::query::{BoolExpr, Expr};
 use crate::sqlval::{IntoSql, SqlVal, ToSql};
@@ -15,6 +17,7 @@ macro_rules! binary_op {
     };
 }
 
+/// Used to implement the `query!` and `filter!` macros.
 pub struct FieldExpr<T>
 where
     T: Into<SqlVal>,

@@ -1,4 +1,4 @@
-use super::Column;
+use super::internal::Column;
 use crate::query::BoolExpr::{And, Eq, Ge, Gt, Le, Lt, Ne, Not, Or, Subquery};
 use crate::query::Expr;
 use crate::query::Expr::{Condition, Placeholder, Val};
@@ -79,6 +79,6 @@ pub fn sql_limit(limit: i32, w: &mut impl Write) {
 
 fn list_columns(columns: &[Column], w: &mut impl Write) {
     let mut colnames: Vec<&'static str> = Vec::new();
-    columns.iter().for_each(|c| colnames.push(c.name));
+    columns.iter().for_each(|c| colnames.push(c.name()));
     write!(w, "{}", colnames.as_slice().join(",")).unwrap();
 }

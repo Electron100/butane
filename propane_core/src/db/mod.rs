@@ -1,6 +1,7 @@
-use super::Error::BoundsError;
+//! Types, traits, and methods for interacting with a database.
+
 use crate::query::BoolExpr;
-use crate::{adb, Error, Result, SqlType, SqlVal};
+use crate::{adb, Error, Result, SqlVal};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
@@ -11,92 +12,24 @@ use std::path::Path;
 use std::vec::Vec;
 
 mod helper;
+pub mod internal;
 mod macros;
-mod sqlite;
+pub mod sqlite;
 
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
 
-pub enum Modification {
-    InsertOnly,
-}
+use internal::*;
 
-pub trait ConnectionMethods {
-    fn backend_name(&self) -> &'static str;
-    fn execute(&self, sql: &str) -> Result<()>;
-    fn query(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        expr: Option<BoolExpr>,
-        limit: Option<i32>,
-    ) -> Result<RawQueryResult>;
-    fn insert_or_replace(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()>;
-    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()>;
-    /// Tests if a table exists in the database.
-    fn has_table(&self, table: &'static str) -> Result<bool>;
-}
-
+/// Database connection.
 pub trait BackendConnection: ConnectionMethods + Send + 'static {
-    fn transaction<'c>(&'c mut self) -> Result<Transaction<'c>>;
+    /// Begin a database transaction. The transaction object must be
+    /// used in place of this connection until it is committed and aborted.
+    fn transaction(&mut self) -> Result<Transaction>;
 }
 
-pub struct Column {
-    name: &'static str,
-    ty: SqlType,
-}
-impl Column {
-    pub const fn new(name: &'static str, ty: SqlType) -> Self {
-        Column { name, ty }
-    }
-    pub fn name(&self) -> &str {
-        self.name
-    }
-    pub fn ty(&self) -> SqlType {
-        self.ty
-    }
-}
-
-pub struct Row {
-    vals: Vec<SqlVal>,
-}
-impl Row {
-    fn new(vals: Vec<SqlVal>) -> Self {
-        Row { vals }
-    }
-    pub fn len(&self) -> usize {
-        self.vals.len()
-    }
-    pub fn get<'a>(&'a self, idx: usize) -> Result<&'a SqlVal> {
-        self.vals.get(idx).ok_or(BoundsError)
-    }
-    pub fn get_int(&self, idx: usize) -> Result<i64> {
-        self.get(idx)?.integer()
-    }
-    pub fn get_bool(&self, idx: usize) -> Result<bool> {
-        self.get(idx)?.bool()
-    }
-    pub fn get_real(&self, idx: usize) -> Result<f64> {
-        self.get(idx)?.real()
-    }
-}
-impl IntoIterator for Row {
-    type Item = SqlVal;
-    type IntoIter = std::vec::IntoIter<SqlVal>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.vals.into_iter()
-    }
-}
-
-pub type RawQueryResult = Vec<Row>;
-
-pub type QueryResult<T> = Vec<T>;
-
+/// Database connection. May be a connection to any type of database
+/// as it is a boxed abstraction over a specific connection.
 pub struct Connection {
     conn: Box<BackendConnection>,
 }
@@ -112,6 +45,9 @@ impl BackendConnection for Connection {
 }
 connection_method_wrapper!(Connection);
 
+/// Connection specification. Contains the name of a database backend
+/// and the backend-specific connection string. See [connect][crate::db::connect]
+/// to make a [Connection][crate::db::Connection] from a `ConnectionSpec`.
 #[derive(Serialize, Deserialize)]
 pub struct ConnectionSpec {
     pub backend_name: String,
@@ -144,6 +80,7 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
     }
 }
 
+/// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
 pub trait Backend {
     fn get_name(&self) -> &'static str;
     fn create_migration_sql(&self, current: &adb::ADB, ops: &[adb::Operation]) -> String;
@@ -162,17 +99,16 @@ impl Backend for Box<dyn Backend> {
     }
 }
 
-pub fn sqlite_backend() -> impl Backend {
-    sqlite::SQLiteBackend::new()
-}
-
+/// Find a backend by name.
 pub fn get_backend(name: &str) -> Option<Box<Backend>> {
     match name {
-        "sqlite" => Some(Box::new(sqlite_backend())),
+        "sqlite" => Some(Box::new(sqlite::SQLiteBackend::new())),
         _ => None,
     }
 }
 
+/// Connect to a database. For non-boxed connections, see individual
+/// [Backend][crate::db::Backend] implementations.
 pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     get_backend(&spec.backend_name)
         .ok_or(Error::UnknownBackend(spec.backend_name.clone()))?
@@ -187,6 +123,7 @@ trait BackendTransaction<'c>: ConnectionMethods {
     fn commit(&mut self) -> Result<()>;
 }
 
+/// Database transaction.
 pub struct Transaction<'c> {
     trans: Box<dyn BackendTransaction<'c> + 'c>,
 }
@@ -198,6 +135,7 @@ impl<'c> Transaction<'c> {
     pub fn commit(mut self) -> Result<()> {
         self.trans.deref_mut().commit()
     }
+    // TODO need rollback method
 }
 impl ConnectionMethods for Transaction<'_> {
     fn backend_name(&self) -> &'static str {

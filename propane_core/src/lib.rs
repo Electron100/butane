@@ -5,11 +5,12 @@ use std::default::Default;
 
 pub mod adb;
 pub mod db;
-pub mod field;
 pub mod fkey;
 pub mod migrations;
 pub mod query;
 pub mod sqlval;
+
+use db::internal::{Column, ConnectionMethods, Row};
 
 pub use adb::*;
 pub use query::Query;
@@ -20,8 +21,8 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 pub trait DBResult: Sized {
     type DBO: DBObject;
     type Fields: Default;
-    const COLUMNS: &'static [db::Column];
-    fn from_row(row: db::Row) -> Result<Self>
+    const COLUMNS: &'static [Column];
+    fn from_row(row: Row) -> Result<Self>
     where
         Self: Sized;
 }
@@ -31,12 +32,12 @@ pub trait DBObject: DBResult<DBO = Self> {
     const PKCOL: &'static str;
     const TABLE: &'static str;
     fn pk(&self) -> &Self::PKType;
-    fn get(conn: &impl db::ConnectionMethods, id: Self::PKType) -> Result<Self>
+    fn get(conn: &impl ConnectionMethods, id: Self::PKType) -> Result<Self>
     where
         Self: Sized;
     fn query() -> Query<Self>;
-    fn save(&mut self, conn: &impl db::ConnectionMethods) -> Result<()>;
-    fn delete(&self, conn: &impl db::ConnectionMethods) -> Result<()>;
+    fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+    fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>;
 }
 
 pub trait ModelTyped {

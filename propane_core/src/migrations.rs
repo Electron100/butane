@@ -1,7 +1,7 @@
 use crate::adb;
 pub use crate::adb::ADB;
 use crate::adb::*;
-use crate::db::ConnectionMethods;
+use crate::db::internal::{Column, ConnectionMethods, Row};
 use crate::sqlval::{FromSql, SqlVal, ToSql};
 use crate::{db, query, DBObject, DBResult, Error, Result, SqlType};
 use serde::{Deserialize, Serialize};
@@ -266,7 +266,7 @@ impl Migrations {
     /// Get migrations which have not yet been applied to the database
     pub fn get_unapplied_migrations(
         &self,
-        conn: &impl db::ConnectionMethods,
+        conn: &impl ConnectionMethods,
     ) -> Result<Vec<Migration>> {
         match self.get_last_applied_migration(conn)? {
             None => self.get_all_migrations(),
@@ -278,7 +278,7 @@ impl Migrations {
     /// if no migrations have been applied
     pub fn get_last_applied_migration(
         &self,
-        conn: &impl db::ConnectionMethods,
+        conn: &impl ConnectionMethods,
     ) -> Result<Option<Migration>> {
         if !conn.has_table(PropaneMigration::TABLE)? {
             return Ok(None);
@@ -373,8 +373,8 @@ struct PropaneMigration {
 impl DBResult for PropaneMigration {
     type DBO = Self;
     type Fields = (); // we don't need Fields as we never filter
-    const COLUMNS: &'static [db::Column] = &[db::Column::new("name", SqlType::Text)];
-    fn from_row(row: db::Row) -> Result<Self> {
+    const COLUMNS: &'static [Column] = &[Column::new("name", SqlType::Text)];
+    fn from_row(row: Row) -> Result<Self> {
         if row.len() != 1usize {
             return Err(Error::BoundsError.into());
         }
@@ -391,7 +391,7 @@ impl DBObject for PropaneMigration {
     fn pk(&self) -> &String {
         &self.name
     }
-    fn get(conn: &impl db::ConnectionMethods, id: Self::PKType) -> Result<Self> {
+    fn get(conn: &impl ConnectionMethods, id: Self::PKType) -> Result<Self> {
         Self::query()
             .filter(query::BoolExpr::Eq("name", query::Expr::Val(id.into())))
             .limit(1)
@@ -403,12 +403,12 @@ impl DBObject for PropaneMigration {
     fn query() -> query::Query<Self> {
         query::Query::new("propane_migrations")
     }
-    fn save(&mut self, conn: &impl db::ConnectionMethods) -> Result<()> {
+    fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);
         values.push(self.name.to_sql());
         conn.insert_or_replace(Self::TABLE, <Self as DBResult>::COLUMNS, &values)
     }
-    fn delete(&self, conn: &impl db::ConnectionMethods) -> Result<()> {
+    fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
         conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
     }
 }

@@ -1,8 +1,24 @@
+use crate::db::internal::ConnectionMethods;
 use crate::*;
 use once_cell::unsync::OnceCell;
 use std::fmt::{Debug, Formatter};
 
+/// Used to implement a relationship between models.
+///
 /// Initialize using `From` or `from_pk`
+///
+/// # Examples
+/// ```
+/// #[model]
+/// struct Blog {
+///  ...
+/// }
+/// #[model]
+/// struct Post {
+///   ...
+///   blog: ForeignKey<Blog>,
+/// }
+///
 pub struct ForeignKey<T>
 where
     T: DBObject,
@@ -24,7 +40,7 @@ impl<T: DBObject> ForeignKey<T> {
 
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to the value.
-    pub fn load(&self, conn: &impl db::ConnectionMethods) -> Result<&T> {
+    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
         self.val.get_or_try_init(|| {
             let pk: SqlVal = self.valpk.get().unwrap().clone();
             T::get(conn, T::PKType::from_sql(pk)?)

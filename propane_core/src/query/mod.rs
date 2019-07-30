@@ -1,6 +1,10 @@
-use crate::db::{ConnectionMethods, QueryResult};
+use crate::db::internal::{ConnectionMethods, QueryResult};
 use crate::{DBResult, Result, SqlVal};
 use std::marker::PhantomData;
+
+mod field;
+
+pub use field::FieldExpr;
 
 #[derive(Clone)]
 pub enum Expr {

@@ -1,4 +1,6 @@
+//! SQLite database backend
 use super::helper;
+use super::internal::*;
 use super::*;
 use crate::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
@@ -8,6 +10,7 @@ use log::warn;
 use rusqlite;
 use std::fmt::Write;
 
+/// SQLite [Backend][crate::db::Backend] implementation.
 pub struct SQLiteBackend {}
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
@@ -39,6 +42,7 @@ impl Backend for SQLiteBackend {
     }
 }
 
+/// SQLite database connection.
 pub struct SQLiteConnection {
     conn: rusqlite::Connection,
 }
@@ -230,7 +234,7 @@ fn row_from_rusqlite(row: &rusqlite::Row, cols: &[Column]) -> Result<Row> {
     Ok(Row::new(vals))
 }
 
-pub fn sql_for_expr<W>(expr: query::Expr, values: &mut Vec<SqlVal>, w: &mut W)
+fn sql_for_expr<W>(expr: query::Expr, values: &mut Vec<SqlVal>, w: &mut W)
 where
     W: Write,
 {

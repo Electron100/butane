@@ -3,7 +3,7 @@
 
 use crate::db::internal::{Column, ConnectionMethods, Row};
 use crate::sqlval::{FromSql, SqlVal, ToSql};
-use crate::{db, query, DBObject, DBResult, Error, Result, SqlType};
+use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
@@ -403,7 +403,7 @@ pub fn from_root<P: AsRef<Path>>(path: P) -> Migrations {
 struct PropaneMigration {
     name: String,
 }
-impl DBResult for PropaneMigration {
+impl DataResult for PropaneMigration {
     type DBO = Self;
     type Fields = (); // we don't need Fields as we never filter
     const COLUMNS: &'static [Column] = &[Column::new("name", SqlType::Text)];
@@ -420,7 +420,7 @@ impl DBResult for PropaneMigration {
         query::Query::new("propane_migrations")
     }
 }
-impl DBObject for PropaneMigration {
+impl DataObject for PropaneMigration {
     type PKType = String;
     const PKCOL: &'static str = "name";
     const TABLE: &'static str = "propane_migrations";
@@ -439,7 +439,7 @@ impl DBObject for PropaneMigration {
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);
         values.push(self.name.to_sql());
-        conn.insert_or_replace(Self::TABLE, <Self as DBResult>::COLUMNS, &values)
+        conn.insert_or_replace(Self::TABLE, <Self as DataResult>::COLUMNS, &values)
     }
     fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
         conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())

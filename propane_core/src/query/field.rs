@@ -3,7 +3,7 @@
 use crate::fkey::ForeignKey;
 use crate::query::{BoolExpr, Expr};
 use crate::sqlval::{IntoSql, SqlVal, ToSql};
-use crate::DBObject;
+use crate::DataObject;
 use std::marker::PhantomData;
 
 macro_rules! binary_op {
@@ -44,7 +44,7 @@ where
     binary_op!(le, std::cmp::PartialOrd<T>, Le);
     binary_op!(ge, std::cmp::PartialOrd<T>, Ge);
 }
-impl<F: DBObject> FieldExpr<ForeignKey<F>> {
+impl<F: DataObject> FieldExpr<ForeignKey<F>> {
     pub fn subfilter(&self, q: BoolExpr) -> BoolExpr {
         BoolExpr::Subquery {
             col: self.name,

@@ -3,7 +3,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Field, ItemStruct};
 
-// implement the DBObject trait
+// implement the DataObject trait
 pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let table_lit = make_ident_literal_str(&tyname);
@@ -34,7 +34,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
         .collect();
 
     quote!(
-        impl propane::DBResult for #tyname {
+        impl propane::DataResult for #tyname {
             type DBO = #tyname;
             type Fields = #fields_type;
             const COLUMNS: &'static [propane::db::internal::Column] = &[
@@ -53,7 +53,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 propane::query::Query::new(#table_lit)
             }
         }
-        impl propane::DBObject for #tyname {
+        impl propane::DataObject for #tyname {
             type PKType = #pktype;
             const PKCOL: &'static str = #pklit;
             const TABLE: &'static str = #tablelit;
@@ -64,7 +64,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 conn: &impl propane::db::internal::ConnectionMethods,
                 id: Self::PKType,
             ) -> propane::Result<Self> {
-                Self::query()
+                <Self as propane::DataResult>::query()
                     .filter(propane::query::BoolExpr::Eq(#pklit, propane::query::Expr::Val(id.into())))
                     .limit(1)
                     .load(conn)?
@@ -76,23 +76,23 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 //todo perf use an array on the stack for better
                 let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numfields);
                 #(#values)*
-                conn.insert_or_replace(Self::TABLE, <Self as propane::DBResult>::COLUMNS, &values)
+                conn.insert_or_replace(Self::TABLE, <Self as propane::DataResult>::COLUMNS, &values)
             }
             fn delete(&self, conn: &impl propane::db::internal::ConnectionMethods) -> propane::Result<()> {
                 use propane::ToSql;
-                use propane::prelude::DBObject;
+                use propane::prelude::DataObject;
                 conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
             }
         }
         impl propane::ToSql for #tyname {
             fn to_sql(&self) -> propane::SqlVal {
-                use propane::DBObject;
+                use propane::DataObject;
                 propane::ToSql::to_sql(self.pk())
             }
         }
         impl propane::ToSql for &#tyname {
             fn to_sql(&self) -> propane::SqlVal {
-                use propane::DBObject;
+                use propane::DataObject;
                 propane::ToSql::to_sql(self.pk())
             }
         }

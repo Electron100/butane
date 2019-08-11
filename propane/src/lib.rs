@@ -5,7 +5,7 @@ pub use propane_core::fkey::ForeignKey;
 pub use propane_core::migrations;
 pub use propane_core::query;
 pub use propane_core::{
-    DBObject, DBResult, Error, FieldType, FromSql, IntoSql, Result, SqlType, SqlVal, ToSql,
+    DataObject, DataResult, Error, FieldType, FromSql, IntoSql, Result, SqlType, SqlVal, ToSql,
 };
 
 /// Macro to construct a [`BoolExpr`] (for use with a [`Query`]) from
@@ -69,7 +69,7 @@ pub use propane_codegen::filter;
 #[macro_export]
 macro_rules! query {
     ($model:ident, $filter:expr) => {
-        $model::query().filter(filter!($model, $filter))
+        <$model as propane::DataResult>::query().filter(filter!($model, $filter))
     };
 }
 
@@ -90,7 +90,7 @@ macro_rules! query {
 /// # use propane::prelude::*;
 /// # use propane::query;
 /// # use propane::find;
-/// # use propane::DBObject;
+/// # use propane::DataObject;
 /// #[model]
 /// struct Contestant {
 ///   #[pk]
@@ -123,7 +123,7 @@ pub mod prelude {
     //! of propane's macros may require some of its re-exports to be
     //! used manually.
     #[doc(no_inline)]
-    pub use crate::DBObject;
+    pub use crate::DataObject;
     pub use filter;
     pub use propane_codegen::Model;
 }

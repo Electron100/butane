@@ -21,13 +21,13 @@ use std::fmt::{Debug, Formatter};
 ///
 pub struct ForeignKey<T>
 where
-    T: DBObject,
+    T: DataObject,
 {
     // At least one must be initialized, but both need not be
     val: OnceCell<T>,
     valpk: OnceCell<SqlVal>,
 }
-impl<T: DBObject> ForeignKey<T> {
+impl<T: DataObject> ForeignKey<T> {
     pub fn from_pk(pk: T::PKType) -> Self {
         let ret = Self::new_raw();
         ret.valpk.set(pk.into_sql()).unwrap();
@@ -66,19 +66,19 @@ impl<T: DBObject> ForeignKey<T> {
     }
 }
 
-impl<T: DBObject> From<T> for ForeignKey<T> {
+impl<T: DataObject> From<T> for ForeignKey<T> {
     fn from(obj: T) -> Self {
         let ret = Self::new_raw();
         ret.val.set(obj).ok();
         ret
     }
 }
-impl<T: DBObject> From<&T> for ForeignKey<T> {
+impl<T: DataObject> From<&T> for ForeignKey<T> {
     fn from(obj: &T) -> Self {
         Self::from_pk(obj.pk().clone())
     }
 }
-impl<T: DBObject> Clone for ForeignKey<T> {
+impl<T: DataObject> Clone for ForeignKey<T> {
     fn clone(&self) -> Self {
         // Once specialization lands, it would be nice to clone val if
         // it's cloneable. Then we wouldn't have to ensure the pk
@@ -89,13 +89,13 @@ impl<T: DBObject> Clone for ForeignKey<T> {
         }
     }
 }
-impl<T: DBObject> PartialEq<ForeignKey<T>> for ForeignKey<T> {
+impl<T: DataObject> PartialEq<ForeignKey<T>> for ForeignKey<T> {
     fn eq(&self, other: &ForeignKey<T>) -> bool {
         self.ensure_valpk().eq(other.ensure_valpk())
     }
 }
-impl<T: DBObject> Eq for ForeignKey<T> {}
-impl<T: DBObject> Debug for ForeignKey<T> {
+impl<T: DataObject> Eq for ForeignKey<T> {}
+impl<T: DataObject> Debug for ForeignKey<T> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         self.ensure_valpk().fmt(f)
     }
@@ -103,7 +103,7 @@ impl<T: DBObject> Debug for ForeignKey<T> {
 
 impl<T> ToSql for ForeignKey<T>
 where
-    T: DBObject,
+    T: DataObject,
 {
     fn to_sql(&self) -> SqlVal {
         self.ensure_valpk().clone()
@@ -111,7 +111,7 @@ where
 }
 impl<T> IntoSql for ForeignKey<T>
 where
-    T: DBObject,
+    T: DataObject,
 {
     fn into_sql(self) -> SqlVal {
         self.ensure_valpk();
@@ -120,13 +120,13 @@ where
 }
 impl<T> FieldType for ForeignKey<T>
 where
-    T: DBObject,
+    T: DataObject,
 {
-    const SQLTYPE: SqlType = <T as DBObject>::PKType::SQLTYPE;
+    const SQLTYPE: SqlType = <T as DataObject>::PKType::SQLTYPE;
 }
 impl<T> FromSql for ForeignKey<T>
 where
-    T: DBObject,
+    T: DataObject,
 {
     fn from_sql(val: SqlVal) -> Result<Self> {
         Ok(ForeignKey {
@@ -137,7 +137,7 @@ where
 }
 impl<T> PartialEq<T> for ForeignKey<T>
 where
-    T: DBObject,
+    T: DataObject,
 {
     fn eq(&self, other: &T) -> bool {
         match self.val.get() {
@@ -151,7 +151,7 @@ where
 }
 impl<T> PartialEq<&T> for ForeignKey<T>
 where
-    T: DBObject,
+    T: DataObject,
 {
     fn eq(&self, other: &&T) -> bool {
         self.eq(*other)

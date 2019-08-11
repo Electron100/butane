@@ -8,7 +8,7 @@ use std::vec::Vec;
 
 /// Methods available on a database connection. Most users do not need
 /// to call these methods directly and will instead use methods on
-/// [DBObject][crate::DBObject] or the `query!` macro. This trait is
+/// [DataObject][crate::DataObject] or the `query!` macro. This trait is
 /// implemented by both database connections and transactions.
 pub trait ConnectionMethods {
     fn backend_name(&self) -> &'static str;

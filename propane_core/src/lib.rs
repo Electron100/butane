@@ -23,9 +23,9 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 /// object type. The purpose of a result type which is not also an
 /// object type is to allow a query to retrieve a subset of an
 /// object's columns.
-pub trait DBResult: Sized {
+pub trait DataResult: Sized {
     /// Corresponding object type.
-    type DBO: DBObject;
+    type DBO: DataObject;
     type Fields: Default;
     const COLUMNS: &'static [Column];
     fn from_row(row: Row) -> Result<Self>
@@ -39,7 +39,7 @@ pub trait DBResult: Sized {
 ///
 /// Rather than implementing this type manually, use the
 /// `#[model]` attribute.
-pub trait DBObject: DBResult<DBO = Self> {
+pub trait DataObject: DataResult<DBO = Self> {
     /// The type of the primary key field.
     type PKType: FieldType + Clone + PartialEq;
     /// The name of the primary key column.
@@ -59,7 +59,7 @@ pub trait DBObject: DBResult<DBO = Self> {
 }
 
 pub trait ModelTyped {
-    type Model: DBObject;
+    type Model: DataObject;
 }
 
 /// Propane errors.

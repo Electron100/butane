@@ -3,7 +3,7 @@
 //! module directly.
 
 use crate::db::internal::{ConnectionMethods, QueryResult};
-use crate::{DBResult, Result, SqlVal};
+use crate::{DataResult, Result, SqlVal};
 use std::marker::PhantomData;
 
 mod field;
@@ -48,13 +48,13 @@ pub enum BoolExpr {
 
 /// Representation of a database query.
 #[derive(Clone)]
-pub struct Query<T: DBResult> {
+pub struct Query<T: DataResult> {
     table: &'static str,
     filter: Option<BoolExpr>,
     limit: Option<i32>,
     phantom: PhantomData<T>,
 }
-impl<T: DBResult> Query<T> {
+impl<T: DataResult> Query<T> {
     /// Creates a query which matches all objects in `table`. The set
     /// of matched objects can be restricted with `filter` and
     /// `limit`.

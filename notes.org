@@ -48,5 +48,5 @@
 	+ Documentation
 	+ Optional dependencies
 	+ Full timestamp and blob support
-	+ Separate DBResult test/support
+	+ Separate DataResult test/support
 	+ PG support

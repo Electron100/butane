@@ -32,7 +32,7 @@ mod filter;
 mod migration;
 
 /// Attribute macro which marks a struct as being a data model and
-/// generates an implementation of [DBObject][crate::DBObject]. This
+/// generates an implementation of [DataObject][crate::DataObject]. This
 /// macro will also write information to disk at compile time necessary to
 /// generate migrations
 ///

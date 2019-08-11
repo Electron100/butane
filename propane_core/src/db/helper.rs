@@ -37,9 +37,14 @@ where
                 Ok(())
             }
             Not(a) => write!(w, "NOT ").and_then(|_| Ok(f(Condition(a), values, w))),
-            Subquery(col, tbl2, tbl2_col, ex) => {
+            Subquery {
+                col,
+                tbl2,
+                tbl2_col,
+                expr,
+            } => {
                 write!(w, "{} IN (SELECT {} FROM {} WHERE ", col, tbl2_col, tbl2).unwrap();
-                f(Expr::Condition(ex), values, w);
+                f(Expr::Condition(expr), values, w);
                 write!(w, ")").unwrap();
                 Ok(())
             }

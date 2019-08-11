@@ -4,10 +4,6 @@
 use super::Error::BoundsError;
 use crate::query::BoolExpr;
 use crate::{Result, SqlType, SqlVal};
-use std::borrow::Cow;
-use std::fs;
-use std::io::Write;
-use std::path::Path;
 use std::vec::Vec;
 
 /// Methods available on a database connection. Most users do not need

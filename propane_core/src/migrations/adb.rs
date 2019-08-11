@@ -1,7 +1,12 @@
+//! Abstract representation of a database schema. If using the propane
+//! CLI tool, there is no need to use this module. Even if applying
+//! migrations without this tool, you are unlikely to need this module.
+
 use crate::{Result, SqlType, SqlVal};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+/// Key used to help resolve `DeferredSqlType`
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum TypeKey {
     /// Represents a type which is the primary key for a table with the given name
@@ -42,6 +47,7 @@ impl TypeResolver {
     }
 }
 
+/// Abstract representation of a database schema.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ADB {
     tables: HashMap<String, ATable>,
@@ -69,7 +75,7 @@ impl ADB {
         while changed {
             changed = false;
             for table in &mut self.tables.values_mut() {
-                let pktype = table.get_pk()?.sqltype();
+                let pktype = table.pk()?.sqltype();
                 if let Ok(pktype) = pktype {
                     changed = resolver.insert_pk(&table.name, pktype)
                 }
@@ -83,6 +89,7 @@ impl ADB {
     }
 }
 
+/// Abstract representation of a database table schema.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ATable {
     pub name: String,
@@ -98,7 +105,7 @@ impl ATable {
     pub fn add_column(&mut self, col: AColumn) {
         self.replace_column(col);
     }
-    pub fn get_column<'a>(&'a self, name: &str) -> Option<&'a AColumn> {
+    pub fn column<'a>(&'a self, name: &str) -> Option<&'a AColumn> {
         self.columns.get(name)
     }
     pub fn replace_column(&mut self, col: AColumn) {
@@ -107,7 +114,7 @@ impl ATable {
     pub fn remove_column(&mut self, name: &str) {
         self.columns.remove(name);
     }
-    pub fn get_pk(&self) -> Result<&AColumn> {
+    pub fn pk(&self) -> Result<&AColumn> {
         self.columns.values().find(|c| c.is_pk()).ok_or(
             crate::Error::NoPK {
                 table: self.name.clone(),
@@ -117,6 +124,7 @@ impl ATable {
     }
 }
 
+/// SqlType which may not yet be known.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DeferredSqlType {
     Known(SqlType),
@@ -136,6 +144,7 @@ impl DeferredSqlType {
     }
 }
 
+/// Abstract representation of a database column schema.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct AColumn {
     name: String,
@@ -190,6 +199,7 @@ impl AColumn {
     }
 }
 
+/// Individual operation use to apply a migration.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Operation {
     //TODO support renames
@@ -201,6 +211,7 @@ pub enum Operation {
     ChangeColumn(String, AColumn, AColumn),
 }
 
+/// Determine the operations necessary to move the database schema from `old` to `new`.
 pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
     let new_names: HashSet<&String> = new.tables.keys().collect();

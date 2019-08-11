@@ -8,6 +8,7 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span, TokenTree};
 use proc_macro_hack::proc_macro_hack;
+use propane_core::migrations::adb::{DeferredSqlType, TypeKey};
 use propane_core::*;
 use quote::{quote, ToTokens};
 use syn;
@@ -30,6 +31,16 @@ mod dbobj;
 mod filter;
 mod migration;
 
+/// Attribute macro which marks a struct as being a data model and
+/// generates an implementation of [DBObject][crate::DBObject]. This
+/// macro will also write information to disk at compile time necessary to
+/// generate migrations
+///
+/// There are a few restrictions on model types:
+/// 1. The type of each field must implement [`FieldType`].
+/// 2. There must be a primary key field. This must be either annotated with a `#[pk]` attribute or named `id`.
+///
+/// [`FieldType`]: crate::FieldType
 #[proc_macro_attribute]
 pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     // Transform into a derive because derives can have helper
@@ -43,6 +54,8 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
+/// Helper for the `model` macro necessary because attribute macros
+/// are not allowed their own helper attributes, whereas derives are.
 #[proc_macro_derive(Model, attributes(pk))]
 pub fn derive_model(input: TokenStream) -> TokenStream {
     let mut result: TokenStream2 = TokenStream2::new();

@@ -46,7 +46,12 @@ where
 }
 impl<F: DBObject> FieldExpr<ForeignKey<F>> {
     pub fn subfilter(&self, q: BoolExpr) -> BoolExpr {
-        BoolExpr::Subquery(self.name, F::TABLE, F::PKCOL, Box::new(q))
+        BoolExpr::Subquery {
+            col: self.name,
+            tbl2: F::TABLE,
+            tbl2_col: F::PKCOL,
+            expr: Box::new(q),
+        }
     }
     pub fn subfilterpk(&self, pk: F::PKType) -> BoolExpr {
         self.subfilter(BoolExpr::Eq(

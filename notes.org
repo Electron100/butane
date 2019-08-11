@@ -47,3 +47,6 @@
 * Roadmap
 	+ Documentation
 	+ Optional dependencies
+	+ Full timestamp and blob support
+	+ Separate DBResult test/support
+	+ PG support

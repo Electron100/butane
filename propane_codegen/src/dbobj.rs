@@ -49,6 +49,9 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                     #(#rows),*
                 })
             }
+            fn query() -> propane::query::Query<Self> {
+                propane::query::Query::new(#table_lit)
+            }
         }
         impl propane::DBObject for #tyname {
             type PKType = #pktype;
@@ -68,9 +71,6 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                     .into_iter()
                     .nth(0)
                     .ok_or(propane::Error::NoSuchObject.into())
-            }
-            fn query() -> propane::query::Query<Self> {
-                propane::query::Query::new(#table_lit)
             }
             fn save(&mut self, conn: &impl propane::db::internal::ConnectionMethods) -> propane::Result<()> {
                 //todo perf use an array on the stack for better
@@ -129,8 +129,8 @@ pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {
             let fnid = Ident::new(&format!("fieldexpr_{}", fid), f.span());
             let fty = &f.ty;
             quote!(
-                #vis fn #fnid(&self) -> propane::query::internal::FieldExpr<#fty> {
-                    propane::query::internal::FieldExpr::<#fty>::new(#fidlit)
+                #vis fn #fnid(&self) -> propane::query::FieldExpr<#fty> {
+                    propane::query::FieldExpr::<#fty>::new(#fidlit)
                 }
             )
         })

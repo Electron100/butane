@@ -8,15 +8,15 @@ use std::fmt::{Debug, Formatter};
 /// Initialize using `From` or `from_pk`
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// #[model]
 /// struct Blog {
-///  ...
+///   ...
 /// }
 /// #[model]
 /// struct Post {
-///   ...
 ///   blog: ForeignKey<Blog>,
+///   ...
 /// }
 ///
 pub struct ForeignKey<T>

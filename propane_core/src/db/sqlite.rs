@@ -2,7 +2,7 @@
 use super::helper;
 use super::internal::*;
 use super::*;
-use crate::adb::{AColumn, ATable, Operation, ADB};
+use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
 use crate::{Result, SqlType, SqlVal};
 use hex;
@@ -342,7 +342,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> String {
 fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {
     let old = current
         .get_table(tbl_name)
-        .and_then(|table| table.get_column(name))
+        .and_then(|table| table.column(name))
         .map(|c| c.clone());
     match old {
         Some(col) => change_column(current, tbl_name, &col, None),

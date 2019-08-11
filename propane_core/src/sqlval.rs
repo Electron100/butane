@@ -2,12 +2,20 @@ use crate::{Error::TypeMismatch, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// A database value.
+///
+/// For conversion between `SqlVal` and other types, see [`FromSql`], [`IntoSql`], and [`ToSql`].
+///
+/// [`FromSql`]: crate::FromSql
+/// [`IntoSql`]: crate::ToSql
+/// [`ToSql`]: crate::ToSql
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SqlVal {
     Bool(bool),
     Int(i64),
     Real(f64),
     Text(String),
+    // TODO properly support and test blob
     Blob(Vec<u8>),
 }
 impl SqlVal {
@@ -55,9 +63,17 @@ impl SqlVal {
     }
 }
 
+/// Used to convert another type to a `SqlVal`.
+///
+/// Unlike [`IntoSql`][crate::IntoSql], the value is not consumed.
 pub trait ToSql {
     fn to_sql(&self) -> SqlVal;
 }
+
+/// Used to convert another type to a `SqlVal`.
+///
+/// The value is consumed. For a non-consuming trait, see
+/// [`ToSql`][crate::ToSql].
 pub trait IntoSql {
     fn into_sql(self) -> SqlVal;
 }
@@ -71,13 +87,17 @@ where
     }
 }
 
+/// Used to convert a `SqlVal` into another type.
+///
+/// The `SqlVal` is consumed.
 pub trait FromSql {
     fn from_sql(val: SqlVal) -> Result<Self>
     where
         Self: Sized;
 }
 
-/// Type suitable for being a database column
+/// Type suitable for being a database column.
+///
 pub trait FieldType: ToSql + IntoSql + FromSql {
     const SQLTYPE: SqlType;
 }

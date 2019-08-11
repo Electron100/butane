@@ -79,7 +79,7 @@ fn basic_find(conn: Connection) {
     foo2.save(&conn).unwrap();
 
     // find
-    let found = find!(Foo, bar == 43, &conn).unwrap();
+    let found: Foo = find!(Foo, bar == 43, &conn).unwrap();
     assert_eq!(found, foo2);
 }
 testall!(basic_find);

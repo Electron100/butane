@@ -1,7 +1,7 @@
 //! Types, traits, and methods for interacting with a database.
 
 use crate::query::BoolExpr;
-use crate::{adb, Error, Result, SqlVal};
+use crate::{migrations::adb, Error, Result, SqlVal};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
@@ -60,14 +60,16 @@ impl ConnectionSpec {
             conn_str: conn_str.into(),
         }
     }
+    /// Save the connection spec to the filesystem for later use.
     pub fn save(&self, path: &Path) -> Result<()> {
         let path = conn_complete_if_dir(path);
         let mut f = fs::File::create(path)?;
         f.write_all(serde_json::to_string(self)?.as_bytes())
             .map_err(|e| e.into())
     }
-    pub fn load(path: &Path) -> Result<Self> {
-        let path = conn_complete_if_dir(path);
+    /// Load a previously saved connection spec
+    pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+        let path = conn_complete_if_dir(path.as_ref());
         serde_json::from_reader(fs::File::open(path)?).map_err(|e| e.into())
     }
 }
@@ -124,6 +126,9 @@ trait BackendTransaction<'c>: ConnectionMethods {
 }
 
 /// Database transaction.
+///
+/// Begin a transaction using the `BackendConnection`
+/// [`transaction`][crate::db::BackendConnection::transaction] method.
 pub struct Transaction<'c> {
     trans: Box<dyn BackendTransaction<'c> + 'c>,
 }

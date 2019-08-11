@@ -76,14 +76,9 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
         .and_then(|a| a.value_of("name").and_then(|s| Some(s.to_string())))
         .unwrap_or_else(|| default_name());
     let ms = get_migrations()?;
-    let m = ms.create_migration_sql(
-        db::sqlite_backend(),
-        &name,
-        ms.get_latest(),
-        &ms.get_current(),
-    )?;
+    let m = ms.create_migration(&db::sqlite::SQLiteBackend::new(), &name, ms.latest())?;
     match m {
-        Some(m) => println!("Created migration {}", m.get_name()),
+        Some(m) => println!("Created migration {}", m.name()),
         None => println!("No changes to migrate"),
     }
     Ok(())
@@ -91,11 +86,11 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
 
 fn migrate() -> Result<()> {
     let spec = db::ConnectionSpec::load(&base_dir()?)?;
-    let conn = db::connect(&spec)?;
-    let to_apply = get_migrations()?.get_unapplied_migrations(&conn);
+    let mut conn = db::connect(&spec)?;
+    let to_apply = get_migrations()?.unapplied_migrations(&conn)?;
     for m in to_apply {
-        println!("Applying migration {}", m.get_name());
-        m.apply(&conn)?;
+        println!("Applying migration {}", m.name());
+        m.apply(&mut conn)?;
     }
     Ok(())
 }

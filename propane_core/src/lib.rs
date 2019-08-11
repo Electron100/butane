@@ -3,7 +3,6 @@ use failure::Fail;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
 
-pub mod adb;
 pub mod db;
 pub mod fkey;
 pub mod migrations;
@@ -12,31 +11,50 @@ pub mod sqlval;
 
 use db::internal::{Column, ConnectionMethods, Row};
 
-pub use adb::*;
 pub use query::Query;
 pub use sqlval::*;
 
 pub type Result<T> = std::result::Result<T, crate::Error>;
 
+/// A type which may be the result of a database query.
+///
+/// Every result type must have a corresponding object type and the
+/// columns of the result type must be a subset of the columns of the
+/// object type. The purpose of a result type which is not also an
+/// object type is to allow a query to retrieve a subset of an
+/// object's columns.
 pub trait DBResult: Sized {
+    /// Corresponding object type.
     type DBO: DBObject;
     type Fields: Default;
     const COLUMNS: &'static [Column];
     fn from_row(row: Row) -> Result<Self>
     where
         Self: Sized;
+    /// Create a blank query (matching all rows) for this type.
+    fn query() -> Query<Self>;
 }
 
+/// An object in the database.
+///
+/// Rather than implementing this type manually, use the
+/// `#[model]` attribute.
 pub trait DBObject: DBResult<DBO = Self> {
+    /// The type of the primary key field.
     type PKType: FieldType + Clone + PartialEq;
+    /// The name of the primary key column.
     const PKCOL: &'static str;
+    /// The name of the table.
     const TABLE: &'static str;
+    /// Get the primary key
     fn pk(&self) -> &Self::PKType;
+    /// Find this object in the database based on primary key.
     fn get(conn: &impl ConnectionMethods, id: Self::PKType) -> Result<Self>
     where
         Self: Sized;
-    fn query() -> Query<Self>;
+    /// Save the object to the database.
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+    /// Delete the object from the database.
     fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>;
 }
 
@@ -44,6 +62,7 @@ pub trait ModelTyped {
     type Model: DBObject;
 }
 
+/// Propane errors.
 #[derive(Debug, Fail)]
 pub enum Error {
     #[fail(display = "No such object exists")]
@@ -105,14 +124,22 @@ impl From<rusqlite::types::FromSqlError> for Error {
     }
 }
 
+/// Enumeration of the types a database value may take.
+///
+/// See also [`SqlVal`][crate::SqlVal].
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SqlType {
     Bool,
-    Int,    // 4 bytes
-    BigInt, // 8 bytes
-    Real,   // 8 byte float
+    /// 4 bytes
+    Int,
+    /// 8 bytes
+    BigInt,
+    /// 8 byte float
+    Real,
     Text,
     Date,
+    // TODO properly support and test timestamp
     Timestamp,
+    // TODO properly support and test blob
     Blob,
 }

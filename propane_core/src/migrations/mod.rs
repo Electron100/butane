@@ -1,6 +1,6 @@
-use crate::adb;
-pub use crate::adb::ADB;
-use crate::adb::*;
+//! For working with migrations. If using the propane CLI tool, it is
+//! not necessary to use these types directly.
+
 use crate::db::internal::{Column, ConnectionMethods, Row};
 use crate::sqlval::{FromSql, SqlVal, ToSql};
 use crate::{db, query, DBObject, DBResult, Error, Result, SqlType};
@@ -11,6 +11,13 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+pub mod adb;
+use adb::{AColumn, ATable, DeferredSqlType, Operation, ADB};
+
+/// Filesystem abstraction for `Migrations`. Primarily intended to
+/// allow bypassing the real filesystem during testing, but
+/// implementations that do not call through to the real filesystem
+/// are supported in production.
 pub trait Filesystem {
     /// Ensure a directory exists, recursively creating missing components
     fn ensure_dir(&self, path: &Path) -> std::io::Result<()>;
@@ -48,11 +55,22 @@ struct MigrationInfo {
     from_name: Option<String>,
 }
 
+/// Type representing a database migration. A migration describes how
+/// to bring the database from state A to state B. In general, the
+/// methods on this type are persistent -- they read from and write to
+/// the filesystem.
+///
+/// A Migration cannot be constructed directly, only retrieved from
+/// [Migrations][crate::migrations::Migrations].
 pub struct Migration {
     fs: Rc<Filesystem>,
     root: PathBuf,
 }
 impl Migration {
+    /// Adds an abstract table to the migration. The table state should
+    /// represent the expected state after the migration has been
+    /// applied. It is expected that all tables will be added to the
+    /// migration in this fashion.
     pub fn write_table(&self, table: &ATable) -> Result<()> {
         self.write_contents(
             &format!("{}.table", table.name),
@@ -60,7 +78,8 @@ impl Migration {
         )
     }
 
-    pub fn get_db(&self) -> Result<ADB> {
+    /// Retrieves the full abstract database state describing all tables
+    pub fn db(&self) -> Result<ADB> {
         let mut db = ADB::new();
         self.ensure_dir()?;
         let entries = self.fs.list_dir(&self.root)?;
@@ -81,7 +100,7 @@ impl Migration {
     }
 
     /// Get the migration before this one (if any).
-    pub fn get_from_migration(&self) -> Result<Option<Migration>> {
+    pub fn from_migration(&self) -> Result<Option<Migration>> {
         let info: MigrationInfo =
             serde_json::from_reader(self.fs.read(&self.root.join("info.json"))?)?;
         match info.from_name {
@@ -96,27 +115,33 @@ impl Migration {
         }
     }
 
-    pub fn get_name(&self) -> Cow<str> {
+    /// The name of this migration.
+    pub fn name(&self) -> Cow<str> {
         // There should be no way our root has no name portion
         self.root.file_name().unwrap().to_string_lossy()
     }
 
+    /// Apply the migration to a database connection. The connection
+    /// must be for the same type of database as
+    /// [create_migration][crate::migrations::Migrations::create_migration]
+    /// and the database must be in the state of the migration prior
+    /// to this one ([from_migration][crate::migrations::Migration::from_migration])
     pub fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
         let tx = conn.transaction()?;
         tx.execute(&self.up_sql(tx.backend_name())?)?;
         tx.insert_or_replace(
             PropaneMigration::TABLE,
             PropaneMigration::COLUMNS,
-            &[self.get_name().as_ref().to_sql()],
+            &[self.name().as_ref().to_sql()],
         )?;
         tx.commit()
     }
 
-    pub fn up_sql(&self, backend_name: &str) -> Result<String> {
+    fn up_sql(&self, backend_name: &str) -> Result<String> {
         self.read_sql(backend_name, "up")
     }
 
-    pub fn down_sql(&self, backend_name: &str) -> Result<String> {
+    fn down_sql(&self, backend_name: &str) -> Result<String> {
         self.read_sql(backend_name, "down")
     }
 
@@ -154,7 +179,7 @@ impl Migration {
 }
 impl PartialEq for Migration {
     fn eq(&self, other: &Migration) -> bool {
-        self.get_name() == other.get_name()
+        self.name() == other.name()
     }
 }
 impl Eq for Migration {}
@@ -169,23 +194,27 @@ impl MigrationsState {
     }
 }
 
+/// A collection of migrations.
 pub struct Migrations {
     fs: Rc<Filesystem>,
     root: PathBuf,
 }
 impl Migrations {
-    /// Get a migration representing the current state as determined
-    /// by the last build of models. This does not necessarily match
-    /// the current state of the database if migrations have not yet been applied.
+    /// Get a pseudo-migration representing the current state as
+    /// determined by the last build of models. This does not
+    /// necessarily match the current state of the database if
+    /// migrations have not yet been applied.
     ///
-    /// This migration is named "current".
-    pub fn get_current(&self) -> Migration {
+    /// This migration is named "current". It is not a "real" migration
+    /// - it should never be applied
+    /// - it will never be returned by `latest`, `migrations_since`, `all_migrations` or other similar methods.
+    pub fn current(&self) -> Migration {
         self.get_migration("current")
     }
 
-    /// Get the most recent migration other than "current" or None if
+    /// Get the most recent migration other than `current` or `None` if
     /// no migrations have been created.
-    pub fn get_latest(&self) -> Option<Migration> {
+    pub fn latest(&self) -> Option<Migration> {
         self.get_state()
             .map(|state| match state.latest {
                 None => None,
@@ -204,10 +233,10 @@ impl Migrations {
         from: Option<Migration>,
     ) -> Result<Option<Migration>> {
         let empty_db = Ok(ADB::new());
-        let from_name = from.as_ref().map(|m| m.get_name().to_string());
+        let from_name = from.as_ref().map(|m| m.name().to_string());
         let from_none = from.is_none();
-        let from_db = from.map_or(empty_db, |m| m.get_db())?;
-        let to_db = self.get_current().get_db()?;
+        let from_db = from.map_or(empty_db, |m| m.db())?;
+        let to_db = self.current().db()?;
         let mut ops = adb::diff(&from_db, &to_db);
         if ops.is_empty() {
             return Ok(None);
@@ -231,19 +260,20 @@ impl Migrations {
         // Update state
         let mut state = self.get_state()?;
         if state.latest.is_none() || state.latest == from_name {
-            state.latest = Some(m.get_name().to_string());
+            state.latest = Some(m.name().to_string());
             self.save_state(&state)?;
         }
 
         Ok(Some(m))
     }
 
-    pub fn get_migrations_since(&self, since: &Migration) -> Result<Vec<Migration>> {
-        let mut last = self.get_latest();
+    /// Returns migrations since the given migration.
+    pub fn migrations_since(&self, since: &Migration) -> Result<Vec<Migration>> {
+        let mut last = self.latest();
         let mut accum: Vec<Migration> = Vec::new();
         while let Some(m) = last {
             if m != *since {
-                last = m.get_from_migration()?;
+                last = m.from_migration()?;
                 accum.push(m);
                 continue;
             }
@@ -253,30 +283,28 @@ impl Migrations {
         Err(Error::MigrationError("Migration not in chain".to_string()))
     }
 
-    pub fn get_all_migrations(&self) -> Result<Vec<Migration>> {
-        let mut last = self.get_latest();
+    /// Returns all migrations
+    pub fn all_migrations(&self) -> Result<Vec<Migration>> {
+        let mut last = self.latest();
         let mut accum: Vec<Migration> = Vec::new();
         while let Some(m) = last {
-            last = m.get_from_migration()?;
+            last = m.from_migration()?;
             accum.push(m);
         }
         Ok(accum.into_iter().rev().collect())
     }
 
     /// Get migrations which have not yet been applied to the database
-    pub fn get_unapplied_migrations(
-        &self,
-        conn: &impl ConnectionMethods,
-    ) -> Result<Vec<Migration>> {
-        match self.get_last_applied_migration(conn)? {
-            None => self.get_all_migrations(),
-            Some(m) => self.get_migrations_since(&m),
+    pub fn unapplied_migrations(&self, conn: &impl ConnectionMethods) -> Result<Vec<Migration>> {
+        match self.last_applied_migration(conn)? {
+            None => self.all_migrations(),
+            Some(m) => self.migrations_since(&m),
         }
     }
 
     /// Get the last migration that has been applied to the database or None
     /// if no migrations have been applied
-    pub fn get_last_applied_migration(
+    pub fn last_applied_migration(
         &self,
         conn: &impl ConnectionMethods,
     ) -> Result<Option<Migration>> {
@@ -295,14 +323,14 @@ impl Migrations {
             .collect();
         let migrations = migrations?;
 
-        let mut m_opt = self.get_latest();
+        let mut m_opt = self.latest();
         while let Some(m) = m_opt {
             if !migrations.contains(&PropaneMigration {
-                name: m.get_name().to_string(),
+                name: m.name().to_string(),
             }) {
                 return Ok(Some(m));
             }
-            m_opt = m.get_from_migration()?;
+            m_opt = m.from_migration()?;
         }
         Ok(None)
     }
@@ -352,6 +380,8 @@ fn migrations_table() -> ATable {
     table
 }
 
+/// Like `from_root` except allows specifying an alternate filesystem
+/// implementation. Intended primarily for testing purposes.
 pub fn from_root_and_filesystem<P: AsRef<Path>>(
     path: P,
     fs: impl Filesystem + 'static,
@@ -362,6 +392,9 @@ pub fn from_root_and_filesystem<P: AsRef<Path>>(
     }
 }
 
+/// Create a `Migrations` from a filesystem location. The `#[model]`
+/// attribute will write migration information to a
+/// `propane/migrations` directory under the project directory.
 pub fn from_root<P: AsRef<Path>>(path: P) -> Migrations {
     from_root_and_filesystem(path, OsFilesystem {})
 }
@@ -383,6 +416,9 @@ impl DBResult for PropaneMigration {
             name: FromSql::from_sql(it.next().unwrap())?,
         })
     }
+    fn query() -> query::Query<Self> {
+        query::Query::new("propane_migrations")
+    }
 }
 impl DBObject for PropaneMigration {
     type PKType = String;
@@ -399,9 +435,6 @@ impl DBObject for PropaneMigration {
             .into_iter()
             .nth(0)
             .ok_or(Error::NoSuchObject.into())
-    }
-    fn query() -> query::Query<Self> {
-        query::Query::new("propane_migrations")
     }
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);

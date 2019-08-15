@@ -50,3 +50,9 @@
 	+ Full timestamp and blob support
 	+ Separate DataResult test/support
 	+ PG support
+	+ Option/null support
+
+
+* ManyToMany
+	- separate table for each ManyToMany field. Named TYPE_FIELD_ManyToMany
+	- One row for each value

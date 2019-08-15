@@ -25,8 +25,8 @@ macro_rules! connection_method_wrapper {
             ) -> Result<()> {
                 self.conn.insert_or_replace(table, columns, values)
             }
-            fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
-                self.conn.delete(table, pkcol, pk)
+            fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
+                self.conn.delete_where(table, expr)
             }
             fn has_table(&self, table: &'static str) -> Result<bool> {
                 self.conn.has_table(table)

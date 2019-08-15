@@ -166,8 +166,8 @@ impl ConnectionMethods for Transaction<'_> {
     ) -> Result<()> {
         self.trans.insert_or_replace(table, columns, values)
     }
-    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
-        self.trans.delete(table, pkcol, pk)
+    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
+        self.trans.delete_where(table, expr)
     }
     fn has_table(&self, table: &'static str) -> Result<bool> {
         self.trans.has_table(table)

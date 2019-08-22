@@ -49,6 +49,7 @@
 	+ Optional dependencies
 	+ Full timestamp and blob support
 	+ Separate DataResult test/support
+	+ foreign key constraints in db, cascade setting
 	+ PG support
 	+ Option/null support
 

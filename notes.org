@@ -45,8 +45,9 @@
   published BOOLEAN NOT NULL DEFAULT 'f'
 )
 * Roadmap
-	+ Documentation
+	+ Summary/readme
 	+ Optional dependencies
 	+ Full timestamp and blob support
 	+ Separate DataResult test/support
+	+ Autoincrement/serial support
 	+ PG support

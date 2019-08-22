@@ -442,6 +442,6 @@ impl DataObject for PropaneMigration {
         conn.insert_or_replace(Self::TABLE, <Self as DataResult>::COLUMNS, &values)
     }
     fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
-        conn.delete(Self::TABLE, Self::PKCOL, &self.pk().to_sql())
+        conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
     }
 }

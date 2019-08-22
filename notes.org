@@ -50,4 +50,11 @@
 	+ Full timestamp and blob support
 	+ Separate DataResult test/support
 	+ Autoincrement/serial support
+	+ foreign key constraints in db, cascade setting
 	+ PG support
+	+ Option/null support
+
+
+* ManyToMany
+	- separate table for each ManyToMany field. Named TYPE_FIELD_ManyToMany
+	- One row for each value

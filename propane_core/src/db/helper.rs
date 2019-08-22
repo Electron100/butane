@@ -5,6 +5,8 @@ use crate::query::Expr::{Condition, Placeholder, Val};
 use crate::SqlVal;
 use std::fmt::Write;
 
+/// Writes to `w` the SQL to express the expression given in `expr`. Values contained in `expr` are rendered
+/// as placeholders in the SQL string and the actual values are added to `values`.
 pub fn sql_for_expr<F, W>(expr: Expr, f: F, values: &mut Vec<SqlVal>, w: &mut W)
 where
     F: Fn(Expr, &mut Vec<SqlVal>, &mut W),
@@ -72,10 +74,6 @@ pub fn sql_insert_or_replace_with_placeholders(
         ", "
     });
     write!(w, ")").unwrap();
-}
-
-pub fn sql_delete_with_placeholder(table: &'static str, pkcol: &'static str, w: &mut impl Write) {
-    write!(w, "DELETE FROM {} WHERE {} = ?", table, pkcol).unwrap();
 }
 
 pub fn sql_limit(limit: i32, w: &mut impl Write) {

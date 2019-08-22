@@ -84,8 +84,8 @@ impl ConnectionMethods for SQLiteConnection {
     ) -> Result<()> {
         self.conn.insert_or_replace(table, columns, values)
     }
-    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
-        self.conn.delete(table, pkcol, pk)
+    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
+        self.conn.delete_where(table, expr)
     }
     fn has_table(&self, table: &'static str) -> Result<bool> {
         self.conn.has_table(table)
@@ -136,10 +136,16 @@ impl ConnectionMethods for rusqlite::Connection {
         self.execute(&sql, &values.iter().collect::<Vec<_>>())?;
         Ok(())
     }
-    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
+    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
         let mut sql = String::new();
-        helper::sql_delete_with_placeholder(table, pkcol, &mut sql);
-        self.execute(&sql, &[&pk])?;
+        let mut values: Vec<SqlVal> = Vec::new();
+        write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
+        sql_for_expr(
+            query::Expr::Condition(Box::new(expr)),
+            &mut values,
+            &mut sql,
+        );
+        self.execute(&sql, &values)?;
         Ok(())
     }
     fn has_table(&self, table: &'static str) -> Result<bool> {
@@ -196,8 +202,11 @@ impl ConnectionMethods for SqliteTransaction<'_> {
     ) -> Result<()> {
         self.get()?.insert_or_replace(table, columns, values)
     }
-    fn delete(&self, table: &'static str, pkcol: &'static str, pk: &SqlVal) -> Result<()> {
+    fn delete(&self, table: &'static str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
         self.get()?.delete(table, pkcol, pk)
+    }
+    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
+        self.get()?.delete_where(table, expr)
     }
     fn has_table(&self, table: &'static str) -> Result<bool> {
         self.get()?.has_table(table)

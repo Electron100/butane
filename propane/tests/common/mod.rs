@@ -27,14 +27,18 @@ impl propane::migrations::Filesystem for MemoryFilesystem {
             .collect()
     }
     fn write(&self, path: &Path) -> std::io::Result<Box<dyn Write>> {
-        self.fs.create_file(path).map(|f| Box::new(f) as Box<Write>)
+        self.fs
+            .create_file(path)
+            .map(|f| Box::new(f) as Box<dyn Write>)
     }
     fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>> {
-        self.fs.open_file(path).map(|f| Box::new(f) as Box<Read>)
+        self.fs
+            .open_file(path)
+            .map(|f| Box::new(f) as Box<dyn Read>)
     }
 }
 
-pub fn setup_db(backend: Box<Backend>, conn: &mut Connection) {
+pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {
     let mut root = std::env::current_dir().unwrap();
     root.push("propane/migrations");
     let disk_migrations = propane::migrations::from_root(&root);

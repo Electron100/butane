@@ -1,6 +1,6 @@
 use propane::model;
 use propane::prelude::*;
-use propane::{db::Connection, ForeignKey};
+use propane::{db::Connection, ForeignKey, Many};
 
 #[model]
 #[derive(Debug, Eq, PartialEq)]
@@ -25,8 +25,7 @@ pub struct Post {
     pub body: String,
     pub published: bool,
     pub likes: i32,
-    // TODO support ManyToMany
-    //pub tags: ManyToMany<Tag>,
+    pub tags: Many<Tag>,
     pub blog: ForeignKey<Blog>,
 }
 impl Post {
@@ -37,15 +36,24 @@ impl Post {
             body: body.to_string(),
             published: false,
             likes: 0,
+            tags: Many::new(),
             blog: ForeignKey::from(blog),
         }
     }
 }
 
 #[model]
-struct Tag {
+#[derive(Debug)]
+pub struct Tag {
     #[pk]
-    tag: String,
+    pub tag: String,
+}
+impl Tag {
+    pub fn new(tag: &str) -> Self {
+        Tag {
+            tag: tag.to_string(),
+        }
+    }
 }
 
 /// Sets up two blogs
@@ -58,6 +66,13 @@ pub fn setup_blog(conn: &Connection) {
     let mut mountains_blog = Blog::new(2, "Mountains");
     mountains_blog.save(conn).unwrap();
 
+    let mut tag_asia = Tag::new("asia");
+    tag_asia.save(conn).unwrap();
+    let mut tag_danger = Tag::new("danger");
+    tag_danger.save(conn).unwrap();
+    let mut tag_monkeys = Tag::new("monkeys");
+    tag_monkeys.save(conn).unwrap();
+
     let mut post = Post::new(
         1,
         "The Tiger",
@@ -66,6 +81,8 @@ pub fn setup_blog(conn: &Connection) {
     );
     post.published = true;
     post.likes = 4;
+    post.tags.add(&tag_danger);
+    post.tags.add(&tag_asia);
     post.save(conn).unwrap();
 
     let mut post = Post::new(
@@ -86,6 +103,7 @@ pub fn setup_blog(conn: &Connection) {
     );
     post.published = true;
     post.likes = 10;
+    post.tags.add(&tag_danger);
     post.save(conn).unwrap();
 
     let mut post = Post::new(
@@ -95,5 +113,6 @@ pub fn setup_blog(conn: &Connection) {
         &mountains_blog,
     );
     post.published = false;
+    post.tags.add(&tag_danger);
     post.save(conn).unwrap();
 }

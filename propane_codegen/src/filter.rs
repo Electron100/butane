@@ -19,7 +19,7 @@ pub fn handle_expr(fields: &impl ToTokens, expr: &Expr) -> TokenStream2 {
         _ => {
             let lit = LitStr::new(
                 &format!(
-                    "Unsupported filter expression '{}' {:?}",
+                    "Unsupported filter expression '{}' \ndebug info: {:?}",
                     expr.clone().into_token_stream(),
                     expr
                 ),
@@ -66,6 +66,7 @@ fn handle_call(fields: &impl ToTokens, mcall: &ExprMethodCall) -> TokenStream2 {
     };
     match method.as_str() {
         "matches" => handle_in(fields, &mcall.receiver, mcall.args.first().unwrap().value()),
+        "contains" => handle_contains(fields, &mcall.receiver, mcall.args.first().unwrap().value()),
         _ => make_compile_error!("Unknown method call {}", method),
     }
 }
@@ -82,6 +83,22 @@ fn handle_in(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStrea
             let q = handle_expr(&quote!(#fex.fields()), expr);
             let span = receiver.span();
             quote_spanned!(span=> #fex.subfilter(#q))
+        }
+    }
+}
+
+fn handle_contains(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStream2 {
+    let fex = fieldexpr(fields, receiver);
+    match expr {
+        Expr::Lit(lit) => {
+            // treat this as matching the primary key
+            quote!(#fex.containspk(#lit))
+        }
+        _ => {
+            // Arbitrary expression
+            let q = handle_expr(&quote!(#fex.fields()), expr);
+            let span = receiver.span();
+            quote_spanned!(span=> #fex.contains(#q))
         }
     }
 }

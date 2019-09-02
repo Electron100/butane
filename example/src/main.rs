@@ -1,8 +1,8 @@
 use failure;
 use propane::db::{Connection, ConnectionSpec};
 use propane::model;
-use propane::ForeignKey;
 use propane::{find, query};
+use propane::{ForeignKey, Many};
 
 use propane::prelude::*;
 
@@ -21,8 +21,7 @@ struct Post {
     body: String,
     published: bool,
     likes: i32,
-    // TODO support ManyToMany
-    //tags: ManyToMany<Tag>,
+    tags: Many<Tag>,
     blog: ForeignKey<Blog>,
 }
 
@@ -38,7 +37,7 @@ fn query() -> Result<()> {
     let published_posts = query!(Post, published == true).limit(5).load(&conn)?;
     let unliked_posts = query!(Post, published == true && likes < 5).load(&conn)?;
     let blog: &Blog = unliked_posts.first().unwrap().blog.load(&conn)?;
-    //let tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn);
+    let tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn);
     //let tagged_posts2 = query!(Post, tags.contains(tag = "dinosaurs")).load(&conn);
     let blog: Blog = find!(Blog, name == "Bears", &conn).unwrap();
     let posts_in_blog = query!(Post, blog == { &blog }).load(&conn);

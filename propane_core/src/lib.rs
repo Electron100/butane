@@ -5,6 +5,7 @@ use std::default::Default;
 
 pub mod db;
 pub mod fkey;
+pub mod many;
 pub mod migrations;
 pub mod query;
 pub mod sqlval;
@@ -67,16 +68,18 @@ pub trait ModelTyped {
 pub enum Error {
     #[fail(display = "No such object exists")]
     NoSuchObject,
-    #[fail(display = "Index out of bounds")]
-    BoundsError,
+    #[fail(display = "Index out of bounds {}", 0)]
+    BoundsError(String),
     #[fail(display = "Type mismatch")]
     TypeMismatch,
     #[fail(display = "SqlType not known for {}", ty)]
     UnknownSqlType { ty: String },
-    #[fail(display = "Table {} has no primary key", table)]
-    NoPK { table: String },
     #[fail(display = "Value has not been loaded from the database")]
     ValueNotLoaded,
+    #[fail(display = "Not initialized")]
+    NotInitialized,
+    #[fail(display = "Already initialized")]
+    AlreadyInitialized,
     #[fail(display = "Migration error {}", 0)]
     MigrationError(String),
     #[fail(display = "Unknown backend {}", 0)]

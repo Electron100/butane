@@ -41,10 +41,10 @@ impl Filesystem for OsFilesystem {
             .collect()
     }
     fn write(&self, path: &Path) -> std::io::Result<Box<dyn Write>> {
-        std::fs::File::create(path).map(|f| Box::new(f) as Box<Write>)
+        std::fs::File::create(path).map(|f| Box::new(f) as Box<dyn Write>)
     }
     fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>> {
-        std::fs::File::open(path).map(|f| Box::new(f) as Box<Read>)
+        std::fs::File::open(path).map(|f| Box::new(f) as Box<dyn Read>)
     }
 }
 
@@ -63,7 +63,7 @@ struct MigrationInfo {
 /// A Migration cannot be constructed directly, only retrieved from
 /// [Migrations][crate::migrations::Migrations].
 pub struct Migration {
-    fs: Rc<Filesystem>,
+    fs: Rc<dyn Filesystem>,
     root: PathBuf,
 }
 impl Migration {
@@ -196,7 +196,7 @@ impl MigrationsState {
 
 /// A collection of migrations.
 pub struct Migrations {
-    fs: Rc<Filesystem>,
+    fs: Rc<dyn Filesystem>,
     root: PathBuf,
 }
 impl Migrations {
@@ -409,7 +409,9 @@ impl DataResult for PropaneMigration {
     const COLUMNS: &'static [Column] = &[Column::new("name", SqlType::Text)];
     fn from_row(row: Row) -> Result<Self> {
         if row.len() != 1usize {
-            return Err(Error::BoundsError.into());
+            return Err(Error::BoundsError(
+                "Row has the wrong number of columns for this DataResult".to_string(),
+            ));
         }
         let mut it = row.into_iter();
         Ok(PropaneMigration {

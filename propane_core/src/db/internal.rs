@@ -65,7 +65,9 @@ impl Row {
         self.vals.len()
     }
     pub fn get<'a>(&'a self, idx: usize) -> Result<&'a SqlVal> {
-        self.vals.get(idx).ok_or(BoundsError)
+        self.vals
+            .get(idx)
+            .ok_or(BoundsError(format!("{}th column not present in row", idx)))
     }
     pub fn get_int(&self, idx: usize) -> Result<i64> {
         self.get(idx)?.integer()

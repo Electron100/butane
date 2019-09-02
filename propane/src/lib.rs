@@ -2,12 +2,14 @@ use proc_macro_hack::proc_macro_hack;
 pub use propane_codegen::model;
 pub use propane_core::db;
 pub use propane_core::fkey::ForeignKey;
+pub use propane_core::many::Many;
 pub use propane_core::migrations;
 pub use propane_core::query;
 pub use propane_core::{
     DataObject, DataResult, Error, FieldType, FromSql, IntoSql, Result, SqlType, SqlVal, ToSql,
 };
 
+// TODO document matches, contains, and any others
 /// Macro to construct a [`BoolExpr`] (for use with a [`Query`]) from
 /// an expression with Rust syntax.
 ///

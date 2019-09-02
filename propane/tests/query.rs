@@ -6,7 +6,7 @@ use propane::query;
 
 mod common;
 use common::blog;
-use common::blog::{Blog, Post};
+use common::blog::{Blog, Post, Tag};
 
 fn equality(conn: Connection) {
     blog::setup_blog(&conn);
@@ -78,3 +78,36 @@ fn fkey_match(conn: Connection) {
     assert_eq!(posts, posts3);
 }
 testall!(fkey_match);
+
+fn many_load(conn: Connection) {
+    blog::setup_blog(&conn);
+    let post: Post = find!(Post, title == "The Tiger", &conn).unwrap();
+    let tags = post.tags.load(&conn).unwrap();
+    let mut tags: Vec<&Tag> = tags.collect();
+    tags.sort_by(|t1, t2| (*t1).tag.partial_cmp(&t2.tag).unwrap());
+    assert_eq!(tags[0].tag, "asia");
+    assert_eq!(tags[1].tag, "danger");
+}
+testall!(many_load);
+
+fn many_objects_with_tag(conn: Connection) {
+    blog::setup_blog(&conn);
+    let mut posts = query!(Post, tags.contains("danger")).load(&conn).unwrap();
+    posts.sort_by(|p1, p2| p1.id.partial_cmp(&p2.id).unwrap());
+    assert_eq!(posts[0].title, "The Tiger");
+    assert_eq!(posts[1].title, "Mount Doom");
+    assert_eq!(posts[2].title, "Mt. Everest");
+}
+testall!(many_objects_with_tag);
+
+fn many_objects_with_tag_explicit(conn: Connection) {
+    blog::setup_blog(&conn);
+    let mut posts = query!(Post, tags.contains(tag == "danger"))
+        .load(&conn)
+        .unwrap();
+    posts.sort_by(|p1, p2| p1.id.partial_cmp(&p2.id).unwrap());
+    assert_eq!(posts[0].title, "The Tiger");
+    assert_eq!(posts[1].title, "Mount Doom");
+    assert_eq!(posts[2].title, "Mt. Everest");
+}
+testall!(many_objects_with_tag_explicit);

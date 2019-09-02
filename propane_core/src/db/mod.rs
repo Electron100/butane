@@ -31,7 +31,7 @@ pub trait BackendConnection: ConnectionMethods + Send + 'static {
 /// Database connection. May be a connection to any type of database
 /// as it is a boxed abstraction over a specific connection.
 pub struct Connection {
-    conn: Box<BackendConnection>,
+    conn: Box<dyn BackendConnection>,
 }
 impl Connection {
     pub fn execute(&self, sql: impl AsRef<str>) -> Result<()> {
@@ -102,7 +102,7 @@ impl Backend for Box<dyn Backend> {
 }
 
 /// Find a backend by name.
-pub fn get_backend(name: &str) -> Option<Box<Backend>> {
+pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
         "sqlite" => Some(Box::new(sqlite::SQLiteBackend::new())),
         _ => None,

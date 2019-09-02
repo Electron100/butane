@@ -22,14 +22,44 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
     let tablelit = make_ident_literal_str(&tyname);
 
     let rows = rows_for_from(&ast_struct);
-    let numfields = rows.len();
+    let numdbfields = ast_struct.fields.iter().filter(|f| is_row_field(f)).count();
+    let (many_init, many_save): (TokenStream2, TokenStream2) = ast_struct
+        .fields
+        .iter()
+        .filter(|f| is_many_to_many(f))
+        .map(|f| {
+            let ident = f
+                .ident
+                .clone()
+                .expect("Fields must be named for propane");
+            let many_table_lit = many_table_lit(&ast_struct, f);
+            let pksqltype = quote!(<<Self as propane::DataObject>::PKType as propane::FieldType>::SQLTYPE);
+            let init = quote!(obj.#ident.ensure_init(#many_table_lit, propane::ToSql::to_sql(obj.pk()), #pksqltype););
+            // Save also needs to ensure_initialized
+            let save = quote!(
+                self.#ident.ensure_init(#many_table_lit, propane::ToSql::to_sql(self.pk()), #pksqltype);
+                self.#ident.save(conn)?;
+            );
+            (init, save)
+        })
+        .unzip();
 
     let values: Vec<TokenStream2> = ast_struct
         .fields
         .iter()
+        .filter(|f| is_row_field(f))
         .map(|f| {
             let ident = f.ident.clone().unwrap();
-            quote!(values.push(propane::ToSql::to_sql(&self.#ident));)
+            if is_row_field(f) {
+                quote!(values.push(propane::ToSql::to_sql(&self.#ident));)
+            } else if is_many_to_many(f) {
+                quote!(
+                self.#ident.ensure_init(Self::TABLE, self.pk().clone(), <Self as propane::DataObject>::PKType);
+                self.#ident.save()?;
+                )
+            } else {
+                panic!("Unexpected struct field {}", ident)
+            }
         })
         .collect();
 
@@ -41,13 +71,16 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 #columns
             ];
             fn from_row(mut row: propane::db::internal::Row) -> propane::Result<Self> {
-                if row.len() != #numfields {
-                    return Err(propane::Error::BoundsError.into());
+                if row.len() != #numdbfields {
+                    return Err(propane::Error::BoundsError(
+                        "Found unexpected number of columns in row for DataResult".to_string()));
                 }
                 let mut it = row.into_iter();
-                Ok(#tyname {
+                let mut obj = #tyname {
                     #(#rows),*
-                })
+                };
+                #many_init
+                Ok(obj)
             }
             fn query() -> propane::query::Query<Self> {
                 propane::query::Query::new(#table_lit)
@@ -73,8 +106,9 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                     .ok_or(propane::Error::NoSuchObject.into())
             }
             fn save(&mut self, conn: &impl propane::db::internal::ConnectionMethods) -> propane::Result<()> {
+                #many_save
                 //todo perf use an array on the stack for better
-                let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numfields);
+                let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numdbfields);
                 #(#values)*
                 conn.insert_or_replace(Self::TABLE, <Self as propane::DataResult>::COLUMNS, &values)
             }
@@ -116,23 +150,11 @@ pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {
         .fields
         .iter()
         .map(|f| {
-            let fid = match &f.ident {
-                Some(fid) => fid,
-                None => {
-                    return quote_spanned!(
-                        f.span() =>
-                            compile_error!("Fields must be named for propane");
-                    )
-                }
-            };
-            let fidlit = make_ident_literal_str(&fid);
-            let fnid = Ident::new(&format!("fieldexpr_{}", fid), f.span());
-            let fty = &f.ty;
-            quote!(
-                #vis fn #fnid(&self) -> propane::query::FieldExpr<#fty> {
-                    propane::query::FieldExpr::<#fty>::new(#fidlit)
-                }
-            )
+            if is_many_to_many(f) {
+                fieldexpr_func_many(f, ast_struct)
+            } else {
+                fieldexpr_func_regular(f, ast_struct)
+            }
         })
         .collect();
 
@@ -156,23 +178,92 @@ pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {
     )
 }
 
+fn fieldexpr_func_regular(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
+    let fty = &f.ty;
+    let fidlit = field_ident_lit(f);
+    fieldexpr_func(
+        f,
+        ast_struct,
+        quote!(propane::query::FieldExpr<#fty>),
+        quote!(propane::query::FieldExpr::<#fty>::new(#fidlit)),
+    )
+}
+
+fn fieldexpr_func_many(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
+    let tyname = &ast_struct.ident;
+    let fty = get_foreign_type_argument(f, "Many").expect("Many field misdetected");
+    let many_table_lit = many_table_lit(ast_struct, f);
+    fieldexpr_func(
+        f,
+        ast_struct,
+        quote!(propane::query::ManyFieldExpr<#tyname, #fty>),
+        quote!(propane::query::ManyFieldExpr::<#tyname, #fty>::new(#many_table_lit)),
+    )
+}
+
+fn fieldexpr_func(
+    f: &Field,
+    ast_struct: &ItemStruct,
+    field_expr_type: TokenStream2,
+    field_expr_ctor: TokenStream2,
+) -> TokenStream2 {
+    let vis = &ast_struct.vis;
+    let fid = match &f.ident {
+        Some(fid) => fid,
+        None => {
+            return quote_spanned!(
+                f.span() =>
+                    compile_error!("Fields must be named for propane");
+            )
+        }
+    };
+    let fnid = Ident::new(&format!("fieldexpr_{}", fid), f.span());
+    quote!(
+        #vis fn #fnid(&self) -> #field_expr_type {
+            #field_expr_ctor
+        }
+    )
+}
+
+fn field_ident_lit(f: &Field) -> TokenStream2 {
+    let fid = match &f.ident {
+        Some(fid) => fid,
+        None => {
+            return quote_spanned!(
+                f.span() =>
+                    compile_error!("Fields must be named for propane");
+            )
+        }
+    };
+    make_ident_literal_str(&fid).into_token_stream()
+}
+
 fn fields_type(tyname: &Ident) -> Ident {
     Ident::new(&format!("{}Fields", tyname), Span::call_site())
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
-    ast_struct.fields.iter().map(|f| from_row_cell(f)).collect()
-}
-
-fn from_row_cell(f: &Field) -> TokenStream2 {
-    let ident = f.ident.clone().unwrap();
-    quote!(#ident: propane::FromSql::from_sql(it.next().unwrap())?)
+    ast_struct
+        .fields
+        .iter()
+        .map(|f| {
+            let ident = f.ident.clone().unwrap();
+            if is_row_field(f) {
+                quote!(#ident: propane::FromSql::from_sql(it.next().unwrap())?)
+            } else if is_many_to_many(f) {
+                quote!(#ident: propane::Many::new())
+            } else {
+                panic!("Unexpected struct field {}", ident)
+            }
+        })
+        .collect()
 }
 
 fn columns(ast_struct: &ItemStruct) -> TokenStream2 {
     ast_struct
         .fields
         .iter()
+        .filter(|f| is_row_field(f))
         .map(|f| match f.ident.clone() {
             Some(fname) => {
                 let ident = make_ident_literal_str(&fname);
@@ -185,4 +276,13 @@ fn columns(ast_struct: &ItemStruct) -> TokenStream2 {
             },
         })
         .collect()
+}
+
+fn many_table_lit(ast_struct: &ItemStruct, field: &Field) -> LitStr {
+    let tyname = &ast_struct.ident;
+    let ident = field
+        .ident
+        .clone()
+        .expect("Fields must be named for propane");
+    make_lit(&format!("{}_{}_Many", &tyname, &ident))
 }

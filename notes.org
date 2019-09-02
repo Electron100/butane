@@ -53,8 +53,9 @@
 	+ foreign key constraints in db, cascade setting
 	+ PG support
 	+ Option/null support
+	+ Many backreferences
 
 
 * ManyToMany
-	- separate table for each ManyToMany field. Named TYPE_FIELD_ManyToMany
+	- separate table for each ManyToMany field. Named TYPE_FIELD_Many
 	- One row for each value

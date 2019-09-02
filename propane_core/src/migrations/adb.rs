@@ -75,13 +75,15 @@ impl ADB {
         while changed {
             changed = false;
             for table in &mut self.tables.values_mut() {
-                let pktype = table.pk()?.sqltype();
-                if let Ok(pktype) = pktype {
-                    changed = resolver.insert_pk(&table.name, pktype)
-                }
+                if let Some(pk) = table.pk() {
+                    let pktype = pk.sqltype();
+                    if let Ok(pktype) = pktype {
+                        changed = resolver.insert_pk(&table.name, pktype)
+                    }
 
-                for col in table.columns.values_mut() {
-                    col.resolve_type(&resolver);
+                    for col in table.columns.values_mut() {
+                        col.resolve_type(&resolver);
+                    }
                 }
             }
         }
@@ -114,13 +116,8 @@ impl ATable {
     pub fn remove_column(&mut self, name: &str) {
         self.columns.remove(name);
     }
-    pub fn pk(&self) -> Result<&AColumn> {
-        self.columns.values().find(|c| c.is_pk()).ok_or(
-            crate::Error::NoPK {
-                table: self.name.clone(),
-            }
-            .into(),
-        )
+    pub fn pk(&self) -> Option<&AColumn> {
+        self.columns.values().find(|c| c.is_pk())
     }
 }
 

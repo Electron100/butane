@@ -1,6 +1,6 @@
 use crate::db::internal::ConnectionMethods;
 use crate::*;
-use once_cell::unsync::OnceCell;
+use lazycell::LazyCell;
 use std::fmt::{Debug, Formatter};
 
 /// Used to implement a relationship between models.
@@ -24,52 +24,52 @@ where
     T: DataObject,
 {
     // At least one must be initialized, but both need not be
-    val: OnceCell<T>,
-    valpk: OnceCell<SqlVal>,
+    val: LazyCell<T>,
+    valpk: LazyCell<SqlVal>,
 }
 impl<T: DataObject> ForeignKey<T> {
     pub fn from_pk(pk: T::PKType) -> Self {
         let ret = Self::new_raw();
-        ret.valpk.set(pk.into_sql()).unwrap();
+        ret.valpk.fill(pk.into_sql()).unwrap();
         ret
     }
     /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
     pub fn get(&self) -> Result<&T> {
-        self.val.get().ok_or(Error::ValueNotLoaded.into())
+        self.val.borrow().ok_or(Error::ValueNotLoaded.into())
     }
 
     /// Loads the value referred to by this foreign key from the
-    /// database if necessary and returns a reference to the value.
+    /// database if necessary and returns a reference to it.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
-        self.val.get_or_try_init(|| {
-            let pk: SqlVal = self.valpk.get().unwrap().clone();
+        self.val.try_borrow_with(|| {
+            let pk: SqlVal = self.valpk.borrow().unwrap().clone();
             T::get(conn, T::PKType::from_sql(pk)?)
         })
     }
 
     fn new_raw() -> Self {
         ForeignKey {
-            val: OnceCell::new(),
-            valpk: OnceCell::new(),
+            val: LazyCell::new(),
+            valpk: LazyCell::new(),
         }
     }
 
     fn ensure_valpk(&self) -> &SqlVal {
-        match self.valpk.get() {
+        match self.valpk.borrow() {
             Some(sqlval) => return &sqlval,
-            None => match self.val.get() {
-                Some(val) => self.valpk.set(val.pk().to_sql()).unwrap(),
+            None => match self.val.borrow() {
+                Some(val) => self.valpk.fill(val.pk().to_sql()).unwrap(),
                 None => panic!("Invalid foreign key state"),
             },
         }
-        &self.valpk.get().unwrap()
+        &self.valpk.borrow().unwrap()
     }
 }
 
 impl<T: DataObject> From<T> for ForeignKey<T> {
     fn from(obj: T) -> Self {
         let ret = Self::new_raw();
-        ret.val.set(obj).ok();
+        ret.val.fill(obj).ok();
         ret
     }
 }
@@ -84,7 +84,7 @@ impl<T: DataObject> Clone for ForeignKey<T> {
         // it's cloneable. Then we wouldn't have to ensure the pk
         self.ensure_valpk();
         ForeignKey {
-            val: OnceCell::new(),
+            val: LazyCell::new(),
             valpk: self.valpk.clone(),
         }
     }
@@ -123,6 +123,7 @@ where
     T: DataObject,
 {
     const SQLTYPE: SqlType = <T as DataObject>::PKType::SQLTYPE;
+    type RefType = <<T as DataObject>::PKType as FieldType>::RefType;
 }
 impl<T> FromSql for ForeignKey<T>
 where
@@ -130,8 +131,8 @@ where
 {
     fn from_sql(val: SqlVal) -> Result<Self> {
         Ok(ForeignKey {
-            valpk: OnceCell::from(val),
-            val: OnceCell::new(),
+            valpk: lazy_cell_from(val),
+            val: LazyCell::new(),
         })
     }
 }
@@ -140,9 +141,9 @@ where
     T: DataObject,
 {
     fn eq(&self, other: &T) -> bool {
-        match self.val.get() {
+        match self.val.borrow() {
             Some(t) => return t.pk().eq(other.pk()),
-            None => match self.valpk.get() {
+            None => match self.valpk.borrow() {
                 Some(valpk) => valpk.eq(&other.pk().to_sql()),
                 None => panic!("Invalid foreign key state"),
             },
@@ -156,4 +157,10 @@ where
     fn eq(&self, other: &&T) -> bool {
         self.eq(*other)
     }
+}
+
+fn lazy_cell_from<T>(val: T) -> LazyCell<T> {
+    let ret = LazyCell::new();
+    ret.fill(val).ok();
+    ret
 }

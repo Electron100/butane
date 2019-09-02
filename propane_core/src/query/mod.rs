@@ -8,18 +8,19 @@ use std::marker::PhantomData;
 
 mod field;
 
-pub use field::FieldExpr;
+pub use field::{FieldExpr, ManyFieldExpr};
 
 /// Abstract representation of a database expression.
 #[derive(Clone)]
 pub enum Expr {
-    // A column.
+    // todo document column name qualification
+    /// A column.
     Column(&'static str),
-    // A value.
+    /// A value.
     Val(SqlVal),
-    // A placeholder for a value.
+    /// A placeholder for a value.
     Placeholder,
-    // A boolean condition.
+    /// A boolean condition.
     Condition(Box<BoolExpr>),
 }
 
@@ -44,6 +45,51 @@ pub enum BoolExpr {
         tbl2_col: &'static str,
         expr: Box<BoolExpr>,
     },
+    In(&'static str, Vec<SqlVal>),
+    /// Expression which is true if the value of `col` is present in
+    /// the set of values of `col2` where `expr` evaluated on a row
+    /// in `tbl2` with the specified joins is true.
+    SubqueryJoin {
+        col: &'static str,
+        tbl2: &'static str,
+        col2: Column,
+        joins: Vec<Join>,
+        expr: Box<BoolExpr>,
+    },
+}
+
+#[derive(Clone)]
+pub enum Join {
+    /// Inner join `join_table` where `col1` is equal to
+    /// `col2`
+    Inner {
+        join_table: &'static str,
+        col1: Column,
+        col2: Column,
+    },
+}
+
+#[derive(Clone)]
+pub struct Column {
+    table: Option<&'static str>,
+    name: &'static str,
+}
+impl Column {
+    pub fn new(table: &'static str, name: &'static str) -> Self {
+        Column {
+            table: Some(table),
+            name,
+        }
+    }
+    pub fn unqualified(name: &'static str) -> Self {
+        Column { table: None, name }
+    }
+    pub fn table(&self) -> Option<&'static str> {
+        self.table
+    }
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
 }
 
 /// Representation of a database query.

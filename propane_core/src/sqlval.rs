@@ -100,10 +100,14 @@ pub trait FromSql {
 ///
 pub trait FieldType: ToSql + IntoSql + FromSql {
     const SQLTYPE: SqlType;
+    type RefType: ?Sized + ToSql;
 }
 
 macro_rules! impl_prim_sql {
     ($prim:ty, $variant:ident, $sqltype:ident) => {
+        impl_prim_sql! {$prim, $variant, $sqltype, $prim}
+    };
+    ($prim:ty, $variant:ident, $sqltype:ident, $reftype: ty) => {
         impl FromSql for $prim {
             fn from_sql(val: SqlVal) -> Result<Self> {
                 if let SqlVal::$variant(val) = val {
@@ -125,6 +129,7 @@ macro_rules! impl_prim_sql {
         }
         impl FieldType for $prim {
             const SQLTYPE: SqlType = SqlType::$sqltype;
+            type RefType = $reftype;
         }
     };
 }
@@ -135,10 +140,15 @@ impl_prim_sql!(i32, Int, Int);
 impl_prim_sql!(u32, Int, BigInt);
 impl_prim_sql!(f64, Real, Real);
 impl_prim_sql!(f32, Real, Real);
-impl_prim_sql!(String, Text, Text);
+impl_prim_sql!(String, Text, Text, str);
 impl_prim_sql!(Vec<u8>, Blob, Blob);
 
 impl ToSql for &str {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Text(self.to_string())
+    }
+}
+impl ToSql for str {
     fn to_sql(&self) -> SqlVal {
         SqlVal::Text(self.to_string())
     }

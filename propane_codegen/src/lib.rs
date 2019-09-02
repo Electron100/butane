@@ -3,7 +3,6 @@
 
 extern crate proc_macro;
 
-use failure::Error;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span, TokenTree};
@@ -37,10 +36,11 @@ mod migration;
 /// generate migrations
 ///
 /// There are a few restrictions on model types:
-/// 1. The type of each field must implement [`FieldType`].
+/// 1. The type of each field must implement [`FieldType`] or be [`Many`].
 /// 2. There must be a primary key field. This must be either annotated with a `#[pk]` attribute or named `id`.
 ///
 /// [`FieldType`]: crate::FieldType
+/// [`Many`]: crate::Many
 #[proc_macro_attribute]
 pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     // Transform into a derive because derives can have helper
@@ -141,6 +141,24 @@ fn get_primitive_sql_type(field: &Field) -> Option<DeferredSqlType> {
 }
 
 fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
+    get_foreign_sql_type(field, "ForeignKey")
+}
+
+fn get_many_sql_type(field: &Field) -> Option<DeferredSqlType> {
+    get_foreign_sql_type(field, "Many")
+}
+
+fn is_many_to_many(field: &Field) -> bool {
+    get_many_sql_type(field).is_some()
+}
+
+/// Check for special fields which won't correspond to rows and don't
+/// implement FieldType
+fn is_row_field(f: &Field) -> bool {
+    !is_many_to_many(f)
+}
+
+fn get_foreign_type_argument<'a>(field: &'a Field, tyname: &'static str) -> Option<&'a syn::Path> {
     let path = match &field.ty {
         syn::Type::Path(path) => &path.path,
         _ => return None,
@@ -151,7 +169,7 @@ fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
         } else {
             path.segments.first()
         }?;
-    if seg.value().ident != "ForeignKey" {
+    if seg.value().ident != tyname {
         return None;
     }
     let args = match &seg.value().arguments {
@@ -159,21 +177,27 @@ fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
         _ => return None,
     };
     if args.len() != 1 {
-        panic!("ForeignKey should have a single type argument")
+        panic!("{} should have a single type argument", tyname)
     }
-    let typath = match args.last().unwrap().value() {
-        syn::GenericArgument::Type(syn::Type::Path(typath)) => &typath.path,
-        _ => panic!("ForeignKey argument should be a type."),
-    };
-    Some(DeferredSqlType::Deferred(TypeKey::PK(
-        typath
-            .segments
-            .last()
-            .expect("ForeignKey must have an argument")
-            .value()
-            .ident
-            .to_string(),
-    )))
+    match args.last().unwrap().value() {
+        syn::GenericArgument::Type(syn::Type::Path(typath)) => Some(&typath.path),
+        _ => panic!("{} argument should be a type.", tyname),
+    }
+}
+
+fn get_foreign_sql_type(field: &Field, tyname: &'static str) -> Option<DeferredSqlType> {
+    let typath = get_foreign_type_argument(field, tyname);
+    typath.map(|typath| {
+        DeferredSqlType::Deferred(TypeKey::PK(
+            typath
+                .segments
+                .last()
+                .expect(&format!("{} must have an argument", tyname))
+                .value()
+                .ident
+                .to_string(),
+        ))
+    })
 }
 
 fn get_deferred_sql_type(field: &Field) -> DeferredSqlType {

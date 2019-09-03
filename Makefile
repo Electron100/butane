@@ -5,6 +5,8 @@ build :
 	cargo build
 
 check : build test
+	cargo clippy
+
 
 test :
 	cargo test

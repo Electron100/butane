@@ -100,15 +100,16 @@ impl Migration {
     }
 
     /// Get the migration before this one (if any).
+    #[allow(clippy::wrong_self_convention)]
     pub fn from_migration(&self) -> Result<Option<Migration>> {
         let info: MigrationInfo =
             serde_json::from_reader(self.fs.read(&self.root.join("info.json"))?)?;
         match info.from_name {
             None => Ok(None),
             Some(name) => {
-                let m = from_root(self.root.parent().ok_or(Error::MigrationError(
-                    "migration path must have a parent".to_string(),
-                ))?)
+                let m = from_root(self.root.parent().ok_or_else(|| {
+                    Error::MigrationError("migration path must have a parent".to_string())
+                })?)
                 .get_migration(&name);
                 Ok(Some(m))
             }
@@ -319,7 +320,7 @@ impl Migrations {
                 None,
             )?
             .into_iter()
-            .map(|row| PropaneMigration::from_row(row))
+            .map(PropaneMigration::from_row)
             .collect();
         let migrations = migrations?;
 
@@ -436,7 +437,7 @@ impl DataObject for PropaneMigration {
             .load(conn)?
             .into_iter()
             .nth(0)
-            .ok_or(Error::NoSuchObject.into())
+            .ok_or(Error::NoSuchObject)
     }
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);

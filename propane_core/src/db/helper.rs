@@ -1,3 +1,6 @@
+#![allow(clippy::many_single_char_names)]
+#![allow(clippy::unit_arg)]
+
 use super::internal::Column;
 use crate::query;
 use crate::query::Expr::{Condition, Placeholder, Val};

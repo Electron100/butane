@@ -132,7 +132,7 @@ impl<T: DataResult> Query<T> {
     pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
         conn.query(self.table, T::COLUMNS, self.filter, self.limit)?
             .into_iter()
-            .map(|row| T::from_row(row))
+            .map(T::from_row)
             .collect()
     }
 }

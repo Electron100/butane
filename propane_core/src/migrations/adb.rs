@@ -32,14 +32,17 @@ impl TypeResolver {
         }
     }
     fn find_type(&self, key: &TypeKey) -> Option<SqlType> {
-        self.types.get(key).map(|t| *t)
+        self.types.get(key).copied()
     }
     fn insert(&mut self, key: TypeKey, ty: SqlType) -> bool {
-        if self.types.contains_key(&key) {
-            false
-        } else {
-            self.types.insert(key, ty);
-            true
+        use std::collections::hash_map::Entry;
+        let entry = self.types.entry(key);
+        match entry {
+            Entry::Occupied(_) => false,
+            Entry::Vacant(e) => {
+                e.insert(ty);
+                true
+            }
         }
     }
     fn insert_pk(&mut self, key: &str, ty: SqlType) -> bool {
@@ -48,7 +51,7 @@ impl TypeResolver {
 }
 
 /// Abstract representation of a database schema.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ADB {
     tables: HashMap<String, ATable>,
 }
@@ -131,12 +134,13 @@ impl DeferredSqlType {
     fn resolve(&self, resolver: &TypeResolver) -> Result<SqlType> {
         match self {
             DeferredSqlType::Known(t) => Ok(*t),
-            DeferredSqlType::Deferred(key) => resolver.find_type(&key).ok_or(
-                crate::Error::UnknownSqlType {
-                    ty: key.to_string(),
-                }
-                .into(),
-            ),
+            DeferredSqlType::Deferred(key) => {
+                resolver
+                    .find_type(&key)
+                    .ok_or_else(|| crate::Error::UnknownSqlType {
+                        ty: key.to_string(),
+                    })
+            }
         }
     }
 }
@@ -178,9 +182,7 @@ impl AColumn {
     pub fn sqltype(&self) -> Result<SqlType> {
         match &self.sqltype {
             DeferredSqlType::Known(t) => Ok(*t),
-            DeferredSqlType::Deferred(t) => {
-                Err(crate::Error::UnknownSqlType { ty: t.to_string() }.into())
-            }
+            DeferredSqlType::Deferred(t) => Err(crate::Error::UnknownSqlType { ty: t.to_string() }),
         }
     }
     fn resolve_type(&mut self, resolver: &'_ TypeResolver) -> Option<SqlType> {

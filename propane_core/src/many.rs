@@ -120,3 +120,8 @@ impl<T: DataObject> PartialEq<Many<T>> for Many<T> {
     }
 }
 impl<T: DataObject> Eq for Many<T> {}
+impl<T: DataObject> Default for Many<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

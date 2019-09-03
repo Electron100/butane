@@ -113,7 +113,7 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
 /// [Backend][crate::db::Backend] implementations.
 pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     get_backend(&spec.backend_name)
-        .ok_or(Error::UnknownBackend(spec.backend_name.clone()))?
+        .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
         .connect(&spec.conn_str)
 }
 

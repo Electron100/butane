@@ -35,7 +35,7 @@ impl<T: DataObject> ForeignKey<T> {
     }
     /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
     pub fn get(&self) -> Result<&T> {
-        self.val.borrow().ok_or(Error::ValueNotLoaded.into())
+        self.val.borrow().ok_or(Error::ValueNotLoaded)
     }
 
     /// Loads the value referred to by this foreign key from the
@@ -142,7 +142,7 @@ where
 {
     fn eq(&self, other: &T) -> bool {
         match self.val.borrow() {
-            Some(t) => return t.pk().eq(other.pk()),
+            Some(t) => t.pk().eq(other.pk()),
             None => match self.valpk.borrow() {
                 Some(valpk) => valpk.eq(&other.pk().to_sql()),
                 None => panic!("Invalid foreign key state"),

@@ -11,6 +11,7 @@ use rusqlite;
 use std::fmt::Write;
 
 /// SQLite [Backend][crate::db::Backend] implementation.
+#[derive(Default)]
 pub struct SQLiteBackend {}
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
@@ -357,7 +358,7 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {
     let old = current
         .get_table(tbl_name)
         .and_then(|table| table.column(name))
-        .map(|c| c.clone());
+        .cloned();
     match old {
         Some(col) => change_column(current, tbl_name, &col, None),
         None => {

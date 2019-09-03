@@ -222,6 +222,7 @@ impl rusqlite::ToSql for SqlVal {
             SqlVal::Real(r) => Owned(Value::Real(*r)),
             SqlVal::Text(t) => Borrowed(ValueRef::Text(&t)),
             SqlVal::Blob(b) => Borrowed(ValueRef::Blob(&b)),
+            SqlVal::Null => Owned(Value::Null),
         })
     }
 }
@@ -251,6 +252,9 @@ where
 }
 
 fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, ty: SqlType) -> Result<SqlVal> {
+    if let rusqlite::types::ValueRef::Null = val {
+        return Ok(SqlVal::Null);
+    }
     Ok(match ty {
         SqlType::Bool => SqlVal::Bool(val.as_i64()? != 0),
         SqlType::Int => SqlVal::Int(val.as_i64()?),
@@ -304,6 +308,7 @@ fn define_column(col: &AColumn) -> String {
 
 fn default_string(d: SqlVal) -> String {
     match d {
+        SqlVal::Null => "NULL".to_string(),
         SqlVal::Bool(b) => {
             if b {
                 "1".to_string()

@@ -1,4 +1,4 @@
-use crate::{Error::TypeMismatch, Result, SqlType};
+use crate::{Error::CannotConvertSqlVal, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -11,6 +11,7 @@ use std::fmt;
 /// [`ToSql`]: crate::ToSql
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SqlVal {
+    Null,
     Bool(bool),
     Int(i64),
     Real(f64),
@@ -22,43 +23,56 @@ impl SqlVal {
     pub fn bool(&self) -> Result<bool> {
         match self {
             SqlVal::Bool(val) => Ok(*val),
-            _ => Err(TypeMismatch.into()),
+            _ => Err(CannotConvertSqlVal(SqlType::Bool, self.clone())),
         }
     }
     pub fn integer(&self) -> Result<i64> {
         match self {
             SqlVal::Int(val) => Ok(*val),
-            _ => Err(TypeMismatch.into()),
+            _ => Err(CannotConvertSqlVal(SqlType::Int, self.clone())),
         }
     }
     pub fn real(&self) -> Result<f64> {
         match self {
             SqlVal::Real(val) => Ok(*val),
-            _ => Err(TypeMismatch.into()),
+            _ => Err(CannotConvertSqlVal(SqlType::Real, self.clone())),
         }
     }
     pub fn text<'a>(&'a self) -> Result<&'a str> {
         match self {
             SqlVal::Text(val) => Ok(val),
-            _ => Err(TypeMismatch.into()),
+            _ => Err(CannotConvertSqlVal(SqlType::Text, self.clone())),
         }
     }
     pub fn owned_text(self) -> Result<String> {
         match self {
             SqlVal::Text(val) => Ok(val),
-            _ => Err(TypeMismatch.into()),
+            _ => Err(CannotConvertSqlVal(SqlType::Text, self.clone())),
         }
     }
     pub fn blob<'a>(&'a self) -> Result<&'a [u8]> {
         match self {
             SqlVal::Blob(val) => Ok(val),
-            _ => Err(TypeMismatch.into()),
+            _ => Err(CannotConvertSqlVal(SqlType::Blob, self.clone())),
         }
     }
     pub fn owned_blob(self) -> Result<Vec<u8>> {
         match self {
             SqlVal::Blob(val) => Ok(val),
-            _ => Err(TypeMismatch.into()),
+            _ => Err(CannotConvertSqlVal(SqlType::Blob, self.clone())),
+        }
+    }
+}
+impl fmt::Display for SqlVal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use SqlVal::*;
+        match &self {
+            SqlVal::Null => f.write_str("NULL"),
+            SqlVal::Bool(val) => val.fmt(f),
+            Int(val) => val.fmt(f),
+            Real(val) => val.fmt(f),
+            Text(val) => val.fmt(f),
+            Blob(val) => f.write_str(&hex::encode(val)),
         }
     }
 }
@@ -97,9 +111,10 @@ pub trait FromSql {
 }
 
 /// Type suitable for being a database column.
-///
 pub trait FieldType: ToSql + IntoSql + FromSql {
     const SQLTYPE: SqlType;
+    /// Reference type. Used for ergonomics with String (which has
+    /// reference type str). For most, it is Self
     type RefType: ?Sized + ToSql;
 }
 
@@ -113,7 +128,10 @@ macro_rules! impl_prim_sql {
                 if let SqlVal::$variant(val) = val {
                     Ok(val as $prim)
                 } else {
-                    Err(crate::Error::TypeMismatch.into())
+                    Err(crate::Error::CannotConvertSqlVal(
+                        SqlType::$sqltype,
+                        val.clone(),
+                    ))
                 }
             }
         }
@@ -154,15 +172,43 @@ impl ToSql for str {
     }
 }
 
-impl fmt::Display for SqlVal {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use SqlVal::*;
-        match &self {
-            SqlVal::Bool(val) => val.fmt(f),
-            Int(val) => val.fmt(f),
-            Real(val) => val.fmt(f),
-            Text(val) => val.fmt(f),
-            Blob(val) => f.write_str(&hex::encode(val)),
+impl<T> ToSql for Option<T>
+where
+    T: ToSql,
+{
+    fn to_sql(&self) -> SqlVal {
+        match self {
+            None => SqlVal::Null,
+            Some(v) => v.to_sql(),
         }
     }
+}
+impl<T> IntoSql for Option<T>
+where
+    T: IntoSql,
+{
+    fn into_sql(self) -> SqlVal {
+        match self {
+            None => SqlVal::Null,
+            Some(v) => v.into_sql(),
+        }
+    }
+}
+impl<T> FromSql for Option<T>
+where
+    T: FromSql,
+{
+    fn from_sql(val: SqlVal) -> Result<Self> {
+        Ok(match val {
+            SqlVal::Null => None,
+            _ => Some(T::from_sql(val)?),
+        })
+    }
+}
+impl<T> FieldType for Option<T>
+where
+    T: FieldType,
+{
+    const SQLTYPE: SqlType = T::SQLTYPE;
+    type RefType = Self;
 }

@@ -6,9 +6,9 @@ use crate::db::internal::{ConnectionMethods, QueryResult};
 use crate::{DataResult, Result, SqlVal};
 use std::marker::PhantomData;
 
-mod field;
+mod fieldexpr;
 
-pub use field::{FieldExpr, ManyFieldExpr};
+pub use fieldexpr::{DataOrd, FieldExpr, ManyFieldExpr};
 
 /// Abstract representation of a database expression.
 #[derive(Clone)]

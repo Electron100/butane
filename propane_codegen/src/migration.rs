@@ -3,8 +3,7 @@ use propane_core::migrations;
 use propane_core::migrations::adb::{AColumn, ATable};
 use propane_core::Result;
 use std::path::PathBuf;
-use syn::parse_quote;
-use syn::{Field, ItemStruct, Type, TypePath};
+use syn::{Field, ItemStruct};
 
 pub fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<()> {
     let mut dir = PathBuf::from(
@@ -68,11 +67,9 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
 }
 
 fn is_nullable(field: &Field) -> bool {
-    let option: TypePath = parse_quote!(std::option::Option);
-    match &field.ty {
-        Type::Path(tp) => option == *tp,
-        _ => false,
-    }
+    let ret = is_option(field);
+    eprintln!("nullable for {} is {}", &field.clone().ident.unwrap(), ret);
+    ret
 }
 
 fn get_default(field: &Field) -> Option<SqlVal> {

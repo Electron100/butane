@@ -23,6 +23,7 @@ struct Post {
     likes: i32,
     tags: Many<Tag>,
     blog: ForeignKey<Blog>,
+    byline: Option<String>,
 }
 
 #[model]

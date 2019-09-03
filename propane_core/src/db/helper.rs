@@ -20,8 +20,14 @@ where
         }
         Placeholder => w.write_str("?"),
         Condition(c) => match *c {
-            Eq(col, ex) => write!(w, "{} = ", col).and_then(|_| Ok(f(ex, values, w))),
-            Ne(col, ex) => write!(w, "{} <> ", col).and_then(|_| Ok(f(ex, values, w))),
+            Eq(col, ex) => match ex {
+                Expr::Val(SqlVal::Null) => write!(w, "{} IS NULL", col),
+                _ => write!(w, "{} = ", col).and_then(|_| Ok(f(ex, values, w))),
+            },
+            Ne(col, ex) => match ex {
+                Expr::Val(SqlVal::Null) => write!(w, "{} IS NOT NULL", col),
+                _ => write!(w, "{} <> ", col).and_then(|_| Ok(f(ex, values, w))),
+            },
             Lt(col, ex) => write!(w, "{} < ", col).and_then(|_| Ok(f(ex, values, w))),
             Gt(col, ex) => write!(w, "{} > ", col).and_then(|_| Ok(f(ex, values, w))),
             Le(col, ex) => write!(w, "{} <= ", col).and_then(|_| Ok(f(ex, values, w))),

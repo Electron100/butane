@@ -52,8 +52,8 @@
 	+ Autoincrement/serial support
 	+ foreign key constraints in db, cascade setting
 	+ PG support
-	+ Option/null support
 	+ Many backreferences
+	+ better error reporting in macro -- compiler_error with span on field instead of proc macro panic
 
 
 * ManyToMany

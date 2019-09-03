@@ -5,18 +5,36 @@ use crate::query::{BoolExpr, Column, Expr, Join};
 use crate::sqlval::{FieldType, IntoSql, SqlVal, ToSql};
 use crate::DataObject;
 use std::borrow::Borrow;
+use std::cmp::{PartialEq, PartialOrd};
 use std::marker::PhantomData;
 
 macro_rules! binary_op {
     ($func_name:ident, $bound:path, $cond:ident) => {
         pub fn $func_name<U>(&self, val: U) -> BoolExpr
         where
-            U: $bound + ToSql,
+            T: $bound,
+            U: ToSql,
         {
             BoolExpr::$cond(self.name, Expr::Val(val.to_sql()))
         }
     };
 }
+
+/// Marker trait to determine whether values can be compared.
+///
+/// Unlike `PartialEq`, handles `Option`, which we need for nullable
+/// types. We would like to automatically implement it if PartialEq
+/// is implemented, but we can't do that without specialization or
+/// negative trait bounds.
+pub trait DataEq<Rhs> {}
+impl<T> DataEq<T> for Option<T> where T: PartialEq<T> + FieldType {}
+impl<T> DataEq<T> for T where T: PartialEq<T> + FieldType {}
+
+/// Marker trait to determine whether values can be compared.
+/// Unlike `PartialOrd`, handles `Option`, which we need for nullable types.
+pub trait DataOrd<Rhs> {}
+impl<T> DataOrd<T> for Option<T> where T: PartialOrd<T> + FieldType {}
+impl<T> DataOrd<T> for T where T: PartialOrd<T> + FieldType {}
 
 /// Used to implement the `query!` and `filter!` macros.
 pub struct FieldExpr<T>
@@ -38,12 +56,12 @@ where
         }
     }
 
-    binary_op!(eq, std::cmp::PartialEq<T>, Eq);
-    binary_op!(ne, std::cmp::PartialEq<T>, Ne);
-    binary_op!(lt, std::cmp::PartialOrd<T>, Lt);
-    binary_op!(gt, std::cmp::PartialOrd<T>, Gt);
-    binary_op!(le, std::cmp::PartialOrd<T>, Le);
-    binary_op!(ge, std::cmp::PartialOrd<T>, Ge);
+    binary_op!(eq, std::cmp::PartialEq<U>, Eq);
+    binary_op!(ne, std::cmp::PartialEq<U>, Ne);
+    binary_op!(lt, DataOrd<U>, Lt);
+    binary_op!(gt, DataOrd<U>, Gt);
+    binary_op!(le, DataOrd<U>, Le);
+    binary_op!(ge, DataOrd<U>, Ge);
 }
 impl<F: DataObject> FieldExpr<ForeignKey<F>> {
     pub fn subfilter(&self, q: BoolExpr) -> BoolExpr {

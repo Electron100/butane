@@ -104,6 +104,9 @@ fn handle_contains(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> Toke
 }
 
 fn handle_path(fields: &impl ToTokens, expr: &ExprPath) -> TokenStream2 {
+    if expr.path.is_ident("None") {
+        return quote!(None);
+    }
     fieldexpr(fields, &expr.path)
 }
 

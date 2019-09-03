@@ -70,8 +70,13 @@ pub enum Error {
     NoSuchObject,
     #[fail(display = "Index out of bounds {}", 0)]
     BoundsError(String),
-    #[fail(display = "Type mismatch")]
-    TypeMismatch,
+    #[fail(
+        display = "Type mismatch converting SqlVal. Expected {}, found value {:?}",
+        0, 1
+    )]
+    CannotConvertSqlVal(SqlType, SqlVal),
+    #[fail(display = "Mismatch between sql types and rust types while loading data.")]
+    SqlResultTypeMismatch,
     #[fail(display = "SqlType not known for {}", ty)]
     UnknownSqlType { ty: String },
     #[fail(display = "Value has not been loaded from the database")]
@@ -120,7 +125,7 @@ impl From<rusqlite::types::FromSqlError> for Error {
     fn from(e: rusqlite::types::FromSqlError) -> Self {
         use rusqlite::types::FromSqlError;
         match e {
-            FromSqlError::InvalidType => Error::TypeMismatch,
+            FromSqlError::InvalidType => Error::SqlResultTypeMismatch,
             FromSqlError::OutOfRange(_) => Error::OutOfRange,
             FromSqlError::Other(e2) => Error::Generic(failure::Error::from_boxed_compat(e2)),
         }
@@ -145,4 +150,20 @@ pub enum SqlType {
     Timestamp,
     // TODO properly support and test blob
     Blob,
+}
+impl std::fmt::Display for SqlType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use SqlType::*;
+        match &self {
+            Bool => "bool",
+            Int => "int",
+            BigInt => "big int",
+            Real => "float",
+            Text => "string",
+            Date => "date",
+            Timestamp => "timestamp",
+            Blob => "blog",
+        }
+        .fmt(f)
+    }
 }

@@ -116,40 +116,57 @@ fn make_lit(s: &str) -> LitStr {
 }
 
 /// If the field refers to a primitive, return its SqlType
-fn get_primitive_sql_type(field: &Field) -> Option<DeferredSqlType> {
+fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
     // Todo support Date, Tmestamp, and Blob
-    if field.ty == parse_quote!(bool) {
+    if *ty == parse_quote!(bool) {
         Some(DeferredSqlType::Known(SqlType::Bool))
-    } else if field.ty == parse_quote!(u8)
-        || field.ty == parse_quote!(i8)
-        || field.ty == parse_quote!(u16)
-        || field.ty == parse_quote!(i16)
-        || field.ty == parse_quote!(u16)
-        || field.ty == parse_quote!(i32)
+    } else if *ty == parse_quote!(u8)
+        || *ty == parse_quote!(i8)
+        || *ty == parse_quote!(u16)
+        || *ty == parse_quote!(i16)
+        || *ty == parse_quote!(u16)
+        || *ty == parse_quote!(i32)
     {
         Some(DeferredSqlType::Known(SqlType::Int))
-    } else if field.ty == parse_quote!(u32) || field.ty == parse_quote!(i64) {
+    } else if *ty == parse_quote!(u32) || *ty == parse_quote!(i64) {
         // TODO better support unsigned integers here. Sqlite has no u64, though Postgres does
         Some(DeferredSqlType::Known(SqlType::BigInt))
-    } else if field.ty == parse_quote!(f32) || field.ty == parse_quote!(f64) {
+    } else if *ty == parse_quote!(f32) || *ty == parse_quote!(f64) {
         Some(DeferredSqlType::Known(SqlType::Real))
-    } else if field.ty == parse_quote!(String) {
+    } else if *ty == parse_quote!(String) {
         Some(DeferredSqlType::Known(SqlType::Text))
     } else {
         None
     }
 }
 
-fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
-    get_foreign_sql_type(field, "ForeignKey")
+fn get_option_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
+    get_foreign_type_argument(ty, "Option").map(|path| {
+        let inner_ty: syn::Type = syn::TypePath {
+            qself: None,
+            path: path.clone(),
+        }
+        .into();
+
+        get_primitive_sql_type(&inner_ty)
+            .or(get_foreign_sql_type(&inner_ty, "ForeignKey"))
+            .expect(&format!(
+                "Unsupported type {} for Option field",
+                inner_ty.into_token_stream()
+            ))
+    })
 }
 
 fn get_many_sql_type(field: &Field) -> Option<DeferredSqlType> {
-    get_foreign_sql_type(field, "Many")
+    get_foreign_sql_type(&field.ty, "Many")
 }
 
 fn is_many_to_many(field: &Field) -> bool {
     get_many_sql_type(field).is_some()
+}
+
+fn is_option(field: &Field) -> bool {
+    get_foreign_type_argument(&field.ty, "Option").is_some()
 }
 
 /// Check for special fields which won't correspond to rows and don't
@@ -158,8 +175,8 @@ fn is_row_field(f: &Field) -> bool {
     !is_many_to_many(f)
 }
 
-fn get_foreign_type_argument<'a>(field: &'a Field, tyname: &'static str) -> Option<&'a syn::Path> {
-    let path = match &field.ty {
+fn get_foreign_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Option<&'a syn::Path> {
+    let path = match ty {
         syn::Type::Path(path) => &path.path,
         _ => return None,
     };
@@ -185,8 +202,8 @@ fn get_foreign_type_argument<'a>(field: &'a Field, tyname: &'static str) -> Opti
     }
 }
 
-fn get_foreign_sql_type(field: &Field, tyname: &'static str) -> Option<DeferredSqlType> {
-    let typath = get_foreign_type_argument(field, tyname);
+fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<DeferredSqlType> {
+    let typath = get_foreign_type_argument(ty, tyname);
     typath.map(|typath| {
         DeferredSqlType::Deferred(TypeKey::PK(
             typath
@@ -201,11 +218,13 @@ fn get_foreign_sql_type(field: &Field, tyname: &'static str) -> Option<DeferredS
 }
 
 fn get_deferred_sql_type(field: &Field) -> DeferredSqlType {
-    get_primitive_sql_type(field)
-        .or(get_foreign_key_sql_type(field))
+    let ty = &field.ty;
+    get_primitive_sql_type(ty)
+        .or(get_option_sql_type(ty))
+        .or(get_foreign_sql_type(ty, "ForeignKey"))
         .expect(&format!(
             "Unsupported type {} for field '{}'",
-            field.ty.clone().into_token_stream(),
+            ty.clone().into_token_stream(),
             field.ident.clone().expect("model fields must be named")
         ))
 }

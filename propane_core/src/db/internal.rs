@@ -20,9 +20,24 @@ pub trait ConnectionMethods {
         expr: Option<BoolExpr>,
         limit: Option<i32>,
     ) -> Result<RawQueryResult>;
+    fn insert(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        pkcol: Column,
+        values: &[SqlVal],
+    ) -> Result<SqlVal>;
     fn insert_or_replace(
         &self,
         table: &'static str,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()>;
+    fn update(
+        &self,
+        table: &'static str,
+        pkcol: Column,
+        pk: SqlVal,
         columns: &[Column],
         values: &[SqlVal],
     ) -> Result<()>;

@@ -10,6 +10,7 @@ pub type Result<T> = std::result::Result<T, failure::Error>;
 
 #[model]
 struct Blog {
+    #[auto]
     id: i64,
     name: String,
 }

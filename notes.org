@@ -46,9 +46,11 @@
 )
 * Roadmap
 	+ Summary/readme
+  + Example like Diesel's
 	+ Optional dependencies
 	+ Full timestamp and blob support
 	+ Separate DataResult test/support
+	+ incremental save
 	+ Autoincrement/serial support
 	+ foreign key constraints in db, cascade setting
 	+ PG support

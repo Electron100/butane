@@ -1,6 +1,7 @@
 use failure;
 use failure::Fail;
 use serde::{Deserialize, Serialize};
+use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 
 pub mod db;
@@ -16,6 +17,19 @@ pub use query::Query;
 pub use sqlval::*;
 
 pub type Result<T> = std::result::Result<T, crate::Error>;
+
+#[derive(Clone, Default, Debug)]
+pub struct ObjectState {
+    pub saved: bool,
+}
+impl PartialEq<ObjectState> for ObjectState {
+    fn eq(&self, _other: &ObjectState) -> bool {
+        // Always return true. This effectively removes ObjectState
+        // from participating in equality tests between two objects
+        true
+    }
+}
+impl Eq for ObjectState {}
 
 /// A type which may be the result of a database query.
 ///
@@ -145,6 +159,7 @@ pub enum SqlType {
     /// 8 byte float
     Real,
     Text,
+    // TODO properly support and test date
     Date,
     // TODO properly support and test timestamp
     Timestamp,

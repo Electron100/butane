@@ -77,6 +77,15 @@ impl ConnectionMethods for SQLiteConnection {
     ) -> Result<RawQueryResult> {
         self.conn.query(table, columns, expr, limit)
     }
+    fn insert(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        pkcol: Column,
+        values: &[SqlVal],
+    ) -> Result<SqlVal> {
+        self.conn.insert(table, columns, pkcol, values)
+    }
     fn insert_or_replace(
         &self,
         table: &'static str,
@@ -84,6 +93,16 @@ impl ConnectionMethods for SQLiteConnection {
         values: &[SqlVal],
     ) -> Result<()> {
         self.conn.insert_or_replace(table, columns, values)
+    }
+    fn update(
+        &self,
+        table: &'static str,
+        pkcol: Column,
+        pk: SqlVal,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        self.conn.update(table, pkcol, pk, columns, values)
     }
     fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
         self.conn.delete_where(table, expr)
@@ -98,6 +117,7 @@ impl ConnectionMethods for rusqlite::Connection {
         "sqlite"
     }
     fn execute(&self, sql: &str) -> Result<()> {
+        eprintln!("execute sql {}", sql);
         self.execute_batch(sql.as_ref())?;
         Ok(())
     }
@@ -126,6 +146,29 @@ impl ConnectionMethods for rusqlite::Connection {
         let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
         rows.collect()
     }
+    fn insert(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        pkcol: Column,
+        values: &[SqlVal],
+    ) -> Result<SqlVal> {
+        let mut sql = String::new();
+        helper::sql_insert_with_placeholders(table, columns, false, &mut sql);
+        eprintln!("insert sql {}", sql);
+        self.execute(&sql, &values.iter().collect::<Vec<_>>())?;
+        eprintln!("trying to get pk");
+        let pk: SqlVal = self.query_row_and_then(
+            &format!(
+                "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
+                pkcol.name(),
+                table
+            ),
+            rusqlite::NO_PARAMS,
+            |row| sql_val_from_rusqlite(row.get_raw(0), pkcol.ty()),
+        )?;
+        Ok(pk)
+    }
     fn insert_or_replace(
         &self,
         table: &'static str,
@@ -133,8 +176,23 @@ impl ConnectionMethods for rusqlite::Connection {
         values: &[SqlVal],
     ) -> Result<()> {
         let mut sql = String::new();
-        helper::sql_insert_or_replace_with_placeholders(table, columns, &mut sql);
+        helper::sql_insert_with_placeholders(table, columns, true, &mut sql);
         self.execute(&sql, &values.iter().collect::<Vec<_>>())?;
+        Ok(())
+    }
+    fn update(
+        &self,
+        table: &'static str,
+        pkcol: Column,
+        pk: SqlVal,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        let mut sql = String::new();
+        helper::sql_update_with_placeholders(table, pkcol, columns, &mut sql);
+        let placeholder_values = [values, &[pk]].concat();
+        eprintln!("update sql {}", sql);
+        self.execute(&sql, &placeholder_values.iter().collect::<Vec<_>>())?;
         Ok(())
     }
     fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
@@ -195,6 +253,15 @@ impl ConnectionMethods for SqliteTransaction<'_> {
     ) -> Result<RawQueryResult> {
         self.get()?.query(table, columns, expr, limit)
     }
+    fn insert(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        pkcol: Column,
+        values: &[SqlVal],
+    ) -> Result<SqlVal> {
+        self.get()?.insert(table, columns, pkcol, values)
+    }
     fn insert_or_replace(
         &self,
         table: &'static str,
@@ -202,6 +269,16 @@ impl ConnectionMethods for SqliteTransaction<'_> {
         values: &[SqlVal],
     ) -> Result<()> {
         self.get()?.insert_or_replace(table, columns, values)
+    }
+    fn update(
+        &self,
+        table: &'static str,
+        pkcol: Column,
+        pk: SqlVal,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        self.get()?.update(table, pkcol, pk, columns, values)
     }
     fn delete(&self, table: &'static str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
         self.get()?.delete(table, pkcol, pk)
@@ -296,8 +373,10 @@ fn define_column(col: &AColumn) -> String {
     if col.is_pk() {
         constraints.push("PRIMARY KEY".to_string());
     }
-    if let Some(defval) = col.default() {
-        constraints.push(format!("DEFAULT {}", default_string(defval.clone())));
+    if col.is_auto() && !col.is_pk() {
+        // integer primary key is automatically an alias for ROWID,
+        // and we only allow auto on integer types
+        constraints.push("AUTOINCREMENT".to_string());
     }
     format!(
         "{} {} {}",

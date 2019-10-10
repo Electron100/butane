@@ -23,7 +23,7 @@ fn create_atables(ast_struct: &ItemStruct) -> Vec<ATable> {
     let pk = pk_field(ast_struct)
         .expect("No primary key found. Expected 'id' field or field with #[pk] attribute.");
     let mut result: Vec<ATable> = Vec::new();
-    for f in ast_struct.fields.iter() {
+    for f in fields(ast_struct) {
         let name = f
             .ident
             .clone()
@@ -35,7 +35,7 @@ fn create_atables(ast_struct: &ItemStruct) -> Vec<ATable> {
                 get_deferred_sql_type(&f),
                 is_nullable(&f),
                 f == &pk,
-                get_default(&f),
+                is_auto(&f),
             );
             table.add_column(col);
         } else if is_many_to_many(f) {
@@ -53,26 +53,25 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .expect("fields must be named")
         .to_string();
     let mut table = ATable::new(format!("{}_{}_Many", main_table_name, field_name));
-    let col = AColumn::new("owner", get_deferred_sql_type(pk_field), false, false, None);
+    let col = AColumn::new(
+        "owner",
+        get_deferred_sql_type(pk_field),
+        false,
+        false,
+        false,
+    );
     table.add_column(col);
     let col = AColumn::new(
         "has",
         get_many_sql_type(many_field).expect(&format!("Mis-identified Many field {}", field_name)),
         false,
         false,
-        None,
+        false,
     );
     table.add_column(col);
     table
 }
 
 fn is_nullable(field: &Field) -> bool {
-    let ret = is_option(field);
-    eprintln!("nullable for {} is {}", &field.clone().ident.unwrap(), ret);
-    ret
-}
-
-fn get_default(field: &Field) -> Option<SqlVal> {
-    // TODO support default values
-    None
+    is_option(field)
 }

@@ -1,6 +1,6 @@
 use propane::model;
 use propane::prelude::*;
-use propane::{db::Connection, ForeignKey, Many};
+use propane::{db::Connection, ForeignKey, Many, ObjectState};
 
 #[model]
 #[derive(Debug, Eq, PartialEq)]
@@ -13,6 +13,7 @@ impl Blog {
         Blog {
             id,
             name: name.to_string(),
+            state: ObjectState::default(),
         }
     }
 }
@@ -38,6 +39,7 @@ impl Post {
             likes: 0,
             tags: Many::new(),
             blog: ForeignKey::from(blog),
+            state: ObjectState::default(),
         }
     }
 }
@@ -52,6 +54,7 @@ impl Tag {
     pub fn new(tag: &str) -> Self {
         Tag {
             tag: tag.to_string(),
+            state: ObjectState::default(),
         }
     }
 }

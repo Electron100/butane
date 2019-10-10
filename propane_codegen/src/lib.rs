@@ -47,16 +47,29 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     // attributes but proc macro attributes can't yet (nor can they
     // create field attributes)
     let ast_struct: ItemStruct = syn::parse(input).unwrap();
+    let attrs = ast_struct.attrs;
+    let vis = ast_struct.vis;
+    let fields = if let syn::Fields::Named(fields) = ast_struct.fields {
+        fields.named
+    } else {
+        panic!("Fields must be named")
+    };
+    let ident = ast_struct.ident;
+
     quote!(
         #[derive(propane::prelude::Model)]
-        #ast_struct
+        #(#attrs)*
+        #vis struct #ident {
+            state: propane::ObjectState,
+            #fields
+        }
     )
     .into()
 }
 
 /// Helper for the `model` macro necessary because attribute macros
 /// are not allowed their own helper attributes, whereas derives are.
-#[proc_macro_derive(Model, attributes(pk))]
+#[proc_macro_derive(Model, attributes(pk, auto))]
 pub fn derive_model(input: TokenStream) -> TokenStream {
     let mut result: TokenStream2 = TokenStream2::new();
 
@@ -230,7 +243,7 @@ fn get_deferred_sql_type(field: &Field) -> DeferredSqlType {
 }
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
-    let pk_by_attribute = ast_struct.fields.iter().find(|f| {
+    let pk_by_attribute = fields(ast_struct).find(|f| {
         f.attrs
             .iter()
             .find(|attr| attr.path.is_ident("pk"))
@@ -248,4 +261,19 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
     } else {
         None
     }
+}
+
+fn is_auto(field: &Field) -> bool {
+    field
+        .attrs
+        .iter()
+        .find(|attr| attr.path.is_ident("auto"))
+        .is_some()
+}
+
+fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
+    ast_struct
+        .fields
+        .iter()
+        .filter(|f| f.ident.clone().unwrap().to_string() != "state")
 }

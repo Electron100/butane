@@ -158,6 +158,15 @@ impl ConnectionMethods for Transaction<'_> {
     ) -> Result<RawQueryResult> {
         self.trans.query(table, columns, expr, limit)
     }
+    fn insert(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        pkcol: Column,
+        values: &[SqlVal],
+    ) -> Result<SqlVal> {
+        self.trans.insert(table, columns, pkcol, values)
+    }
     fn insert_or_replace(
         &self,
         table: &'static str,
@@ -165,6 +174,16 @@ impl ConnectionMethods for Transaction<'_> {
         values: &[SqlVal],
     ) -> Result<()> {
         self.trans.insert_or_replace(table, columns, values)
+    }
+    fn update(
+        &self,
+        table: &'static str,
+        pkcol: Column,
+        pk: SqlVal,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        self.trans.update(table, pkcol, pk, columns, values)
     }
     fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
         self.trans.delete_where(table, expr)

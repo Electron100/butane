@@ -373,9 +373,9 @@ fn migrations_table() -> ATable {
     let col = AColumn::new(
         "name",
         DeferredSqlType::Known(SqlType::Text),
-        false,
-        true,
-        None,
+        false, // nullable
+        true,  // pk
+        false, // auto
     );
     table.add_column(col);
     table

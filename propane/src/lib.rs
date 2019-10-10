@@ -6,7 +6,8 @@ pub use propane_core::many::Many;
 pub use propane_core::migrations;
 pub use propane_core::query;
 pub use propane_core::{
-    DataObject, DataResult, Error, FieldType, FromSql, IntoSql, Result, SqlType, SqlVal, ToSql,
+    DataObject, DataResult, Error, FieldType, FromSql, IntoSql, ObjectState, Result, SqlType,
+    SqlVal, ToSql,
 };
 
 // TODO document matches, contains, and any others

@@ -8,24 +8,31 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let table_lit = make_ident_literal_str(&tyname);
 
-    let columns = columns(ast_struct);
+    let err = verify_fields(ast_struct);
+    if let Some(err) = err {
+        return err;
+    }
 
-    let pk_field = pk_field(&ast_struct);
-    if pk_field.is_none() {
-        return make_compile_error!(ast_struct.span() => "No pk field found");
-    };
-    let pk_field = pk_field.unwrap();
-    let pktype = pk_field.ty;
-    let pkident = pk_field.ident.unwrap();
+    let pk_field = pk_field(&ast_struct).unwrap();
+    let pktype = &pk_field.ty;
+    let pkident = pk_field.ident.clone().unwrap();
     let pklit = make_ident_literal_str(&pkident);
+
+    let cols = columns(ast_struct, |_| true);
+    let insert_cols = columns(ast_struct, |f| !is_auto(f));
+    let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
+
     let fields_type = fields_type(tyname);
     let tablelit = make_ident_literal_str(&tyname);
 
+    let mut post_insert: Vec<TokenStream2> = Vec::new();
+    add_post_insert_for_auto(&pk_field, &mut post_insert);
+    post_insert.push(quote!(self.state.saved = true;));
+
     let rows = rows_for_from(&ast_struct);
-    let numdbfields = ast_struct.fields.iter().filter(|f| is_row_field(f)).count();
-    let (many_init, many_save): (TokenStream2, TokenStream2) = ast_struct
-        .fields
-        .iter()
+    let numdbfields = fields(&ast_struct).filter(|f| is_row_field(f)).count();
+    let (many_init, many_save): (TokenStream2, TokenStream2) = 
+        fields(&ast_struct)
         .filter(|f| is_many_to_many(f))
         .map(|f| {
             let ident = f
@@ -44,31 +51,15 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
         })
         .unzip();
 
-    let values: Vec<TokenStream2> = ast_struct
-        .fields
-        .iter()
-        .filter(|f| is_row_field(f))
-        .map(|f| {
-            let ident = f.ident.clone().unwrap();
-            if is_row_field(f) {
-                quote!(values.push(propane::ToSql::to_sql(&self.#ident));)
-            } else if is_many_to_many(f) {
-                quote!(
-                self.#ident.ensure_init(Self::TABLE, self.pk().clone(), <Self as propane::DataObject>::PKType);
-                self.#ident.save()?;
-                )
-            } else {
-                panic!("Unexpected struct field {}", ident)
-            }
-        })
-        .collect();
+    let values: Vec<TokenStream2> = push_values(&ast_struct, |_| true);
+    let values_no_pk: Vec<TokenStream2> = push_values(&ast_struct, |f: &Field| f != &pk_field);
 
     quote!(
         impl propane::DataResult for #tyname {
             type DBO = #tyname;
             type Fields = #fields_type;
             const COLUMNS: &'static [propane::db::internal::Column] = &[
-                #columns
+                #cols
             ];
             fn from_row(mut row: propane::db::internal::Row) -> propane::Result<Self> {
                 if row.len() != #numdbfields {
@@ -77,8 +68,10 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 }
                 let mut it = row.into_iter();
                 let mut obj = #tyname {
+                    state: propane::ObjectState::default(),
                     #(#rows),*
                 };
+                obj.state.saved = true;
                 #many_init
                 Ok(obj)
             }
@@ -109,8 +102,21 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 #many_save
                 //todo perf use an array on the stack for better
                 let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numdbfields);
-                #(#values)*
-                conn.insert_or_replace(Self::TABLE, <Self as propane::DataResult>::COLUMNS, &values)
+                let pkcol = propane::db::internal::Column::new(
+                    #pklit,
+                    <#pktype as propane::FieldType>::SQLTYPE);
+                if self.state.saved {
+                    #(#values_no_pk)*
+                    conn.update(Self::TABLE,
+                                pkcol,
+                                propane::ToSql::to_sql(self.pk()),
+                                &[#save_cols], &values)?;
+                } else {
+                    #(#values)*
+                    let pk = conn.insert(Self::TABLE, &[#insert_cols], pkcol, &values)?;
+                    #(#post_insert)*
+                }
+                Ok(())
             }
             fn delete(&self, conn: &impl propane::db::internal::ConnectionMethods) -> propane::Result<()> {
                 use propane::ToSql;
@@ -146,9 +152,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
 pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let vis = &ast_struct.vis;
-    let fieldexprs: Vec<TokenStream2> = ast_struct
-        .fields
-        .iter()
+    let fieldexprs: Vec<TokenStream2> = fields(ast_struct)
         .map(|f| {
             if is_many_to_many(f) {
                 fieldexpr_func_many(f, ast_struct)
@@ -243,9 +247,7 @@ fn fields_type(tyname: &Ident) -> Ident {
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
-    ast_struct
-        .fields
-        .iter()
+    fields(&ast_struct)
         .map(|f| {
             let ident = f.ident.clone().unwrap();
             if is_row_field(f) {
@@ -259,11 +261,12 @@ fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
         .collect()
 }
 
-fn columns(ast_struct: &ItemStruct) -> TokenStream2 {
-    ast_struct
-        .fields
-        .iter()
-        .filter(|f| is_row_field(f))
+fn columns<P>(ast_struct: &ItemStruct, mut predicate: P) -> TokenStream2
+where
+    P: FnMut(&Field) -> bool,
+{
+    fields(&ast_struct)
+        .filter(|f| is_row_field(f) && predicate(f))
         .map(|f| match f.ident.clone() {
             Some(fname) => {
                 let ident = make_ident_literal_str(&fname);
@@ -285,4 +288,62 @@ fn many_table_lit(ast_struct: &ItemStruct, field: &Field) -> LitStr {
         .clone()
         .expect("Fields must be named for propane");
     make_lit(&format!("{}_{}_Many", &tyname, &ident))
+}
+
+fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
+    let pk_field = pk_field(ast_struct);
+    if pk_field.is_none() {
+        return Some(make_compile_error!(ast_struct.span() => "No pk field found"));
+    };
+    let pk_field = pk_field.unwrap();
+    for f in fields(ast_struct) {
+        if is_auto(f) {
+            match get_primitive_sql_type(&f.ty) {
+                Some(DeferredSqlType::Known(SqlType::Int)) => (),
+                Some(DeferredSqlType::Known(SqlType::BigInt)) => (),
+                _ => return Some(quote_spanned!(
+                    f.span() =>
+                        compile_error!("Auto is only supported for integer types");
+                )),
+            }
+            if &pk_field != f {
+                return Some(quote_spanned!(f.span() => compile_error!("Auto is currently only supported for the primary key")));
+            }
+        }
+    }
+    None
+}
+
+fn add_post_insert_for_auto(pk_field: &Field, post_insert: &mut Vec<TokenStream2>) {
+    if !is_auto(&pk_field) {
+        return;
+    }
+    let pkident = pk_field.ident.clone().unwrap();
+    post_insert.push(quote!(self.#pkident = propane::FromSql::from_sql(pk)?;));
+}
+
+/// Builds code for pushing SqlVals for each column satisfying predicate into a vec called `values`
+fn push_values<P>(ast_struct: &ItemStruct, mut predicate: P) -> Vec<TokenStream2>
+where P: FnMut(&Field) -> bool,
+{
+    fields(&ast_struct)
+        .filter(|f| is_row_field(f) && predicate(f))
+        .map(|f| {
+            let ident = f.ident.clone().unwrap();
+            if is_row_field(f) {
+                if !is_auto(f) {
+                    quote!(values.push(propane::ToSql::to_sql(&self.#ident));)
+                } else {
+                    quote!()
+                }
+            } else if is_many_to_many(f) {
+                quote!(
+                    self.#ident.ensure_init(Self::TABLE, self.pk().clone(), <Self as propane::DataObject>::PKType);
+                    self.#ident.save()?;
+                )
+            } else {
+                panic!("Unexpected struct field {}", ident)
+            }
+        })
+        .collect()
 }

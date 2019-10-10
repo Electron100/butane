@@ -1,10 +1,8 @@
 use paste;
 use propane::db::Connection;
-use propane::find;
-use propane::model;
 use propane::prelude::*;
-use propane::query;
-use propane::ForeignKey;
+use propane::{find, model, query};
+use propane::{ForeignKey, ObjectState};
 
 mod common;
 
@@ -21,6 +19,7 @@ impl Foo {
             id: id,
             bar: 0,
             baz: String::new(),
+            state: ObjectState::default(),
         }
     }
 }
@@ -37,6 +36,23 @@ impl Bar {
         Bar {
             name: name.to_string(),
             foo: foo.into(),
+            state: ObjectState::default(),
+        }
+    }
+}
+
+#[model]
+struct Baz {
+    #[auto]
+    id: i64,
+    text: String,
+}
+impl Baz {
+    fn new(text: &str) -> Self {
+        Baz {
+            id: -1, // will be set automatically when saved
+            text: text.to_string(),
+            state: ObjectState::default(),
         }
     }
 }
@@ -131,3 +147,15 @@ fn foreign_key(conn: Connection) {
     assert_eq!(foo2, foo3);
 }
 testall!(foreign_key);
+
+fn auto_pk(conn: Connection) {
+    let mut baz1 = Baz::new("baz1");
+    baz1.save(&conn).unwrap();
+    let mut baz2 = Baz::new("baz2");
+    baz2.save(&conn).unwrap();
+    let mut baz3 = Baz::new("baz3");
+    baz3.save(&conn).unwrap();
+    assert!(baz1.id < baz2.id);
+    assert!(baz2.id < baz3.id);
+}
+testall!(auto_pk);

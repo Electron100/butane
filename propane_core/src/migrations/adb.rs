@@ -152,7 +152,7 @@ pub struct AColumn {
     sqltype: DeferredSqlType,
     nullable: bool,
     pk: bool,
-    default: Option<SqlVal>,
+    auto: bool,
 }
 impl AColumn {
     pub fn new(
@@ -160,14 +160,14 @@ impl AColumn {
         sqltype: DeferredSqlType,
         nullable: bool,
         pk: bool,
-        default: Option<SqlVal>,
+        auto: bool,
     ) -> Self {
         AColumn {
             name: name.into(),
             sqltype,
             nullable,
             pk,
-            default,
+            auto,
         }
     }
     pub fn name(&self) -> &str {
@@ -193,8 +193,8 @@ impl AColumn {
             None
         }
     }
-    pub fn default(&self) -> &Option<SqlVal> {
-        &self.default
+    pub fn is_auto(&self) -> bool {
+        self.auto
     }
 }
 

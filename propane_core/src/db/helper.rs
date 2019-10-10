@@ -97,12 +97,17 @@ pub fn sql_select(columns: &[Column], table: &'static str, w: &mut impl Write) {
     write!(w, " FROM {}", table).unwrap();
 }
 
-pub fn sql_insert_or_replace_with_placeholders(
+pub fn sql_insert_with_placeholders(
     table: &'static str,
     columns: &[Column],
+    allow_replace: bool,
     w: &mut impl Write,
 ) {
-    write!(w, "INSERT OR REPLACE INTO {} (", table).unwrap();
+    write!(w, "INSERT ").unwrap();
+    if allow_replace {
+        write!(w, "OR REPLACE ").unwrap();
+    }
+    write!(w, "INTO {} (", table).unwrap();
     list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold("", |sep, _| {
@@ -110,6 +115,20 @@ pub fn sql_insert_or_replace_with_placeholders(
         ", "
     });
     write!(w, ")").unwrap();
+}
+
+pub fn sql_update_with_placeholders(
+    table: &'static str,
+    pkcol: Column,
+    columns: &[Column],
+    w: &mut impl Write,
+) {
+    write!(w, "UPDATE {} SET ", table).unwrap();
+    columns.iter().fold("", |sep, c| {
+        write!(w, "{}{} = ?", sep, c.name()).unwrap();
+        ", "
+    });
+    write!(w, " WHERE {} = ?", pkcol.name()).unwrap();
 }
 
 pub fn sql_limit(limit: i32, w: &mut impl Write) {

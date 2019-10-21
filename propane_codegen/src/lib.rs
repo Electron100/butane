@@ -193,23 +193,22 @@ fn get_foreign_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Opt
         syn::Type::Path(path) => &path.path,
         _ => return None,
     };
-    let seg =
-        if path.segments.len() == 2 && path.segments.first().unwrap().value().ident == "propane" {
-            path.segments.last()
-        } else {
-            path.segments.first()
-        }?;
-    if seg.value().ident != tyname {
+    let seg = if path.segments.len() == 2 && path.segments.first().unwrap().ident == "propane" {
+        path.segments.last()
+    } else {
+        path.segments.first()
+    }?;
+    if seg.ident != tyname {
         return None;
     }
-    let args = match &seg.value().arguments {
+    let args = match &seg.arguments {
         syn::PathArguments::AngleBracketed(args) => &args.args,
         _ => return None,
     };
     if args.len() != 1 {
         panic!("{} should have a single type argument", tyname)
     }
-    match args.last().unwrap().value() {
+    match args.last().unwrap() {
         syn::GenericArgument::Type(syn::Type::Path(typath)) => Some(&typath.path),
         _ => panic!("{} argument should be a type.", tyname),
     }
@@ -223,7 +222,6 @@ fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<Deferred
                 .segments
                 .last()
                 .expect(&format!("{} must have an argument", tyname))
-                .value()
                 .ident
                 .to_string(),
         ))

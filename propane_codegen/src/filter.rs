@@ -65,8 +65,8 @@ fn handle_call(fields: &impl ToTokens, mcall: &ExprMethodCall) -> TokenStream2 {
         _ => (),
     };
     match method.as_str() {
-        "matches" => handle_in(fields, &mcall.receiver, mcall.args.first().unwrap().value()),
-        "contains" => handle_contains(fields, &mcall.receiver, mcall.args.first().unwrap().value()),
+        "matches" => handle_in(fields, &mcall.receiver, mcall.args.first().unwrap()),
+        "contains" => handle_contains(fields, &mcall.receiver, mcall.args.first().unwrap()),
         _ => make_compile_error!("Unknown method call {}", method),
     }
 }

@@ -38,6 +38,17 @@ impl<T: DataObject> ForeignKey<T> {
         self.val.borrow().ok_or(Error::ValueNotLoaded)
     }
 
+    /// Returns a reference to the primary key of the value.
+    pub fn pk(&self) -> T::PKType {
+        match self.val.borrow() {
+            Some(v) => v.pk().clone(),
+            None => match self.valpk.borrow() {
+                Some(pk) => T::PKType::from_sql(pk.clone()).unwrap(),
+                None => panic!("Invalid foreign key state"),
+            },
+        }
+    }
+
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to it.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {

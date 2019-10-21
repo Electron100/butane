@@ -127,6 +127,8 @@ pub mod prelude {
     //! used manually.
     #[doc(no_inline)]
     pub use crate::DataObject;
+    #[doc(no_inline)]
+    pub use crate::DataResult;
     pub use filter;
     pub use propane_codegen::Model;
 }

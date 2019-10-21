@@ -148,6 +148,8 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         Some(DeferredSqlType::Known(SqlType::Real))
     } else if *ty == parse_quote!(String) {
         Some(DeferredSqlType::Known(SqlType::Text))
+    } else if *ty == parse_quote!(Vec<u8>) {
+        Some(DeferredSqlType::Known(SqlType::Blob))
     } else {
         None
     }

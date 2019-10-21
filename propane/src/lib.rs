@@ -1,5 +1,5 @@
 use proc_macro_hack::proc_macro_hack;
-pub use propane_codegen::model;
+pub use propane_codegen::{model, propane_type};
 pub use propane_core::db;
 pub use propane_core::fkey::ForeignKey;
 pub use propane_core::many::Many;

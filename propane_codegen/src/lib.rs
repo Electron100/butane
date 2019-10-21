@@ -12,7 +12,7 @@ use propane_core::*;
 use quote::{quote, ToTokens};
 use syn;
 use syn::parse_quote;
-use syn::{Expr, Field, ItemStruct, LitStr};
+use syn::{Expr, Field, ItemStruct, ItemType, LitStr};
 
 #[macro_use]
 macro_rules! make_compile_error {
@@ -69,7 +69,7 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Helper for the `model` macro necessary because attribute macros
 /// are not allowed their own helper attributes, whereas derives are.
-#[proc_macro_derive(Model, attributes(pk, auto))]
+#[proc_macro_derive(Model, attributes(pk, auto, sqltype))]
 pub fn derive_model(input: TokenStream) -> TokenStream {
     let mut result: TokenStream2 = TokenStream2::new();
 
@@ -104,6 +104,24 @@ pub fn filter(input: TokenStream) -> TokenStream {
     let expr: TokenStream2 = args.into_iter().skip(2).collect();
     let expr: Expr = syn::parse2(expr).expect("Expected filter!(Type, expression)");
     filter::for_expr(&tyid, &expr).into()
+}
+
+#[proc_macro_attribute]
+pub fn propane_type(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let type_alias: syn::Result<ItemType> = syn::parse(input.clone());
+    if let Ok(type_alias) = type_alias {
+        if let Err(e) = migration::add_typedef(&type_alias.ident, &type_alias.ty) {
+            eprintln!("unable to save typedef {}", e);
+            panic!("unable to save typedef")
+        } else {
+            input
+        }
+    } else {
+        quote!(compile_error!(
+            "The #[propane] macro wasn't expected to be used here"
+        ))
+        .into()
+    }
 }
 
 fn tokens_for_sqltype(ty: SqlType) -> TokenStream2 {
@@ -230,16 +248,13 @@ fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<Deferred
     })
 }
 
-fn get_deferred_sql_type(field: &Field) -> DeferredSqlType {
-    let ty = &field.ty;
+fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
     get_primitive_sql_type(ty)
         .or(get_option_sql_type(ty))
         .or(get_foreign_sql_type(ty, "ForeignKey"))
-        .expect(&format!(
-            "Unsupported type {} for field '{}'",
-            ty.clone().into_token_stream(),
-            field.ident.clone().expect("model fields must be named")
-        ))
+        .unwrap_or(DeferredSqlType::Deferred(TypeKey::CustomType(
+            ty.clone().into_token_stream().to_string(),
+        )))
 }
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {

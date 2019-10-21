@@ -1,17 +1,20 @@
 use paste;
 use propane::db::Connection;
 use propane::prelude::*;
-use propane::{find, model, query};
+use propane::{find, model, propane_type, query};
 use propane::{ForeignKey, ObjectState};
 
 mod common;
+
+#[propane_type]
+pub type Whatsit = String;
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]
 struct Foo {
     id: i64,
     bar: u32,
-    baz: String,
+    baz: Whatsit,
 }
 impl Foo {
     fn new(id: i64) -> Self {

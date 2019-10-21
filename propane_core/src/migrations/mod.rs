@@ -7,12 +7,13 @@ use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 pub mod adb;
-use adb::{AColumn, ATable, DeferredSqlType, Operation, ADB};
+use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeKey, ADB};
 
 /// Filesystem abstraction for `Migrations`. Primarily intended to
 /// allow bypassing the real filesystem during testing, but
@@ -55,6 +56,8 @@ struct MigrationInfo {
     from_name: Option<String>,
 }
 
+type SqlTypeMap = HashMap<TypeKey, DeferredSqlType>;
+
 /// Type representing a database migration. A migration describes how
 /// to bring the database from state A to state B. In general, the
 /// methods on this type are persistent -- they read from and write to
@@ -78,6 +81,17 @@ impl Migration {
         )
     }
 
+    /// Adds a TypeKey -> SqlType mapping. Only meaningful on the special current migration.
+    pub fn add_type(&self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
+        let mut types: SqlTypeMap = match self.fs.read(&self.root.join("types")) {
+            Ok(reader) => serde_json::from_reader(reader)?,
+            Err(_) => HashMap::new(),
+        };
+        types.insert(key, sqltype);
+        self.write_contents("types", serde_json::to_string(&types)?.as_bytes())?;
+        return Ok(());
+    }
+
     /// Retrieves the full abstract database state describing all tables
     pub fn db(&self) -> Result<ADB> {
         let mut db = ADB::new();
@@ -87,13 +101,20 @@ impl Migration {
             match entry.file_name() {
                 None => continue,
                 Some(name) => {
-                    if !name.to_string_lossy().ends_with(".table") {
-                        continue;
+                    let name = name.to_string_lossy();
+                    if name.ends_with(".table") {
+                        let table: ATable = serde_json::from_reader(self.fs.read(&entry)?)?;
+                        db.replace_table(table)
+                    } else if name == "types" {
+                        let types: SqlTypeMap =
+                            serde_json::from_reader(self.fs.read(&self.root.join("types"))?)?;
+
+                        for (key, sqltype) in types {
+                            db.add_type(key, sqltype);
+                        }
                     }
                 }
             }
-            let table: ATable = serde_json::from_reader(self.fs.read(&entry)?)?;
-            db.replace_table(table)
         }
         db.resolve_types()?;
         Ok(db)

@@ -2,20 +2,65 @@
 //! CLI tool, there is no need to use this module. Even if applying
 //! migrations without this tool, you are unlikely to need this module.
 
-use crate::{Result, SqlType, SqlVal};
-use serde::{Deserialize, Serialize};
+use crate::{Result, SqlType};
+use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 /// Key used to help resolve `DeferredSqlType`
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TypeKey {
     /// Represents a type which is the primary key for a table with the given name
     PK(String),
+    /// Represents a type which is not natively known to propane but
+    /// which propane will be made aware of with the #[propane_aware] macro
+    CustomType(String),
 }
 impl std::fmt::Display for TypeKey {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
         match self {
             TypeKey::PK(name) => write!(f, "PK({})", name),
+            TypeKey::CustomType(name) => write!(f, "CustomType({})", name),
+        }
+    }
+}
+// Custom Serialize/Deserialize implementations so that it can be used
+// as a string for HashMap keys, which are required to be strings (at least for serde_json)
+impl serde::ser::Serialize for TypeKey {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&match self {
+            TypeKey::PK(s) => format!("PK:{}", s),
+            TypeKey::CustomType(s) => format!("CT:{}", s),
+        })
+    }
+}
+impl<'de> Deserialize<'de> for TypeKey {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<TypeKey, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_string(TypeKeyVisitor)
+    }
+}
+struct TypeKeyVisitor;
+impl<'de> Visitor<'de> for TypeKeyVisitor {
+    type Value = TypeKey;
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("serialized TypeKey")
+    }
+    fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let rest = v.to_string().split_off(3);
+        if v.starts_with("PK:") {
+            Ok(TypeKey::PK(rest))
+        } else if v.starts_with("CT:") {
+            Ok(TypeKey::CustomType(rest))
+        } else {
+            Err(E::custom("Unkown type key string".to_string()))
         }
     }
 }
@@ -54,11 +99,13 @@ impl TypeResolver {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ADB {
     tables: HashMap<String, ATable>,
+    extra_types: HashMap<TypeKey, DeferredSqlType>,
 }
 impl ADB {
     pub fn new() -> Self {
         ADB {
             tables: HashMap::new(),
+            extra_types: HashMap::new(),
         }
     }
     pub fn tables(&self) -> impl Iterator<Item = &ATable> {
@@ -70,6 +117,10 @@ impl ADB {
     pub fn replace_table(&mut self, table: ATable) {
         self.tables.insert(table.name.clone(), table);
     }
+    pub fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) {
+        self.extra_types.insert(key, sqltype);
+    }
+
     /// Fixup as many DeferredSqlType::Deferred instances as possible
     /// into DeferredSqlType::Known
     pub fn resolve_types(&mut self) -> Result<()> {
@@ -86,6 +137,14 @@ impl ADB {
 
                     for col in table.columns.values_mut() {
                         col.resolve_type(&resolver);
+                    }
+                }
+            }
+            for (_key, ty) in self.extra_types.iter_mut() {
+                if let DeferredSqlType::Deferred(tykey) = ty {
+                    if let Some(sqltype) = resolver.find_type(tykey) {
+                        *ty = DeferredSqlType::Known(sqltype);
+                        changed = true;
                     }
                 }
             }

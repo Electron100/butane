@@ -27,12 +27,14 @@ pub enum Expr {
 /// Abstract representation of a boolean expression.
 #[derive(Clone)]
 pub enum BoolExpr {
+    True,
     Eq(&'static str, Expr),
     Ne(&'static str, Expr),
     Lt(&'static str, Expr),
     Gt(&'static str, Expr),
     Le(&'static str, Expr),
     Ge(&'static str, Expr),
+    AllOf(Vec<BoolExpr>),
     And(Box<BoolExpr>, Box<BoolExpr>),
     Or(Box<BoolExpr>, Box<BoolExpr>),
     Not(Box<BoolExpr>),

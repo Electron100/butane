@@ -1,8 +1,8 @@
 use paste;
 use propane::db::Connection;
-use propane::find;
 use propane::prelude::*;
-use propane::query;
+use propane::query::BoolExpr;
+use propane::{find, query};
 
 mod common;
 use common::blog;
@@ -38,6 +38,21 @@ fn combination(conn: Connection) {
     assert_eq!(posts[0].title, "The Tiger");
 }
 testall!(combination);
+
+fn combination_allof(conn: Connection) {
+    blog::setup_blog(&conn);
+    let posts = Post::query()
+        .filter(BoolExpr::AllOf(vec![
+            filter!(Post, published == true),
+            filter!(Post, likes < 5),
+            filter!(Post, title == "The Tiger"),
+        ]))
+        .load(&conn)
+        .unwrap();
+    assert_eq!(posts.len(), 1);
+    assert_eq!(posts[0].title, "The Tiger");
+}
+testall!(combination_allof);
 
 fn not_found(conn: Connection) {
     blog::setup_blog(&conn);

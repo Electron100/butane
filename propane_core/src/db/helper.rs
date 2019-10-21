@@ -23,6 +23,7 @@ where
         }
         Placeholder => w.write_str("?"),
         Condition(c) => match *c {
+            True => write!(w, "TRUE"),
             Eq(col, ex) => match ex {
                 Expr::Val(SqlVal::Null) => write!(w, "{} IS NULL", col),
                 _ => write!(w, "{} = ", col).and_then(|_| Ok(f(ex, values, w))),
@@ -35,6 +36,18 @@ where
             Gt(col, ex) => write!(w, "{} > ", col).and_then(|_| Ok(f(ex, values, w))),
             Le(col, ex) => write!(w, "{} <= ", col).and_then(|_| Ok(f(ex, values, w))),
             Ge(col, ex) => write!(w, "{} >= ", col).and_then(|_| Ok(f(ex, values, w))),
+            AllOf(conds) => {
+                let mut remaining = conds.len();
+                for cond in conds {
+                    // todo avoid the extra boxing
+                    f(Condition(Box::new(cond)), values, w);
+                    if remaining > 1 {
+                        write!(w, " AND ").unwrap();
+                        remaining -= 1;
+                    }
+                }
+                Ok(())
+            }
             And(a, b) => {
                 f(Condition(a), values, w);
                 write!(w, " AND ").unwrap();

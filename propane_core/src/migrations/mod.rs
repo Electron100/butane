@@ -120,6 +120,23 @@ impl Migration {
         Ok(db)
     }
 
+    pub fn copy_to(&self, other: &mut Migration) -> Result<()> {
+        self.ensure_dir()?;
+        other.ensure_dir()?;
+        let entries = self.fs.list_dir(&self.root)?;
+        for entry in entries {
+            match entry.file_name() {
+                None => continue,
+                Some(name) => {
+                    let mut rd = self.fs.read(&entry)?;
+                    let mut wr = other.fs.write(&other.root.join(name))?;
+                    std::io::copy(&mut rd, &mut wr)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Get the migration before this one (if any).
     #[allow(clippy::wrong_self_convention)]
     pub fn from_migration(&self) -> Result<Option<Migration>> {

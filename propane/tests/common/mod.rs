@@ -48,12 +48,9 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {
     // also faster than real disk writes.
     let mem_migrations =
         propane::migrations::from_root_and_filesystem("/", MemoryFilesystem::new());
-    let mem_current = mem_migrations.current();
+    let mut mem_current = mem_migrations.current();
 
-    // Make mem_current have the same tables as disk_current
-    for table in disk_current.db().unwrap().tables() {
-        mem_current.write_table(table).unwrap();
-    }
+    disk_current.copy_to(&mut mem_current).unwrap();
 
     mem_migrations
         .create_migration(&backend, &format!("init"), None)

@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 
+#[cfg(feature = "datetime")]
+mod chrono;
 pub mod db;
 pub mod fkey;
 pub mod many;
@@ -107,6 +109,8 @@ pub enum Error {
     OutOfRange,
     #[fail(display = "Internal logic error")]
     Internal,
+    #[fail(display = "Cannot resolve type {}", 0)]
+    CannotResolveType(String),
     #[fail(display = "(De)serialization error {}", 0)]
     SerdeJson(serde_json::Error),
     #[fail(display = "IO error {}", 0)]
@@ -159,9 +163,8 @@ pub enum SqlType {
     /// 8 byte float
     Real,
     Text,
-    // TODO properly support and test date
-    Date,
     // TODO properly support and test timestamp
+    #[cfg(feature = "datetime")]
     Timestamp,
     // TODO properly support and test blob
     Blob,
@@ -175,7 +178,7 @@ impl std::fmt::Display for SqlType {
             BigInt => "big int",
             Real => "float",
             Text => "string",
-            Date => "date",
+            #[cfg(feature = "datetime")]
             Timestamp => "timestamp",
             Blob => "blog",
         }

@@ -2,6 +2,9 @@ use crate::{Error::CannotConvertSqlVal, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+#[cfg(feature = "datetime")]
+use chrono::naive::NaiveDateTime;
+
 /// A database value.
 ///
 /// For conversion between `SqlVal` and other types, see [`FromSql`], [`IntoSql`], and [`ToSql`].
@@ -18,6 +21,9 @@ pub enum SqlVal {
     Text(String),
     // TODO properly support and test blob
     Blob(Vec<u8>),
+    // TODO properly support and test timestamp
+    #[cfg(feature = "datetime")]
+    Timestamp(NaiveDateTime),
 }
 impl SqlVal {
     pub fn bool(&self) -> Result<bool> {
@@ -73,6 +79,8 @@ impl fmt::Display for SqlVal {
             Real(val) => val.fmt(f),
             Text(val) => val.fmt(f),
             Blob(val) => f.write_str(&hex::encode(val)),
+            #[cfg(feature = "datetime")]
+            Timestamp(val) => val.format("%+").fmt(f),
         }
     }
 }
@@ -160,6 +168,8 @@ impl_prim_sql!(f64, Real, Real);
 impl_prim_sql!(f32, Real, Real);
 impl_prim_sql!(String, Text, Text, str);
 impl_prim_sql!(Vec<u8>, Blob, Blob);
+#[cfg(feature = "datetime")]
+impl_prim_sql!(NaiveDateTime, Timestamp, Timestamp);
 
 impl ToSql for &str {
     fn to_sql(&self) -> SqlVal {

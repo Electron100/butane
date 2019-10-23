@@ -5,10 +5,12 @@ use super::*;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
 use crate::{Result, SqlType, SqlVal};
-use hex;
 use log::warn;
 use rusqlite;
 use std::fmt::Write;
+
+#[cfg(feature = "datetime")]
+use crate::chrono::timestamp_from_millis;
 
 /// SQLite [Backend][crate::db::Backend] implementation.
 #[derive(Default)]
@@ -300,6 +302,8 @@ impl rusqlite::ToSql for SqlVal {
             SqlVal::Real(r) => Owned(Value::Real(*r)),
             SqlVal::Text(t) => Borrowed(ValueRef::Text(&t)),
             SqlVal::Blob(b) => Borrowed(ValueRef::Blob(&b)),
+            #[cfg(feature = "datetime")]
+            SqlVal::Timestamp(dt) => Owned(Value::Integer(dt.timestamp_millis())),
             SqlVal::Null => Owned(Value::Null),
         })
     }
@@ -339,8 +343,8 @@ fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, ty: SqlType) -> Result<
         SqlType::BigInt => SqlVal::Int(val.as_i64()?),
         SqlType::Real => SqlVal::Real(val.as_f64()?),
         SqlType::Text => SqlVal::Text(val.as_str()?.to_string()),
-        SqlType::Date => SqlVal::Int(val.as_i64()?),
-        SqlType::Timestamp => SqlVal::Int(val.as_i64()?),
+        #[cfg(feature = "datetime")]
+        SqlType::Timestamp => timestamp_from_millis(val.as_i64()?)?,
         SqlType::Blob => SqlVal::Blob(val.as_blob()?.into()),
     })
 }
@@ -386,23 +390,6 @@ fn define_column(col: &AColumn) -> String {
     )
 }
 
-fn default_string(d: SqlVal) -> String {
-    match d {
-        SqlVal::Null => "NULL".to_string(),
-        SqlVal::Bool(b) => {
-            if b {
-                "1".to_string()
-            } else {
-                "0".to_string()
-            }
-        }
-        SqlVal::Int(i) => i.to_string(),
-        SqlVal::Real(f) => f.to_string(),
-        SqlVal::Text(t) => format!("'{}'", t),
-        SqlVal::Blob(b) => format!("x'{}'", hex::encode(b)),
-    }
-}
-
 fn col_sqltype(col: &AColumn) -> &'static str {
     match col.sqltype() {
         Ok(ty) => sqltype(ty),
@@ -419,7 +406,7 @@ fn sqltype(ty: SqlType) -> &'static str {
         SqlType::BigInt => "INTEGER",
         SqlType::Real => "REAL",
         SqlType::Text => "TEXT",
-        SqlType::Date => "INTEGER",
+        #[cfg(feature = "datetime")]
         SqlType::Timestamp => "INTEGER",
         SqlType::Blob => "BLOB",
     }

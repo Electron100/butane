@@ -131,7 +131,6 @@ fn tokens_for_sqltype(ty: SqlType) -> TokenStream2 {
         SqlType::BigInt => quote!(propane::SqlType::BigInt),
         SqlType::Real => quote!(propane::SqlType::Real),
         SqlType::Text => quote!(propane::SqlType::Text),
-        SqlType::Date => quote!(propane::SqlType::Date),
         SqlType::Timestamp => quote!(propane::SqlType::Timestamp),
         SqlType::Blob => quote!(propane::SqlType::Blob),
     }
@@ -168,6 +167,8 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         Some(DeferredSqlType::Known(SqlType::Text))
     } else if *ty == parse_quote!(Vec<u8>) {
         Some(DeferredSqlType::Known(SqlType::Blob))
+    } else if *ty == parse_quote!(NaiveDateTime) {
+        Some(DeferredSqlType::Known(SqlType::Timestamp))
     } else {
         None
     }

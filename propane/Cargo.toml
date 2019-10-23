@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
 
+[features]
+default = ["datetime"]
+datetime = ["propane_core/datetime"]
+
 [dependencies]
 propane_codegen = { path = "../propane_codegen", version = "0.1.0" }
 propane_core = { path = "../propane_core", version = "0.1.0" }
@@ -13,3 +17,4 @@ proc-macro-hack = "0.5"
 [dev-dependencies]
 paste = "0.1"
 rsfs = "0.4"
+chrono = { version = "0.4", features=["serde"] }

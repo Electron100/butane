@@ -1,3 +1,4 @@
+use chrono::{naive::NaiveDateTime, offset::Utc};
 use propane::model;
 use propane::prelude::*;
 use propane::{db::Connection, ForeignKey, Many, ObjectState};
@@ -25,6 +26,7 @@ pub struct Post {
     pub title: String,
     pub body: String,
     pub published: bool,
+    pub pub_time: Option<NaiveDateTime>,
     pub likes: i32,
     pub tags: Many<Tag>,
     pub blog: ForeignKey<Blog>,
@@ -36,6 +38,7 @@ impl Post {
             title: title.to_string(),
             body: body.to_string(),
             published: false,
+            pub_time: None,
             likes: 0,
             tags: Many::new(),
             blog: ForeignKey::from(blog),
@@ -83,6 +86,7 @@ pub fn setup_blog(conn: &Connection) {
         &cats_blog,
     );
     post.published = true;
+    post.pub_time = Some(Utc::now().naive_utc());
     post.likes = 4;
     post.tags.add(&tag_danger);
     post.tags.add(&tag_asia);

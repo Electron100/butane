@@ -2,7 +2,7 @@
 //! CLI tool, there is no need to use this module. Even if applying
 //! migrations without this tool, you are unlikely to need this module.
 
-use crate::{Result, SqlType};
+use crate::{Error, Result, SqlType};
 use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -134,18 +134,31 @@ impl ADB {
                     if let Ok(pktype) = pktype {
                         changed = resolver.insert_pk(&table.name, pktype)
                     }
-
-                    for col in table.columns.values_mut() {
-                        col.resolve_type(&resolver);
+                }
+                for col in table.columns.values_mut() {
+                    col.resolve_type(&resolver);
+                }
+            }
+            for (key, ty) in self.extra_types.iter_mut() {
+                match ty {
+                    DeferredSqlType::Known(ty) => {
+                        changed = resolver.insert(key.clone(), *ty);
+                    }
+                    DeferredSqlType::Deferred(tykey) => {
+                        if let Some(sqltype) = resolver.find_type(tykey) {
+                            *ty = DeferredSqlType::Known(sqltype);
+                            changed = true;
+                        }
                     }
                 }
             }
-            for (_key, ty) in self.extra_types.iter_mut() {
-                if let DeferredSqlType::Deferred(tykey) = ty {
-                    if let Some(sqltype) = resolver.find_type(tykey) {
-                        *ty = DeferredSqlType::Known(sqltype);
-                        changed = true;
-                    }
+        }
+
+        // Now do a verification pass to ensure nothing is unresolved
+        for table in &mut self.tables.values() {
+            for col in table.columns.values() {
+                if let DeferredSqlType::Deferred(key) = &col.sqltype {
+                    return Err(Error::CannotResolveType(key.to_string()));
                 }
             }
         }

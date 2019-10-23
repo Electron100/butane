@@ -181,12 +181,7 @@ fn get_option_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         }
         .into();
 
-        get_primitive_sql_type(&inner_ty)
-            .or(get_foreign_sql_type(&inner_ty, "ForeignKey"))
-            .expect(&format!(
-                "Unsupported type {} for Option field",
-                inner_ty.into_token_stream()
-            ))
+        get_deferred_sql_type(&inner_ty)
     })
 }
 

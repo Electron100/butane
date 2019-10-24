@@ -131,4 +131,5 @@ pub mod prelude {
     pub use crate::DataResult;
     pub use filter;
     pub use propane_codegen::Model;
+    pub use propane_core::db::BackendConnection;
 }

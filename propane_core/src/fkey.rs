@@ -54,7 +54,7 @@ impl<T: DataObject> ForeignKey<T> {
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
         self.val.try_borrow_with(|| {
             let pk: SqlVal = self.valpk.borrow().unwrap().clone();
-            T::get(conn, T::PKType::from_sql(pk)?)
+            T::get(conn, &T::PKType::from_sql(pk)?)
         })
     }
 

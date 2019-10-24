@@ -1,6 +1,7 @@
 use failure;
 use failure::Fail;
 use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 
@@ -66,9 +67,21 @@ pub trait DataObject: DataResult<DBO = Self> {
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
     /// Find this object in the database based on primary key.
-    fn get(conn: &impl ConnectionMethods, id: Self::PKType) -> Result<Self>
+    fn get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType>) -> Result<Self>
     where
-        Self: Sized;
+        Self: Sized,
+    {
+        <Self as DataResult>::query()
+            .filter(query::BoolExpr::Eq(
+                Self::PKCOL,
+                query::Expr::Val(id.borrow().to_sql()),
+            ))
+            .limit(1)
+            .load(conn)?
+            .into_iter()
+            .nth(0)
+            .ok_or(Error::NoSuchObject.into())
+    }
     /// Save the object to the database.
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
     /// Delete the object from the database.

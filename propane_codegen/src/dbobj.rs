@@ -86,18 +86,6 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
             fn pk(&self) -> &Self::PKType {
                 &self.#pkident
             }
-            fn get(
-                conn: &impl propane::db::internal::ConnectionMethods,
-                id: Self::PKType,
-            ) -> propane::Result<Self> {
-                <Self as propane::DataResult>::query()
-                    .filter(propane::query::BoolExpr::Eq(#pklit, propane::query::Expr::Val(id.into())))
-                    .limit(1)
-                    .load(conn)?
-                    .into_iter()
-                    .nth(0)
-                    .ok_or(propane::Error::NoSuchObject.into())
-            }
             fn save(&mut self, conn: &impl propane::db::internal::ConnectionMethods) -> propane::Result<()> {
                 #many_save
                 //todo perf use an array on the stack for better

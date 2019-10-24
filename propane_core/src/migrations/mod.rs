@@ -468,15 +468,6 @@ impl DataObject for PropaneMigration {
     fn pk(&self) -> &String {
         &self.name
     }
-    fn get(conn: &impl ConnectionMethods, id: Self::PKType) -> Result<Self> {
-        Self::query()
-            .filter(query::BoolExpr::Eq("name", query::Expr::Val(id.into())))
-            .limit(1)
-            .load(conn)?
-            .into_iter()
-            .nth(0)
-            .ok_or(Error::NoSuchObject)
-    }
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);
         values.push(self.name.to_sql());

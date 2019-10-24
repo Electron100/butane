@@ -1,6 +1,7 @@
 use crate::db::internal::ConnectionMethods;
 use crate::*;
 use lazycell::LazyCell;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Formatter};
 
 /// Used to implement a relationship between models.
@@ -167,6 +168,32 @@ where
 {
     fn eq(&self, other: &&T) -> bool {
         self.eq(*other)
+    }
+}
+
+impl<T> Serialize for ForeignKey<T>
+where
+    T: DataObject,
+    T::PKType: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.pk().serialize(serializer)
+    }
+}
+
+impl<'de, T> Deserialize<'de> for ForeignKey<T>
+where
+    T: DataObject,
+    T::PKType: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self::from_pk(T::PKType::deserialize(deserializer)?))
     }
 }
 

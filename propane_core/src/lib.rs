@@ -21,7 +21,7 @@ pub use sqlval::*;
 
 pub type Result<T> = std::result::Result<T, crate::Error>;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct ObjectState {
     pub saved: bool,
 }

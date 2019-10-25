@@ -300,7 +300,7 @@ impl rusqlite::ToSql for SqlVal {
             SqlVal::Bool(b) => Owned(Value::Integer(if *b { 1 } else { 0 })),
             SqlVal::Int(i) => Owned(Value::Integer(*i)),
             SqlVal::Real(r) => Owned(Value::Real(*r)),
-            SqlVal::Text(t) => Borrowed(ValueRef::Text(&t)),
+            SqlVal::Text(t) => Borrowed(ValueRef::Text(t.as_ref())),
             SqlVal::Blob(b) => Borrowed(ValueRef::Blob(&b)),
             #[cfg(feature = "datetime")]
             SqlVal::Timestamp(dt) => Owned(Value::Integer(dt.timestamp_millis())),

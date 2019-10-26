@@ -12,7 +12,7 @@ use propane_core::*;
 use quote::{quote, ToTokens};
 use syn;
 use syn::parse_quote;
-use syn::{Expr, Field, ItemStruct, ItemType, LitStr};
+use syn::{Attribute, Expr, Field, ItemStruct, ItemType, LitStr, Meta, NestedMeta};
 
 #[macro_use]
 macro_rules! make_compile_error {
@@ -48,6 +48,13 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     // create field attributes)
     let ast_struct: ItemStruct = syn::parse(input).unwrap();
     let attrs = ast_struct.attrs;
+
+    let state_attrs = if has_derive_serialize(&attrs) {
+        quote!(#[serde(skip)])
+    } else {
+        TokenStream2::new()
+    };
+
     let vis = ast_struct.vis;
     let fields = if let syn::Fields::Named(fields) = ast_struct.fields {
         fields.named
@@ -60,11 +67,32 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
         #[derive(propane::prelude::Model)]
         #(#attrs)*
         #vis struct #ident {
+            #state_attrs
             state: propane::ObjectState,
             #fields
         }
     )
     .into()
+}
+
+fn has_derive_serialize(attrs: &Vec<Attribute>) -> bool {
+    for attr in attrs {
+        if let Ok(Meta::List(ml)) = attr.parse_meta() {
+            if ml.path.is_ident("derive")
+                && ml
+                    .nested
+                    .iter()
+                    .find(|nm| match nm {
+                        NestedMeta::Meta(Meta::Path(path)) => path.is_ident("Serialize"),
+                        _ => false,
+                    })
+                    .is_some()
+            {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Helper for the `model` macro necessary because attribute macros

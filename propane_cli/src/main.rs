@@ -76,6 +76,15 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
         .and_then(|a| a.value_of("name").and_then(|s| Some(s.to_string())))
         .unwrap_or_else(|| default_name());
     let ms = get_migrations()?;
+    if ms
+        .all_migrations()?
+        .iter()
+        .find(|m| m.name() == name)
+        .is_some()
+    {
+        eprintln!("Migration {} already exists", name);
+        std::process::exit(1);
+    }
     let m = ms.create_migration(&db::sqlite::SQLiteBackend::new(), &name, ms.latest())?;
     match m {
         Some(m) => println!("Created migration {}", m.name()),
@@ -107,7 +116,10 @@ fn base_dir() -> Result<PathBuf> {
 
 fn handle_error(r: Result<()>) {
     match r {
-        Err(e) => eprintln!("Encountered unexpectd error: {}", e),
+        Err(e) => {
+            eprintln!("Encountered unexpected error: {}", e);
+            std::process::exit(1);
+        }
         _ => (),
     }
 }

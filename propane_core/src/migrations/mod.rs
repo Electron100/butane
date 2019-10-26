@@ -15,6 +15,8 @@ use std::rc::Rc;
 pub mod adb;
 use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeKey, ADB};
 
+const TYPES_FILENAME: &'static str = "types.json";
+
 /// Filesystem abstraction for `Migrations`. Primarily intended to
 /// allow bypassing the real filesystem during testing, but
 /// implementations that do not call through to the real filesystem
@@ -83,12 +85,12 @@ impl Migration {
 
     /// Adds a TypeKey -> SqlType mapping. Only meaningful on the special current migration.
     pub fn add_type(&self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
-        let mut types: SqlTypeMap = match self.fs.read(&self.root.join("types")) {
+        let mut types: SqlTypeMap = match self.fs.read(&self.root.join(TYPES_FILENAME)) {
             Ok(reader) => serde_json::from_reader(reader)?,
             Err(_) => HashMap::new(),
         };
         types.insert(key, sqltype);
-        self.write_contents("types", serde_json::to_string(&types)?.as_bytes())?;
+        self.write_contents(TYPES_FILENAME, serde_json::to_string(&types)?.as_bytes())?;
         return Ok(());
     }
 
@@ -105,9 +107,10 @@ impl Migration {
                     if name.ends_with(".table") {
                         let table: ATable = serde_json::from_reader(self.fs.read(&entry)?)?;
                         db.replace_table(table)
-                    } else if name == "types" {
-                        let types: SqlTypeMap =
-                            serde_json::from_reader(self.fs.read(&self.root.join("types"))?)?;
+                    } else if name == TYPES_FILENAME {
+                        let types: SqlTypeMap = serde_json::from_reader(
+                            self.fs.read(&self.root.join(TYPES_FILENAME))?,
+                        )?;
 
                         for (key, sqltype) in types {
                             db.add_type(key, sqltype);
@@ -288,6 +291,10 @@ impl Migrations {
 
         let sql = backend.create_migration_sql(&from_db, &ops);
         let m = self.get_migration(name);
+        // Save the DB for use by other migrations from this one
+        for table in to_db.tables() {
+            m.write_table(table)?;
+        }
         m.write_sql(&format!("{}_up", backend.get_name()), &sql)?;
         // And write the undo
         let sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db));

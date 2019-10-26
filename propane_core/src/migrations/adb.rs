@@ -132,17 +132,17 @@ impl ADB {
                 if let Some(pk) = table.pk() {
                     let pktype = pk.sqltype();
                     if let Ok(pktype) = pktype {
-                        changed = resolver.insert_pk(&table.name, pktype)
+                        changed |= resolver.insert_pk(&table.name, pktype);
                     }
                 }
                 for col in table.columns.values_mut() {
-                    col.resolve_type(&resolver);
+                    changed |= col.resolve_type(&resolver);
                 }
             }
             for (key, ty) in self.extra_types.iter_mut() {
                 match ty {
                     DeferredSqlType::Known(ty) => {
-                        changed = resolver.insert(key.clone(), *ty);
+                        changed |= resolver.insert(key.clone(), *ty) || changed;
                     }
                     DeferredSqlType::Deferred(tykey) => {
                         if let Some(sqltype) = resolver.find_type(tykey) {
@@ -257,12 +257,16 @@ impl AColumn {
             DeferredSqlType::Deferred(t) => Err(crate::Error::UnknownSqlType { ty: t.to_string() }),
         }
     }
-    fn resolve_type(&mut self, resolver: &'_ TypeResolver) -> Option<SqlType> {
-        if let Ok(ty) = self.sqltype.resolve(resolver) {
+    /// Returns true if the type was previously unresolved but is now resolved
+    fn resolve_type(&mut self, resolver: &'_ TypeResolver) -> bool {
+        if let DeferredSqlType::Known(_) = self.sqltype {
+            // Already resolved, nothing to do
+            false
+        } else if let Ok(ty) = self.sqltype.resolve(resolver) {
             self.sqltype = DeferredSqlType::Known(ty);
-            Some(ty)
+            true
         } else {
-            None
+            false
         }
     }
     pub fn is_auto(&self) -> bool {

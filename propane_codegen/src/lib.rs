@@ -46,8 +46,8 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     // Transform into a derive because derives can have helper
     // attributes but proc macro attributes can't yet (nor can they
     // create field attributes)
-    let ast_struct: ItemStruct = syn::parse(input).unwrap();
-    let attrs = ast_struct.attrs;
+    let mut ast_struct: ItemStruct = syn::parse(input).unwrap();
+    let attrs = &ast_struct.attrs;
 
     let state_attrs = if has_derive_serialize(&attrs) {
         quote!(#[serde(skip)])
@@ -55,22 +55,41 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
         TokenStream2::new()
     };
 
-    let vis = ast_struct.vis;
-    let fields = if let syn::Fields::Named(fields) = ast_struct.fields {
-        fields.named
-    } else {
-        panic!("Fields must be named")
+    let vis = &ast_struct.vis;
+
+    migration::write_table_to_disk(&ast_struct).unwrap();
+
+    let impltraits = dbobj::impl_dbobject(&ast_struct);
+    let fieldexprs = dbobj::add_fieldexprs(&ast_struct);
+
+    match &mut ast_struct.fields {
+        syn::Fields::Named(fields) => {
+            for field in &mut fields.named {
+                field.attrs.retain(|a| {
+                    !a.path.is_ident("pk")
+                        && !a.path.is_ident("auto")
+                        && !a.path.is_ident("sqltype")
+                });
+            }
+        }
+        _ => panic!("Fields must be named"),
     };
+    let fields = match ast_struct.fields {
+        syn::Fields::Named(fields) => fields.named,
+        _ => panic!("Fields must be named"),
+    };
+
     let ident = ast_struct.ident;
 
     quote!(
-        #[derive(propane::prelude::Model)]
         #(#attrs)*
         #vis struct #ident {
             #state_attrs
             state: propane::ObjectState,
             #fields
         }
+        #impltraits
+        #fieldexprs
     )
     .into()
 }
@@ -93,23 +112,6 @@ fn has_derive_serialize(attrs: &Vec<Attribute>) -> bool {
         }
     }
     false
-}
-
-/// Helper for the `model` macro necessary because attribute macros
-/// are not allowed their own helper attributes, whereas derives are.
-#[proc_macro_derive(Model, attributes(pk, auto, sqltype))]
-pub fn derive_model(input: TokenStream) -> TokenStream {
-    let mut result: TokenStream2 = TokenStream2::new();
-
-    // Read the struct name and all fields
-    let ast_struct: ItemStruct = syn::parse(input).unwrap();
-
-    migration::write_table_to_disk(&ast_struct).unwrap();
-
-    result.extend(dbobj::impl_dbobject(&ast_struct));
-    result.extend(dbobj::add_fieldexprs(&ast_struct));
-
-    result.into()
 }
 
 #[proc_macro_hack]

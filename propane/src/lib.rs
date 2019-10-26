@@ -130,6 +130,5 @@ pub mod prelude {
     #[doc(no_inline)]
     pub use crate::DataResult;
     pub use filter;
-    pub use propane_codegen::Model;
     pub use propane_core::db::BackendConnection;
 }

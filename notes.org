@@ -48,16 +48,22 @@
 	+ Summary/readme
   + Example like Diesel's
 	+ Optional dependencies
-	+ Full timestamp and blob support
-	+ Separate DataResult test/support
 	+ incremental save
-	+ Autoincrement/serial support
 	+ foreign key constraints in db, cascade setting
 	+ PG support
 	+ Many backreferences
 	+ better error reporting in macro -- compiler_error with span on field instead of proc macro panic
 	+ support delete without loading first
-	+ Document #[propane_type]
+	+ Connections/BackendConnection/ConnectionMethods is confusing
+	+ migration downgrade
+	+ Missing tests
+		- blob
+		- timestamp
+		- migrations
+		- separate DataResult
+	+ Missing documentation
+		- #[propane_type]
+		- 
 
 
 * ManyToMany

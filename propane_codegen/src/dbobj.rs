@@ -3,10 +3,19 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Field, ItemStruct};
 
+// Configuration that can be specified with attributes to override default behavior
+#[derive(Default)]
+pub struct Config {
+    pub table_name: Option<String> 
+}
+
 // implement the DataObject trait
-pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
+pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let table_lit = make_ident_literal_str(&tyname);
+    let tablelit = match &config.table_name {
+        Some(s) => make_lit(&s),
+        None => make_ident_literal_str(&tyname)
+    };
 
     let err = verify_fields(ast_struct);
     if let Some(err) = err {
@@ -23,7 +32,6 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
     let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
 
     let fields_type = fields_type(tyname);
-    let tablelit = make_ident_literal_str(&tyname);
 
     let mut post_insert: Vec<TokenStream2> = Vec::new();
     add_post_insert_for_auto(&pk_field, &mut post_insert);
@@ -76,7 +84,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct) -> TokenStream2 {
                 Ok(obj)
             }
             fn query() -> propane::query::Query<Self> {
-                propane::query::Query::new(#table_lit)
+                propane::query::Query::new(#tablelit)
             }
         }
         impl propane::DataObject for #tyname {

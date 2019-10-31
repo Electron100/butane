@@ -135,7 +135,7 @@ impl ADB {
                         changed |= resolver.insert_pk(&table.name, pktype);
                     }
                 }
-                for col in table.columns.values_mut() {
+                for col in &mut table.columns {
                     changed |= col.resolve_type(&resolver);
                 }
             }
@@ -156,7 +156,7 @@ impl ADB {
 
         // Now do a verification pass to ensure nothing is unresolved
         for table in &mut self.tables.values() {
-            for col in table.columns.values() {
+            for col in &table.columns {
                 if let DeferredSqlType::Deferred(key) = &col.sqltype {
                     return Err(Error::CannotResolveType(key.to_string()));
                 }
@@ -170,29 +170,33 @@ impl ADB {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ATable {
     pub name: String,
-    pub columns: HashMap<String, AColumn>,
+    pub columns: Vec<AColumn>,
 }
 impl ATable {
     pub fn new(name: String) -> ATable {
         ATable {
             name,
-            columns: HashMap::new(),
+            columns: Vec::new(),
         }
     }
     pub fn add_column(&mut self, col: AColumn) {
         self.replace_column(col);
     }
     pub fn column<'a>(&'a self, name: &str) -> Option<&'a AColumn> {
-        self.columns.get(name)
+        self.columns.iter().find(|c| c.name == name)
     }
     pub fn replace_column(&mut self, col: AColumn) {
-        self.columns.insert(col.name.clone(), col);
+        if let Some(existing) = self.columns.iter_mut().find(|c| c.name == col.name) {
+            std::mem::replace(existing, col);
+        } else {
+            self.columns.push(col);
+        }
     }
     pub fn remove_column(&mut self, name: &str) {
-        self.columns.remove(name);
+        self.columns.retain(|c| c.name != name);
     }
     pub fn pk(&self) -> Option<&AColumn> {
-        self.columns.values().find(|c| c.is_pk())
+        self.columns.iter().find(|c| c.is_pk())
     }
 }
 
@@ -311,16 +315,20 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     ops
 }
 
+fn col_by_name<'a>(columns: &'a Vec<AColumn>, name: &str) -> Option<&'a AColumn> {
+    columns.iter().find(|c| c.name == name)
+}
+
 fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
-    let new_names: HashSet<&String> = new.columns.keys().collect();
-    let old_names: HashSet<&String> = old.columns.keys().collect();
+    let new_names: HashSet<&String> = new.columns.iter().map(|c| &c.name).collect();
+    let old_names: HashSet<&String> = old.columns.iter().map(|c| &c.name).collect();
     let added_names = new_names.difference(&old_names);
     for added in added_names {
         let added: &str = added.as_ref();
         ops.push(Operation::AddColumn(
             new.name.clone(),
-            new.columns.get(added).unwrap().clone(),
+            col_by_name(&new.columns, added).unwrap().clone(),
         ));
     }
     for removed in old_names.difference(&new_names) {
@@ -331,8 +339,8 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
     }
     for colname in new_names.intersection(&old_names) {
         let colname: &str = colname.as_ref();
-        let col = new.columns.get(colname).unwrap();
-        let old_col = old.columns.get(colname).unwrap();
+        let col = col_by_name(&new.columns, colname).unwrap();
+        let old_col = col_by_name(&old.columns, colname).unwrap();
         if col == old_col {
             continue;
         }

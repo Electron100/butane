@@ -12,7 +12,9 @@ use propane_core::*;
 use quote::{quote, ToTokens};
 use syn;
 use syn::parse_quote;
-use syn::{Attribute, Expr, Field, ItemStruct, ItemType, LitStr, Meta, NestedMeta};
+use syn::{
+    Attribute, Expr, Field, ItemStruct, ItemType, Lit, LitStr, Meta, MetaNameValue, NestedMeta,
+};
 
 #[macro_use]
 macro_rules! make_compile_error {
@@ -47,7 +49,28 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     // attributes but proc macro attributes can't yet (nor can they
     // create field attributes)
     let mut ast_struct: ItemStruct = syn::parse(input).unwrap();
-    let attrs = &ast_struct.attrs;
+    let mut config = dbobj::Config::default();
+    for attr in &ast_struct.attrs {
+        match attr.parse_meta() {
+            Ok(Meta::NameValue(MetaNameValue {
+                path,
+                eq_token: _,
+                lit: Lit::Str(s),
+            })) => {
+                if path.is_ident("table") {
+                    config.table_name = Some(s.value())
+                }
+            }
+            _ => (),
+        }
+    }
+    // Filter out our helper attributes
+    let attrs: Vec<Attribute> = ast_struct
+        .attrs
+        .clone()
+        .into_iter()
+        .filter(|a| !a.path.is_ident("table"))
+        .collect();
 
     let state_attrs = if has_derive_serialize(&attrs) {
         quote!(#[serde(skip)])
@@ -57,9 +80,9 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let vis = &ast_struct.vis;
 
-    migration::write_table_to_disk(&ast_struct).unwrap();
+    migration::write_table_to_disk(&ast_struct, &config).unwrap();
 
-    let impltraits = dbobj::impl_dbobject(&ast_struct);
+    let impltraits = dbobj::impl_dbobject(&ast_struct, &config);
     let fieldexprs = dbobj::add_fieldexprs(&ast_struct);
 
     match &mut ast_struct.fields {

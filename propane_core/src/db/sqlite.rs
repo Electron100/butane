@@ -362,7 +362,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> String {
 fn create_table(table: &ATable) -> String {
     let coldefs = table
         .columns
-        .values()
+        .iter()
         .map(define_column)
         .collect::<Vec<String>>()
         .join(",\n");
@@ -440,7 +440,7 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {
 fn copy_table(old: &ATable, new: &ATable) -> String {
     let column_names = new
         .columns
-        .values()
+        .iter()
         .map(|col| col.name())
         .collect::<Vec<&str>>()
         .join(", ");

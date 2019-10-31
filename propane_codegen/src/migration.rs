@@ -5,12 +5,20 @@ use propane_core::Result;
 use std::path::PathBuf;
 use syn::{Field, ItemStruct};
 
-pub fn write_table_to_disk(ast_struct: &ItemStruct) -> Result<()> {
+pub fn write_table_to_disk(ast_struct: &ItemStruct, config: &dbobj::Config) -> Result<()> {
     let dir = migrations_dir();
     let current_migration = migrations::from_root(&dir).current();
-    for table in create_atables(ast_struct) {
+    for table in create_atables(ast_struct, config) {
         current_migration.write_table(&table)?;
     }
+    if let Some(name) = &config.table_name {
+        // Custom table name, need to also be able to map with the type name
+        current_migration.add_type(
+            TypeKey::PK(ast_struct.ident.to_string()),
+            DeferredSqlType::Deferred(TypeKey::PK(name.clone())),
+        )?;
+    }
+
     Ok(())
 }
 
@@ -29,8 +37,12 @@ fn migrations_dir() -> PathBuf {
     dir
 }
 
-fn create_atables(ast_struct: &ItemStruct) -> Vec<ATable> {
-    let mut table = ATable::new(ast_struct.ident.to_string());
+fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable> {
+    let name = match &config.table_name {
+        Some(n) => n.clone(),
+        None => ast_struct.ident.to_string(),
+    };
+    let mut table = ATable::new(name);
     let pk = pk_field(ast_struct)
         .expect("No primary key found. Expected 'id' field or field with #[pk] attribute.");
     let mut result: Vec<ATable> = Vec::new();

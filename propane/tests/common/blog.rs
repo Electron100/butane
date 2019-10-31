@@ -49,6 +49,7 @@ impl Post {
 
 #[model]
 #[derive(Debug)]
+#[table = "tags"]
 pub struct Tag {
     #[pk]
     pub tag: String,

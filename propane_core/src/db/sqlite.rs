@@ -5,12 +5,13 @@ use super::*;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
 use crate::{Result, SqlType, SqlVal};
+#[cfg(feature = "datetime")]
+use chrono::naive::NaiveDateTime;
 use log::warn;
 use rusqlite;
 use std::fmt::Write;
 
-#[cfg(feature = "datetime")]
-use crate::chrono::timestamp_from_millis;
+const SQLITE_DT_FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
 
 /// SQLite [Backend][crate::db::Backend] implementation.
 #[derive(Default)]
@@ -144,6 +145,7 @@ impl ConnectionMethods for rusqlite::Connection {
         if let Some(limit) = limit {
             helper::sql_limit(limit, &mut sqlquery)
         }
+        eprintln!("query sql {}", sqlquery);
         let mut stmt = self.prepare(&sqlquery)?;
         let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
         rows.collect()
@@ -167,7 +169,7 @@ impl ConnectionMethods for rusqlite::Connection {
                 table
             ),
             rusqlite::NO_PARAMS,
-            |row| sql_val_from_rusqlite(row.get_raw(0), pkcol.ty()),
+            |row| sql_val_from_rusqlite(row.get_raw(0), &pkcol),
         )?;
         Ok(pk)
     }
@@ -303,7 +305,10 @@ impl rusqlite::ToSql for SqlVal {
             SqlVal::Text(t) => Borrowed(ValueRef::Text(t.as_ref())),
             SqlVal::Blob(b) => Borrowed(ValueRef::Blob(&b)),
             #[cfg(feature = "datetime")]
-            SqlVal::Timestamp(dt) => Owned(Value::Integer(dt.timestamp_millis())),
+            SqlVal::Timestamp(dt) => {
+                let f = dt.format(SQLITE_DT_FORMAT);
+                Owned(Value::Text(f.to_string()))
+            }
             SqlVal::Null => Owned(Value::Null),
         })
     }
@@ -320,8 +325,8 @@ fn row_from_rusqlite(row: &rusqlite::Row, cols: &[Column]) -> Result<Row> {
     }
     vals.reserve(cols.len());
     for i in 0..cols.len() {
-        let ty = cols.get(i).unwrap().ty();
-        vals.push(sql_val_from_rusqlite(row.get_raw(i), ty)?);
+        let col = cols.get(i).unwrap();
+        vals.push(sql_val_from_rusqlite(row.get_raw(i), col)?);
     }
     Ok(Row::new(vals))
 }
@@ -333,19 +338,29 @@ where
     helper::sql_for_expr(expr, &sql_for_expr, values, w)
 }
 
-fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, ty: SqlType) -> Result<SqlVal> {
+fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result<SqlVal> {
     if let rusqlite::types::ValueRef::Null = val {
         return Ok(SqlVal::Null);
     }
-    Ok(match ty {
-        SqlType::Bool => SqlVal::Bool(val.as_i64()? != 0),
-        SqlType::Int => SqlVal::Int(val.as_i64()?),
-        SqlType::BigInt => SqlVal::Int(val.as_i64()?),
-        SqlType::Real => SqlVal::Real(val.as_f64()?),
-        SqlType::Text => SqlVal::Text(val.as_str()?.to_string()),
-        #[cfg(feature = "datetime")]
-        SqlType::Timestamp => timestamp_from_millis(val.as_i64()?)?,
-        SqlType::Blob => SqlVal::Blob(val.as_blob()?.into()),
+    let ret = || -> Result<SqlVal> {
+        Ok(match col.ty() {
+            SqlType::Bool => SqlVal::Bool(val.as_i64()? != 0),
+            SqlType::Int => SqlVal::Int(val.as_i64()?),
+            SqlType::BigInt => SqlVal::Int(val.as_i64()?),
+            SqlType::Real => SqlVal::Real(val.as_f64()?),
+            SqlType::Text => SqlVal::Text(val.as_str()?.to_string()),
+            #[cfg(feature = "datetime")]
+            SqlType::Timestamp => SqlVal::Timestamp(NaiveDateTime::parse_from_str(
+                val.as_str()?,
+                SQLITE_DT_FORMAT,
+            )?),
+            SqlType::Blob => SqlVal::Blob(val.as_blob()?.into()),
+        })
+    }();
+    // Automatic error conversion won't have preserved the column name for any errors
+    ret.map_err(|e| match e {
+        Error::SqlResultTypeMismatch(_) => Error::SqlResultTypeMismatch(col.name().to_string()),
+        e => e,
     })
 }
 
@@ -407,7 +422,7 @@ fn sqltype(ty: SqlType) -> &'static str {
         SqlType::Real => "REAL",
         SqlType::Text => "TEXT",
         #[cfg(feature = "datetime")]
-        SqlType::Timestamp => "INTEGER",
+        SqlType::Timestamp => "TEXT",
         SqlType::Blob => "BLOB",
     }
 }

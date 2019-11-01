@@ -6,7 +6,10 @@ use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 
 #[cfg(feature = "datetime")]
-mod chrono;
+use chrono::ParseError;
+
+#[cfg(feature = "datetime")]
+mod datetime;
 pub mod db;
 pub mod fkey;
 pub mod many;
@@ -104,8 +107,11 @@ pub enum Error {
         0, 1
     )]
     CannotConvertSqlVal(SqlType, SqlVal),
-    #[fail(display = "Mismatch between sql types and rust types while loading data.")]
-    SqlResultTypeMismatch,
+    #[fail(
+        display = "Mismatch between sql types and rust types while loading data for column {}.",
+        0
+    )]
+    SqlResultTypeMismatch(String),
     #[fail(display = "SqlType not known for {}", ty)]
     UnknownSqlType { ty: String },
     #[fail(display = "Value has not been loaded from the database")]
@@ -156,10 +162,17 @@ impl From<rusqlite::types::FromSqlError> for Error {
     fn from(e: rusqlite::types::FromSqlError) -> Self {
         use rusqlite::types::FromSqlError;
         match e {
-            FromSqlError::InvalidType => Error::SqlResultTypeMismatch,
+            FromSqlError::InvalidType => Error::SqlResultTypeMismatch("unknown".to_string()),
             FromSqlError::OutOfRange(_) => Error::OutOfRange,
             FromSqlError::Other(e2) => Error::Generic(failure::Error::from_boxed_compat(e2)),
         }
+    }
+}
+
+#[cfg(feature = "datetime")]
+impl From<ParseError> for Error {
+    fn from(e: ParseError) -> Self {
+        Error::Generic(failure::Error::from(e))
     }
 }
 

@@ -371,7 +371,7 @@ impl Migrations {
 
         let mut m_opt = self.latest();
         while let Some(m) = m_opt {
-            if !migrations.contains(&PropaneMigration {
+            if migrations.contains(&PropaneMigration {
                 name: m.name().to_string(),
             }) {
                 return Ok(Some(m));

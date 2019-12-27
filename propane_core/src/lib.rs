@@ -192,7 +192,7 @@ pub enum SqlType {
     // TODO properly support and test timestamp
     #[cfg(feature = "datetime")]
     Timestamp,
-    // TODO properly support and test blob
+    // TODO properly test blob
     Blob,
 }
 impl std::fmt::Display for SqlType {

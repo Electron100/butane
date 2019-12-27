@@ -2,10 +2,11 @@
 #![allow(clippy::unit_arg)]
 
 use super::internal::Column;
+use crate::migrations::adb::AColumn;
 use crate::query;
 use crate::query::Expr::{Condition, Placeholder, Val};
 use crate::query::{BoolExpr::*, Expr, Join};
-use crate::SqlVal;
+use crate::{SqlType, SqlVal};
 use std::fmt::Write;
 
 /// Writes to `w` the SQL to express the expression given in `expr`. Values contained in `expr` are rendered
@@ -148,6 +149,24 @@ pub fn sql_limit(limit: i32, w: &mut impl Write) {
     write!(w, " LIMIT {}", limit).unwrap();
 }
 
+pub fn column_default(col: &AColumn) -> SqlVal {
+    match col.default() {
+        Some(val) => val.clone(),
+        None => match col.sqltype() {
+            Ok(t) => match t {
+                SqlType::Bool => SqlVal::Bool(false),
+                SqlType::Int => SqlVal::Int(0),
+                SqlType::BigInt => SqlVal::Int(0),
+                SqlType::Real => SqlVal::Real(0.0),
+                SqlType::Text => SqlVal::Text("".to_string()),
+                SqlType::Blob => SqlVal::Blob(Vec::new()),
+                _ => SqlVal::Null,
+            },
+            Err(_) => SqlVal::Null, // todo better error reporting
+        },
+    }
+}
+
 fn list_columns(columns: &[Column], w: &mut impl Write) {
     let mut colnames: Vec<&'static str> = Vec::new();
     columns.iter().for_each(|c| colnames.push(c.name()));
@@ -178,4 +197,18 @@ fn sql_column(col: query::Column, w: &mut impl Write) {
         None => w.write_str(col.name()),
     }
     .unwrap()
+}
+
+pub fn sql_literal_value(val: SqlVal) -> String {
+    use SqlVal::*;
+    match val {
+        SqlVal::Null => "NULL".to_string(),
+        SqlVal::Bool(val) => val.to_string(),
+        Int(val) => val.to_string(),
+        Real(val) => val.to_string(),
+        Text(val) => format!("'{}'", val),
+        Blob(val) => format!("x'{}'", hex::encode_upper(val)),
+        #[cfg(feature = "datetime")]
+        Timestamp(ndt) => ndt.format("%+").to_string(),
+    }
 }

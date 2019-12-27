@@ -2,7 +2,7 @@
 //! CLI tool, there is no need to use this module. Even if applying
 //! migrations without this tool, you are unlikely to need this module.
 
-use crate::{Error, Result, SqlType};
+use crate::{Error, Result, SqlType, SqlVal};
 use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -229,6 +229,7 @@ pub struct AColumn {
     nullable: bool,
     pk: bool,
     auto: bool,
+    default: Option<SqlVal>,
 }
 impl AColumn {
     pub fn new(
@@ -237,6 +238,7 @@ impl AColumn {
         nullable: bool,
         pk: bool,
         auto: bool,
+        default: Option<SqlVal>,
     ) -> Self {
         AColumn {
             name: name.into(),
@@ -244,7 +246,12 @@ impl AColumn {
             nullable,
             pk,
             auto,
+            default,
         }
+    }
+    /// Simple column that is non-null, non-auto, non-pk with no default
+    pub fn new_simple(name: impl Into<String>, sqltype: DeferredSqlType) -> Self {
+        Self::new(name, sqltype, false, false, false, None)
     }
     pub fn name(&self) -> &str {
         &self.name
@@ -254,6 +261,9 @@ impl AColumn {
     }
     pub fn is_pk(&self) -> bool {
         self.pk
+    }
+    pub fn default(&self) -> &Option<SqlVal> {
+        &self.default
     }
     pub fn sqltype(&self) -> Result<SqlType> {
         match &self.sqltype {

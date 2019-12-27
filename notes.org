@@ -64,7 +64,7 @@
 		- separate DataResult
 	+ Missing documentation
 		- #[propane_type]
-		- 
+		- default attribute
 
 
 * ManyToMany

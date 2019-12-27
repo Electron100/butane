@@ -421,6 +421,7 @@ fn migrations_table() -> ATable {
         false, // nullable
         true,  // pk
         false, // auto
+        None,
     );
     table.add_column(col);
     table

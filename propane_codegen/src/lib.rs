@@ -92,6 +92,7 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
                     !a.path.is_ident("pk")
                         && !a.path.is_ident("auto")
                         && !a.path.is_ident("sqltype")
+                        && !a.path.is_ident("default")
                 });
             }
         }
@@ -335,9 +336,38 @@ fn is_auto(field: &Field) -> bool {
         .is_some()
 }
 
+/// Defaults are used for fields added by later migrations
+/// Example
+/// #[default = 42]
+fn get_default(field: &Field) -> Option<SqlVal> {
+    // TODO these panics should report proper compiler errors
+    field
+        .attrs
+        .iter()
+        .find(|attr| attr.path.is_ident("auto"))
+        .map(|attr| match attr.parse_meta() {
+            Ok(Meta::NameValue(meta)) => sqlval_from_lit(meta.lit),
+            _ => panic!("malformed default value"),
+        })
+}
+
 fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
     ast_struct
         .fields
         .iter()
         .filter(|f| f.ident.clone().unwrap().to_string() != "state")
+}
+
+fn sqlval_from_lit(lit: Lit) -> SqlVal {
+    // TODO these panics should report proper compiler errors
+    match lit {
+        Lit::Str(lit) => SqlVal::Text(lit.value()),
+        Lit::ByteStr(lit) => SqlVal::Blob(lit.value()),
+        Lit::Byte(lit) => panic!("single byte literal is not supported"),
+        Lit::Char(lit) => panic!("single char literal is not supported"),
+        Lit::Int(lit) => SqlVal::Int(lit.base10_parse().unwrap()),
+        Lit::Float(lit) => SqlVal::Real(lit.base10_parse().unwrap()),
+        Lit::Bool(lit) => SqlVal::Bool(lit.value),
+        Lit::Verbatim(lit) => panic!("raw verbatim literals are not supported"),
+    }
 }

@@ -432,7 +432,13 @@ fn drop_table(name: &str) -> String {
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> String {
-    format!("ALTER TABLE {} ADD COLUMN {}", tbl_name, define_column(col))
+    let default: SqlVal = helper::column_default(col);
+    format!(
+        "ALTER TABLE {} ADD COLUMN {} DEFAULT {}",
+        tbl_name,
+        define_column(col),
+        helper::sql_literal_value(default)
+    )
 }
 
 fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {

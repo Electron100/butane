@@ -59,6 +59,7 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
                 is_nullable(&f),
                 f == &pk,
                 is_auto(&f),
+                get_default(&f),
             );
             table.add_column(col);
         } else if is_many_to_many(f) {
@@ -76,20 +77,11 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .expect("fields must be named")
         .to_string();
     let mut table = ATable::new(format!("{}_{}_Many", main_table_name, field_name));
-    let col = AColumn::new(
-        "owner",
-        get_deferred_sql_type(&pk_field.ty),
-        false,
-        false,
-        false,
-    );
+    let col = AColumn::new_simple("owner", get_deferred_sql_type(&pk_field.ty));
     table.add_column(col);
-    let col = AColumn::new(
+    let col = AColumn::new_simple(
         "has",
         get_many_sql_type(many_field).expect(&format!("Mis-identified Many field {}", field_name)),
-        false,
-        false,
-        false,
     );
     table.add_column(col);
     table

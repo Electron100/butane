@@ -5,7 +5,6 @@ authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
 
 [dependencies]
-failure="0.1.5"
 proc-macro2 = "1.0"
 # Required for proc_macro in expression position until issue #54727 is fixed.
 proc-macro-hack = "0.5"

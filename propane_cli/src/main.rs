@@ -30,7 +30,7 @@ fn main() {
         )
         .subcommand(
             clap::SubCommand::with_name("makemigration")
-                .about("Used for configuration")
+                .about("Create a new migration")
                 .arg(
                     Arg::with_name("name")
                         .short("n")
@@ -40,7 +40,7 @@ fn main() {
                         .help("Name to use for the migration"),
                 ),
         )
-        .subcommand(clap::SubCommand::with_name("migrate"))
+        .subcommand(clap::SubCommand::with_name("migrate").about("Apply migrations"))
         .setting(clap::AppSettings::ArgRequiredElseHelp)
         .get_matches();
     match args.subcommand() {
@@ -97,6 +97,7 @@ fn migrate() -> Result<()> {
     let spec = db::ConnectionSpec::load(&base_dir()?)?;
     let mut conn = db::connect(&spec)?;
     let to_apply = get_migrations()?.unapplied_migrations(&conn)?;
+    println!("{} migrations to apply", to_apply.len());
     for m in to_apply {
         println!("Applying migration {}", m.name());
         m.apply(&mut conn)?;

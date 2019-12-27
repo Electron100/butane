@@ -10,6 +10,7 @@ use proc_macro_hack::proc_macro_hack;
 use propane_core::migrations::adb::{DeferredSqlType, TypeKey};
 use propane_core::*;
 use quote::{quote, ToTokens};
+use std;
 use syn;
 use syn::parse_quote;
 use syn::{
@@ -339,16 +340,20 @@ fn is_auto(field: &Field) -> bool {
 /// Defaults are used for fields added by later migrations
 /// Example
 /// #[default = 42]
-fn get_default(field: &Field) -> Option<SqlVal> {
+fn get_default(field: &Field) -> std::result::Result<Option<SqlVal>, CompilerErrorMsg> {
     // TODO these panics should report proper compiler errors
-    field
+    let attr: Option<&Attribute> = field
         .attrs
         .iter()
-        .find(|attr| attr.path.is_ident("auto"))
-        .map(|attr| match attr.parse_meta() {
-            Ok(Meta::NameValue(meta)) => sqlval_from_lit(meta.lit),
-            _ => panic!("malformed default value"),
-        })
+        .find(|attr| attr.path.is_ident("default"));
+    let lit: Lit = match attr {
+        None => return Ok(None),
+        Some(attr) => match attr.parse_meta() {
+            Ok(Meta::NameValue(meta)) => meta.lit,
+            _ => return Err(make_compile_error!("malformed default value").into()),
+        },
+    };
+    return Ok(Some(sqlval_from_lit(lit)?));
 }
 
 fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
@@ -358,16 +363,32 @@ fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
         .filter(|f| f.ident.clone().unwrap().to_string() != "state")
 }
 
-fn sqlval_from_lit(lit: Lit) -> SqlVal {
-    // TODO these panics should report proper compiler errors
+fn sqlval_from_lit(lit: Lit) -> std::result::Result<SqlVal, CompilerErrorMsg> {
     match lit {
-        Lit::Str(lit) => SqlVal::Text(lit.value()),
-        Lit::ByteStr(lit) => SqlVal::Blob(lit.value()),
-        Lit::Byte(lit) => panic!("single byte literal is not supported"),
-        Lit::Char(lit) => panic!("single char literal is not supported"),
-        Lit::Int(lit) => SqlVal::Int(lit.base10_parse().unwrap()),
-        Lit::Float(lit) => SqlVal::Real(lit.base10_parse().unwrap()),
-        Lit::Bool(lit) => SqlVal::Bool(lit.value),
-        Lit::Verbatim(lit) => panic!("raw verbatim literals are not supported"),
+        Lit::Str(lit) => Ok(SqlVal::Text(lit.value())),
+        Lit::ByteStr(lit) => Ok(SqlVal::Blob(lit.value())),
+        Lit::Byte(_) => Err(make_compile_error!("single byte literal is not supported").into()),
+        Lit::Char(_) => Err(make_compile_error!("single char literal is not supported").into()),
+        Lit::Int(lit) => Ok(SqlVal::Int(lit.base10_parse().unwrap())),
+        Lit::Float(lit) => Ok(SqlVal::Real(lit.base10_parse().unwrap())),
+        Lit::Bool(lit) => Ok(SqlVal::Bool(lit.value)),
+        Lit::Verbatim(_) => {
+            Err(make_compile_error!("raw verbatim literals are not supported").into())
+        }
+    }
+}
+
+#[derive(Debug)]
+struct CompilerErrorMsg {
+    ts: TokenStream2,
+}
+impl CompilerErrorMsg {
+    fn new(ts: TokenStream2) -> Self {
+        CompilerErrorMsg { ts }
+    }
+}
+impl From<TokenStream2> for CompilerErrorMsg {
+    fn from(ts: TokenStream2) -> Self {
+        CompilerErrorMsg::new(ts)
     }
 }

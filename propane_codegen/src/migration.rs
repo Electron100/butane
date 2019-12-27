@@ -59,7 +59,7 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
                 is_nullable(&f),
                 f == &pk,
                 is_auto(&f),
-                get_default(&f),
+                get_default(&f).expect("Malformed default attribute"),
             );
             table.add_column(col);
         } else if is_many_to_many(f) {

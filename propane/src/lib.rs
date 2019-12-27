@@ -72,7 +72,7 @@ pub use propane_codegen::filter;
 #[macro_export]
 macro_rules! query {
     ($model:ident, $filter:expr) => {
-        <$model as propane::DataResult>::query().filter(filter!($model, $filter))
+        <$model as propane::DataResult>::query().filter(propane::filter!($model, $filter))
     };
 }
 
@@ -129,6 +129,5 @@ pub mod prelude {
     pub use crate::DataObject;
     #[doc(no_inline)]
     pub use crate::DataResult;
-    pub use filter;
     pub use propane_core::db::BackendConnection;
 }

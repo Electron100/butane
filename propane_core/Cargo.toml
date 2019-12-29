@@ -6,6 +6,7 @@ edition = "2018"
 
 [features]
 datetime = ["chrono"]
+debug = ["exec_time"]
 
 [dependencies]
 bincode = "1.1"
@@ -17,3 +18,4 @@ rusqlite = "0.20.0"
 serde = { version = "1.0", features=["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features=["serde"], optional = true }
+exec_time = { version="0.1.4", optional=true }

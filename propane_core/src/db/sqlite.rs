@@ -11,6 +11,9 @@ use log::warn;
 use rusqlite;
 use std::fmt::Write;
 
+#[cfg(feature = "debug")]
+use exec_time::exec_time;
+
 const SQLITE_DT_FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
 
 /// SQLite [Backend][crate::db::Backend] implementation.
@@ -124,6 +127,8 @@ impl ConnectionMethods for rusqlite::Connection {
         self.execute_batch(sql.as_ref())?;
         Ok(())
     }
+
+    #[cfg_attr(feature = "debug", exec_time)]
     fn query(
         &self,
         table: &'static str,
@@ -145,7 +150,10 @@ impl ConnectionMethods for rusqlite::Connection {
         if let Some(limit) = limit {
             helper::sql_limit(limit, &mut sqlquery)
         }
-        eprintln!("query sql {}", sqlquery);
+        if cfg!(feature = "debug") {
+            eprintln!("query sql {}", sqlquery);
+        }
+
         let mut stmt = self.prepare(&sqlquery)?;
         let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
         rows.collect()
@@ -159,9 +167,10 @@ impl ConnectionMethods for rusqlite::Connection {
     ) -> Result<SqlVal> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(table, columns, false, &mut sql);
-        eprintln!("insert sql {}", sql);
+        if cfg!(feature = "debug") {
+            eprintln!("insert sql {}", sql);
+        }
         self.execute(&sql, &values.iter().collect::<Vec<_>>())?;
-        eprintln!("trying to get pk");
         let pk: SqlVal = self.query_row_and_then(
             &format!(
                 "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
@@ -195,7 +204,9 @@ impl ConnectionMethods for rusqlite::Connection {
         let mut sql = String::new();
         helper::sql_update_with_placeholders(table, pkcol, columns, &mut sql);
         let placeholder_values = [values, &[pk]].concat();
-        eprintln!("update sql {}", sql);
+        if cfg!(feature = "debug") {
+            eprintln!("update sql {}", sql);
+        }
         self.execute(&sql, &placeholder_values.iter().collect::<Vec<_>>())?;
         Ok(())
     }

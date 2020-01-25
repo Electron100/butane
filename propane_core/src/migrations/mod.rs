@@ -7,7 +7,7 @@ use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -58,7 +58,7 @@ struct MigrationInfo {
     from_name: Option<String>,
 }
 
-type SqlTypeMap = HashMap<TypeKey, DeferredSqlType>;
+type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 
 /// Type representing a database migration. A migration describes how
 /// to bring the database from state A to state B. In general, the
@@ -87,7 +87,7 @@ impl Migration {
     pub fn add_type(&self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
         let mut types: SqlTypeMap = match self.fs.read(&self.root.join(TYPES_FILENAME)) {
             Ok(reader) => serde_json::from_reader(reader)?,
-            Err(_) => HashMap::new(),
+            Err(_) => BTreeMap::new(),
         };
         types.insert(key, sqltype);
         self.write_contents(TYPES_FILENAME, serde_json::to_string(&types)?.as_bytes())?;

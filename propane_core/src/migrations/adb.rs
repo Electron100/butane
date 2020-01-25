@@ -4,6 +4,7 @@
 
 use crate::{Error, Result, SqlType, SqlVal};
 use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 /// Key used to help resolve `DeferredSqlType`
@@ -61,6 +62,26 @@ impl<'de> Visitor<'de> for TypeKeyVisitor {
             Ok(TypeKey::CustomType(rest))
         } else {
             Err(E::custom("Unkown type key string".to_string()))
+        }
+    }
+}
+impl PartialOrd for TypeKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for TypeKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        use TypeKey::*;
+        match self {
+            PK(s) => match other {
+                PK(other_s) => s.cmp(other_s),
+                CustomType(_) => Ordering::Less,
+            },
+            CustomType(s) => match other {
+                PK(_) => Ordering::Greater,
+                CustomType(other_s) => s.cmp(other_s),
+            },
         }
     }
 }

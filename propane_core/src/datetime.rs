@@ -4,6 +4,7 @@ use crate::{Error, Result, SqlVal};
 use chrono::naive::NaiveDateTime;
 
 #[cfg(feature = "datetime")]
+#[allow(dead_code)] // TODO figure out if this is needed
 pub fn timestamp_from_millis(millis: i64) -> Result<SqlVal> {
     let secs = millis / 1000;
     let msecs = millis % 1000;

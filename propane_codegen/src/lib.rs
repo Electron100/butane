@@ -179,18 +179,6 @@ pub fn propane_type(_args: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-fn tokens_for_sqltype(ty: SqlType) -> TokenStream2 {
-    match ty {
-        SqlType::Bool => quote!(propane::SqlType::Bool),
-        SqlType::Int => quote!(propane::SqlType::Int),
-        SqlType::BigInt => quote!(propane::SqlType::BigInt),
-        SqlType::Real => quote!(propane::SqlType::Real),
-        SqlType::Text => quote!(propane::SqlType::Text),
-        SqlType::Timestamp => quote!(propane::SqlType::Timestamp),
-        SqlType::Blob => quote!(propane::SqlType::Blob),
-    }
-}
-
 fn make_ident_literal_str(ident: &Ident) -> LitStr {
     let as_str = format!("{}", ident);
     LitStr::new(&as_str, Span::call_site())

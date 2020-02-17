@@ -183,6 +183,7 @@ impl Migration {
         self.read_sql(backend_name, "up")
     }
 
+    #[allow(dead_code)] // TODO use this, shouldn't be dead
     fn down_sql(&self, backend_name: &str) -> Result<String> {
         self.read_sql(backend_name, "down")
     }

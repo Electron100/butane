@@ -5,9 +5,10 @@ authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
 
 [features]
-default = ["datetime"]
+default = ["datetime", "uuid"]
 datetime = ["propane_core/datetime"]
 debug = ["propane_core/debug"]
+uuid = ["propane_core/uuid"]
 
 [dependencies]
 propane_codegen = { path = "../propane_codegen", version = "0.1.0" }
@@ -15,7 +16,9 @@ propane_core = { path = "../propane_core", version = "0.1.0" }
 # Required for proc_macro in expression position until issue #54727 is fixed.
 proc-macro-hack = "0.5"
 
+
 [dev-dependencies]
 paste = "0.1"
 rsfs = "0.4"
 chrono = { version = "0.4", features=["serde"] }
+uuid_for_test = {package="uuid", version = "0.8", features=["v4"] }

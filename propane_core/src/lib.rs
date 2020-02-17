@@ -17,6 +17,9 @@ pub mod migrations;
 pub mod query;
 pub mod sqlval;
 
+#[cfg(feature = "uuid")]
+pub mod uuid;
+
 use db::internal::{Column, ConnectionMethods, Row};
 
 pub use query::Query;

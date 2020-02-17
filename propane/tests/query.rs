@@ -2,7 +2,7 @@ use paste;
 use propane::db::Connection;
 use propane::prelude::*;
 use propane::query::BoolExpr;
-use propane::{find, query};
+use propane::{filter, find, query};
 
 mod common;
 use common::blog;

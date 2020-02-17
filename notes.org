@@ -56,7 +56,7 @@
 	+ support delete without loading first
 	+ Connections/BackendConnection/ConnectionMethods is confusing
 	+ migration downgrade
-	+ Deleting tables doesnt work, old table file will still be there
+	+ Deleting tables doesn't work, old table file will still be there
 	+ Missing tests
 		- blob
 		- timestamp
@@ -65,7 +65,8 @@
 	+ Missing documentation
 		- #[propane_type]
 		- default attribute
-
+	+ Clean up TODOs
+	+ Support for fully custom types
 
 * ManyToMany
 	- separate table for each ManyToMany field. Named TYPE_FIELD_Many

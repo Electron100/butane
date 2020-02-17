@@ -78,7 +78,8 @@ macro_rules! query {
 
 /// Finds a specific database object.
 ///
-/// Use as find!(Foo, expr)`, where `Foo` is a model type. Returns
+/// Use as find!(Foo, expr, conn)`, where `Foo` is a model type and
+/// conn implements `ConnectionImpl`. Returns
 /// [`Result`]`<`[`Foo`]`>`. The error will be [`NoSuchObject`] if no
 /// object was found. If more than one object matches the expression,
 /// the first one found is returned.

@@ -173,7 +173,7 @@ pub fn propane_type(_args: TokenStream, input: TokenStream) -> TokenStream {
         }
     } else {
         quote!(compile_error!(
-            "The #[propane] macro wasn't expected to be used here"
+            "The #[propane_type] macro wasn't expected to be used here"
         ))
         .into()
     }

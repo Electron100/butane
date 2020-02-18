@@ -1,12 +1,8 @@
-use failure;
-use failure::Fail;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 use std::default::Default;
-
-#[cfg(feature = "datetime")]
-use chrono::ParseError;
+use thiserror::Error as ThisError;
 
 #[cfg(feature = "datetime")]
 mod datetime;
@@ -99,83 +95,55 @@ pub trait ModelTyped {
 }
 
 /// Propane errors.
-#[derive(Debug, Fail)]
+#[derive(Debug, ThisError)]
 pub enum Error {
-    #[fail(display = "No such object exists")]
+    #[error("No such object exists")]
     NoSuchObject,
-    #[fail(display = "Index out of bounds {}", 0)]
+    #[error("Index out of bounds {0}")]
     BoundsError(String),
-    #[fail(
-        display = "Type mismatch converting SqlVal. Expected {}, found value {:?}",
-        0, 1
-    )]
+    #[error("Type mismatch converting SqlVal. Expected {0}, found value {1:?}")]
     CannotConvertSqlVal(SqlType, SqlVal),
-    #[fail(
-        display = "Mismatch between sql types and rust types while loading data for column {}.",
-        0
-    )]
+    #[error("Mismatch between sql types and rust types while loading data for column {0}.")]
     SqlResultTypeMismatch(String),
-    #[fail(display = "SqlType not known for {}", ty)]
+    #[error("SqlType not known for {ty}")]
     UnknownSqlType { ty: String },
-    #[fail(display = "Value has not been loaded from the database")]
+    #[error("Value has not been loaded from the database")]
     ValueNotLoaded,
-    #[fail(display = "Not initialized")]
+    #[error("Not initialized")]
     NotInitialized,
-    #[fail(display = "Already initialized")]
+    #[error("Already initialized")]
     AlreadyInitialized,
-    #[fail(display = "Migration error {}", 0)]
+    #[error("Migration error {0}")]
     MigrationError(String),
-    #[fail(display = "Unknown backend {}", 0)]
+    #[error("Unknown backend {0}")]
     UnknownBackend(String),
-    #[fail(display = "Range error")]
+    #[error("Range error")]
     OutOfRange,
-    #[fail(display = "Internal logic error")]
+    #[error("Internal logic error")]
     Internal,
-    #[fail(display = "Cannot resolve type {}", 0)]
+    #[error("Cannot resolve type {0}")]
     CannotResolveType(String),
-    #[fail(display = "(De)serialization error {}", 0)]
-    SerdeJson(serde_json::Error),
-    #[fail(display = "IO error {}", 0)]
-    IO(std::io::Error),
-    #[fail(display = "Sqlite error {}", 0)]
-    SQLite(rusqlite::Error),
-    #[fail(display = "{}", 0)]
-    Generic(failure::Error),
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Self {
-        Error::SerdeJson(e)
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::IO(e)
-    }
-}
-
-impl From<rusqlite::Error> for Error {
-    fn from(e: rusqlite::Error) -> Self {
-        Error::SQLite(e)
-    }
+    #[error("(De)serialization error {0}")]
+    SerdeJson(#[from] serde_json::Error),
+    #[error("IO error {0}")]
+    IO(#[from] std::io::Error),
+    #[error("Sqlite error {0}")]
+    SQLite(#[from] rusqlite::Error),
+    #[error("Sqlite error {0}")]
+    SQLiteFromSQL(rusqlite::types::FromSqlError),
+    #[cfg(feature = "datetime")]
+    #[error("Chrono error {0}")]
+    Chrono(#[from] chrono::ParseError),
 }
 
 impl From<rusqlite::types::FromSqlError> for Error {
     fn from(e: rusqlite::types::FromSqlError) -> Self {
         use rusqlite::types::FromSqlError;
-        match e {
+        match &e {
             FromSqlError::InvalidType => Error::SqlResultTypeMismatch("unknown".to_string()),
             FromSqlError::OutOfRange(_) => Error::OutOfRange,
-            FromSqlError::Other(e2) => Error::Generic(failure::Error::from_boxed_compat(e2)),
+            FromSqlError::Other(_) => Error::SQLiteFromSQL(e),
         }
-    }
-}
-
-#[cfg(feature = "datetime")]
-impl From<ParseError> for Error {
-    fn from(e: ParseError) -> Self {
-        Error::Generic(failure::Error::from(e))
     }
 }
 

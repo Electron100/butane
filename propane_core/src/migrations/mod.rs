@@ -15,6 +15,9 @@ use std::rc::Rc;
 pub mod adb;
 use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeKey, ADB};
 
+#[cfg(feature = "memfs")]
+pub mod memfs;
+
 const TYPES_FILENAME: &'static str = "types.json";
 
 /// Filesystem abstraction for `Migrations`. Primarily intended to

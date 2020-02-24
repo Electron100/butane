@@ -65,6 +65,7 @@
 	+ Missing documentation
 		- #[propane_type]
 		- default attribute
+		- memfs
 	+ Clean up TODOs
 	+ Support for fully custom types
 

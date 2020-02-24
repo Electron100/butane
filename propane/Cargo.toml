@@ -8,6 +8,7 @@ edition = "2018"
 default = ["datetime", "uuid"]
 datetime = ["propane_core/datetime"]
 debug = ["propane_core/debug"]
+memfs = ["propane_core/memfs"]
 uuid = ["propane_core/uuid"]
 
 [dependencies]
@@ -19,6 +20,6 @@ proc-macro-hack = "0.5"
 
 [dev-dependencies]
 paste = "0.1"
-rsfs = "0.4"
 chrono = { version = "0.4", features=["serde"] }
+propane_core = { path = "../propane_core", version = "0.1.0", features=["memfs"] }
 uuid_for_test = {package="uuid", version = "0.8", features=["v4"] }

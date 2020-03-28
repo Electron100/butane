@@ -220,7 +220,7 @@ impl Migration {
     }
 
     fn ensure_dir(&self) -> Result<()> {
-        self.fs.ensure_dir(&self.root).map_err(|e| e.into())
+        Ok(self.fs.ensure_dir(&self.root)?)
     }
 }
 impl PartialEq for Migration {

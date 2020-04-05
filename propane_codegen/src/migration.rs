@@ -1,13 +1,14 @@
 use super::*;
 use propane_core::migrations;
 use propane_core::migrations::adb::{AColumn, ATable};
+use propane_core::migrations::{MigrationMut, MigrationsMut};
 use propane_core::Result;
 use std::path::PathBuf;
 use syn::{Field, ItemStruct};
 
 pub fn write_table_to_disk(ast_struct: &ItemStruct, config: &dbobj::Config) -> Result<()> {
     let dir = migrations_dir();
-    let current_migration = migrations::from_root(&dir).current();
+    let mut current_migration = migrations::from_root(&dir).current();
     for table in create_atables(ast_struct, config) {
         current_migration.write_table(&table)?;
     }

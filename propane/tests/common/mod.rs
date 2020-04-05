@@ -1,5 +1,6 @@
 use propane::db::{Backend, Connection};
 use propane::migrations::memfs::MemoryFilesystem;
+use propane::migrations::{Migration, Migrations, MigrationsMut};
 
 pub mod blog;
 

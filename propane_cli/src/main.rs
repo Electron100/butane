@@ -1,7 +1,7 @@
 use chrono::Utc;
 use clap;
 use clap::{Arg, ArgMatches};
-use propane::migrations::Migrations;
+use propane::migrations::{FsMigrations, Migration, Migrations, MigrationsMut};
 use propane::{db, migrations};
 use std::path::PathBuf;
 
@@ -105,7 +105,7 @@ fn migrate() -> Result<()> {
     Ok(())
 }
 
-fn get_migrations() -> Result<Migrations> {
+fn get_migrations() -> Result<FsMigrations> {
     Ok(migrations::from_root(base_dir()?.join("migrations")))
 }
 

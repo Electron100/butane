@@ -13,7 +13,7 @@ impl MemoryFilesystem {
         }
     }
 }
-impl super::Filesystem for MemoryFilesystem {
+impl super::fs::Filesystem for MemoryFilesystem {
     fn ensure_dir(&self, path: &Path) -> std::io::Result<()> {
         self.fs.create_dir_all(path)
     }

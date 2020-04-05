@@ -1,6 +1,5 @@
 //! For working with migrations. If using the propane CLI tool, it is
 //! not necessary to use these types directly.
-
 use crate::db::internal::{Column, ConnectionMethods, Row};
 use crate::sqlval::{FromSql, SqlVal, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
@@ -9,7 +8,7 @@ use std::path::Path;
 use std::rc::Rc;
 
 pub mod adb;
-use adb::{AColumn, ATable, DeferredSqlType};
+use adb::{AColumn, ATable, DeferredSqlType, Operation, ADB};
 
 mod migration;
 pub use migration::{Migration, MigrationMut};
@@ -23,13 +22,6 @@ pub use fsmigrations::{FsMigration, FsMigrations};
 
 #[cfg(feature = "memfs")]
 pub mod memfs;
-
-#[derive(Serialize, Deserialize)]
-struct MigrationInfo {
-    /// The migration this one is based on, or None if this is the
-    /// first migration in the chain
-    from_name: Option<String>,
-}
 
 /// State internal to a Migrations implementation. Unless you are
 /// implementating Migrations, you can ignore this.
@@ -140,8 +132,44 @@ where
         &self,
         backend: &impl db::Backend,
         name: &str,
-        from: Option<Self::M>,
-    ) -> Result<Option<Self::M>>;
+        from: Option<&Self::M>,
+    ) -> Result<Option<Self::M>> {
+        let empty_db = Ok(ADB::new());
+        let from_name = from.map(|m| m.name().to_string());
+        let from_none = from.is_none();
+        let from_db = from.map_or(empty_db, |m| m.db())?;
+        let to_db = self.current().db()?;
+        let mut ops = adb::diff(&from_db, &to_db);
+        if ops.is_empty() {
+            return Ok(None);
+        }
+
+        if from_none {
+            // This is the first migration. Create the propane_migration table
+            ops.push(Operation::AddTable(migrations_table()));
+        }
+
+        let sql = backend.create_migration_sql(&from_db, &ops);
+        let mut m = self.get_migration(name);
+        // Save the DB for use by other migrations from this one
+        for table in to_db.tables() {
+            m.write_table(table)?;
+        }
+        m.add_up_sql(backend.get_name(), &sql)?;
+        // And write the undo
+        let sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db));
+        m.add_down_sql(backend.get_name(), &sql)?;
+        m.set_migration_from(from)?;
+
+        // Update state
+        let mut state = self.get_state()?;
+        if state.latest.is_none() || state.latest == from_name {
+            state.latest = Some(m.name().to_string());
+            self.save_state(&state)?;
+        }
+
+        Ok(Some(m))
+    }
 
     /// Get a pseudo-migration representing the current state as
     /// determined by the last build of models. This does not

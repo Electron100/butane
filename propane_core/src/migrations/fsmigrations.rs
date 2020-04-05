@@ -1,13 +1,8 @@
-use super::adb;
-use super::adb::{ATable, DeferredSqlType, Operation, TypeKey, ADB};
+use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::fs::Filesystem;
-use super::{
-    migrations_table, Migration, MigrationInfo, MigrationMut, Migrations, MigrationsMut,
-    MigrationsState, PropaneMigration,
-};
-use crate::db::internal::ConnectionMethods;
-use crate::sqlval::ToSql;
-use crate::{db, DataObject, DataResult, Error, Result};
+use super::{Migration, MigrationMut, Migrations, MigrationsMut, MigrationsState};
+use crate::{Error, Result};
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -17,6 +12,13 @@ use std::rc::Rc;
 
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 const TYPES_FILENAME: &'static str = "types.json";
+
+#[derive(Serialize, Deserialize)]
+struct MigrationInfo {
+    /// The migration this one is based on, or None if this is the
+    /// first migration in the chain
+    from_name: Option<String>,
+}
 
 /// A migration stored in the filesystem
 pub struct FsMigration {
@@ -40,15 +42,6 @@ impl FsMigration {
             }
         }
         Ok(())
-    }
-
-    fn up_sql(&self, backend_name: &str) -> Result<String> {
-        self.read_sql(backend_name, "up")
-    }
-
-    #[allow(dead_code)] // TODO use this, shouldn't be dead
-    fn down_sql(&self, backend_name: &str) -> Result<String> {
-        self.read_sql(backend_name, "down")
     }
 
     fn write_info(&self, info: &MigrationInfo) -> Result<()> {
@@ -92,7 +85,15 @@ impl MigrationMut for FsMigration {
         )
     }
 
-    fn add_type(&self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
+    fn add_up_sql(&mut self, backend_name: &str, sql: &str) -> Result<()> {
+        self.write_sql(&format!("{}_up", backend_name), &sql)
+    }
+
+    fn add_down_sql(&mut self, backend_name: &str, sql: &str) -> Result<()> {
+        self.write_sql(&format!("{}_down", backend_name), &sql)
+    }
+
+    fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
         let mut types: SqlTypeMap = match self.fs.read(&self.root.join(TYPES_FILENAME)) {
             Ok(reader) => serde_json::from_reader(reader)?,
             Err(_) => BTreeMap::new(),
@@ -100,6 +101,13 @@ impl MigrationMut for FsMigration {
         types.insert(key, sqltype);
         self.write_contents(TYPES_FILENAME, serde_json::to_string(&types)?.as_bytes())?;
         return Ok(());
+    }
+
+    /// Set the migration before this one.
+    fn set_migration_from(&mut self, prev: Option<&Self>) -> Result<()> {
+        self.write_info(&MigrationInfo {
+            from_name: prev.map(|m| m.name().to_string()),
+        })
     }
 }
 
@@ -159,15 +167,12 @@ impl Migration for FsMigration {
         self.root.file_name().unwrap().to_string_lossy()
     }
 
-    fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
-        let tx = conn.transaction()?;
-        tx.execute(&self.up_sql(tx.backend_name())?)?;
-        tx.insert_or_replace(
-            PropaneMigration::TABLE,
-            PropaneMigration::COLUMNS,
-            &[self.name().as_ref().to_sql()],
-        )?;
-        tx.commit()
+    fn up_sql(&self, backend_name: &str) -> Result<String> {
+        self.read_sql(backend_name, "up")
+    }
+
+    fn down_sql(&self, backend_name: &str) -> Result<String> {
+        self.read_sql(backend_name, "down")
     }
 }
 
@@ -214,51 +219,6 @@ impl Migrations for FsMigrations {
 }
 
 impl MigrationsMut for FsMigrations {
-    fn create_migration(
-        &self,
-        backend: &impl db::Backend,
-        name: &str,
-        from: Option<Self::M>,
-    ) -> Result<Option<Self::M>> {
-        let empty_db = Ok(ADB::new());
-        let from_name = from.as_ref().map(|m| m.name().to_string());
-        let from_none = from.is_none();
-        let from_db = from.map_or(empty_db, |m| m.db())?;
-        let to_db = self.current().db()?;
-        let mut ops = adb::diff(&from_db, &to_db);
-        if ops.is_empty() {
-            return Ok(None);
-        }
-
-        if from_none {
-            // This is the first migration. Create the propane_migration table
-            ops.push(Operation::AddTable(migrations_table()));
-        }
-
-        let sql = backend.create_migration_sql(&from_db, &ops);
-        let mut m = self.get_migration(name);
-        // Save the DB for use by other migrations from this one
-        for table in to_db.tables() {
-            m.write_table(table)?;
-        }
-        m.write_sql(&format!("{}_up", backend.get_name()), &sql)?;
-        // And write the undo
-        let sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db));
-        m.write_sql(&format!("{}_down", backend.get_name()), &sql)?;
-        m.write_info(&MigrationInfo {
-            from_name: from_name.clone(),
-        })?;
-
-        // Update state
-        let mut state = self.get_state()?;
-        if state.latest.is_none() || state.latest == from_name {
-            state.latest = Some(m.name().to_string());
-            self.save_state(&state)?;
-        }
-
-        Ok(Some(m))
-    }
-
     fn save_state(&self, state: &MigrationsState) -> Result<()> {
         let path = self.root.join("state.json");
         let mut f = self.fs.write(&path)?;

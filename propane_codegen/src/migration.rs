@@ -24,7 +24,7 @@ pub fn write_table_to_disk(ast_struct: &ItemStruct, config: &dbobj::Config) -> R
 }
 
 pub fn add_typedef(alias: &syn::Ident, orig: &syn::Type) -> Result<()> {
-    let current_migration = migrations::from_root(&migrations_dir()).current();
+    let mut current_migration = migrations::from_root(&migrations_dir()).current();
     let key = TypeKey::CustomType(alias.to_string());
     current_migration.add_type(key, get_deferred_sql_type(orig))
 }

@@ -1,5 +1,7 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
-use crate::{db, Result};
+use super::PropaneMigration;
+use crate::db::internal::ConnectionMethods;
+use crate::{db, sqlval::ToSql, DataObject, DataResult, Result};
 use std::borrow::Cow;
 use std::cmp::PartialEq;
 
@@ -22,12 +24,27 @@ pub trait Migration: PartialEq {
     /// The name of this migration.
     fn name(&self) -> Cow<str>;
 
+    /// The backend-specific commands to apply this migration.
+    fn up_sql(&self, backend_name: &str) -> Result<String>;
+
+    /// The backend-specific commands to undo this migration.
+    fn down_sql(&self, backend_name: &str) -> Result<String>;
+
     /// Apply the migration to a database connection. The connection
     /// must be for the same type of database as
     /// [create_migration][crate::migrations::Migrations::create_migration]
     /// and the database must be in the state of the migration prior
     /// to this one ([from_migration][crate::migrations::Migration::from_migration])
-    fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()>;
+    fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
+        let tx = conn.transaction()?;
+        tx.execute(&self.up_sql(tx.backend_name())?)?;
+        tx.insert_or_replace(
+            PropaneMigration::TABLE,
+            PropaneMigration::COLUMNS,
+            &[self.name().as_ref().to_sql()],
+        )?;
+        tx.commit()
+    }
 }
 
 /// A migration which can be modified
@@ -38,6 +55,15 @@ pub trait MigrationMut: Migration {
     /// migration in this fashion.
     fn write_table(&mut self, table: &ATable) -> Result<()>;
 
+    /// Set the backend-specific commands to apply this migration.
+    fn add_up_sql(&mut self, backend_name: &str, sql: &str) -> Result<()>;
+
+    /// Set the backend-specific commands to undo this migration.
+    fn add_down_sql(&mut self, backend_name: &str, sql: &str) -> Result<()>;
+
     /// Adds a TypeKey -> SqlType mapping. Only meaningful on the special current migration.
-    fn add_type(&self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()>;
+    fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()>;
+
+    /// Set the migration before this one.
+    fn set_migration_from(&mut self, prev: Option<&Self>) -> Result<()>;
 }

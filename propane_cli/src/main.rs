@@ -85,7 +85,11 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
         eprintln!("Migration {} already exists", name);
         std::process::exit(1);
     }
-    let m = ms.create_migration(&db::sqlite::SQLiteBackend::new(), &name, ms.latest())?;
+    let m = ms.create_migration(
+        &db::sqlite::SQLiteBackend::new(),
+        &name,
+        ms.latest().as_ref(),
+    )?;
     match m {
         Some(m) => println!("Created migration {}", m.name()),
         None => println!("No changes to migrate"),

@@ -14,7 +14,7 @@ use std::fmt::Write;
 #[cfg(feature = "debug")]
 use exec_time::exec_time;
 
-const SQLITE_DT_FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
+const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 /// SQLite [Backend][crate::db::Backend] implementation.
 #[derive(Default)]

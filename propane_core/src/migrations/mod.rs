@@ -179,11 +179,8 @@ where
     /// This migration is named "current". It is not a "real" migration
     /// - it should never be applied
     /// - it will never be returned by `latest`, `migrations_since`, `all_migrations` or other similar methods.
-    fn current(&self) -> Self::M
-    where
-        Self::M: Into<Self::M>,
-    {
-        self.get_migration("current").into()
+    fn current(&self) -> Self::M {
+        self.get_migration("current")
     }
 }
 

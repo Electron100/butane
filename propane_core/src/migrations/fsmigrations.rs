@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
-const TYPES_FILENAME: &'static str = "types.json";
+const TYPES_FILENAME: &str = "types.json";
 
 #[derive(Serialize, Deserialize)]
 struct MigrationInfo {
@@ -100,7 +100,7 @@ impl MigrationMut for FsMigration {
         };
         types.insert(key, sqltype);
         self.write_contents(TYPES_FILENAME, serde_json::to_string(&types)?.as_bytes())?;
-        return Ok(());
+        Ok(())
     }
 
     /// Set the migration before this one.

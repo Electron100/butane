@@ -8,7 +8,8 @@ use syn::{Field, ItemStruct};
 
 pub fn write_table_to_disk(ast_struct: &ItemStruct, config: &dbobj::Config) -> Result<()> {
     let dir = migrations_dir();
-    let mut current_migration = migrations::from_root(&dir).current();
+    let mut ms = migrations::from_root(&dir);
+    let current_migration = ms.current();
     for table in create_atables(ast_struct, config) {
         current_migration.write_table(&table)?;
     }
@@ -24,7 +25,8 @@ pub fn write_table_to_disk(ast_struct: &ItemStruct, config: &dbobj::Config) -> R
 }
 
 pub fn add_typedef(alias: &syn::Ident, orig: &syn::Type) -> Result<()> {
-    let mut current_migration = migrations::from_root(&migrations_dir()).current();
+    let mut ms = migrations::from_root(&migrations_dir());
+    let current_migration = ms.current();
     let key = TypeKey::CustomType(alias.to_string());
     current_migration.add_type(key, get_deferred_sql_type(orig))
 }

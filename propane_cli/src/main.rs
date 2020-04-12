@@ -75,7 +75,7 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
     let name = args
         .and_then(|a| a.value_of("name").and_then(|s| Some(s.to_string())))
         .unwrap_or_else(|| default_name());
-    let ms = get_migrations()?;
+    let mut ms = get_migrations()?;
     if ms
         .all_migrations()?
         .iter()
@@ -85,14 +85,15 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
         eprintln!("Migration {} already exists", name);
         std::process::exit(1);
     }
-    let m = ms.create_migration(
+    let created = ms.create_migration(
         &db::sqlite::SQLiteBackend::new(),
         &name,
         ms.latest().as_ref(),
     )?;
-    match m {
-        Some(m) => println!("Created migration {}", m.name()),
-        None => println!("No changes to migrate"),
+    if created {
+        println!("Created migration {}", name);
+    } else {
+        println!("No changes to migrate");
     }
     Ok(())
 }

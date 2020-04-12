@@ -3,7 +3,7 @@
 use crate::db::internal::{Column, ConnectionMethods, Row};
 use crate::sqlval::{FromSql, SqlVal, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
-use serde::{Deserialize, Serialize};
+
 use std::path::Path;
 use std::rc::Rc;
 
@@ -19,39 +19,22 @@ use fs::OsFilesystem;
 
 mod fsmigrations;
 pub use fsmigrations::{FsMigration, FsMigrations};
+mod memmigrations;
+pub use memmigrations::{MemMigration, MemMigrations};
 
 #[cfg(feature = "memfs")]
 pub mod memfs;
-
-/// State internal to a Migrations implementation. Unless you are
-/// implementating Migrations, you can ignore this.
-#[derive(Serialize, Deserialize)]
-pub struct MigrationsState {
-    latest: Option<String>,
-}
-impl MigrationsState {
-    fn new() -> Self {
-        MigrationsState { latest: None }
-    }
-}
 
 /// A collection of migrations.
 pub trait Migrations {
     type M: Migration;
 
-    fn get_migration(&self, name: &str) -> Self::M;
-    fn get_state(&self) -> Result<MigrationsState>;
+    /// Gets the migration with the given name, if it exists
+    fn get_migration(&self, name: &str) -> Option<Self::M>;
 
     /// Get the most recent migration (other than `current`) or `None` if
     /// no migrations have been created.
-    fn latest(&self) -> Option<Self::M> {
-        self.get_state()
-            .map(|state| match state.latest {
-                None => None,
-                Some(name) => Some(self.get_migration(&name)),
-            })
-            .unwrap_or(None)
-    }
+    fn latest(&self) -> Option<Self::M>;
 
     /// Returns migrations since the given migration.
     fn migrations_since(&self, since: &Self::M) -> Result<Vec<Self::M>> {
@@ -59,7 +42,10 @@ pub trait Migrations {
         let mut accum: Vec<Self::M> = Vec::new();
         while let Some(m) = last {
             if m != *since {
-                last = m.migration_from()?;
+                last = match m.migration_from()? {
+                    None => None,
+                    Some(name) => self.get_migration(&name),
+                };
                 accum.push(m);
                 continue;
             }
@@ -74,7 +60,10 @@ pub trait Migrations {
         let mut last = self.latest();
         let mut accum: Vec<Self::M> = Vec::new();
         while let Some(m) = last {
-            last = m.migration_from()?;
+            last = match m.migration_from()? {
+                None => None,
+                Some(name) => self.get_migration(&name),
+            };
             accum.push(m);
         }
         Ok(accum.into_iter().rev().collect())
@@ -113,7 +102,9 @@ pub trait Migrations {
             }) {
                 return Ok(Some(m));
             }
-            m_opt = m.migration_from()?;
+            m_opt = m
+                .migration_from()?
+                .and_then(|name| self.get_migration(&name))
         }
         Ok(None)
     }
@@ -123,53 +114,8 @@ pub trait MigrationsMut: Migrations
 where
     Self::M: MigrationMut,
 {
-    fn save_state(&self, state: &MigrationsState) -> Result<()>;
-
-    /// Create a migration `from` -> `current` named `name`. From may be None, in which
-    /// case the migration is created from an empty database.
-    /// Returns None if `from` and `current` represent identical states
-    fn create_migration(
-        &self,
-        backend: &impl db::Backend,
-        name: &str,
-        from: Option<&Self::M>,
-    ) -> Result<Option<Self::M>> {
-        let empty_db = Ok(ADB::new());
-        let from_name = from.map(|m| m.name().to_string());
-        let from_none = from.is_none();
-        let from_db = from.map_or(empty_db, |m| m.db())?;
-        let to_db = self.current().db()?;
-        let mut ops = adb::diff(&from_db, &to_db);
-        if ops.is_empty() {
-            return Ok(None);
-        }
-
-        if from_none {
-            // This is the first migration. Create the propane_migration table
-            ops.push(Operation::AddTable(migrations_table()));
-        }
-
-        let sql = backend.create_migration_sql(&from_db, &ops);
-        let mut m = self.get_migration(name);
-        // Save the DB for use by other migrations from this one
-        for table in to_db.tables() {
-            m.write_table(table)?;
-        }
-        m.add_up_sql(backend.get_name(), &sql)?;
-        // And write the undo
-        let sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db));
-        m.add_down_sql(backend.get_name(), &sql)?;
-        m.set_migration_from(from)?;
-
-        // Update state
-        let mut state = self.get_state()?;
-        if state.latest.is_none() || state.latest == from_name {
-            state.latest = Some(m.name().to_string());
-            self.save_state(&state)?;
-        }
-
-        Ok(Some(m))
-    }
+    fn new_migration(&self, name: &str) -> Self::M;
+    fn add_migration(&mut self, m: Self::M) -> Result<()>;
 
     /// Get a pseudo-migration representing the current state as
     /// determined by the last build of models. This does not
@@ -179,8 +125,45 @@ where
     /// This migration is named "current". It is not a "real" migration
     /// - it should never be applied
     /// - it will never be returned by `latest`, `migrations_since`, `all_migrations` or other similar methods.
-    fn current(&self) -> Self::M {
-        self.get_migration("current")
+    fn current(&mut self) -> &mut Self::M;
+
+    /// Create a migration `from` -> `current` named `name`. From may be None, in which
+    /// case the migration is created from an empty database.
+    /// Returns true if a migration was created, false if `from` and `current` represent identical states.
+    fn create_migration(
+        &mut self,
+        backend: &impl db::Backend,
+        name: &str,
+        from: Option<&Self::M>,
+    ) -> Result<bool> {
+        let empty_db = Ok(ADB::new());
+        let from_none = from.is_none();
+        let from_db = from.map_or(empty_db, |m| m.db())?;
+        let to_db = self.current().db()?;
+        let mut ops = adb::diff(&from_db, &to_db);
+        if ops.is_empty() {
+            return Ok(false);
+        }
+
+        if from_none {
+            // This is the first migration. Create the propane_migration table
+            ops.push(Operation::AddTable(migrations_table()));
+        }
+
+        let sql = backend.create_migration_sql(&from_db, &ops);
+        let mut m = self.new_migration(name);
+        // Save the DB for use by other migrations from this one
+        for table in to_db.tables() {
+            m.write_table(table)?;
+        }
+        m.add_up_sql(backend.get_name(), &sql)?;
+        // And write the undo
+        let sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db));
+        m.add_down_sql(backend.get_name(), &sql)?;
+        m.set_migration_from(from.map(|m| m.name().to_string()))?;
+
+        self.add_migration(m)?;
+        Ok(true)
     }
 }
 
@@ -204,10 +187,7 @@ pub fn from_root_and_filesystem<P: AsRef<Path>>(
     path: P,
     fs: impl Filesystem + 'static,
 ) -> FsMigrations {
-    FsMigrations {
-        fs: Rc::new(fs),
-        root: path.as_ref().to_path_buf(),
-    }
+    FsMigrations::new(Rc::new(fs), path.as_ref().to_path_buf())
 }
 
 /// Create a `Migrations` from a filesystem location. The `#[model]`
@@ -215,6 +195,33 @@ pub fn from_root_and_filesystem<P: AsRef<Path>>(
 /// `propane/migrations` directory under the project directory.
 pub fn from_root<P: AsRef<Path>>(path: P) -> FsMigrations {
     from_root_and_filesystem(path, OsFilesystem {})
+}
+
+/// Copies the data in `from` to `to`.
+pub fn copy_migration(
+    from: &impl Migration,
+    to: &mut impl MigrationMut,
+    backend_name: Option<&str>,
+) -> Result<()> {
+    to.set_migration_from(from.migration_from()?.map(|s| s.to_string()))?;
+    let db = from.db()?;
+    for table in db.tables() {
+        to.write_table(table)?;
+    }
+    for (k, v) in db.types() {
+        to.add_type(k.clone(), v.clone())?;
+    }
+    if let Some(backend_name) = backend_name {
+        let sql = from.up_sql(backend_name)?;
+        if let Some(sql) = sql {
+            to.add_up_sql(backend_name, &sql)?;
+        }
+        let sql: Option<String> = from.down_sql(backend_name)?;
+        if let Some(sql) = sql {
+            to.add_down_sql(backend_name, &sql)?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(PartialEq)]

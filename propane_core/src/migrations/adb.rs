@@ -135,6 +135,9 @@ impl ADB {
     pub fn get_table<'a>(&'a self, name: &str) -> Option<&'a ATable> {
         self.tables.get(name)
     }
+    pub fn types(&self) -> &HashMap<TypeKey, DeferredSqlType> {
+        &self.extra_types
+    }
     pub fn replace_table(&mut self, table: ATable) {
         self.tables.insert(table.name.clone(), table);
     }

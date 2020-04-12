@@ -1,11 +1,12 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::fs::Filesystem;
-use super::{Migration, MigrationMut, Migrations, MigrationsMut, MigrationsState};
-use crate::{Error, Result};
+use super::{Migration, MigrationMut, Migrations, MigrationsMut};
+use crate::Result;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -18,6 +19,16 @@ struct MigrationInfo {
     /// The migration this one is based on, or None if this is the
     /// first migration in the chain
     from_name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct MigrationsState {
+    latest: Option<String>,
+}
+impl MigrationsState {
+    fn new() -> Self {
+        MigrationsState { latest: None }
+    }
 }
 
 /// A migration stored in the filesystem
@@ -52,11 +63,14 @@ impl FsMigration {
         self.write_contents(&format!("{}.sql", name), sql.as_bytes())
     }
 
-    fn read_sql(&self, backend: &str, direction: &str) -> Result<String> {
+    fn read_sql(&self, backend: &str, direction: &str) -> Result<Option<String>> {
         let path = self.sql_path(backend, direction);
         let mut buf = String::new();
+        if !path.exists() {
+            return Ok(None);
+        }
         self.fs.read(&path)?.read_to_string(&mut buf)?;
-        Ok(buf)
+        Ok(Some(buf))
     }
 
     fn sql_path(&self, backend: &str, direction: &str) -> PathBuf {
@@ -104,10 +118,8 @@ impl MigrationMut for FsMigration {
     }
 
     /// Set the migration before this one.
-    fn set_migration_from(&mut self, prev: Option<&Self>) -> Result<()> {
-        self.write_info(&MigrationInfo {
-            from_name: prev.map(|m| m.name().to_string()),
-        })
+    fn set_migration_from(&mut self, prev: Option<String>) -> Result<()> {
+        self.write_info(&MigrationInfo { from_name: prev })
     }
 }
 
@@ -140,26 +152,13 @@ impl Migration for FsMigration {
         Ok(db)
     }
 
-    fn migration_from(&self) -> Result<Option<Self>> {
-        let info: MigrationInfo =
-            serde_json::from_reader(self.fs.read(&self.root.join("info.json"))?)?;
-        match info.from_name {
-            None => Ok(None),
-            Some(name) => {
-                let mut dir = self
-                    .root
-                    .parent()
-                    .ok_or_else(|| {
-                        Error::MigrationError("migration path must have a parent".to_string())
-                    })?
-                    .to_path_buf();
-                dir.push(name);
-                Ok(Some(FsMigration {
-                    root: dir,
-                    fs: self.fs.clone(),
-                }))
-            }
+    fn migration_from(&self) -> Result<Option<Cow<str>>> {
+        let path = self.root.join("info.json");
+        if !path.exists() {
+            return Ok(None);
         }
+        let info: MigrationInfo = serde_json::from_reader(self.fs.read(&path)?)?;
+        Ok(info.from_name.map(|name| Cow::from(name)))
     }
 
     fn name(&self) -> Cow<str> {
@@ -167,11 +166,11 @@ impl Migration for FsMigration {
         self.root.file_name().unwrap().to_string_lossy()
     }
 
-    fn up_sql(&self, backend_name: &str) -> Result<String> {
+    fn up_sql(&self, backend_name: &str) -> Result<Option<String>> {
         self.read_sql(backend_name, "up")
     }
 
-    fn down_sql(&self, backend_name: &str) -> Result<String> {
+    fn down_sql(&self, backend_name: &str) -> Result<Option<String>> {
         self.read_sql(backend_name, "down")
     }
 }
@@ -185,23 +184,18 @@ impl Eq for FsMigration {}
 
 /// A collection of migrations.
 pub struct FsMigrations {
-    pub(crate) fs: Rc<dyn Filesystem>,
-    pub(crate) root: PathBuf,
+    fs: Rc<dyn Filesystem>,
+    root: PathBuf,
+    current: FsMigration,
 }
-impl FsMigrations {}
-
-impl Migrations for FsMigrations {
-    type M = FsMigration;
-
-    fn get_migration(&self, name: &str) -> Self::M {
-        let mut dir = self.root.clone();
-        dir.push(name);
-        FsMigration {
-            fs: self.fs.clone(),
-            root: dir,
-        }
+impl FsMigrations {
+    pub fn new(fs: Rc<dyn Filesystem>, root: PathBuf) -> Self {
+        let current = FsMigration {
+            fs: fs.clone(),
+            root: root.join("current"),
+        };
+        FsMigrations { fs, root, current }
     }
-
     fn get_state(&self) -> Result<MigrationsState> {
         let path = self.root.join("state.json");
         let fr = self.fs.read(&path);
@@ -216,13 +210,60 @@ impl Migrations for FsMigrations {
             }
         }
     }
-}
-
-impl MigrationsMut for FsMigrations {
-    fn save_state(&self, state: &MigrationsState) -> Result<()> {
+    fn save_state(&mut self, state: &MigrationsState) -> Result<()> {
         let path = self.root.join("state.json");
         let mut f = self.fs.write(&path)?;
         f.write_all(serde_json::to_string(state)?.as_bytes())
             .map_err(|e| e.into())
+    }
+}
+
+impl Migrations for FsMigrations {
+    type M = FsMigration;
+
+    fn get_migration(&self, name: &str) -> Option<Self::M> {
+        let mut dir = self.root.clone();
+        dir.push(name);
+        if dir.exists() {
+            Some(FsMigration {
+                fs: self.fs.clone(),
+                root: dir,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn latest(&self) -> Option<Self::M> {
+        self.get_state()
+            .map(|state| match state.latest {
+                None => None,
+                Some(name) => self.get_migration(&name),
+            })
+            .unwrap_or(None)
+    }
+}
+
+impl MigrationsMut for FsMigrations {
+    fn current(&mut self) -> &mut Self::M {
+        &mut self.current
+    }
+    fn new_migration(&self, name: &str) -> Self::M {
+        let mut dir = self.root.clone();
+        dir.push(name);
+        FsMigration {
+            fs: self.fs.clone(),
+            root: dir,
+        }
+    }
+    fn add_migration(&mut self, m: Self::M) -> Result<()> {
+        // Update state
+        let from_name = m.migration_from()?.map(|s| s.to_string());
+        let mut state = self.get_state()?;
+        if state.latest.is_none() || state.latest == from_name {
+            state.latest = Some(m.name().to_string());
+            self.save_state(&state)?;
+        }
+        Ok(())
     }
 }

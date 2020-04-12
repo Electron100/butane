@@ -144,6 +144,7 @@ impl From<rusqlite::types::FromSqlError> for Error {
             FromSqlError::InvalidType => Error::SqlResultTypeMismatch("unknown".to_string()),
             FromSqlError::OutOfRange(_) => Error::OutOfRange,
             FromSqlError::Other(_) => Error::SQLiteFromSQL(e),
+            _ => Error::SQLiteFromSQL(e),
         }
     }
 }

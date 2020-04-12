@@ -52,17 +52,15 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     let mut ast_struct: ItemStruct = syn::parse(input).unwrap();
     let mut config = dbobj::Config::default();
     for attr in &ast_struct.attrs {
-        match attr.parse_meta() {
-            Ok(Meta::NameValue(MetaNameValue {
-                path,
-                eq_token: _,
-                lit: Lit::Str(s),
-            })) => {
-                if path.is_ident("table") {
-                    config.table_name = Some(s.value())
-                }
+        if let Ok(Meta::NameValue(MetaNameValue {
+            path,
+            lit: Lit::Str(s),
+            ..
+        })) = attr.parse_meta()
+        {
+            if path.is_ident("table") {
+                config.table_name = Some(s.value())
             }
-            _ => (),
         }
     }
     // Filter out our helper attributes
@@ -119,18 +117,14 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
-fn has_derive_serialize(attrs: &Vec<Attribute>) -> bool {
+fn has_derive_serialize(attrs: &[Attribute]) -> bool {
     for attr in attrs {
         if let Ok(Meta::List(ml)) = attr.parse_meta() {
             if ml.path.is_ident("derive")
-                && ml
-                    .nested
-                    .iter()
-                    .find(|nm| match nm {
-                        NestedMeta::Meta(Meta::Path(path)) => path.is_ident("Serialize"),
-                        _ => false,
-                    })
-                    .is_some()
+                && ml.nested.iter().any(|nm| match nm {
+                    NestedMeta::Meta(Meta::Path(path)) => path.is_ident("Serialize"),
+                    _ => false,
+                })
             {
                 return true;
             }
@@ -282,7 +276,7 @@ fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<Deferred
             typath
                 .segments
                 .last()
-                .expect(&format!("{} must have an argument", tyname))
+                .unwrap_or_else(|| panic!("{} must have an argument", tyname))
                 .ident
                 .to_string(),
         ))
@@ -291,25 +285,23 @@ fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<Deferred
 
 fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
     get_primitive_sql_type(ty)
-        .or(get_option_sql_type(ty))
-        .or(get_foreign_sql_type(ty, "ForeignKey"))
-        .unwrap_or(DeferredSqlType::Deferred(TypeKey::CustomType(
-            ty.clone().into_token_stream().to_string(),
-        )))
+        .or_else(|| get_option_sql_type(ty))
+        .or_else(|| get_foreign_sql_type(ty, "ForeignKey"))
+        .unwrap_or_else(|| {
+            DeferredSqlType::Deferred(TypeKey::CustomType(
+                ty.clone().into_token_stream().to_string(),
+            ))
+        })
 }
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
-    let pk_by_attribute = fields(ast_struct).find(|f| {
-        f.attrs
-            .iter()
-            .find(|attr| attr.path.is_ident("pk"))
-            .is_some()
-    });
+    let pk_by_attribute =
+        fields(ast_struct).find(|f| f.attrs.iter().any(|attr| attr.path.is_ident("pk")));
     if let Some(id_field) = pk_by_attribute {
         return Some(id_field.clone());
     }
     let pk_by_name = ast_struct.fields.iter().find(|f| match &f.ident {
-        Some(ident) => "id" == ident.to_string(),
+        Some(ident) => *ident == "id",
         None => false,
     });
     if let Some(id_field) = pk_by_name {
@@ -320,11 +312,7 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
 }
 
 fn is_auto(field: &Field) -> bool {
-    field
-        .attrs
-        .iter()
-        .find(|attr| attr.path.is_ident("auto"))
-        .is_some()
+    field.attrs.iter().any(|attr| attr.path.is_ident("auto"))
 }
 
 /// Defaults are used for fields added by later migrations
@@ -343,14 +331,14 @@ fn get_default(field: &Field) -> std::result::Result<Option<SqlVal>, CompilerErr
             _ => return Err(make_compile_error!("malformed default value").into()),
         },
     };
-    return Ok(Some(sqlval_from_lit(lit)?));
+    Ok(Some(sqlval_from_lit(lit)?))
 }
 
 fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
     ast_struct
         .fields
         .iter()
-        .filter(|f| f.ident.clone().unwrap().to_string() != "state")
+        .filter(|f| f.ident.clone().unwrap() != "state")
 }
 
 fn sqlval_from_lit(lit: Lit) -> std::result::Result<SqlVal, CompilerErrorMsg> {

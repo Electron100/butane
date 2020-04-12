@@ -173,7 +173,7 @@ impl_prim_sql!(NaiveDateTime, Timestamp, Timestamp);
 
 impl ToSql for &str {
     fn to_sql(&self) -> SqlVal {
-        SqlVal::Text(self.to_string())
+        SqlVal::Text((*self).to_string())
     }
 }
 impl ToSql for str {

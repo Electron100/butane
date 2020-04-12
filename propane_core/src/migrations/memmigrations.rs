@@ -35,7 +35,7 @@ impl Migration for MemMigration {
     }
 
     fn migration_from(&self) -> Result<Option<Cow<str>>> {
-        Ok(self.from.as_ref().map(|name| Cow::from(name)))
+        Ok(self.from.as_ref().map(Cow::from))
     }
 
     fn name(&self) -> Cow<str> {
@@ -97,7 +97,11 @@ impl MemMigrations {
         }
     }
 }
-
+impl Default for MemMigrations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Migrations for MemMigrations {
     type M = MemMigration;
     fn get_migration(&self, name: &str) -> Option<Self::M> {

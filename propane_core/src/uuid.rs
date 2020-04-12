@@ -30,7 +30,7 @@ impl FromSql for Uuid {
             }
             _ => (),
         }
-        Err(CannotConvertSqlVal(SqlType::Blob, val.clone()))
+        Err(CannotConvertSqlVal(SqlType::Blob, val))
     }
 }
 

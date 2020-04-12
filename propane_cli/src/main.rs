@@ -73,15 +73,10 @@ fn init<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
 
 fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
     let name = args
-        .and_then(|a| a.value_of("name").and_then(|s| Some(s.to_string())))
-        .unwrap_or_else(|| default_name());
+        .and_then(|a| a.value_of("name").map(|s| s.to_string()))
+        .unwrap_or_else(default_name);
     let mut ms = get_migrations()?;
-    if ms
-        .all_migrations()?
-        .iter()
-        .find(|m| m.name() == name)
-        .is_some()
-    {
+    if ms.all_migrations()?.iter().any(|m| m.name() == name) {
         eprintln!("Migration {} already exists", name);
         std::process::exit(1);
     }
@@ -121,11 +116,8 @@ fn base_dir() -> Result<PathBuf> {
 }
 
 fn handle_error(r: Result<()>) {
-    match r {
-        Err(e) => {
-            eprintln!("Encountered unexpected error: {}", e);
-            std::process::exit(1);
-        }
-        _ => (),
+    if let Err(e) = r {
+        eprintln!("Encountered unexpected error: {}", e);
+        std::process::exit(1);
     }
 }

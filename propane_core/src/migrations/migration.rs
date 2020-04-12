@@ -39,7 +39,7 @@ pub trait Migration: PartialEq {
         let tx = conn.transaction()?;
         let sql = self
             .up_sql(tx.backend_name())?
-            .ok_or(Error::UnknownBackend(tx.backend_name().to_string()))?;
+            .ok_or_else(|| Error::UnknownBackend(tx.backend_name().to_string()))?;
         tx.execute(&sql)?;
         tx.insert_or_replace(
             PropaneMigration::TABLE,

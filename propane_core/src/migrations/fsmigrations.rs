@@ -158,7 +158,7 @@ impl Migration for FsMigration {
             return Ok(None);
         }
         let info: MigrationInfo = serde_json::from_reader(self.fs.read(&path)?)?;
-        Ok(info.from_name.map(|name| Cow::from(name)))
+        Ok(info.from_name.map(Cow::from))
     }
 
     fn name(&self) -> Cow<str> {

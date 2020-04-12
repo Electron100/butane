@@ -84,7 +84,8 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
     table.add_column(col);
     let col = AColumn::new_simple(
         "has",
-        get_many_sql_type(many_field).expect(&format!("Mis-identified Many field {}", field_name)),
+        get_many_sql_type(many_field)
+            .unwrap_or_else(|| panic!("Mis-identified Many field {}", field_name)),
     );
     table.add_column(col);
     table

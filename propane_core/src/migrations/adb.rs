@@ -337,7 +337,7 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
         ));
     }
     for removed in old_names.difference(&new_names) {
-        ops.push(Operation::RemoveTable(removed.to_string()));
+        ops.push(Operation::RemoveTable((*removed).to_string()));
     }
     for table in new_names.intersection(&old_names) {
         let table: &str = table.as_ref();
@@ -349,7 +349,7 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     ops
 }
 
-fn col_by_name<'a>(columns: &'a Vec<AColumn>, name: &str) -> Option<&'a AColumn> {
+fn col_by_name<'a>(columns: &'a [AColumn], name: &str) -> Option<&'a AColumn> {
     columns.iter().find(|c| c.name == name)
 }
 
@@ -368,7 +368,7 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
     for removed in old_names.difference(&new_names) {
         ops.push(Operation::RemoveColumn(
             old.name.clone(),
-            removed.to_string(),
+            (*removed).to_string(),
         ));
     }
     for colname in new_names.intersection(&old_names) {

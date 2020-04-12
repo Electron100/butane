@@ -1,5 +1,5 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
-use super::fs::Filesystem;
+use super::fs::{Filesystem, OsFilesystem};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
 use crate::Result;
 use serde::{Deserialize, Serialize};
@@ -189,7 +189,8 @@ pub struct FsMigrations {
     current: FsMigration,
 }
 impl FsMigrations {
-    pub fn new(fs: Rc<dyn Filesystem>, root: PathBuf) -> Self {
+    pub fn new(root: PathBuf) -> Self {
+        let fs = Rc::new(OsFilesystem {});
         let current = FsMigration {
             fs: fs.clone(),
             root: root.join("current"),

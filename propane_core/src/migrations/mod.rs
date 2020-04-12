@@ -5,7 +5,6 @@ use crate::sqlval::{FromSql, SqlVal, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
 
 use std::path::Path;
-use std::rc::Rc;
 
 pub mod adb;
 use adb::{AColumn, ATable, DeferredSqlType, Operation, ADB};
@@ -14,8 +13,6 @@ mod migration;
 pub use migration::{Migration, MigrationMut};
 
 mod fs;
-pub use fs::Filesystem;
-use fs::OsFilesystem;
 
 mod fsmigrations;
 pub use fsmigrations::{FsMigration, FsMigrations};
@@ -178,20 +175,11 @@ fn migrations_table() -> ATable {
     table
 }
 
-/// Like `from_root` except allows specifying an alternate filesystem
-/// implementation. Intended primarily for testing purposes.
-pub fn from_root_and_filesystem<P: AsRef<Path>>(
-    path: P,
-    fs: impl Filesystem + 'static,
-) -> FsMigrations {
-    FsMigrations::new(Rc::new(fs), path.as_ref().to_path_buf())
-}
-
 /// Create a `Migrations` from a filesystem location. The `#[model]`
 /// attribute will write migration information to a
 /// `propane/migrations` directory under the project directory.
 pub fn from_root<P: AsRef<Path>>(path: P) -> FsMigrations {
-    from_root_and_filesystem(path, OsFilesystem {})
+    FsMigrations::new(path.as_ref().to_path_buf())
 }
 
 /// Copies the data in `from` to `to`.

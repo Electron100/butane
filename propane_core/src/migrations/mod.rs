@@ -22,9 +22,6 @@ pub use fsmigrations::{FsMigration, FsMigrations};
 mod memmigrations;
 pub use memmigrations::{MemMigration, MemMigrations};
 
-#[cfg(feature = "memfs")]
-pub mod memfs;
-
 /// A collection of migrations.
 pub trait Migrations {
     type M: Migration;

@@ -1,8 +1,13 @@
 use chrono::Utc;
 use clap;
 use clap::{Arg, ArgMatches};
-use propane::migrations::{FsMigrations, Migration, Migrations, MigrationsMut};
+use propane::migrations::{
+    copy_migration, FsMigrations, MemMigrations, Migration, Migrations, MigrationsMut,
+};
 use propane::{db, migrations};
+use quote::quote;
+use serde_json;
+use std::io::Write;
 use std::path::PathBuf;
 
 type Result<T> = std::result::Result<T, failure::Error>;
@@ -41,12 +46,16 @@ fn main() {
                 ),
         )
         .subcommand(clap::SubCommand::with_name("migrate").about("Apply migrations"))
+        .subcommand(
+            clap::SubCommand::with_name("embed").about("Embed migrations in the source code"),
+        )
         .setting(clap::AppSettings::ArgRequiredElseHelp)
         .get_matches();
     match args.subcommand() {
         ("init", sub_args) => handle_error(init(sub_args)),
         ("makemigration", sub_args) => handle_error(make_migration(sub_args)),
         ("migrate", _) => handle_error(migrate()),
+        ("embed", _) => handle_error(embed()),
         (cmd, _) => eprintln!("Unknown command {}", cmd),
     }
 }
@@ -102,6 +111,39 @@ fn migrate() -> Result<()> {
         println!("Applying migration {}", m.name());
         m.apply(&mut conn)?;
     }
+    Ok(())
+}
+
+fn embed() -> Result<()> {
+    let srcdir = std::env::current_dir()?.join("src");
+    if !srcdir.exists() {
+        eprintln!("src directory not found");
+        std::process::exit(1);
+    }
+    let path = srcdir.join("propane_migrations.rs");
+
+    let mut mem_ms = MemMigrations::new();
+    for m in get_migrations()?.all_migrations()? {
+        let mut new_m = mem_ms.new_migration(&m.name());
+        copy_migration(&m, &mut new_m)?;
+        mem_ms.add_migration(new_m)?;
+    }
+    let json = serde_json::to_string(&mem_ms)?;
+
+    let src = format!(
+        "
+use propane::migrations::MemMigrations;
+use std::result::Result;
+pub fn get_migrations() -> Result<MemMigrations, propane::Error> {{
+    let json = r#\"{}\"#;
+    MemMigrations::from_json(json)
+}}",
+        json
+    );
+
+    let mut f = std::fs::File::create(path)?;
+    f.write_all(format!("{}", src).as_bytes())?;
+
     Ok(())
 }
 

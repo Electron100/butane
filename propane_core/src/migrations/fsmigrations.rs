@@ -19,6 +19,15 @@ struct MigrationInfo {
     /// The migration this one is based on, or None if this is the
     /// first migration in the chain
     from_name: Option<String>,
+    backends: Vec<String>,
+}
+impl MigrationInfo {
+    fn new() -> Self {
+        MigrationInfo {
+            from_name: None,
+            backends: Vec::new(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -89,6 +98,15 @@ impl FsMigration {
     fn ensure_dir(&self) -> Result<()> {
         Ok(self.fs.ensure_dir(&self.root)?)
     }
+
+    fn info(&self) -> Result<MigrationInfo> {
+        let path = self.root.join("info.json");
+        if !path.exists() {
+            return Ok(MigrationInfo::new());
+        }
+        let info: MigrationInfo = serde_json::from_reader(self.fs.read(&path)?)?;
+        Ok(info)
+    }
 }
 
 impl MigrationMut for FsMigration {
@@ -99,12 +117,13 @@ impl MigrationMut for FsMigration {
         )
     }
 
-    fn add_up_sql(&mut self, backend_name: &str, sql: &str) -> Result<()> {
-        self.write_sql(&format!("{}_up", backend_name), &sql)
-    }
-
-    fn add_down_sql(&mut self, backend_name: &str, sql: &str) -> Result<()> {
-        self.write_sql(&format!("{}_down", backend_name), &sql)
+    fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()> {
+        self.write_sql(&format!("{}_up", backend_name), &up_sql)?;
+        self.write_sql(&format!("{}_down", backend_name), &down_sql)?;
+        let mut info = self.info()?;
+        info.backends.push(backend_name.to_string());
+        self.write_info(&info)?;
+        Ok(())
     }
 
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
@@ -119,7 +138,9 @@ impl MigrationMut for FsMigration {
 
     /// Set the migration before this one.
     fn set_migration_from(&mut self, prev: Option<String>) -> Result<()> {
-        self.write_info(&MigrationInfo { from_name: prev })
+        let mut info = self.info()?;
+        info.from_name = prev;
+        self.write_info(&info)
     }
 }
 
@@ -153,12 +174,7 @@ impl Migration for FsMigration {
     }
 
     fn migration_from(&self) -> Result<Option<Cow<str>>> {
-        let path = self.root.join("info.json");
-        if !path.exists() {
-            return Ok(None);
-        }
-        let info: MigrationInfo = serde_json::from_reader(self.fs.read(&path)?)?;
-        Ok(info.from_name.map(Cow::from))
+        Ok(self.info()?.from_name.map(Cow::from))
     }
 
     fn name(&self) -> Cow<str> {
@@ -172,6 +188,10 @@ impl Migration for FsMigration {
 
     fn down_sql(&self, backend_name: &str) -> Result<Option<String>> {
         self.read_sql(backend_name, "down")
+    }
+
+    fn sql_backends(&self) -> Result<Vec<String>> {
+        Ok(self.info()?.backends)
     }
 }
 

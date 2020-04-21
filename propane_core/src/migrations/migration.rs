@@ -30,6 +30,9 @@ pub trait Migration: PartialEq {
     /// The backend-specific commands to undo this migration.
     fn down_sql(&self, backend_name: &str) -> Result<Option<String>>;
 
+    /// The names of the backends this migration has sql for.
+    fn sql_backends(&self) -> Result<Vec<String>>;
+
     /// Apply the migration to a database connection. The connection
     /// must be for the same type of database as
     /// [create_migration][crate::migrations::Migrations::create_migration]
@@ -58,11 +61,8 @@ pub trait MigrationMut: Migration {
     /// migration in this fashion.
     fn write_table(&mut self, table: &ATable) -> Result<()>;
 
-    /// Set the backend-specific commands to apply this migration.
-    fn add_up_sql(&mut self, backend_name: &str, sql: &str) -> Result<()>;
-
-    /// Set the backend-specific commands to undo this migration.
-    fn add_down_sql(&mut self, backend_name: &str, sql: &str) -> Result<()>;
+    /// Set the backend-specific commands to apply/undo this migration.
+    fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()>;
 
     /// Adds a TypeKey -> SqlType mapping. Only meaningful on the special current migration.
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()>;

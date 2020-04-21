@@ -144,16 +144,14 @@ where
             ops.push(Operation::AddTable(migrations_table()));
         }
 
-        let sql = backend.create_migration_sql(&from_db, &ops);
+        let up_sql = backend.create_migration_sql(&from_db, &ops);
+        let down_sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db));
         let mut m = self.new_migration(name);
         // Save the DB for use by other migrations from this one
         for table in to_db.tables() {
             m.write_table(table)?;
         }
-        m.add_up_sql(backend.get_name(), &sql)?;
-        // And write the undo
-        let sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db));
-        m.add_down_sql(backend.get_name(), &sql)?;
+        m.add_sql(backend.get_name(), &up_sql, &down_sql)?;
         m.set_migration_from(from.map(|m| m.name().to_string()))?;
 
         self.add_migration(m)?;
@@ -183,11 +181,7 @@ pub fn from_root<P: AsRef<Path>>(path: P) -> FsMigrations {
 }
 
 /// Copies the data in `from` to `to`.
-pub fn copy_migration(
-    from: &impl Migration,
-    to: &mut impl MigrationMut,
-    backend_name: Option<&str>,
-) -> Result<()> {
+pub fn copy_migration(from: &impl Migration, to: &mut impl MigrationMut) -> Result<()> {
     to.set_migration_from(from.migration_from()?.map(|s| s.to_string()))?;
     let db = from.db()?;
     for table in db.tables() {
@@ -196,14 +190,11 @@ pub fn copy_migration(
     for (k, v) in db.types() {
         to.add_type(k.clone(), v.clone())?;
     }
-    if let Some(backend_name) = backend_name {
-        let sql = from.up_sql(backend_name)?;
-        if let Some(sql) = sql {
-            to.add_up_sql(backend_name, &sql)?;
-        }
-        let sql: Option<String> = from.down_sql(backend_name)?;
-        if let Some(sql) = sql {
-            to.add_down_sql(backend_name, &sql)?;
+    for backend_name in from.sql_backends()? {
+        let up_sql = from.up_sql(&backend_name)?;
+        let down_sql = from.down_sql(&backend_name)?;
+        if let (Some(up_sql), Some(down_sql)) = (up_sql, down_sql) {
+            to.add_sql(&backend_name, &up_sql, &down_sql)?;
         }
     }
     Ok(())

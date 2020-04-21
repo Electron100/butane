@@ -1,12 +1,14 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
 use crate::Result;
+use serde::{Deserialize, Serialize};
+use serde_json;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
 type SqlTypeMap = HashMap<TypeKey, DeferredSqlType>;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MemMigration {
     name: String,
     db: ADB,
@@ -51,6 +53,9 @@ impl Migration for MemMigration {
     fn down_sql(&self, backend_name: &str) -> Result<Option<String>> {
         Ok(self.down.get(backend_name).map(|s| s.to_string()))
     }
+    fn sql_backends(&self) -> Result<Vec<String>> {
+        Ok(self.up.keys().map(|k| k.to_string()).collect())
+    }
 }
 impl PartialEq for MemMigration {
     fn eq(&self, other: &Self) -> bool {
@@ -64,12 +69,10 @@ impl MigrationMut for MemMigration {
         self.db.replace_table(table.clone());
         Ok(())
     }
-    fn add_up_sql(&mut self, backend_name: &str, sql: &str) -> Result<()> {
-        self.up.insert(backend_name.to_string(), sql.to_string());
-        Ok(())
-    }
-    fn add_down_sql(&mut self, backend_name: &str, sql: &str) -> Result<()> {
-        self.down.insert(backend_name.to_string(), sql.to_string());
+    fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()> {
+        self.up.insert(backend_name.to_string(), up_sql.to_string());
+        self.down
+            .insert(backend_name.to_string(), down_sql.to_string());
         Ok(())
     }
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
@@ -82,6 +85,7 @@ impl MigrationMut for MemMigration {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct MemMigrations {
     migrations: HashMap<String, MemMigration>,
     current: MemMigration,
@@ -95,6 +99,9 @@ impl MemMigrations {
             current: MemMigration::new("current".to_string()),
             latest: None,
         }
+    }
+    pub fn from_json(json: &str) -> Result<Self> {
+        serde_json::from_str(json).map_err(|e| e.into())
     }
 }
 impl Default for MemMigrations {

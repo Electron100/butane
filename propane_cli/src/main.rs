@@ -5,8 +5,9 @@ use propane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, Migrations, MigrationsMut,
 };
 use propane::{db, migrations};
-use quote::quote;
+use serde::{Deserialize, Serialize};
 use serde_json;
+use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -46,6 +47,7 @@ fn main() {
                 ),
         )
         .subcommand(clap::SubCommand::with_name("migrate").about("Apply migrations"))
+        .subcommand(clap::SubCommand::with_name("list").about("List migrations"))
         .subcommand(
             clap::SubCommand::with_name("embed").about("Embed migrations in the source code"),
         )
@@ -56,7 +58,30 @@ fn main() {
         ("makemigration", sub_args) => handle_error(make_migration(sub_args)),
         ("migrate", _) => handle_error(migrate()),
         ("embed", _) => handle_error(embed()),
+        ("list", _) => handle_error(list_migrations()),
         (cmd, _) => eprintln!("Unknown command {}", cmd),
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct CliState {
+    embedded: bool,
+}
+impl CliState {
+    pub fn load() -> Result<Self> {
+        let path = base_dir()?.join("clistate.json");
+        let file = File::open(path);
+        match file {
+            Ok(file) => Ok(serde_json::from_reader(file)?),
+            Err(_) => Ok(CliState::default()),
+        }
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let path = base_dir()?.join("clistate.json");
+        let file = File::create(path)?;
+        serde_json::to_writer(file, &self)?;
+        Ok(())
     }
 }
 
@@ -95,6 +120,11 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
         ms.latest().as_ref(),
     )?;
     if created {
+        let cli_state = CliState::load()?;
+        if cli_state.embedded {
+            // Better include the new migration in the embedding
+            embed()?;
+        }
         println!("Created migration {}", name);
     } else {
         println!("No changes to migrate");
@@ -144,6 +174,25 @@ pub fn get_migrations() -> Result<MemMigrations, propane::Error> {{
     let mut f = std::fs::File::create(path)?;
     f.write_all(format!("{}", src).as_bytes())?;
 
+    let mut cli_state = CliState::load()?;
+    cli_state.embedded = true;
+    cli_state.save()?;
+    Ok(())
+}
+
+fn list_migrations() -> Result<()> {
+    let spec = db::ConnectionSpec::load(&base_dir()?)?;
+    let conn = db::connect(&spec)?;
+    let ms = get_migrations()?;
+    let unapplied = ms.unapplied_migrations(&conn)?;
+    let all = ms.all_migrations()?;
+    for m in all {
+        let m_state = match unapplied.contains(&m) {
+            true => "not applied",
+            false => "applied",
+        };
+        println!("Migration '{}' ({})", m.name(), m_state);
+    }
     Ok(())
 }
 

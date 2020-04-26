@@ -206,7 +206,7 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         Some(DeferredSqlType::Known(SqlType::Blob))
     } else if *ty == parse_quote!(NaiveDateTime) {
         Some(DeferredSqlType::Known(SqlType::Timestamp))
-    } else if *ty == parse_quote!(Uuid) {
+    } else if *ty == parse_quote!(Uuid) || *ty == parse_quote!(uuid::Uuid) {
         Some(DeferredSqlType::Known(SqlType::Blob))
     } else {
         None

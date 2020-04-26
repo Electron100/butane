@@ -122,7 +122,7 @@ pub enum Error {
     OutOfRange,
     #[error("Internal logic error")]
     Internal,
-    #[error("Cannot resolve type {0}")]
+    #[error("Cannot resolve type {0}. Are you missing a #[propane_type] attribute?")]
     CannotResolveType(String),
     #[error("(De)serialization error {0}")]
     SerdeJson(#[from] serde_json::Error),

@@ -60,6 +60,19 @@ impl Baz {
     }
 }
 
+#[model]
+struct HasOnlyPk {
+    id: i64,
+}
+impl HasOnlyPk {
+    fn new(id: i64) -> Self {
+        HasOnlyPk {
+            id,
+            state: ObjectState::default(),
+        }
+    }
+}
+
 fn basic_crud(conn: Connection) {
     //create
     let mut foo = Foo::new(1);
@@ -162,3 +175,12 @@ fn auto_pk(conn: Connection) {
     assert!(baz2.id < baz3.id);
 }
 testall!(auto_pk);
+
+fn only_pk(conn: Connection) {
+    let mut obj = HasOnlyPk::new(1);
+    obj.save(&conn).unwrap();
+    // verify we can still save the object even though it has no
+    // fields to modify
+    obj.save(&conn).unwrap();
+}
+testall!(only_pk);

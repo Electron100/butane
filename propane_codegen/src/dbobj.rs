@@ -103,10 +103,12 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     <#pktype as propane::FieldType>::SQLTYPE);
                 if self.state.saved {
                     #(#values_no_pk)*
-                    conn.update(Self::TABLE,
-                                pkcol,
-                                propane::ToSql::to_sql(self.pk()),
-                                &[#save_cols], &values)?;
+                    if values.len() > 0 {
+                        conn.update(Self::TABLE,
+                                    pkcol,
+                                    propane::ToSql::to_sql(self.pk()),
+                                    &[#save_cols], &values)?;
+                    }
                 } else {
                     #(#values)*
                     let pk = conn.insert(Self::TABLE, &[#insert_cols], pkcol, &values)?;

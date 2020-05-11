@@ -14,7 +14,7 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {
     let mut mem_migrations = MemMigrations::new();
     let mem_current = mem_migrations.current();
 
-    propane::migrations::copy_migration(disk_current, mem_current, None).unwrap();
+    propane::migrations::copy_migration(disk_current, mem_current).unwrap();
 
     assert!(
         mem_migrations

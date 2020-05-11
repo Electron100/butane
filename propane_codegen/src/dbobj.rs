@@ -6,7 +6,7 @@ use syn::{spanned::Spanned, Field, ItemStruct};
 // Configuration that can be specified with attributes to override default behavior
 #[derive(Default)]
 pub struct Config {
-    pub table_name: Option<String> 
+    pub table_name: Option<String>,
 }
 
 // implement the DataObject trait
@@ -14,7 +14,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let tablelit = match &config.table_name {
         Some(s) => make_lit(&s),
-        None => make_ident_literal_str(&tyname)
+        None => make_ident_literal_str(&tyname),
     };
 
     let err = verify_fields(ast_struct);
@@ -39,7 +39,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
 
     let rows = rows_for_from(&ast_struct);
     let numdbfields = fields(&ast_struct).filter(|f| is_row_field(f)).count();
-    let (many_init, many_save): (TokenStream2, TokenStream2) = 
+    let (many_init, many_save): (TokenStream2, TokenStream2) =
         fields(&ast_struct)
         .filter(|f| is_many_to_many(f))
         .map(|f| {
@@ -299,13 +299,17 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
             match get_primitive_sql_type(&f.ty) {
                 Some(DeferredSqlType::Known(SqlType::Int)) => (),
                 Some(DeferredSqlType::Known(SqlType::BigInt)) => (),
-                _ => return Some(quote_spanned!(
-                    f.span() =>
-                        compile_error!("Auto is only supported for integer types");
-                )),
+                _ => {
+                    return Some(quote_spanned!(
+                        f.span() =>
+                            compile_error!("Auto is only supported for integer types");
+                    ))
+                }
             }
             if &pk_field != f {
-                return Some(quote_spanned!(f.span() => compile_error!("Auto is currently only supported for the primary key")));
+                return Some(
+                    quote_spanned!(f.span() => compile_error!("Auto is currently only supported for the primary key")),
+                );
             }
         }
     }
@@ -322,7 +326,8 @@ fn add_post_insert_for_auto(pk_field: &Field, post_insert: &mut Vec<TokenStream2
 
 /// Builds code for pushing SqlVals for each column satisfying predicate into a vec called `values`
 fn push_values<P>(ast_struct: &ItemStruct, mut predicate: P) -> Vec<TokenStream2>
-where P: FnMut(&Field) -> bool,
+where
+    P: FnMut(&Field) -> bool,
 {
     fields(&ast_struct)
         .filter(|f| is_row_field(f) && predicate(f))

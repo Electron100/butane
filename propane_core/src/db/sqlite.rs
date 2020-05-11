@@ -445,7 +445,7 @@ fn drop_table(name: &str) -> String {
 fn add_column(tbl_name: &str, col: &AColumn) -> String {
     let default: SqlVal = helper::column_default(col);
     format!(
-        "ALTER TABLE {} ADD COLUMN {} DEFAULT {}",
+        "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         tbl_name,
         define_column(col),
         helper::sql_literal_value(default)

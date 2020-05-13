@@ -508,15 +508,13 @@ fn change_column(
         Some(col) => new_table.replace_column(col.clone()),
         None => new_table.remove_column(old.name()),
     }
-    let result = [
-        "BEGIN TRANSACTION;",
+    let stmts: [&str; 4] = [
         &create_table(&new_table),
         &copy_table(&old_table, &new_table),
         &drop_table(&old_table.name),
         &format!("ALTER TABLE {} RENAME TO {};", &new_table.name, tbl_name),
-        "COMMIT TRANSACTION;",
-    ]
-    .join("\n");
+    ];
+    let result = stmts.join("\n");
     new_table.name = old_table.name.clone();
     current.replace_table(new_table);
     result

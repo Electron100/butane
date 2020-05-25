@@ -164,6 +164,8 @@ impl_prim_sql!(bool, Bool, Bool);
 impl_prim_sql!(i64, Int, BigInt);
 impl_prim_sql!(i32, Int, Int);
 impl_prim_sql!(u32, Int, BigInt);
+impl_prim_sql!(u16, Int, Int);
+impl_prim_sql!(i16, Int, Int);
 impl_prim_sql!(f64, Real, Real);
 impl_prim_sql!(f32, Real, Real);
 impl_prim_sql!(String, Text, Text, str);

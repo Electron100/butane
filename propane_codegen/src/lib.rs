@@ -261,7 +261,7 @@ fn make_lit(s: &str) -> LitStr {
 /// If the field refers to a primitive, return its SqlType
 fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
     if *ty == parse_quote!(bool) {
-        Some(DeferredSqlType::Known(SqlType::Bool))
+        return Some(DeferredSqlType::Known(SqlType::Bool));
     } else if *ty == parse_quote!(u8)
         || *ty == parse_quote!(i8)
         || *ty == parse_quote!(u16)
@@ -269,23 +269,33 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         || *ty == parse_quote!(u16)
         || *ty == parse_quote!(i32)
     {
-        Some(DeferredSqlType::Known(SqlType::Int))
+        return Some(DeferredSqlType::Known(SqlType::Int));
     } else if *ty == parse_quote!(u32) || *ty == parse_quote!(i64) {
         // TODO better support unsigned integers here. Sqlite has no u64, though Postgres does
-        Some(DeferredSqlType::Known(SqlType::BigInt))
+        return Some(DeferredSqlType::Known(SqlType::BigInt));
     } else if *ty == parse_quote!(f32) || *ty == parse_quote!(f64) {
-        Some(DeferredSqlType::Known(SqlType::Real))
+        return Some(DeferredSqlType::Known(SqlType::Real));
     } else if *ty == parse_quote!(String) {
-        Some(DeferredSqlType::Known(SqlType::Text))
+        return Some(DeferredSqlType::Known(SqlType::Text));
     } else if *ty == parse_quote!(Vec<u8>) {
-        Some(DeferredSqlType::Known(SqlType::Blob))
-    } else if *ty == parse_quote!(NaiveDateTime) {
-        Some(DeferredSqlType::Known(SqlType::Timestamp))
-    } else if *ty == parse_quote!(Uuid) || *ty == parse_quote!(uuid::Uuid) {
-        Some(DeferredSqlType::Known(SqlType::Blob))
-    } else {
-        None
+        return Some(DeferredSqlType::Known(SqlType::Blob));
     }
+
+    #[cfg(feature = "datetime")]
+    {
+        if *ty == parse_quote!(NaiveDateTime) {
+            return Some(DeferredSqlType::Known(SqlType::Timestamp));
+        }
+    }
+
+    #[cfg(feature = "uuid")]
+    {
+        if *ty == parse_quote!(Uuid) || *ty == parse_quote!(uuid::Uuid) {
+            return Some(DeferredSqlType::Known(SqlType::Blob));
+        }
+    }
+
+    None
 }
 
 fn sqltype_from_name(name: &Ident) -> Option<SqlType> {
@@ -296,6 +306,7 @@ fn sqltype_from_name(name: &Ident) -> Option<SqlType> {
         "BigInt" => Some(SqlType::BigInt),
         "Real" => Some(SqlType::Real),
         "Text" => Some(SqlType::Text),
+        #[cfg(feature = "datetime")]
         "Timestamp" => Some(SqlType::Timestamp),
         "Blob" => Some(SqlType::Blob),
         _ => None,

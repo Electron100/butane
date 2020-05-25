@@ -6,9 +6,9 @@ edition = "2018"
 
 [features]
 default = ["datetime", "uuid"]
-datetime = ["propane_core/datetime"]
+datetime = ["propane_core/datetime", "propane_codegen/datetime"]
 debug = ["propane_core/debug"]
-uuid = ["propane_core/uuid"]
+uuid = ["propane_core/uuid", "propane_codegen/uuid"]
 
 [dependencies]
 propane_codegen = { path = "../propane_codegen", version = "0.1.0" }

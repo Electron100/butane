@@ -14,7 +14,8 @@ use std;
 use syn;
 use syn::parse_quote;
 use syn::{
-    Attribute, Expr, Field, ItemStruct, ItemType, Lit, LitStr, Meta, MetaNameValue, NestedMeta,
+    Attribute, Expr, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta, MetaNameValue,
+    NestedMeta,
 };
 
 #[macro_use]
@@ -155,21 +156,96 @@ pub fn filter(input: TokenStream) -> TokenStream {
     filter::for_expr(&tyid, &expr).into()
 }
 
+struct CustomTypeInfo {
+    name: String,
+    ty: DeferredSqlType,
+}
+
+/// Attribute macro which marks a type as being available to propane
+/// for use in models.
+///
+/// May be used on type aliases, structs, or enums. Except when used
+/// on type aliases, it must be given a parameter specifying the
+/// SqlType it can be converted to.
+///
+/// E.g.
+/// ```
+/// #[propane_type]
+/// pub type CurrencyAmount = f64;
+///
+/// #[propane_type(Text)]
+/// pub enum Currency {
+///   Dollars,
+///   Pounds,
+///   Euros,
+/// }
+/// impl ToSql for Currency {
+///   fn to_sql(&self) -> SqlVal {
+///      SqlVal::Text(
+///          match self {
+///              Self::Dollars => "dollars",
+///              Self::Pounds => "pounds",
+///              Self::Euros => "euros",
+///          }
+///          .to_string())
+///  }
+/// }
+/// ```
 #[proc_macro_attribute]
-pub fn propane_type(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn propane_type(args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut tyinfo: Option<CustomTypeInfo> = None;
     let type_alias: syn::Result<ItemType> = syn::parse(input.clone());
     if let Ok(type_alias) = type_alias {
-        if let Err(e) = migration::add_typedef(&type_alias.ident, &type_alias.ty) {
-            eprintln!("unable to save typedef {}", e);
-            panic!("unable to save typedef")
-        } else {
-            input
+        tyinfo = Some(CustomTypeInfo {
+            name: type_alias.ident.to_string(),
+            ty: get_deferred_sql_type(&type_alias.ty),
+        })
+    }
+
+    if tyinfo.is_none() {
+        // For types below here, we need the SqlType given to us
+        let args: TokenStream2 = args.into();
+        let args: Vec<TokenTree> = args.into_iter().collect();
+        if args.len() != 1 {
+            return quote!(compile_error!("Expected propane_type(sqltype)");).into();
         }
-    } else {
-        quote!(compile_error!(
-            "The #[propane_type] macro wasn't expected to be used here"
-        ))
-        .into()
+        let tyid = match &args[0] {
+            TokenTree::Ident(tyid) => tyid.clone(),
+            _ => return quote!(compile_error!("Unexpected tokens in propane_type");).into(),
+        };
+        let sqltype = match sqltype_from_name(&tyid) {
+            Some(ty) => ty,
+            None => {
+                eprintln!("No SqlType value named {}", tyid.to_string());
+                return quote!(compile_error!("No SqlType value with the given name");).into();
+            }
+        };
+
+        if let Ok(item) = syn::parse::<ItemStruct>(input.clone()) {
+            tyinfo = Some(CustomTypeInfo {
+                name: item.ident.to_string(),
+                ty: DeferredSqlType::Known(sqltype),
+            });
+        } else if let Ok(item) = syn::parse::<ItemEnum>(input.clone()) {
+            tyinfo = Some(CustomTypeInfo {
+                name: item.ident.to_string(),
+                ty: DeferredSqlType::Known(sqltype),
+            });
+        }
+    }
+
+    match tyinfo {
+        Some(tyinfo) => match migration::add_custom_type(tyinfo.name, tyinfo.ty) {
+            Ok(()) => input,
+            Err(e) => {
+                eprintln!("unable to save type {}", e);
+                quote!(compile_error!("unable to save type");).into()
+            }
+        },
+        None => {
+            quote!(compile_error!("The #[propane_type] macro wasn't expected to be used here");)
+                .into()
+        }
     }
 }
 
@@ -184,7 +260,6 @@ fn make_lit(s: &str) -> LitStr {
 
 /// If the field refers to a primitive, return its SqlType
 fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    // Todo support Date, Tmestamp, and Blob
     if *ty == parse_quote!(bool) {
         Some(DeferredSqlType::Known(SqlType::Bool))
     } else if *ty == parse_quote!(u8)
@@ -210,6 +285,20 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         Some(DeferredSqlType::Known(SqlType::Blob))
     } else {
         None
+    }
+}
+
+fn sqltype_from_name(name: &Ident) -> Option<SqlType> {
+    let name = name.to_string();
+    match name.as_ref() {
+        "Bool" => Some(SqlType::Bool),
+        "Int" => Some(SqlType::Int),
+        "BigInt" => Some(SqlType::BigInt),
+        "Real" => Some(SqlType::Real),
+        "Text" => Some(SqlType::Text),
+        "Timestamp" => Some(SqlType::Timestamp),
+        "Blob" => Some(SqlType::Blob),
+        _ => None,
     }
 }
 

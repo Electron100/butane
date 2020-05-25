@@ -24,11 +24,11 @@ pub fn write_table_to_disk(ast_struct: &ItemStruct, config: &dbobj::Config) -> R
     Ok(())
 }
 
-pub fn add_typedef(alias: &syn::Ident, orig: &syn::Type) -> Result<()> {
+pub fn add_custom_type(name: String, ty: DeferredSqlType) -> Result<()> {
     let mut ms = migrations::from_root(&migrations_dir());
     let current_migration = ms.current();
-    let key = TypeKey::CustomType(alias.to_string());
-    current_migration.add_type(key, get_deferred_sql_type(orig))
+    let key = TypeKey::CustomType(name);
+    current_migration.add_type(key, ty)
 }
 
 fn migrations_dir() -> PathBuf {

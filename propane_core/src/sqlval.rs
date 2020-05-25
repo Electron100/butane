@@ -10,7 +10,7 @@ use chrono::naive::NaiveDateTime;
 /// For conversion between `SqlVal` and other types, see [`FromSql`], [`IntoSql`], and [`ToSql`].
 ///
 /// [`FromSql`]: crate::FromSql
-/// [`IntoSql`]: crate::ToSql
+/// [`IntoSql`]: crate::IntoSql
 /// [`ToSql`]: crate::ToSql
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SqlVal {

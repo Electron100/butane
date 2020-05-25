@@ -2,13 +2,15 @@ use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::fs::{Filesystem, OsFilesystem};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
 use crate::Result;
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fs::{File, OpenOptions};
 
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
@@ -107,6 +109,14 @@ impl FsMigration {
         let info: MigrationInfo = serde_json::from_reader(self.fs.read(&path)?)?;
         Ok(info)
     }
+
+    fn lock_exclusive(&self) -> Result<MigrationLock> {
+        MigrationLock::new_exclusive(&self.root.join("lock"))
+    }
+
+    fn lock_shared(&self) -> Result<MigrationLock> {
+        MigrationLock::new_shared(&self.root.join("lock"))
+    }
 }
 
 impl MigrationMut for FsMigration {
@@ -127,12 +137,26 @@ impl MigrationMut for FsMigration {
     }
 
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
-        let mut types: SqlTypeMap = match self.fs.read(&self.root.join(TYPES_FILENAME)) {
-            Ok(reader) => serde_json::from_reader(reader)?,
+        let _lock = self.lock_exclusive();
+        let typefile = self.root.join(TYPES_FILENAME);
+
+        let mut types: SqlTypeMap = match self.fs.read(&typefile) {
+            Ok(reader) => serde_json::from_reader(reader).map_err(|e| {
+                eprintln!("failed to read types {:?}", typefile);
+                e
+            })?,
             Err(_) => BTreeMap::new(),
         };
         types.insert(key, sqltype);
-        self.write_contents(TYPES_FILENAME, serde_json::to_string(&types)?.as_bytes())?;
+        self.write_contents(
+            TYPES_FILENAME,
+            serde_json::to_string(&types)
+                .map_err(|e| {
+                    eprintln!("failed to read types");
+                    e
+                })?
+                .as_bytes(),
+        )?;
         Ok(())
     }
 
@@ -146,6 +170,7 @@ impl MigrationMut for FsMigration {
 
 impl Migration for FsMigration {
     fn db(&self) -> Result<ADB> {
+        let _lock = self.lock_shared()?;
         let mut db = ADB::new();
         self.ensure_dir()?;
         let entries = self.fs.list_dir(&self.root)?;
@@ -286,5 +311,35 @@ impl MigrationsMut for FsMigrations {
             self.save_state(&state)?;
         }
         Ok(())
+    }
+}
+
+struct MigrationLock {
+    file: File,
+}
+impl MigrationLock {
+    fn new_exclusive(path: &Path) -> Result<Self> {
+        let file = Self::get_file(path)?;
+        file.lock_exclusive()?;
+        Ok(MigrationLock { file })
+    }
+
+    fn new_shared(path: &Path) -> Result<Self> {
+        let file = Self::get_file(path)?;
+        file.lock_shared()?;
+        Ok(MigrationLock { file })
+    }
+
+    fn get_file(path: &Path) -> Result<File> {
+        Ok(OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)?)
+    }
+}
+impl Drop for MigrationLock {
+    fn drop(&mut self) {
+        self.file.unlock().unwrap();
     }
 }

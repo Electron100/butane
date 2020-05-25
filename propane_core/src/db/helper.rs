@@ -150,20 +150,23 @@ pub fn sql_limit(limit: i32, w: &mut impl Write) {
 }
 
 pub fn column_default(col: &AColumn) -> SqlVal {
-    match col.default() {
-        Some(val) => val.clone(),
-        None => match col.sqltype() {
-            Ok(t) => match t {
-                SqlType::Bool => SqlVal::Bool(false),
-                SqlType::Int => SqlVal::Int(0),
-                SqlType::BigInt => SqlVal::Int(0),
-                SqlType::Real => SqlVal::Real(0.0),
-                SqlType::Text => SqlVal::Text("".to_string()),
-                SqlType::Blob => SqlVal::Blob(Vec::new()),
-                _ => SqlVal::Null,
-            },
-            Err(_) => SqlVal::Null, // todo better error reporting
+    if let Some(val) = col.default() {
+        return val.clone();
+    }
+    if col.nullable() {
+        return SqlVal::Null;
+    }
+    match col.sqltype() {
+        Ok(t) => match t {
+            SqlType::Bool => SqlVal::Bool(false),
+            SqlType::Int => SqlVal::Int(0),
+            SqlType::BigInt => SqlVal::Int(0),
+            SqlType::Real => SqlVal::Real(0.0),
+            SqlType::Text => SqlVal::Text("".to_string()),
+            SqlType::Blob => SqlVal::Blob(Vec::new()),
+            _ => SqlVal::Null,
         },
+        Err(_) => SqlVal::Null, // todo better error reporting
     }
 }
 

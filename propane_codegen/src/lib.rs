@@ -109,7 +109,7 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
         #(#attrs)*
         #vis struct #ident {
             #state_attrs
-            state: propane::ObjectState,
+            pub state: propane::ObjectState,
             #fields
         }
         #impltraits

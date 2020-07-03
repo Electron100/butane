@@ -106,9 +106,11 @@ fn init<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
 }
 
 fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
-    let name = args
-        .and_then(|a| a.value_of("name").map(|s| s.to_string()))
-        .unwrap_or_else(default_name);
+    let name_arg = args.map(|a| a.value_of("name")).flatten();
+    let name = match name_arg {
+        Some(name) => format!("{}_{}", default_name(), name),
+        None => default_name(),
+    };
     let mut ms = get_migrations()?;
     if ms.all_migrations()?.iter().any(|m| m.name() == name) {
         eprintln!("Migration {} already exists", name);
@@ -197,7 +199,12 @@ fn list_migrations() -> Result<()> {
 }
 
 fn get_migrations() -> Result<FsMigrations> {
-    Ok(migrations::from_root(base_dir()?.join("migrations")))
+    let root = base_dir()?.join("migrations");
+    if !root.exists() {
+        eprintln!("No propane migrations directory found");
+        std::process::exit(1);
+    }
+    Ok(migrations::from_root(root))
 }
 
 fn base_dir() -> Result<PathBuf> {

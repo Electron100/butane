@@ -25,7 +25,7 @@ fn main() {
                     Arg::with_name("BACKEND")
                         .required(true)
                         .index(1)
-                        .help("Database backend to use"),
+                        .help("Database backend to use. Currently only 'sqlite' is supported."),
                 )
                 .arg(
                     Arg::with_name("CONNECTION")
@@ -38,11 +38,9 @@ fn main() {
             clap::SubCommand::with_name("makemigration")
                 .about("Create a new migration")
                 .arg(
-                    Arg::with_name("name")
-                        .short("n")
-                        .long("name")
-                        .takes_value(true)
-                        .value_name("NAME")
+                    Arg::with_name("NAME")
+                        .required(true)
+                        .index(1)
                         .help("Name to use for the migration"),
                 ),
         )
@@ -100,13 +98,14 @@ fn init<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
 
     let spec = db::ConnectionSpec::new(name, connstr);
     db::connect(&spec)?; // ensure we can
+    std::fs::create_dir(base_dir()?)?;
     spec.save(&base_dir()?)?;
 
     Ok(())
 }
 
 fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
-    let name_arg = args.map(|a| a.value_of("name")).flatten();
+    let name_arg = args.map(|a| a.value_of("NAME")).flatten();
     let name = match name_arg {
         Some(name) => format!("{}_{}", default_name(), name),
         None => default_name(),
@@ -201,7 +200,7 @@ fn list_migrations() -> Result<()> {
 fn get_migrations() -> Result<FsMigrations> {
     let root = base_dir()?.join("migrations");
     if !root.exists() {
-        eprintln!("No propane migrations directory found");
+        eprintln!("No propane migrations directory found. Add at least one model to your project and build.");
         std::process::exit(1);
     }
     Ok(migrations::from_root(root))

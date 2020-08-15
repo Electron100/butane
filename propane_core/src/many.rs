@@ -29,7 +29,7 @@ where
     /// `Error::NotInitialized`). `init` will automatically be called
     /// when a [`DataObject`] with a `Many` field is loaded or saved.
     ///
-    /// [`DataObject`]: propane::DataObject
+    /// [`DataObject`]: super::DataObject
     pub fn new() -> Self {
         Many {
             item_table: "not_initialized",

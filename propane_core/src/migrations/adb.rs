@@ -13,7 +13,7 @@ pub enum TypeKey {
     /// Represents a type which is the primary key for a table with the given name
     PK(String),
     /// Represents a type which is not natively known to propane but
-    /// which propane will be made aware of with the #[propane_aware] macro
+    /// which propane will be made aware of with the `#\[propane_type\]` macro
     CustomType(String),
 }
 impl std::fmt::Display for TypeKey {
@@ -211,7 +211,7 @@ impl ATable {
     }
     pub fn replace_column(&mut self, col: AColumn) {
         if let Some(existing) = self.columns.iter_mut().find(|c| c.name == col.name) {
-            std::mem::replace(existing, col);
+            *existing = col;
         } else {
             self.columns.push(col);
         }

@@ -34,10 +34,8 @@ pub trait Migration: PartialEq {
     fn sql_backends(&self) -> Result<Vec<String>>;
 
     /// Apply the migration to a database connection. The connection
-    /// must be for the same type of database as
-    /// [create_migration][crate::migrations::Migrations::create_migration]
-    /// and the database must be in the state of the migration prior
-    /// to this one ([from_migration][crate::migrations::Migration::from_migration])
+    /// must be for the same type of database as this and the database
+    /// must be in the state of the migration prior to this one
     fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
         let tx = conn.transaction()?;
         let sql = self

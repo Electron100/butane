@@ -39,12 +39,38 @@ mod migration;
 /// macro will also write information to disk at compile time necessary to
 /// generate migrations
 ///
-/// There are a few restrictions on model types:
+/// ## Restrictions on model types:
 /// 1. The type of each field must implement [`FieldType`] or be [`Many`].
 /// 2. There must be a primary key field. This must be either annotated with a `#[pk]` attribute or named `id`.
 ///
+/// ## Helper Attributes
+/// * `#[table = "NAME"]` used on the struct to specify the name of the table (defaults to struct name)
+/// * `#[pk]` on a field to specify that it is the primary key.
+/// * `#[auto]` on a field indicates that the field's value is
+///    initialized based on serial/autoincrement. Currently supported
+///    only on the primary key and only if the primary key is an integer
+///    type
+/// * `[default]` should be used on fields added by later migrations to avoid errors on existing objects.
+///     Unnecessary if the new field is an `Option<>`
+///
+/// For example
+/// ```
+/// #[model]
+/// #[table = "posts"]
+/// pub struct Post {
+///   #[auto]
+///   #[pk] // unnecessary if identifier were named id instead
+///   pub identifier: i32,
+///   pub title: String,
+///   pub content: String,
+///   #[default = false]
+///   pub published: bool,
+/// }
+/// ```
+///
+///
 /// [`FieldType`]: crate::FieldType
-/// [`Many`]: crate::Many
+/// [`Many`]: propane_core::many::Many
 #[proc_macro_attribute]
 pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     // Transform into a derive because derives can have helper
@@ -419,7 +445,6 @@ fn is_auto(field: &Field) -> bool {
 /// Example
 /// #[default = 42]
 fn get_default(field: &Field) -> std::result::Result<Option<SqlVal>, CompilerErrorMsg> {
-    // TODO these panics should report proper compiler errors
     let attr: Option<&Attribute> = field
         .attrs
         .iter()

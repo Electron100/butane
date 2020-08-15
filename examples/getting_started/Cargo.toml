@@ -1,0 +1,23 @@
+[package]
+name = "getting_started"
+version = "0.1.0"
+authors = ["James Oakley <james@electronstudio.org>"]
+edition = "2018"
+
+[[bin]]
+name = "show_posts"
+doc = false
+
+[[bin]]
+name = "write_post"
+doc = false
+
+[[bin]]
+name = "delete_post"
+doc = false
+
+[lib]
+doc = false
+
+[dependencies]
+propane = { path = "../../propane", features=["default"] }

@@ -1,0 +1,9 @@
+CREATE TABLE Post (
+id INTEGER NOT NULL PRIMARY KEY,
+title TEXT NOT NULL,
+body TEXT NOT NULL,
+published INTEGER NOT NULL
+);
+CREATE TABLE propane_migrations (
+name TEXT NOT NULL PRIMARY KEY
+);

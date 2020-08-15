@@ -67,6 +67,7 @@ fn handle_call(fields: &impl ToTokens, mcall: &ExprMethodCall) -> TokenStream2 {
     match method.as_str() {
         "matches" => handle_in(fields, &mcall.receiver, mcall.args.first().unwrap()),
         "contains" => handle_contains(fields, &mcall.receiver, mcall.args.first().unwrap()),
+        "like" => handle_like(fields, &mcall.receiver, mcall.args.first().unwrap()),
         _ => make_compile_error!("Unknown method call {}", method),
     }
 }
@@ -99,6 +100,20 @@ fn handle_contains(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> Toke
             let q = handle_expr(&quote!(#fex.fields()), expr);
             let span = receiver.span();
             quote_spanned!(span=> #fex.contains(#q))
+        }
+    }
+}
+
+fn handle_like(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStream2 {
+    let fex = fieldexpr(fields, receiver);
+    match expr {
+        Expr::Binary(_) => make_compile_error!("Unexpected binary expression as parameter to like"),
+        Expr::Call(_) => make_compile_error!("Unexpected call expression as parameter to like"),
+        _ => {
+            // Arbitrary expression
+            let q = handle_expr(fields, expr);
+            let span = receiver.span();
+            quote_spanned!(span=> #fex.like(#q))
         }
     }
 }

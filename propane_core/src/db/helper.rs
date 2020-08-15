@@ -37,6 +37,7 @@ where
             Gt(col, ex) => write!(w, "{} > ", col).and_then(|_| Ok(f(ex, values, w))),
             Le(col, ex) => write!(w, "{} <= ", col).and_then(|_| Ok(f(ex, values, w))),
             Ge(col, ex) => write!(w, "{} >= ", col).and_then(|_| Ok(f(ex, values, w))),
+            Like(col, ex) => write!(w, "{} like ", col).and_then(|_| Ok(f(ex, values, w))),
             AllOf(conds) => {
                 let mut remaining = conds.len();
                 for cond in conds {

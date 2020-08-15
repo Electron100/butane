@@ -34,6 +34,7 @@ pub enum BoolExpr {
     Gt(&'static str, Expr),
     Le(&'static str, Expr),
     Ge(&'static str, Expr),
+    Like(&'static str, Expr),
     AllOf(Vec<BoolExpr>),
     And(Box<BoolExpr>, Box<BoolExpr>),
     Or(Box<BoolExpr>, Box<BoolExpr>),

@@ -138,4 +138,9 @@ impl<T: DataResult> Query<T> {
             .map(T::from_row)
             .collect()
     }
+
+    /// Executes the query against `conn` and deletes all matching objects.
+    pub fn delete(self, conn: &impl ConnectionMethods) -> Result<()> {
+        conn.delete_where(self.table, self.filter.unwrap_or(BoolExpr::True))
+    }
 }

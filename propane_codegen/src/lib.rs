@@ -54,7 +54,7 @@ mod migration;
 ///     Unnecessary if the new field is an `Option<>`
 ///
 /// For example
-/// ```
+/// ```ignore
 /// #[model]
 /// #[table = "posts"]
 /// pub struct Post {
@@ -195,7 +195,7 @@ struct CustomTypeInfo {
 /// SqlType it can be converted to.
 ///
 /// E.g.
-/// ```
+/// ```ignore
 /// #[propane_type]
 /// pub type CurrencyAmount = f64;
 ///

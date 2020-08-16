@@ -1,3 +1,4 @@
+#![allow(clippy::expect_fun_call)]
 use self::models::Post;
 use getting_started::*;
 use propane::prelude::*;

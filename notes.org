@@ -47,27 +47,23 @@
 * Roadmap
 	+ Summary/readme
   + Example like Diesel's
+		Now in progress
 	+ Optional dependencies
 	+ incremental save
 	+ foreign key constraints in db, cascade setting
 	+ PG support
 	+ Many backreferences
 	+ better error reporting in macro -- compiler_error with span on field instead of proc macro panic
-	+ support delete without loading first
-	+ Connections/BackendConnection/ConnectionMethods is confusing
 	+ migration downgrade
 	+ Deleting tables doesn't work, old table file will still be there
 	+ Missing tests
-		- blob
-		- timestamp
 		- migrations
 		- separate DataResult
-	+ Missing documentation
-		- #[propane_type]
 		- default attribute
+	+ Missing documentation
 		- memfs
 	+ Clean up TODOs
-	+ Support for fully custom types
+
 
 * ManyToMany
 	- separate table for each ManyToMany field. Named TYPE_FIELD_Many

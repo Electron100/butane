@@ -1,9 +1,20 @@
 //! Types, traits, and methods for interacting with a database.
+//!
+//! The different ways of referring to a database handle may present
+//! some initial confusion.
+//! * `ConnectionMethods` is a trait containing the methods available on a database connection or a transaction.
+//!    Most methods on a [DataObject][crate::DataObject] or a [Query][crate::query::Query] require an
+//!    implementation of `ConnectionMethods`.
+//! * `BackendConnection` is a trait representing a direct connection to a database backend. It is a superset
+//!   of `ConnectionMethods` and also includes the ability to create a transaction.
+//! * `Transaction` is a struct representing a database transaction. It implements `ConnectionMethods`.
+//! * `Connection` is a convience struct containing a boxed `BackendConnection`. It cannot do anything other than
+//!    what a `BackendConnection` can do, but allows using a single concrete type that is not tied to a particular
+//!    database backend. It is returned by the `connect` method.
 
 use crate::query::BoolExpr;
 use crate::{migrations::adb, Error, Result, SqlVal};
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::borrow::Cow;
 use std::fs;
 use std::io::Write;
@@ -11,15 +22,15 @@ use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::vec::Vec;
 
+mod connmethods;
 mod helper;
-pub mod internal;
 mod macros;
 pub mod sqlite;
 
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
 
-use internal::*;
+pub use connmethods::{Column, ConnectionMethods, QueryResult, RawQueryResult, Row};
 
 /// Database connection.
 pub trait BackendConnection: ConnectionMethods + Send + 'static {

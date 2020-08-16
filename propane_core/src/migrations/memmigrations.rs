@@ -2,7 +2,6 @@ use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
 use crate::Result;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::borrow::Cow;
 use std::collections::HashMap;
 

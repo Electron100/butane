@@ -1,3 +1,4 @@
+use chrono::{TimeZone, Utc};
 use paste;
 use propane::db::Connection;
 use propane::prelude::*;
@@ -28,6 +29,16 @@ fn comparison(conn: Connection) {
     assert_eq!(posts[1].title, "Mt. Everest");
 }
 testall!(comparison);
+
+fn like(conn: Connection) {
+    blog::setup_blog(&conn);
+    let mut posts = query!(Post, title.like("M%")).load(&conn).unwrap();
+    assert_eq!(posts.len(), 2);
+    posts.sort_by(|p1, p2| p1.id.partial_cmp(&p2.id).unwrap());
+    assert_eq!(posts[0].title, "Mount Doom");
+    assert_eq!(posts[1].title, "Mt. Everest");
+}
+testall!(like);
 
 fn combination(conn: Connection) {
     blog::setup_blog(&conn);
@@ -126,3 +137,28 @@ fn many_objects_with_tag_explicit(conn: Connection) {
     assert_eq!(posts[2].title, "Mt. Everest");
 }
 testall!(many_objects_with_tag_explicit);
+
+fn by_timestamp(conn: Connection) {
+    blog::setup_blog(&conn);
+    let mut post = find!(Post, title == "Sir Charles", &conn).unwrap();
+    // Pretend this post was published in 1970
+    post.pub_time = Some(Utc.ymd(1970, 1, 1).and_hms(1, 1, 1).naive_utc());
+    post.save(&conn).unwrap();
+    // And pretend another post was later in 1971
+    let mut post = find!(Post, title == "The Tiger", &conn).unwrap();
+    post.pub_time = Some(Utc.ymd(1970, 5, 1).and_hms(1, 1, 1).naive_utc());
+    post.save(&conn).unwrap();
+
+    // Now find all posts published before 1971. Assume we haven't gone
+    // back in time to run these unit tests.
+    let mut posts = query!(
+        Post,
+        pub_time < { Utc.ymd(1972, 1, 1).and_hms(1, 1, 1).naive_utc() }
+    )
+    .load(&conn)
+    .unwrap();
+    posts.sort_by(|p1, p2| p1.id.partial_cmp(&p2.id).unwrap());
+    assert_eq!(posts[0].title, "The Tiger");
+    assert_eq!(posts[1].title, "Sir Charles");
+}
+testall!(by_timestamp);

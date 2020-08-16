@@ -21,7 +21,6 @@ pub enum SqlVal {
     Text(String),
     // TODO properly support and test blob
     Blob(Vec<u8>),
-    // TODO properly support and test timestamp
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime),
 }

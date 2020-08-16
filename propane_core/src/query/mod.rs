@@ -2,7 +2,7 @@
 //! the `query!`, `filter!`, and `find!` macros instead of using this
 //! module directly.
 
-use crate::db::internal::{ConnectionMethods, QueryResult};
+use crate::db::{ConnectionMethods, QueryResult};
 use crate::{DataResult, Result, SqlVal};
 use std::marker::PhantomData;
 

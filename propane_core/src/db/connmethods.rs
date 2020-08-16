@@ -42,9 +42,10 @@ pub trait ConnectionMethods {
         values: &[SqlVal],
     ) -> Result<()>;
     fn delete(&self, table: &'static str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
-        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))
+        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))?;
+        Ok(())
     }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()>;
+    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize>;
     /// Tests if a table exists in the database.
     fn has_table(&self, table: &'static str) -> Result<bool>;
 }

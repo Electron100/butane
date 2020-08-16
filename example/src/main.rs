@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-use failure;
 use propane::db::{Connection, ConnectionSpec};
 use propane::model;
 use propane::{find, query};

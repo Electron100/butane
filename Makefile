@@ -6,7 +6,7 @@ build :
 	cargo build --all-features
 
 check : build test
-	cargo clippy --all-features
+	cargo clippy --all-features -- -D warnings
 
 
 test :

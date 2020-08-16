@@ -17,21 +17,28 @@ pub mod sqlval;
 #[cfg(feature = "uuid")]
 pub mod uuid;
 
-use db::internal::{Column, ConnectionMethods, Row};
+use db::{Column, ConnectionMethods, Row};
 
 pub use query::Query;
 pub use sqlval::*;
 
 pub type Result<T> = std::result::Result<T, crate::Error>;
 
+/// Used internally by propane to track state about the object.
+///
+/// Includes information such as whether it has actually been created
+/// in the database yet. Propane automatically creates the field
+/// `state: ObjectState` on `#[model]` structs. When initializing the
+/// state field, use `ObjectState::default()`.
 #[derive(Clone, Default, Debug)]
 pub struct ObjectState {
     pub saved: bool,
 }
+/// Two `ObjectState`s always compare as equal. This effectively
+/// removes `ObjectState` from participating in equality tests between
+/// two objects
 impl PartialEq<ObjectState> for ObjectState {
     fn eq(&self, _other: &ObjectState) -> bool {
-        // Always return true. This effectively removes ObjectState
-        // from participating in equality tests between two objects
         true
     }
 }
@@ -179,7 +186,7 @@ impl std::fmt::Display for SqlType {
             Text => "string",
             #[cfg(feature = "datetime")]
             Timestamp => "timestamp",
-            Blob => "blog",
+            Blob => "blob",
         }
         .fmt(f)
     }

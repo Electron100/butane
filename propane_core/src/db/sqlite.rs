@@ -1,6 +1,5 @@
 //! SQLite database backend
 use super::helper;
-use super::internal::*;
 use super::*;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
@@ -8,7 +7,6 @@ use crate::{Result, SqlType, SqlVal};
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
 use log::warn;
-use rusqlite;
 use std::fmt::Write;
 
 #[cfg(feature = "debug")]

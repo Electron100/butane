@@ -1,6 +1,6 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::PropaneMigration;
-use crate::db::internal::ConnectionMethods;
+use crate::db::ConnectionMethods;
 use crate::{db, sqlval::ToSql, DataObject, DataResult, Error, Result};
 use std::borrow::Cow;
 use std::cmp::PartialEq;

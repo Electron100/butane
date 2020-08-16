@@ -1,7 +1,7 @@
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::unit_arg)]
 
-use super::internal::Column;
+use super::Column;
 use crate::migrations::adb::AColumn;
 use crate::query;
 use crate::query::Expr::{Condition, Placeholder, Val};

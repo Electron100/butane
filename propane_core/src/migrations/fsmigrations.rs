@@ -4,7 +4,6 @@ use super::{Migration, MigrationMut, Migrations, MigrationsMut};
 use crate::Result;
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};

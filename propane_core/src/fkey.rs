@@ -1,4 +1,4 @@
-use crate::db::internal::ConnectionMethods;
+use crate::db::ConnectionMethods;
 use crate::*;
 use lazycell::LazyCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

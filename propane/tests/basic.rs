@@ -15,13 +15,15 @@ struct Foo {
     id: i64,
     bar: u32,
     baz: Whatsit,
+    blobbity: Vec<u8>,
 }
 impl Foo {
     fn new(id: i64) -> Self {
         Foo {
-            id: id,
+            id,
             bar: 0,
             baz: String::new(),
+            blobbity: Vec::new(),
             state: ObjectState::default(),
         }
     }
@@ -78,6 +80,7 @@ fn basic_crud(conn: Connection) {
     let mut foo = Foo::new(1);
     foo.bar = 42;
     foo.baz = "hello world".to_string();
+    foo.blobbity = [1u8, 2u8, 3u8].to_vec();
     foo.save(&conn).unwrap();
 
     // read
@@ -137,6 +140,31 @@ fn basic_query(conn: Connection) {
     assert_eq!(found.len(), 2);
 }
 testall!(basic_query);
+
+fn basic_query_delete(conn: Connection) {
+    //create
+    let mut foo1 = Foo::new(1);
+    foo1.bar = 42;
+    foo1.baz = "hello world".to_string();
+    foo1.save(&conn).unwrap();
+    let mut foo2 = Foo::new(2);
+    foo2.bar = 43;
+    foo2.baz = "hello world".to_string();
+    foo2.save(&conn).unwrap();
+    let mut foo3 = Foo::new(3);
+    foo3.bar = 44;
+    foo3.baz = "goodbye world".to_string();
+    foo3.save(&conn).unwrap();
+
+    // delete just the last one
+    let cnt = query!(Foo, baz == "goodbye world").delete(&conn).unwrap();
+    assert_eq!(cnt, 1);
+
+    // delete the other two
+    let cnt = query!(Foo, baz.like("hello%")).delete(&conn).unwrap();
+    assert_eq!(cnt, 2);
+}
+testall!(basic_query_delete);
 
 fn string_pk(conn: Connection) {
     let mut foo = Foo::new(1);

@@ -1,12 +1,10 @@
 use chrono::Utc;
-use clap;
 use clap::{Arg, ArgMatches};
 use propane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, Migrations, MigrationsMut,
 };
 use propane::{db, migrations};
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -173,7 +171,7 @@ pub fn get_migrations() -> Result<MemMigrations, propane::Error> {{
     );
 
     let mut f = std::fs::File::create(path)?;
-    f.write_all(format!("{}", src).as_bytes())?;
+    f.write_all(src.as_bytes())?;
 
     let mut cli_state = CliState::load()?;
     cli_state.embedded = true;

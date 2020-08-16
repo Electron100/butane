@@ -1,7 +1,6 @@
 pub mod models;
 
 use models::Post;
-use propane;
 use propane::db::{Connection, ConnectionSpec};
 use propane::prelude::*;
 

@@ -1,6 +1,6 @@
 //! For working with migrations. If using the propane CLI tool, it is
 //! not necessary to use these types directly.
-use crate::db::internal::{Column, ConnectionMethods, Row};
+use crate::db::{Column, ConnectionMethods, Row};
 use crate::sqlval::{FromSql, SqlVal, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
 

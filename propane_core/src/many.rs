@@ -1,13 +1,14 @@
-use crate::db::internal::{Column, ConnectionMethods};
+use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use lazycell::LazyCell;
 
-// Many to many item table:
-// columns "owner" and "has"
-// If type T has a many-to-many relationship with U,
-// owner type is T::PKType, has is U::PKType
-// table name is T_ManyToMany_foo where foo is the name of the Many field
+/// Used to implement a many-to-many relationship between models.
+///
+/// Creates a new table with columns "owner" and "has" If type T has a
+/// many-to-many relationship with U, owner type is T::PKType, has is
+/// U::PKType. Table name is T_ManyToMany_foo where foo is the name of
+/// the Many field
 //
 #[derive(Debug)]
 pub struct Many<T>

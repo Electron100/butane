@@ -10,8 +10,6 @@ use proc_macro_hack::proc_macro_hack;
 use propane_core::migrations::adb::{DeferredSqlType, TypeKey};
 use propane_core::*;
 use quote::{quote, ToTokens};
-use std;
-use syn;
 use syn::parse_quote;
 use syn::{
     Attribute, Expr, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta, MetaNameValue,

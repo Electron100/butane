@@ -66,10 +66,10 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         impl propane::DataResult for #tyname {
             type DBO = #tyname;
             type Fields = #fields_type;
-            const COLUMNS: &'static [propane::db::internal::Column] = &[
+            const COLUMNS: &'static [propane::db::Column] = &[
                 #cols
             ];
-            fn from_row(mut row: propane::db::internal::Row) -> propane::Result<Self> {
+            fn from_row(mut row: propane::db::Row) -> propane::Result<Self> {
                 if row.len() != #numdbfields {
                     return Err(propane::Error::BoundsError(
                         "Found unexpected number of columns in row for DataResult".to_string()));
@@ -94,11 +94,11 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             fn pk(&self) -> &Self::PKType {
                 &self.#pkident
             }
-            fn save(&mut self, conn: &impl propane::db::internal::ConnectionMethods) -> propane::Result<()> {
+            fn save(&mut self, conn: &impl propane::db::ConnectionMethods) -> propane::Result<()> {
                 #many_save
                 //todo perf use an array on the stack for better
                 let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numdbfields);
-                let pkcol = propane::db::internal::Column::new(
+                let pkcol = propane::db::Column::new(
                     #pklit,
                     <#pktype as propane::FieldType>::SQLTYPE);
                 if self.state.saved {
@@ -116,7 +116,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 }
                 Ok(())
             }
-            fn delete(&self, conn: &impl propane::db::internal::ConnectionMethods) -> propane::Result<()> {
+            fn delete(&self, conn: &impl propane::db::ConnectionMethods) -> propane::Result<()> {
                 use propane::ToSql;
                 use propane::prelude::DataObject;
                 conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
@@ -269,7 +269,7 @@ where
             Some(fname) => {
                 let ident = make_ident_literal_str(&fname);
                 let fty = &f.ty;
-                quote!(propane::db::internal::Column::new(#ident, <#fty as propane::FieldType>::SQLTYPE),)
+                quote!(propane::db::Column::new(#ident, <#fty as propane::FieldType>::SQLTYPE),)
             }
             None => quote_spanned! {
                 f.span() =>

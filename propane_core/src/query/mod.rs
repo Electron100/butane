@@ -140,7 +140,7 @@ impl<T: DataResult> Query<T> {
     }
 
     /// Executes the query against `conn` and deletes all matching objects.
-    pub fn delete(self, conn: &impl ConnectionMethods) -> Result<()> {
+    pub fn delete(self, conn: &impl ConnectionMethods) -> Result<usize> {
         conn.delete_where(self.table, self.filter.unwrap_or(BoolExpr::True))
     }
 }

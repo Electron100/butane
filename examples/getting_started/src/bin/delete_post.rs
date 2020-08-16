@@ -8,8 +8,8 @@ fn main() {
     let pattern = format!("%{}%", target);
 
     let conn = establish_connection();
-    // TODO count deleted posts and print number
-    query!(Post, title.like({ pattern }))
+    let cnt = query!(Post, title.like({ pattern }))
         .delete(&conn)
         .expect("error deleting posts");
+    println!("Deleted {} posts", cnt);
 }

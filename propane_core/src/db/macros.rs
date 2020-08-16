@@ -44,7 +44,7 @@ macro_rules! connection_method_wrapper {
             ) -> Result<()> {
                 self.conn.update(table, pkcol, pk, columns, values)
             }
-            fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
+            fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
                 self.conn.delete_where(table, expr)
             }
             fn has_table(&self, table: &'static str) -> Result<bool> {

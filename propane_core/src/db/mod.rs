@@ -185,7 +185,7 @@ impl ConnectionMethods for Transaction<'_> {
     ) -> Result<()> {
         self.trans.update(table, pkcol, pk, columns, values)
     }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<()> {
+    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
         self.trans.delete_where(table, expr)
     }
     fn has_table(&self, table: &'static str) -> Result<bool> {

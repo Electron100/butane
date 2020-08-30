@@ -253,7 +253,7 @@ fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
             } else if is_many_to_many(f) {
                 quote!(#ident: propane::Many::new())
             } else {
-                panic!("Unexpected struct field {}", ident)
+                make_compile_error!(f.span()=> "Unexpected struct field")
             }
         })
         .collect()
@@ -345,7 +345,7 @@ where
                     self.#ident.save()?;
                 )
             } else {
-                panic!("Unexpected struct field {}", ident)
+								make_compile_error!(f.span()=> "Unexpected struct field")
             }
         })
         .collect()

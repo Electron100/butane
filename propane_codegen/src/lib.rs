@@ -120,11 +120,11 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
                 });
             }
         }
-        _ => panic!("Fields must be named"),
+        _ => return make_compile_error!("Fields must be named").into(),
     };
     let fields = match ast_struct.fields {
         syn::Fields::Named(fields) => fields.named,
-        _ => panic!("Fields must be named"),
+        _ => return make_compile_error!("Fields must be named").into(),
     };
 
     let ident = ast_struct.ident;

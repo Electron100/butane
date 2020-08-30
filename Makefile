@@ -5,7 +5,7 @@ build :
 	cargo build
 	cargo build --all-features
 
-check : build test
+check : build test doc
 	cargo clippy --all-features -- -D warnings
 
 
@@ -16,4 +16,4 @@ clean :
 	cargo clean
 
 doc :
-	cargo +nightly doc --all-features
+	cd propane && cargo +nightly doc --all-features

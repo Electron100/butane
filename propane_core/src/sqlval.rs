@@ -19,7 +19,6 @@ pub enum SqlVal {
     Int(i64),
     Real(f64),
     Text(String),
-    // TODO properly support and test blob
     Blob(Vec<u8>),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime),

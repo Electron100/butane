@@ -3,11 +3,13 @@
 
 use super::Column;
 use crate::migrations::adb::AColumn;
-use crate::query;
 use crate::query::Expr::{Condition, Placeholder, Val};
 use crate::query::{BoolExpr::*, Expr, Join};
-use crate::{SqlType, SqlVal};
+use crate::{query, Result, SqlType, SqlVal};
 use std::fmt::Write;
+
+#[cfg(feature = "datetime")]
+use chrono::naive::NaiveDateTime;
 
 /// Writes to `w` the SQL to express the expression given in `expr`. Values contained in `expr` are rendered
 /// as placeholders in the SQL string and the actual values are added to `values`.
@@ -150,25 +152,23 @@ pub fn sql_limit(limit: i32, w: &mut impl Write) {
     write!(w, " LIMIT {}", limit).unwrap();
 }
 
-pub fn column_default(col: &AColumn) -> SqlVal {
+pub fn column_default(col: &AColumn) -> Result<SqlVal> {
     if let Some(val) = col.default() {
-        return val.clone();
+        return Ok(val.clone());
     }
     if col.nullable() {
-        return SqlVal::Null;
+        return Ok(SqlVal::Null);
     }
-    match col.sqltype() {
-        Ok(t) => match t {
-            SqlType::Bool => SqlVal::Bool(false),
-            SqlType::Int => SqlVal::Int(0),
-            SqlType::BigInt => SqlVal::Int(0),
-            SqlType::Real => SqlVal::Real(0.0),
-            SqlType::Text => SqlVal::Text("".to_string()),
-            SqlType::Blob => SqlVal::Blob(Vec::new()),
-            _ => SqlVal::Null,
-        },
-        Err(_) => SqlVal::Null, // todo better error reporting
-    }
+    Ok(match col.sqltype()? {
+        SqlType::Bool => SqlVal::Bool(false),
+        SqlType::Int => SqlVal::Int(0),
+        SqlType::BigInt => SqlVal::Int(0),
+        SqlType::Real => SqlVal::Real(0.0),
+        SqlType::Text => SqlVal::Text("".to_string()),
+        SqlType::Blob => SqlVal::Blob(Vec::new()),
+        #[cfg(feature = "datetime")]
+        SqlType::Timestamp => SqlVal::Timestamp(NaiveDateTime::from_timestamp(0, 0)),
+    })
 }
 
 fn list_columns(columns: &[Column], w: &mut impl Write) {

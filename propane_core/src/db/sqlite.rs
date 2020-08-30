@@ -33,12 +33,13 @@ impl Backend for SQLiteBackend {
         "sqlite"
     }
 
-    fn create_migration_sql(&self, current: &ADB, ops: &[Operation]) -> String {
+    fn create_migration_sql(&self, current: &ADB, ops: &[Operation]) -> Result<String> {
         let mut current: ADB = (*current).clone();
-        ops.iter()
+        Ok(ops
+            .iter()
             .map(|o| sql_for_op(&mut current, o))
-            .collect::<Vec<String>>()
-            .join("\n")
+            .collect::<Result<Vec<String>>>()?
+            .join("\n"))
     }
 
     fn connect(&self, path: &str) -> Result<Connection> {
@@ -374,13 +375,13 @@ fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result
     })
 }
 
-fn sql_for_op(current: &mut ADB, op: &Operation) -> String {
+fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
-        Operation::AddTable(table) => create_table(&table),
-        Operation::RemoveTable(name) => drop_table(&name),
+        Operation::AddTable(table) => Ok(create_table(&table)),
+        Operation::RemoveTable(name) => Ok(drop_table(&name)),
         Operation::AddColumn(tbl, col) => add_column(&tbl, &col),
-        Operation::RemoveColumn(tbl, name) => remove_column(current, &tbl, &name),
-        Operation::ChangeColumn(tbl, old, new) => change_column(current, &tbl, &old, Some(new)),
+        Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, &tbl, &name)),
+        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, &tbl, &old, Some(new))),
     }
 }
 
@@ -441,14 +442,14 @@ fn drop_table(name: &str) -> String {
     format!("DROP TABLE {};", name)
 }
 
-fn add_column(tbl_name: &str, col: &AColumn) -> String {
-    let default: SqlVal = helper::column_default(col);
-    format!(
+fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
+    let default: SqlVal = helper::column_default(col)?;
+    Ok(format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         tbl_name,
         define_column(col),
         helper::sql_literal_value(default)
-    )
+    ))
 }
 
 fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {

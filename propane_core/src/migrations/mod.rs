@@ -144,8 +144,8 @@ where
             ops.push(Operation::AddTable(migrations_table()));
         }
 
-        let up_sql = backend.create_migration_sql(&from_db, &ops);
-        let down_sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db));
+        let up_sql = backend.create_migration_sql(&from_db, &ops)?;
+        let down_sql = backend.create_migration_sql(&from_db, &adb::diff(&to_db, &from_db))?;
         let mut m = self.new_migration(name);
         // Save the DB for use by other migrations from this one
         for table in to_db.tables() {

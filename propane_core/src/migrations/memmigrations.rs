@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 type SqlTypeMap = HashMap<TypeKey, DeferredSqlType>;
 
+/// A migration stored in memory.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MemMigration {
     name: String,
@@ -84,6 +85,7 @@ impl MigrationMut for MemMigration {
     }
 }
 
+/// A collection of migrations stored in memory.
 #[derive(Serialize, Deserialize)]
 pub struct MemMigrations {
     migrations: HashMap<String, MemMigration>,

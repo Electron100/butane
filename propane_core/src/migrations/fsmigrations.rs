@@ -226,7 +226,7 @@ impl PartialEq for FsMigration {
 }
 impl Eq for FsMigration {}
 
-/// A collection of migrations.
+/// A collection of migrations stored in the filesystem.
 pub struct FsMigrations {
     fs: Rc<dyn Filesystem>,
     root: PathBuf,

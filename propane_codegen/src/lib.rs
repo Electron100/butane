@@ -5,32 +5,17 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use proc_macro2::{Ident, Span, TokenTree};
+use proc_macro2::{Ident, TokenTree};
 use proc_macro_hack::proc_macro_hack;
+use propane_core::codegen::get_deferred_sql_type;
 use propane_core::migrations::adb::{DeferredSqlType, TypeKey};
+use propane_core::migrations::{MigrationMut, MigrationsMut};
 use propane_core::*;
-use quote::{quote, ToTokens};
-use syn::parse_quote;
-use syn::{
-    Attribute, Expr, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta, MetaNameValue,
-    NestedMeta,
-};
+use quote::quote;
+use std::path::PathBuf;
+use syn::{Expr, ItemEnum, ItemStruct, ItemType};
 
-#[macro_use]
-macro_rules! make_compile_error {
-    ($span:expr=> $($arg:tt)*) => ({
-        let lit = make_lit(&std::fmt::format(format_args!($($arg)*)));
-        quote_spanned!($span=> compile_error!(#lit))
-    });
-    ($($arg:tt)*) => ({
-        let lit = make_lit(&std::fmt::format(format_args!($($arg)*)));
-        quote!(compile_error!(#lit))
-    })
-}
-
-mod dbobj;
 mod filter;
-mod migration;
 
 /// Attribute macro which marks a struct as being a data model and
 /// generates an implementation of [DataObject][crate::DataObject]. This
@@ -71,91 +56,7 @@ mod migration;
 /// [`Many`]: propane_core::many::Many
 #[proc_macro_attribute]
 pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
-    // Transform into a derive because derives can have helper
-    // attributes but proc macro attributes can't yet (nor can they
-    // create field attributes)
-    let mut ast_struct: ItemStruct = syn::parse(input).unwrap();
-    let mut config = dbobj::Config::default();
-    for attr in &ast_struct.attrs {
-        if let Ok(Meta::NameValue(MetaNameValue {
-            path,
-            lit: Lit::Str(s),
-            ..
-        })) = attr.parse_meta()
-        {
-            if path.is_ident("table") {
-                config.table_name = Some(s.value())
-            }
-        }
-    }
-    // Filter out our helper attributes
-    let attrs: Vec<Attribute> = ast_struct
-        .attrs
-        .clone()
-        .into_iter()
-        .filter(|a| !a.path.is_ident("table"))
-        .collect();
-
-    let state_attrs = if has_derive_serialize(&attrs) {
-        quote!(#[serde(skip)])
-    } else {
-        TokenStream2::new()
-    };
-
-    let vis = &ast_struct.vis;
-
-    migration::write_table_to_disk(&ast_struct, &config).unwrap();
-
-    let impltraits = dbobj::impl_dbobject(&ast_struct, &config);
-    let fieldexprs = dbobj::add_fieldexprs(&ast_struct);
-
-    match &mut ast_struct.fields {
-        syn::Fields::Named(fields) => {
-            for field in &mut fields.named {
-                field.attrs.retain(|a| {
-                    !a.path.is_ident("pk")
-                        && !a.path.is_ident("auto")
-                        && !a.path.is_ident("sqltype")
-                        && !a.path.is_ident("default")
-                });
-            }
-        }
-        _ => return make_compile_error!("Fields must be named").into(),
-    };
-    let fields = match ast_struct.fields {
-        syn::Fields::Named(fields) => fields.named,
-        _ => return make_compile_error!("Fields must be named").into(),
-    };
-
-    let ident = ast_struct.ident;
-
-    quote!(
-        #(#attrs)*
-        #vis struct #ident {
-            #state_attrs
-            pub state: propane::ObjectState,
-            #fields
-        }
-        #impltraits
-        #fieldexprs
-    )
-    .into()
-}
-
-fn has_derive_serialize(attrs: &[Attribute]) -> bool {
-    for attr in attrs {
-        if let Ok(Meta::List(ml)) = attr.parse_meta() {
-            if ml.path.is_ident("derive")
-                && ml.nested.iter().any(|nm| match nm {
-                    NestedMeta::Meta(Meta::Path(path)) => path.is_ident("Serialize"),
-                    _ => false,
-                })
-            {
-                return true;
-            }
-        }
-    }
-    false
+    codegen::model_with_migrations(input.into(), &mut migrations_for_dir()).into()
 }
 
 #[proc_macro_hack]
@@ -259,7 +160,7 @@ pub fn propane_type(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     match tyinfo {
-        Some(tyinfo) => match migration::add_custom_type(tyinfo.name, tyinfo.ty) {
+        Some(tyinfo) => match add_custom_type(migrations_for_dir(), tyinfo.name, tyinfo.ty) {
             Ok(()) => input,
             Err(e) => {
                 eprintln!("unable to save type {}", e);
@@ -273,53 +174,30 @@ pub fn propane_type(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-fn make_ident_literal_str(ident: &Ident) -> LitStr {
-    let as_str = format!("{}", ident);
-    LitStr::new(&as_str, Span::call_site())
+fn add_custom_type<M>(
+    mut ms: impl MigrationsMut<M = M>,
+    name: String,
+    ty: DeferredSqlType,
+) -> Result<()>
+where
+    M: MigrationMut,
+{
+    let current_migration = ms.current();
+    let key = TypeKey::CustomType(name);
+    current_migration.add_type(key, ty)
 }
 
-fn make_lit(s: &str) -> LitStr {
-    LitStr::new(s, Span::call_site())
+fn migrations_for_dir() -> migrations::FsMigrations {
+    migrations::from_root(&migrations_dir())
 }
 
-/// If the field refers to a primitive, return its SqlType
-fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    if *ty == parse_quote!(bool) {
-        return Some(DeferredSqlType::Known(SqlType::Bool));
-    } else if *ty == parse_quote!(u8)
-        || *ty == parse_quote!(i8)
-        || *ty == parse_quote!(u16)
-        || *ty == parse_quote!(i16)
-        || *ty == parse_quote!(u16)
-        || *ty == parse_quote!(i32)
-    {
-        return Some(DeferredSqlType::Known(SqlType::Int));
-    } else if *ty == parse_quote!(u32) || *ty == parse_quote!(i64) {
-        // TODO better support unsigned integers here. Sqlite has no u64, though Postgres does
-        return Some(DeferredSqlType::Known(SqlType::BigInt));
-    } else if *ty == parse_quote!(f32) || *ty == parse_quote!(f64) {
-        return Some(DeferredSqlType::Known(SqlType::Real));
-    } else if *ty == parse_quote!(String) {
-        return Some(DeferredSqlType::Known(SqlType::Text));
-    } else if *ty == parse_quote!(Vec<u8>) {
-        return Some(DeferredSqlType::Known(SqlType::Blob));
-    }
-
-    #[cfg(feature = "datetime")]
-    {
-        if *ty == parse_quote!(NaiveDateTime) {
-            return Some(DeferredSqlType::Known(SqlType::Timestamp));
-        }
-    }
-
-    #[cfg(feature = "uuid")]
-    {
-        if *ty == parse_quote!(Uuid) || *ty == parse_quote!(uuid::Uuid) {
-            return Some(DeferredSqlType::Known(SqlType::Blob));
-        }
-    }
-
-    None
+fn migrations_dir() -> PathBuf {
+    let mut dir = PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR expected to be set"),
+    );
+    dir.push("propane");
+    dir.push("migrations");
+    dir
 }
 
 fn sqltype_from_name(name: &Ident) -> Option<SqlType> {
@@ -334,162 +212,5 @@ fn sqltype_from_name(name: &Ident) -> Option<SqlType> {
         "Timestamp" => Some(SqlType::Timestamp),
         "Blob" => Some(SqlType::Blob),
         _ => None,
-    }
-}
-
-fn get_option_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    get_foreign_type_argument(ty, "Option").map(|path| {
-        let inner_ty: syn::Type = syn::TypePath {
-            qself: None,
-            path: path.clone(),
-        }
-        .into();
-
-        get_deferred_sql_type(&inner_ty)
-    })
-}
-
-fn get_many_sql_type(field: &Field) -> Option<DeferredSqlType> {
-    get_foreign_sql_type(&field.ty, "Many")
-}
-
-fn is_many_to_many(field: &Field) -> bool {
-    get_many_sql_type(field).is_some()
-}
-
-fn is_option(field: &Field) -> bool {
-    get_foreign_type_argument(&field.ty, "Option").is_some()
-}
-
-/// Check for special fields which won't correspond to rows and don't
-/// implement FieldType
-fn is_row_field(f: &Field) -> bool {
-    !is_many_to_many(f)
-}
-
-fn get_foreign_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Option<&'a syn::Path> {
-    let path = match ty {
-        syn::Type::Path(path) => &path.path,
-        _ => return None,
-    };
-    let seg = if path.segments.len() == 2 && path.segments.first().unwrap().ident == "propane" {
-        path.segments.last()
-    } else {
-        path.segments.first()
-    }?;
-    if seg.ident != tyname {
-        return None;
-    }
-    let args = match &seg.arguments {
-        syn::PathArguments::AngleBracketed(args) => &args.args,
-        _ => return None,
-    };
-    if args.len() != 1 {
-        panic!("{} should have a single type argument", tyname)
-    }
-    match args.last().unwrap() {
-        syn::GenericArgument::Type(syn::Type::Path(typath)) => Some(&typath.path),
-        _ => panic!("{} argument should be a type.", tyname),
-    }
-}
-
-fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<DeferredSqlType> {
-    let typath = get_foreign_type_argument(ty, tyname);
-    typath.map(|typath| {
-        DeferredSqlType::Deferred(TypeKey::PK(
-            typath
-                .segments
-                .last()
-                .unwrap_or_else(|| panic!("{} must have an argument", tyname))
-                .ident
-                .to_string(),
-        ))
-    })
-}
-
-fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
-    get_primitive_sql_type(ty)
-        .or_else(|| get_option_sql_type(ty))
-        .or_else(|| get_foreign_sql_type(ty, "ForeignKey"))
-        .unwrap_or_else(|| {
-            DeferredSqlType::Deferred(TypeKey::CustomType(
-                ty.clone().into_token_stream().to_string(),
-            ))
-        })
-}
-
-fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
-    let pk_by_attribute =
-        fields(ast_struct).find(|f| f.attrs.iter().any(|attr| attr.path.is_ident("pk")));
-    if let Some(id_field) = pk_by_attribute {
-        return Some(id_field.clone());
-    }
-    let pk_by_name = ast_struct.fields.iter().find(|f| match &f.ident {
-        Some(ident) => *ident == "id",
-        None => false,
-    });
-    if let Some(id_field) = pk_by_name {
-        Some(id_field.clone())
-    } else {
-        None
-    }
-}
-
-fn is_auto(field: &Field) -> bool {
-    field.attrs.iter().any(|attr| attr.path.is_ident("auto"))
-}
-
-/// Defaults are used for fields added by later migrations
-/// Example
-/// #[default = 42]
-fn get_default(field: &Field) -> std::result::Result<Option<SqlVal>, CompilerErrorMsg> {
-    let attr: Option<&Attribute> = field
-        .attrs
-        .iter()
-        .find(|attr| attr.path.is_ident("default"));
-    let lit: Lit = match attr {
-        None => return Ok(None),
-        Some(attr) => match attr.parse_meta() {
-            Ok(Meta::NameValue(meta)) => meta.lit,
-            _ => return Err(make_compile_error!("malformed default value").into()),
-        },
-    };
-    Ok(Some(sqlval_from_lit(lit)?))
-}
-
-fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
-    ast_struct
-        .fields
-        .iter()
-        .filter(|f| f.ident.clone().unwrap() != "state")
-}
-
-fn sqlval_from_lit(lit: Lit) -> std::result::Result<SqlVal, CompilerErrorMsg> {
-    match lit {
-        Lit::Str(lit) => Ok(SqlVal::Text(lit.value())),
-        Lit::ByteStr(lit) => Ok(SqlVal::Blob(lit.value())),
-        Lit::Byte(_) => Err(make_compile_error!("single byte literal is not supported").into()),
-        Lit::Char(_) => Err(make_compile_error!("single char literal is not supported").into()),
-        Lit::Int(lit) => Ok(SqlVal::Int(lit.base10_parse().unwrap())),
-        Lit::Float(lit) => Ok(SqlVal::Real(lit.base10_parse().unwrap())),
-        Lit::Bool(lit) => Ok(SqlVal::Bool(lit.value)),
-        Lit::Verbatim(_) => {
-            Err(make_compile_error!("raw verbatim literals are not supported").into())
-        }
-    }
-}
-
-#[derive(Debug)]
-struct CompilerErrorMsg {
-    ts: TokenStream2,
-}
-impl CompilerErrorMsg {
-    fn new(ts: TokenStream2) -> Self {
-        CompilerErrorMsg { ts }
-    }
-}
-impl From<TokenStream2> for CompilerErrorMsg {
-    fn from(ts: TokenStream2) -> Self {
-        CompilerErrorMsg::new(ts)
     }
 }

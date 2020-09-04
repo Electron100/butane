@@ -21,4 +21,5 @@ proc-macro-hack = "0.5"
 paste = "0.1"
 chrono = { version = "0.4", features=["serde"] }
 propane_core = { path = "../propane_core", version = "0.1.0" }
+quote = "1.0"
 uuid_for_test = {package="uuid", version = "0.8", features=["v4"] }

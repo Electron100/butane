@@ -1,5 +1,8 @@
 use super::*;
+use crate::migrations::adb::DeferredSqlType;
+use crate::SqlType;
 use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Field, ItemStruct};
 

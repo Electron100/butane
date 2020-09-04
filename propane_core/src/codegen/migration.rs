@@ -1,14 +1,17 @@
 use super::*;
-use propane_core::migrations;
-use propane_core::migrations::adb::{AColumn, ATable};
-use propane_core::migrations::{MigrationMut, MigrationsMut};
-use propane_core::Result;
-use std::path::PathBuf;
+use crate::migrations::adb::{AColumn, ATable};
+use crate::migrations::{MigrationMut, MigrationsMut};
+use crate::Result;
 use syn::{Field, ItemStruct};
 
-pub fn write_table_to_disk(ast_struct: &ItemStruct, config: &dbobj::Config) -> Result<()> {
-    let dir = migrations_dir();
-    let mut ms = migrations::from_root(&dir);
+pub fn write_table_to_disk<M>(
+    ms: &mut impl MigrationsMut<M = M>,
+    ast_struct: &ItemStruct,
+    config: &dbobj::Config,
+) -> Result<()>
+where
+    M: MigrationMut,
+{
     let current_migration = ms.current();
     for table in create_atables(ast_struct, config) {
         current_migration.write_table(&table)?;
@@ -22,22 +25,6 @@ pub fn write_table_to_disk(ast_struct: &ItemStruct, config: &dbobj::Config) -> R
     }
 
     Ok(())
-}
-
-pub fn add_custom_type(name: String, ty: DeferredSqlType) -> Result<()> {
-    let mut ms = migrations::from_root(&migrations_dir());
-    let current_migration = ms.current();
-    let key = TypeKey::CustomType(name);
-    current_migration.add_type(key, ty)
-}
-
-fn migrations_dir() -> PathBuf {
-    let mut dir = PathBuf::from(
-        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR expected to be set"),
-    );
-    dir.push("propane");
-    dir.push("migrations");
-    dir
 }
 
 fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable> {

@@ -5,6 +5,7 @@ use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 use thiserror::Error as ThisError;
 
+pub mod codegen;
 pub mod db;
 pub mod fkey;
 pub mod many;

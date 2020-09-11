@@ -29,7 +29,7 @@ impl SQLiteBackend {
     }
 }
 impl Backend for SQLiteBackend {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         "sqlite"
     }
 

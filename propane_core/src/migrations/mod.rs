@@ -151,7 +151,7 @@ where
         for table in to_db.tables() {
             m.write_table(table)?;
         }
-        m.add_sql(backend.get_name(), &up_sql, &down_sql)?;
+        m.add_sql(backend.name(), &up_sql, &down_sql)?;
         m.set_migration_from(from.map(|m| m.name().to_string()))?;
 
         self.add_migration(m)?;

@@ -100,14 +100,14 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
 
 /// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
 pub trait Backend {
-    fn get_name(&self) -> &'static str;
+    fn name(&self) -> &'static str;
     fn create_migration_sql(&self, current: &adb::ADB, ops: &[adb::Operation]) -> Result<String>;
     fn connect(&self, conn_str: &str) -> Result<Connection>;
 }
 
 impl Backend for Box<dyn Backend> {
-    fn get_name(&self) -> &'static str {
-        self.deref().get_name()
+    fn name(&self) -> &'static str {
+        self.deref().name()
     }
     fn create_migration_sql(&self, current: &adb::ADB, ops: &[adb::Operation]) -> Result<String> {
         self.deref().create_migration_sql(current, ops)

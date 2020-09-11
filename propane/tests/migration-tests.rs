@@ -201,7 +201,7 @@ fn test_migrate(
     let actual_sql = ms
         .latest()
         .unwrap()
-        .up_sql(backend.get_name())
+        .up_sql(backend.name())
         .unwrap()
         .unwrap();
     assert_eq!(actual_sql, expected_sql);

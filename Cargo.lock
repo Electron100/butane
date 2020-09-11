@@ -338,6 +338,7 @@ dependencies = [
  "chrono 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "paste 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro-hack 0.5.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "proc-macro2 1.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "propane_codegen 0.1.0",
  "propane_core 0.1.0",
  "quote 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",

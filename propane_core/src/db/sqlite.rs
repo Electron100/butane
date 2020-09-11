@@ -66,6 +66,9 @@ impl BackendConnection for SQLiteConnection {
         let trans = Box::new(SqliteTransaction::new(trans));
         Ok(Transaction::new(trans))
     }
+    fn backend(&self) -> Box<dyn Backend> {
+        Box::new(SQLiteBackend {})
+    }
 }
 impl ConnectionMethods for SQLiteConnection {
     fn backend_name(&self) -> &'static str {

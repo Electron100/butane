@@ -1,3 +1,4 @@
+#![allow(dead_code)] //this module is used by multiple tests, not all use all parts
 use propane::db::{Backend, Connection};
 use propane::migrations::{MemMigrations, Migration, Migrations, MigrationsMut};
 
@@ -28,6 +29,11 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {
         println!("Applying migration {}", m.name());
         m.apply(conn).unwrap();
     }
+}
+
+pub fn sqlite_connection() -> Connection {
+    let backend = propane::db::get_backend("sqlite").unwrap();
+    backend.connect(":memory:").unwrap()
 }
 
 #[macro_export]

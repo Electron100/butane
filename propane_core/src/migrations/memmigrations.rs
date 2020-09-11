@@ -5,8 +5,6 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-type SqlTypeMap = HashMap<TypeKey, DeferredSqlType>;
-
 /// A migration stored in memory.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MemMigration {
@@ -15,7 +13,6 @@ pub struct MemMigration {
     from: Option<String>,
     up: HashMap<String, String>,
     down: HashMap<String, String>,
-    types: SqlTypeMap,
 }
 
 impl MemMigration {
@@ -26,14 +23,15 @@ impl MemMigration {
             from: None,
             up: HashMap::new(),
             down: HashMap::new(),
-            types: SqlTypeMap::new(),
         }
     }
 }
 
 impl Migration for MemMigration {
     fn db(&self) -> Result<ADB> {
-        Ok(self.db.clone())
+        let mut ret = self.db.clone();
+        ret.resolve_types()?;
+        Ok(ret)
     }
 
     fn migration_from(&self) -> Result<Option<Cow<str>>> {
@@ -67,6 +65,7 @@ impl Eq for MemMigration {}
 impl MigrationMut for MemMigration {
     fn write_table(&mut self, table: &ATable) -> Result<()> {
         self.db.replace_table(table.clone());
+        self.db.resolve_types()?;
         Ok(())
     }
     fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()> {
@@ -76,7 +75,8 @@ impl MigrationMut for MemMigration {
         Ok(())
     }
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
-        self.types.insert(key, sqltype);
+        self.db.add_type(key, sqltype);
+        self.db.resolve_types()?;
         Ok(())
     }
     fn set_migration_from(&mut self, prev: Option<String>) -> Result<()> {

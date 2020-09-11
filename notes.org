@@ -51,17 +51,16 @@
 		 Now in progress
 	 + Optional dependencies
 	 + PG support
-	 + Many backreferences
 	 + migration downgrade
 	 + Deleting tables doesn't work, old table file will still be there
 	 + Missing tests
-		 - migrations
 		 - separate DataResult
-		 - default attribute
 	 + Clean up TODOs
+	 + rename get_name to just name
 ** vNext
 	 + foreign key constraints in db, cascade setting
 	 + incremental save
+	 + Many backreferences
 
 
 * ManyToMany

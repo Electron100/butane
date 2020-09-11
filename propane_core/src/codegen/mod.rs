@@ -2,10 +2,12 @@ use crate::migrations::adb::{DeferredSqlType, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::{SqlType, SqlVal};
 use proc_macro2::TokenStream as TokenStream2;
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident, Span, TokenTree};
 use quote::{quote, ToTokens};
 use syn::parse_quote;
-use syn::{Attribute, Field, ItemStruct, Lit, LitStr, Meta, MetaNameValue, NestedMeta};
+use syn::{
+    Attribute, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta, MetaNameValue, NestedMeta,
+};
 
 #[macro_export]
 macro_rules! make_compile_error {
@@ -98,6 +100,70 @@ where
         #fieldexprs
     )
     .into()
+}
+
+pub fn propane_type_with_migrations<M>(
+    args: TokenStream2,
+    input: TokenStream2,
+    ms: &mut impl MigrationsMut<M = M>,
+) -> TokenStream2
+where
+    M: MigrationMut,
+{
+    let mut tyinfo: Option<CustomTypeInfo> = None;
+    let type_alias: syn::Result<ItemType> = syn::parse2(input.clone());
+    if let Ok(type_alias) = type_alias {
+        tyinfo = Some(CustomTypeInfo {
+            name: type_alias.ident.to_string(),
+            ty: get_deferred_sql_type(&type_alias.ty),
+        })
+    }
+
+    if tyinfo.is_none() {
+        // For types below here, we need the SqlType given to us
+        let args: TokenStream2 = args.into();
+        let args: Vec<TokenTree> = args.into_iter().collect();
+        if args.len() != 1 {
+            return quote!(compile_error!("Expected propane_type(sqltype)");).into();
+        }
+        let tyid = match &args[0] {
+            TokenTree::Ident(tyid) => tyid.clone(),
+            _ => return quote!(compile_error!("Unexpected tokens in propane_type");).into(),
+        };
+        let sqltype = match sqltype_from_name(&tyid) {
+            Some(ty) => ty,
+            None => {
+                eprintln!("No SqlType value named {}", tyid.to_string());
+                return quote!(compile_error!("No SqlType value with the given name");).into();
+            }
+        };
+
+        if let Ok(item) = syn::parse2::<ItemStruct>(input.clone()) {
+            tyinfo = Some(CustomTypeInfo {
+                name: item.ident.to_string(),
+                ty: DeferredSqlType::Known(sqltype),
+            });
+        } else if let Ok(item) = syn::parse2::<ItemEnum>(input.clone()) {
+            tyinfo = Some(CustomTypeInfo {
+                name: item.ident.to_string(),
+                ty: DeferredSqlType::Known(sqltype),
+            });
+        }
+    }
+
+    match tyinfo {
+        Some(tyinfo) => match add_custom_type(ms, tyinfo.name, tyinfo.ty) {
+            Ok(()) => input,
+            Err(e) => {
+                eprintln!("unable to save type {}", e);
+                quote!(compile_error!("unable to save type");).into()
+            }
+        },
+        None => {
+            quote!(compile_error!("The #[propane_type] macro wasn't expected to be used here");)
+                .into()
+        }
+    }
 }
 
 fn make_ident_literal_str(ident: &Ident) -> LitStr {
@@ -304,6 +370,39 @@ fn sqlval_from_lit(lit: Lit) -> std::result::Result<SqlVal, CompilerErrorMsg> {
         Lit::Verbatim(_) => {
             Err(make_compile_error!("raw verbatim literals are not supported").into())
         }
+    }
+}
+
+struct CustomTypeInfo {
+    name: String,
+    ty: DeferredSqlType,
+}
+
+fn add_custom_type<M>(
+    ms: &mut impl MigrationsMut<M = M>,
+    name: String,
+    ty: DeferredSqlType,
+) -> crate::Result<()>
+where
+    M: MigrationMut,
+{
+    let current_migration = ms.current();
+    let key = TypeKey::CustomType(name);
+    current_migration.add_type(key, ty)
+}
+
+fn sqltype_from_name(name: &Ident) -> Option<SqlType> {
+    let name = name.to_string();
+    match name.as_ref() {
+        "Bool" => Some(SqlType::Bool),
+        "Int" => Some(SqlType::Int),
+        "BigInt" => Some(SqlType::BigInt),
+        "Real" => Some(SqlType::Real),
+        "Text" => Some(SqlType::Text),
+        #[cfg(feature = "datetime")]
+        "Timestamp" => Some(SqlType::Timestamp),
+        "Blob" => Some(SqlType::Blob),
+        _ => None,
     }
 }
 

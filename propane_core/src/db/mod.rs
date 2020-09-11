@@ -37,6 +37,8 @@ pub trait BackendConnection: ConnectionMethods + Send + 'static {
     /// Begin a database transaction. The transaction object must be
     /// used in place of this connection until it is committed and aborted.
     fn transaction(&mut self) -> Result<Transaction>;
+    /// Retrieve the backend backend this connection
+    fn backend(&self) -> Box<dyn Backend>;
 }
 
 /// Database connection. May be a connection to any type of database
@@ -52,6 +54,9 @@ impl Connection {
 impl BackendConnection for Connection {
     fn transaction(&mut self) -> Result<Transaction> {
         self.conn.transaction()
+    }
+    fn backend(&self) -> Box<dyn Backend> {
+        self.conn.backend()
     }
 }
 connection_method_wrapper!(Connection);

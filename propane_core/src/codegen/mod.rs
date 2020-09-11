@@ -80,11 +80,11 @@ where
                 });
             }
         }
-        _ => return make_compile_error!("Fields must be named").into(),
+        _ => return make_compile_error!("Fields must be named"),
     };
     let fields = match ast_struct.fields {
         syn::Fields::Named(fields) => fields.named,
-        _ => return make_compile_error!("Fields must be named").into(),
+        _ => return make_compile_error!("Fields must be named"),
     };
 
     let ident = ast_struct.ident;
@@ -99,7 +99,6 @@ where
         #impltraits
         #fieldexprs
     )
-    .into()
 }
 
 pub fn propane_type_with_migrations<M>(
@@ -121,20 +120,20 @@ where
 
     if tyinfo.is_none() {
         // For types below here, we need the SqlType given to us
-        let args: TokenStream2 = args.into();
+        let args: TokenStream2 = args;
         let args: Vec<TokenTree> = args.into_iter().collect();
         if args.len() != 1 {
-            return quote!(compile_error!("Expected propane_type(sqltype)");).into();
+            return quote!(compile_error!("Expected propane_type(sqltype)"););
         }
         let tyid = match &args[0] {
             TokenTree::Ident(tyid) => tyid.clone(),
-            _ => return quote!(compile_error!("Unexpected tokens in propane_type");).into(),
+            _ => return quote!(compile_error!("Unexpected tokens in propane_type");),
         };
         let sqltype = match sqltype_from_name(&tyid) {
             Some(ty) => ty,
             None => {
                 eprintln!("No SqlType value named {}", tyid.to_string());
-                return quote!(compile_error!("No SqlType value with the given name");).into();
+                return quote!(compile_error!("No SqlType value with the given name"););
             }
         };
 
@@ -156,12 +155,11 @@ where
             Ok(()) => input,
             Err(e) => {
                 eprintln!("unable to save type {}", e);
-                quote!(compile_error!("unable to save type");).into()
+                quote!(compile_error!("unable to save type");)
             }
         },
         None => {
             quote!(compile_error!("The #[propane_type] macro wasn't expected to be used here");)
-                .into()
         }
     }
 }

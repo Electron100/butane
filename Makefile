@@ -17,3 +17,6 @@ clean :
 
 doc :
 	cd propane && cargo +nightly doc --all-features
+
+install :
+	cd propane_cli && cargo install --path .

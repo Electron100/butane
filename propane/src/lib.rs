@@ -1,4 +1,3 @@
-use proc_macro_hack::proc_macro_hack;
 pub use propane_codegen::{model, propane_type};
 pub use propane_core::db;
 pub use propane_core::fkey::ForeignKey;
@@ -28,8 +27,7 @@ pub use propane_core::{
 /// ```
 /// # use propane::query::BoolExpr;
 /// # use propane_codegen::model;
-/// # use proc_macro_hack::proc_macro_hack;
-/// # #[proc_macro_hack] use propane_codegen::filter;
+/// # use propane_codegen::filter;
 /// #[model]
 /// struct Contestant {
 ///   #[pk]
@@ -42,7 +40,6 @@ pub use propane_core::{
 ///
 /// [`BoolExpr`]: crate::query::BoolExpr
 /// [`Query`]: crate::query::Query
-#[proc_macro_hack]
 pub use propane_codegen::filter;
 
 /// Constructs a filtered database query.

@@ -15,6 +15,7 @@ pub fn handle_expr(fields: &impl ToTokens, expr: &Expr) -> TokenStream2 {
         Expr::Path(path) => handle_path(fields, path),
         Expr::Lit(lit) => lit.lit.clone().into_token_stream(),
         Expr::Block(block) => handle_block(&block.block),
+        Expr::Group(group) => handle_expr(fields, group.expr.as_ref()),
         _ => {
             let lit = LitStr::new(
                 &format!(

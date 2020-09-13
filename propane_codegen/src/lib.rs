@@ -6,11 +6,10 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
-use proc_macro_hack::proc_macro_hack;
 use propane_core::*;
 use quote::quote;
 use std::path::PathBuf;
-use syn::Expr;
+use syn::{Expr, Ident};
 
 mod filter;
 
@@ -56,21 +55,31 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     codegen::model_with_migrations(input.into(), &mut migrations_for_dir()).into()
 }
 
-#[proc_macro_hack]
+#[proc_macro]
 pub fn filter(input: TokenStream) -> TokenStream {
     let input: TokenStream2 = input.into();
     let args: Vec<TokenTree> = input.into_iter().collect();
     if args.len() < 2 {
-        return quote!(compile_error!("Expected filter!(Type, expression)")).into();
+        return make_compile_error!("Expected filter!(Type, expression)").into();
     }
-    let tyid = match &args[0] {
+    let tyid: Ident = match &args[0] {
         TokenTree::Ident(tyid) => tyid.clone(),
-        _ => return quote!(compile_error!("Unexpected tokens in database object type")).into(),
+        TokenTree::Group(g) => match syn::parse2::<Ident>(g.stream()) {
+            Ok(ident) => ident,
+            Err(_) => {
+                return make_compile_error!("Unexpected tokens in database object type {:?}", &g)
+                    .into()
+            }
+        },
+        _ => {
+            return make_compile_error!("Unexpected tokens in database object type {:?}", &args[0])
+                .into()
+        }
     };
 
     if let TokenTree::Punct(_) = args[1] {
     } else {
-        return quote!(compile_error!("Expected filter!(Type, expression)")).into();
+        return make_compile_error!("Expected filter!(Type, expression)").into();
     }
 
     let expr: TokenStream2 = args.into_iter().skip(2).collect();

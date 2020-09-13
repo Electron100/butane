@@ -9,8 +9,6 @@ datetime = []
 
 [dependencies]
 proc-macro2 = "1.0"
-# Required for proc_macro in expression position until issue #54727 is fixed.
-proc-macro-hack = "0.5"
 propane_core = { path = "../propane_core", version = "0.1.0" }
 quote = "1.0"
 syn = { version = "1.0", features = ["full", "extra-traits"] }

@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use propane::migrations::{
-    adb::DeferredSqlType, adb::TypeKey, MemMigrations, Migration, Migrations, MigrationsMut,
+    adb::DeferredSqlType, adb::TypeKey, MemMigrations, Migration, MigrationMut, Migrations,
+    MigrationsMut,
 };
 use propane::{db::Connection, prelude::*, SqlType, SqlVal};
 use propane_core::codegen::{model_with_migrations, propane_type_with_migrations};
@@ -177,6 +178,11 @@ fn migration_add_field_with_default_sqlite() {
     );
 }
 
+#[test]
+fn migration_delete_table_sqlite() {
+    migration_delete_table(&mut common::sqlite_connection(), "DROP TABLE Foo;");
+}
+
 fn test_migrate(
     conn: &mut Connection,
     init_tokens: TokenStream,
@@ -242,4 +248,36 @@ fn migration_add_field_with_default(conn: &mut Connection, sql: &str) {
         }
     };
     test_migrate(conn, init, v2, sql);
+}
+
+fn migration_delete_table(conn: &mut Connection, expected_sql: &str) {
+    let init_tokens = quote! {
+        struct Foo {
+            id: i64,
+            bar: String,
+        }
+    };
+
+    let mut ms = MemMigrations::new();
+    let backend = conn.backend();
+    model_with_migrations(init_tokens, &mut ms);
+    assert!(ms.create_migration(&backend, "init", None).unwrap());
+
+    ms.current().delete_table("Foo").unwrap();
+    assert!(ms
+        .create_migration(&backend, "v2", ms.latest().as_ref())
+        .unwrap());
+
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
+    assert_eq!(to_apply.len(), 2);
+    for m in to_apply {
+        m.apply(conn).unwrap();
+    }
+    let actual_sql = ms
+        .latest()
+        .unwrap()
+        .up_sql(backend.name())
+        .unwrap()
+        .unwrap();
+    assert_eq!(actual_sql, expected_sql);
 }

@@ -1,7 +1,7 @@
 use chrono::Utc;
 use clap::{Arg, ArgMatches};
 use propane::migrations::{
-    copy_migration, FsMigrations, MemMigrations, Migration, Migrations, MigrationsMut,
+    copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
 use propane::{db, migrations};
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 type Result<T> = std::result::Result<T, failure::Error>;
 
 fn main() {
-    let args = clap::App::new("propane")
+    let app = clap::App::new("propane")
         .version(env!("CARGO_PKG_VERSION"))
         .author("James Oakley <james@electronstudio.org>")
         .about("Manages propane database migrations")
@@ -47,14 +47,35 @@ fn main() {
         .subcommand(
             clap::SubCommand::with_name("embed").about("Embed migrations in the source code"),
         )
-        .setting(clap::AppSettings::ArgRequiredElseHelp)
-        .get_matches();
+        .subcommand(
+            clap::SubCommand::with_name("delete")
+                .about("Delete a table")
+                .setting(clap::AppSettings::ArgRequiredElseHelp)
+                .subcommand(
+                    clap::SubCommand::with_name("table")
+                        .about("Delete a table")
+                        .arg(
+                            Arg::with_name("TABLE")
+                                .required(true)
+                                .index(1)
+                                .help("Name of table to delete"),
+                        ),
+                ),
+        )
+        .setting(clap::AppSettings::ArgRequiredElseHelp);
+    let args = app.get_matches();
     match args.subcommand() {
         ("init", sub_args) => handle_error(init(sub_args)),
         ("makemigration", sub_args) => handle_error(make_migration(sub_args)),
         ("migrate", _) => handle_error(migrate()),
         ("embed", _) => handle_error(embed()),
         ("list", _) => handle_error(list_migrations()),
+        ("delete", Some(sub_args)) => match sub_args.subcommand() {
+            ("table", Some(sub_args2)) => {
+                handle_error(delete_table(sub_args2.value_of("TABLE").unwrap()))
+            }
+            (_, _) => eprintln!("Unknown delete command. Try: delete table"),
+        },
         (cmd, _) => eprintln!("Unknown command {}", cmd),
     }
 }
@@ -192,6 +213,13 @@ fn list_migrations() -> Result<()> {
         };
         println!("Migration '{}' ({})", m.name(), m_state);
     }
+    Ok(())
+}
+
+fn delete_table(name: &str) -> Result<()> {
+    let mut ms = get_migrations()?;
+    let current = ms.current();
+    current.delete_table(name)?;
     Ok(())
 }
 

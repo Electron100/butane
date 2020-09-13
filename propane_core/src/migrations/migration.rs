@@ -59,6 +59,12 @@ pub trait MigrationMut: Migration {
     /// migration in this fashion.
     fn write_table(&mut self, table: &ATable) -> Result<()>;
 
+    /// Delete the table with the given name. Note that simply
+    /// deleting a table in code does not work -- it will remain with
+    /// its last known schema unless explicitly deleted. See also the
+    /// propane cli command `propane delete table <TABLE>`.
+    fn delete_table(&mut self, name: &str) -> Result<()>;
+
     /// Set the backend-specific commands to apply/undo this migration.
     fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()>;
 

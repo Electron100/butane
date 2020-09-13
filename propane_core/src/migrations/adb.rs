@@ -141,6 +141,9 @@ impl ADB {
     pub fn replace_table(&mut self, table: ATable) {
         self.tables.insert(table.name.clone(), table);
     }
+    pub fn remove_table(&mut self, name: &str) {
+        self.tables.remove(name);
+    }
     pub fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) {
         self.extra_types.insert(key, sqltype);
     }

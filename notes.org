@@ -52,7 +52,6 @@
 	 + Optional dependencies
 	 + PG support
 	 + migration downgrade
-	 + Deleting tables doesn't work, old table file will still be there
 	 + Missing tests
 		 - separate DataResult
 	 + Clean up TODOs
@@ -62,6 +61,3 @@
 	 + Many backreferences
 
 
-* ManyToMany
-	- separate table for each ManyToMany field. Named TYPE_FIELD_Many
-	- One row for each value

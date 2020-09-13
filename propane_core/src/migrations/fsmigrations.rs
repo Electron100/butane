@@ -126,6 +126,14 @@ impl MigrationMut for FsMigration {
         )
     }
 
+    fn delete_table(&mut self, table: &str) -> Result<()> {
+        let fname = format!("{}.table", table);
+        self.ensure_dir()?;
+        let path = self.root.join(fname);
+        std::fs::remove_file(&path)?;
+        Ok(())
+    }
+
     fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()> {
         self.write_sql(&format!("{}_up", backend_name), &up_sql)?;
         self.write_sql(&format!("{}_down", backend_name), &down_sql)?;

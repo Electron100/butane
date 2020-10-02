@@ -35,26 +35,10 @@ where
     // attributes but proc macro attributes can't yet (nor can they
     // create field attributes)
     let mut ast_struct: ItemStruct = syn::parse2(input).unwrap();
-    let mut config = dbobj::Config::default();
-    for attr in &ast_struct.attrs {
-        if let Ok(Meta::NameValue(MetaNameValue {
-            path,
-            lit: Lit::Str(s),
-            ..
-        })) = attr.parse_meta()
-        {
-            if path.is_ident("table") {
-                config.table_name = Some(s.value())
-            }
-        }
-    }
+    let config: dbobj::Config = config_from_attributes(&ast_struct);
+
     // Filter out our helper attributes
-    let attrs: Vec<Attribute> = ast_struct
-        .attrs
-        .clone()
-        .into_iter()
-        .filter(|a| !a.path.is_ident("table"))
-        .collect();
+    let attrs: Vec<Attribute> = filter_helper_attributes(&ast_struct);
 
     let state_attrs = if has_derive_serialize(&attrs) {
         quote!(#[serde(skip)])
@@ -69,22 +53,9 @@ where
     let impltraits = dbobj::impl_dbobject(&ast_struct, &config);
     let fieldexprs = dbobj::add_fieldexprs(&ast_struct);
 
-    match &mut ast_struct.fields {
-        syn::Fields::Named(fields) => {
-            for field in &mut fields.named {
-                field.attrs.retain(|a| {
-                    !a.path.is_ident("pk")
-                        && !a.path.is_ident("auto")
-                        && !a.path.is_ident("sqltype")
-                        && !a.path.is_ident("default")
-                });
-            }
-        }
-        _ => return make_compile_error!("Fields must be named"),
-    };
-    let fields = match ast_struct.fields {
-        syn::Fields::Named(fields) => fields.named,
-        _ => return make_compile_error!("Fields must be named"),
+    let fields = match remove_helper_field_attributes(&mut ast_struct.fields) {
+        Ok(fields) => &fields.named,
+        Err(err) => return err,
     };
 
     let ident = ast_struct.ident;
@@ -98,6 +69,40 @@ where
         }
         #impltraits
         #fieldexprs
+    )
+}
+
+pub fn dataresult(input: TokenStream2) -> TokenStream2 {
+    let mut ast_struct: ItemStruct = syn::parse2(input).unwrap();
+    let config: dbobj::Config = config_from_attributes(&ast_struct);
+
+    // Filter out our helper attributes
+    let attrs: Vec<Attribute> = filter_helper_attributes(&ast_struct);
+
+    let state_attrs = if has_derive_serialize(&attrs) {
+        quote!(#[serde(skip)])
+    } else {
+        TokenStream2::new()
+    };
+
+    let vis = &ast_struct.vis;
+
+    let impltraits = dbobj::impl_dataresult(&ast_struct, &config);
+
+    let fields = match remove_helper_field_attributes(&mut ast_struct.fields) {
+        Ok(fields) => fields,
+        Err(err) => return err,
+    };
+
+    let ident = ast_struct.ident;
+
+    quote!(
+        #(#attrs)*
+        #vis struct #ident {
+            #state_attrs
+            #fields
+        }
+        #impltraits
     )
 }
 
@@ -171,6 +176,51 @@ fn make_ident_literal_str(ident: &Ident) -> LitStr {
 
 pub fn make_lit(s: &str) -> LitStr {
     LitStr::new(s, Span::call_site())
+}
+
+fn filter_helper_attributes(ast_struct: &ItemStruct) -> Vec<Attribute> {
+    ast_struct
+        .attrs
+        .clone()
+        .into_iter()
+        .filter(|a| !a.path.is_ident("table"))
+        .collect()
+}
+
+fn config_from_attributes(ast_struct: &ItemStruct) -> dbobj::Config {
+    let mut config = dbobj::Config::default();
+    for attr in &ast_struct.attrs {
+        if let Ok(Meta::NameValue(MetaNameValue {
+            path,
+            lit: Lit::Str(s),
+            ..
+        })) = attr.parse_meta()
+        {
+            if path.is_ident("table") {
+                config.table_name = Some(s.value())
+            }
+        }
+    }
+    config
+}
+
+fn remove_helper_field_attributes(
+    fields: &mut syn::Fields,
+) -> std::result::Result<&syn::FieldsNamed, TokenStream2> {
+    match fields {
+        syn::Fields::Named(fields) => {
+            for field in &mut fields.named {
+                field.attrs.retain(|a| {
+                    !a.path.is_ident("pk")
+                        && !a.path.is_ident("auto")
+                        && !a.path.is_ident("sqltype")
+                        && !a.path.is_ident("default")
+                });
+            }
+            Ok(fields)
+        }
+        _ => Err(make_compile_error!("Fields must be named")),
+    }
 }
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {

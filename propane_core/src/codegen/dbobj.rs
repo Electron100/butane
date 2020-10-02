@@ -15,10 +15,7 @@ pub struct Config {
 // implement the DataObject trait
 pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let tablelit = match &config.table_name {
-        Some(s) => make_lit(&s),
-        None => make_ident_literal_str(&tyname),
-    };
+    let tablelit = make_tablelit(config, tyname);
 
     let err = verify_fields(ast_struct);
     if let Some(err) = err {
@@ -30,66 +27,32 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let pkident = pk_field.ident.clone().unwrap();
     let pklit = make_ident_literal_str(&pkident);
 
-    let cols = columns(ast_struct, |_| true);
     let insert_cols = columns(ast_struct, |f| !is_auto(f));
     let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
-
-    let fields_type = fields_type(tyname);
 
     let mut post_insert: Vec<TokenStream2> = Vec::new();
     add_post_insert_for_auto(&pk_field, &mut post_insert);
     post_insert.push(quote!(self.state.saved = true;));
 
-    let rows = rows_for_from(&ast_struct);
     let numdbfields = fields(&ast_struct).filter(|f| is_row_field(f)).count();
-    let (many_init, many_save): (TokenStream2, TokenStream2) =
-        fields(&ast_struct)
-        .filter(|f| is_many_to_many(f))
-        .map(|f| {
-            let ident = f
-                .ident
-                .clone()
-                .expect("Fields must be named for propane");
-            let many_table_lit = many_table_lit(&ast_struct, f);
-            let pksqltype = quote!(<<Self as propane::DataObject>::PKType as propane::FieldType>::SQLTYPE);
-            let init = quote!(obj.#ident.ensure_init(#many_table_lit, propane::ToSql::to_sql(obj.pk()), #pksqltype););
-            // Save also needs to ensure_initialized
-            let save = quote!(
-                self.#ident.ensure_init(#many_table_lit, propane::ToSql::to_sql(self.pk()), #pksqltype);
-                self.#ident.save(conn)?;
-            );
-            (init, save)
-        })
-        .unzip();
+    let many_save: TokenStream2 = fields(&ast_struct).filter(|f| is_many_to_many(f)).map(|f| {
+        let ident = f.ident.clone().expect("Fields must be named for propane");
+        let many_table_lit = many_table_lit(&ast_struct, f);
+        let pksqltype =
+            quote!(<<Self as propane::DataObject>::PKType as propane::FieldType>::SQLTYPE);
+        // Save  needs to ensure_initialized
+        quote!(
+            self.#ident.ensure_init(#many_table_lit, propane::ToSql::to_sql(self.pk()), #pksqltype);
+            self.#ident.save(conn)?;
+        )
+    }).collect();
 
     let values: Vec<TokenStream2> = push_values(&ast_struct, |_| true);
     let values_no_pk: Vec<TokenStream2> = push_values(&ast_struct, |f: &Field| f != &pk_field);
 
+    let dataresult = impl_dataresult(ast_struct, config);
     quote!(
-        impl propane::DataResult for #tyname {
-            type DBO = #tyname;
-            type Fields = #fields_type;
-            const COLUMNS: &'static [propane::db::Column] = &[
-                #cols
-            ];
-            fn from_row(mut row: propane::db::Row) -> propane::Result<Self> {
-                if row.len() != #numdbfields {
-                    return Err(propane::Error::BoundsError(
-                        "Found unexpected number of columns in row for DataResult".to_string()));
-                }
-                let mut it = row.into_iter();
-                let mut obj = #tyname {
-                    state: propane::ObjectState::default(),
-                    #(#rows),*
-                };
-                obj.state.saved = true;
-                #many_init
-                Ok(obj)
-            }
-            fn query() -> propane::query::Query<Self> {
-                propane::query::Query::new(#tablelit)
-            }
-        }
+                #dataresult
         impl propane::DataObject for #tyname {
             type PKType = #pktype;
             const PKCOL: &'static str = #pklit;
@@ -148,6 +111,62 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             }
         }
     )
+}
+
+pub fn impl_dataresult(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
+    let tyname = &ast_struct.ident;
+    let tablelit = make_tablelit(config, tyname);
+    let fields_type = fields_type(tyname);
+    let numdbfields = fields(&ast_struct).filter(|f| is_row_field(f)).count();
+    let rows = rows_for_from(&ast_struct);
+    let cols = columns(ast_struct, |_| true);
+
+    let many_init: TokenStream2 =
+        fields(&ast_struct)
+        .filter(|f| is_many_to_many(f))
+        .map(|f| {
+            let ident = f
+                .ident
+                .clone()
+                .expect("Fields must be named for propane");
+            let many_table_lit = many_table_lit(&ast_struct, f);
+            let pksqltype = quote!(<<Self as propane::DataObject>::PKType as propane::FieldType>::SQLTYPE);
+            quote!(obj.#ident.ensure_init(#many_table_lit, propane::ToSql::to_sql(obj.pk()), #pksqltype);)
+        }).collect();
+
+    quote!(
+                impl propane::DataResult for #tyname {
+                        type DBO = #tyname;
+                        type Fields = #fields_type;
+                        const COLUMNS: &'static [propane::db::Column] = &[
+                                #cols
+                        ];
+                        fn from_row(mut row: propane::db::Row) -> propane::Result<Self> {
+                                if row.len() != #numdbfields {
+                                        return Err(propane::Error::BoundsError(
+                                                "Found unexpected number of columns in row for DataResult".to_string()));
+                                }
+                                let mut it = row.into_iter();
+                                let mut obj = #tyname {
+                                        state: propane::ObjectState::default(),
+                                        #(#rows),*
+                                };
+                                obj.state.saved = true;
+                                #many_init
+                                Ok(obj)
+                        }
+                        fn query() -> propane::query::Query<Self> {
+                                propane::query::Query::new(#tablelit)
+                        }
+                }
+    )
+}
+
+fn make_tablelit(config: &Config, tyname: &Ident) -> LitStr {
+    match &config.table_name {
+        Some(s) => make_lit(&s),
+        None => make_ident_literal_str(&tyname),
+    }
 }
 
 pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {

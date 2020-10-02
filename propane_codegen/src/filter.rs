@@ -35,7 +35,8 @@ fn ident(name: &str) -> Ident {
 }
 
 fn handle_block(block: &syn::Block) -> TokenStream2 {
-    quote!(#block)
+    let stmts = &block.stmts;
+    quote!(#(#stmts)*)
 }
 
 fn handle_bin_op(fields: &impl ToTokens, binop: &ExprBinary) -> TokenStream2 {

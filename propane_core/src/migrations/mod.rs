@@ -206,7 +206,6 @@ struct PropaneMigration {
 }
 impl DataResult for PropaneMigration {
     type DBO = Self;
-    type Fields = (); // we don't need Fields as we never filter
     const COLUMNS: &'static [Column] = &[Column::new("name", SqlType::Text)];
     fn from_row(row: Row) -> Result<Self> {
         if row.len() != 1usize {
@@ -225,6 +224,7 @@ impl DataResult for PropaneMigration {
 }
 impl DataObject for PropaneMigration {
     type PKType = String;
+    type Fields = (); // we don't need Fields as we never filter
     const PKCOL: &'static str = "name";
     const TABLE: &'static str = "propane_migrations";
     fn pk(&self) -> &String {

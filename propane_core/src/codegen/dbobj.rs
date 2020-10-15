@@ -16,6 +16,7 @@ pub struct Config {
 pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let tablelit = make_tablelit(config, tyname);
+    let fields_type = fields_type(tyname);
 
     let err = verify_fields(ast_struct);
     if let Some(err) = err {
@@ -50,11 +51,12 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let values: Vec<TokenStream2> = push_values(&ast_struct, |_| true);
     let values_no_pk: Vec<TokenStream2> = push_values(&ast_struct, |f: &Field| f != &pk_field);
 
-    let dataresult = impl_dataresult(ast_struct, config);
+    let dataresult = impl_dataresult(ast_struct, &tyname);
     quote!(
                 #dataresult
         impl propane::DataObject for #tyname {
             type PKType = #pktype;
+                        type Fields = #fields_type;
             const PKCOL: &'static str = #pklit;
             const TABLE: &'static str = #tablelit;
             fn pk(&self) -> &Self::PKType {
@@ -113,10 +115,8 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     )
 }
 
-pub fn impl_dataresult(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
+pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let tablelit = make_tablelit(config, tyname);
-    let fields_type = fields_type(tyname);
     let numdbfields = fields(&ast_struct).filter(|f| is_row_field(f)).count();
     let rows = rows_for_from(&ast_struct);
     let cols = columns(ast_struct, |_| true);
@@ -134,10 +134,26 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, config: &Config) -> TokenStream2
             quote!(obj.#ident.ensure_init(#many_table_lit, propane::ToSql::to_sql(obj.pk()), #pksqltype);)
         }).collect();
 
+    let dbo_is_self = dbo == tyname;
+    let ctor = if dbo_is_self {
+        quote!(
+            let mut obj = #tyname {
+                                state: propane::ObjectState::default(),
+                                #(#rows),*
+                        };
+                        obj.state.saved = true;
+        )
+    } else {
+        quote!(
+            let mut obj = #tyname {
+                #(#rows),*
+            };
+        )
+    };
+
     quote!(
                 impl propane::DataResult for #tyname {
-                        type DBO = #tyname;
-                        type Fields = #fields_type;
+                        type DBO = #dbo;
                         const COLUMNS: &'static [propane::db::Column] = &[
                                 #cols
                         ];
@@ -147,17 +163,14 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, config: &Config) -> TokenStream2
                                                 "Found unexpected number of columns in row for DataResult".to_string()));
                                 }
                                 let mut it = row.into_iter();
-                                let mut obj = #tyname {
-                                        state: propane::ObjectState::default(),
-                                        #(#rows),*
-                                };
-                                obj.state.saved = true;
+                                #ctor
                                 #many_init
                                 Ok(obj)
                         }
-                        fn query() -> propane::query::Query<Self> {
-                                propane::query::Query::new(#tablelit)
-                        }
+                    fn query() -> propane::query::Query<Self> {
+                        use propane::prelude::DataObject;
+                        propane::query::Query::new(Self::DBO::TABLE)
+                    }
                 }
     )
 }

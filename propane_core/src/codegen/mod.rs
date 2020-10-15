@@ -72,9 +72,10 @@ where
     )
 }
 
-pub fn dataresult(input: TokenStream2) -> TokenStream2 {
+pub fn dataresult(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
+    let dbo: Ident = syn::parse2(args)
+        .expect("Model type must be specified as argument to dataresult attribute");
     let mut ast_struct: ItemStruct = syn::parse2(input).unwrap();
-    let config: dbobj::Config = config_from_attributes(&ast_struct);
 
     // Filter out our helper attributes
     let attrs: Vec<Attribute> = filter_helper_attributes(&ast_struct);
@@ -87,10 +88,10 @@ pub fn dataresult(input: TokenStream2) -> TokenStream2 {
 
     let vis = &ast_struct.vis;
 
-    let impltraits = dbobj::impl_dataresult(&ast_struct, &config);
+    let impltraits = dbobj::impl_dataresult(&ast_struct, &dbo);
 
     let fields = match remove_helper_field_attributes(&mut ast_struct.fields) {
-        Ok(fields) => fields,
+        Ok(fields) => &fields.named,
         Err(err) => return err,
     };
 

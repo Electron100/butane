@@ -1,6 +1,6 @@
 use chrono::{naive::NaiveDateTime, offset::Utc};
-use propane::model;
 use propane::prelude::*;
+use propane::{dataresult, model};
 use propane::{db::Connection, ForeignKey, Many, ObjectState};
 
 #[model]
@@ -45,6 +45,13 @@ impl Post {
             state: ObjectState::default(),
         }
     }
+}
+
+#[dataresult(Post)]
+pub struct PostMetadata {
+    pub id: i64,
+    pub title: String,
+    pub pub_time: Option<NaiveDateTime>,
 }
 
 #[model]

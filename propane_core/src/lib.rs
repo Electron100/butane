@@ -53,7 +53,6 @@ impl Eq for ObjectState {}
 pub trait DataResult: Sized {
     /// Corresponding object type.
     type DBO: DataObject;
-    type Fields: Default;
     const COLUMNS: &'static [Column];
     fn from_row(row: Row) -> Result<Self>
     where
@@ -69,6 +68,7 @@ pub trait DataResult: Sized {
 pub trait DataObject: DataResult<DBO = Self> {
     /// The type of the primary key field.
     type PKType: FieldType + Clone + PartialEq;
+    type Fields: Default;
     /// The name of the primary key column.
     const PKCOL: &'static str;
     /// The name of the table.

@@ -55,6 +55,11 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     codegen::model_with_migrations(input.into(), &mut migrations_for_dir()).into()
 }
 
+#[proc_macro_attribute]
+pub fn dataresult(args: TokenStream, input: TokenStream) -> TokenStream {
+    codegen::dataresult(args.into(), input.into()).into()
+}
+
 #[proc_macro]
 pub fn filter(input: TokenStream) -> TokenStream {
     let input: TokenStream2 = input.into();

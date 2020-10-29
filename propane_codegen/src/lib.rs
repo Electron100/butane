@@ -88,7 +88,15 @@ pub fn filter(input: TokenStream) -> TokenStream {
     }
 
     let expr: TokenStream2 = args.into_iter().skip(2).collect();
-    let expr: Expr = syn::parse2(expr).expect("Expected filter!(Type, expression)");
+    let expr: Expr = match syn::parse2(expr) {
+        Ok(expr) => expr,
+        Err(_) => {
+            return make_compile_error!(
+                "Expected filter!(Type, expression) but could not parse expression"
+            )
+            .into()
+        }
+    };
     filter::for_expr(&tyid, &expr).into()
 }
 

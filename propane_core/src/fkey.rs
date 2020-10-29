@@ -1,4 +1,5 @@
 use crate::db::ConnectionMethods;
+use crate::pkey::{PrimaryKey, PrimaryKeyRef};
 use crate::*;
 use lazycell::LazyCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -168,6 +169,36 @@ where
 {
     fn eq(&self, other: &&T) -> bool {
         self.eq(*other)
+    }
+}
+
+impl<T> PartialEq<PrimaryKey<T>> for ForeignKey<T>
+where
+    T: DataObject,
+{
+    fn eq(&self, otherpk: &PrimaryKey<T>) -> bool {
+        match self.val.borrow() {
+            Some(t) => t.pk().eq(otherpk.as_ref()),
+            None => match self.valpk.borrow() {
+                Some(valpk) => valpk.eq(&otherpk.as_ref().to_sql()),
+                None => panic!("Invalid foreign key state"),
+            },
+        }
+    }
+}
+
+impl<'a, T> PartialEq<PrimaryKeyRef<'a, T>> for ForeignKey<T>
+where
+    T: DataObject,
+{
+    fn eq(&self, otherpk: &PrimaryKeyRef<'a, T>) -> bool {
+        match self.val.borrow() {
+            Some(t) => t.pk().eq(otherpk.pk()),
+            None => match self.valpk.borrow() {
+                Some(valpk) => valpk.eq(&otherpk.pk().to_sql()),
+                None => panic!("Invalid foreign key state"),
+            },
+        }
     }
 }
 

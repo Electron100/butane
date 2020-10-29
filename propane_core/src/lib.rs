@@ -10,6 +10,7 @@ pub mod db;
 pub mod fkey;
 pub mod many;
 pub mod migrations;
+pub mod pkey;
 pub mod query;
 pub mod sqlval;
 

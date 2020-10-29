@@ -3,6 +3,7 @@ pub use propane_core::db;
 pub use propane_core::fkey::ForeignKey;
 pub use propane_core::many::Many;
 pub use propane_core::migrations;
+pub use propane_core::pkey::{PrimaryKey, PrimaryKeyRef};
 pub use propane_core::query;
 pub use propane_core::{
     DataObject, DataResult, Error, FieldType, FromSql, IntoSql, ObjectState, Result, SqlType,

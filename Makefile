@@ -18,5 +18,8 @@ clean :
 doc :
 	cd propane && cargo +nightly doc --all-features
 
+docview :
+	cd propane && cargo +nightly doc --all-features --open
+
 install :
 	cd propane_cli && cargo install --path .

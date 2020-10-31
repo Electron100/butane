@@ -49,11 +49,9 @@
 	 + Summary/readme
    + Example like Diesel's
 		 Now in progress
-	 + Optional dependencies
+	 + Optional dependencies for rusqlite
 	 + PG support
 	 + migration downgrade
-	 + Missing tests
-		 - separate DataResult
 	 + Clean up TODOs
 ** vNext
 	 + foreign key constraints in db, cascade setting

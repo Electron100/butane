@@ -113,8 +113,8 @@ pub enum Error {
     CannotConvertSqlVal(SqlType, SqlVal),
     #[error("Mismatch between sql types and rust types while loading data for column {0}.")]
     SqlResultTypeMismatch(String),
-    #[error("SqlType not known for {ty}")]
-    UnknownSqlType { ty: String },
+    #[error("SqlType not known for {0}")]
+    UnknownSqlType(String),
     #[error("Value has not been loaded from the database")]
     ValueNotLoaded,
     #[error("Not initialized")]

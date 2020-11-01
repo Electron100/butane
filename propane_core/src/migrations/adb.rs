@@ -237,13 +237,9 @@ impl DeferredSqlType {
     fn resolve(&self, resolver: &TypeResolver) -> Result<SqlType> {
         match self {
             DeferredSqlType::Known(t) => Ok(*t),
-            DeferredSqlType::Deferred(key) => {
-                resolver
-                    .find_type(&key)
-                    .ok_or_else(|| crate::Error::UnknownSqlType {
-                        ty: key.to_string(),
-                    })
-            }
+            DeferredSqlType::Deferred(key) => resolver
+                .find_type(&key)
+                .ok_or_else(|| crate::Error::UnknownSqlType(key.to_string())),
         }
     }
 }
@@ -295,7 +291,7 @@ impl AColumn {
     pub fn sqltype(&self) -> Result<SqlType> {
         match &self.sqltype {
             DeferredSqlType::Known(t) => Ok(*t),
-            DeferredSqlType::Deferred(t) => Err(crate::Error::UnknownSqlType { ty: t.to_string() }),
+            DeferredSqlType::Deferred(t) => Err(crate::Error::UnknownSqlType(t.to_string())),
         }
     }
     /// Returns true if the type was previously unresolved but is now resolved

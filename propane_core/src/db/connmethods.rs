@@ -11,7 +11,6 @@ use std::vec::Vec;
 /// [DataObject][crate::DataObject] or the `query!` macro. This trait is
 /// implemented by both database connections and transactions.
 pub trait ConnectionMethods {
-    fn backend_name(&self) -> &'static str;
     fn execute(&self, sql: &str) -> Result<()>;
     fn query(
         &self,

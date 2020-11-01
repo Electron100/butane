@@ -2,20 +2,18 @@
 macro_rules! connection_method_wrapper {
     ($ty:path) => {
         impl ConnectionMethods for $ty {
-            fn backend_name(&self) -> &'static str {
-                self.conn.backend_name()
-            }
-            fn execute(&self, sql: &str) -> Result<()> {
-                self.conn.execute(sql)
+            fn execute(&mut self, sql: &str) -> Result<()> {
+                self.wrapped_connection_methods()?.execute(sql)
             }
             fn query(
-                &self,
+                &mut self,
                 table: &'static str,
                 columns: &[Column],
                 expr: Option<BoolExpr>,
                 limit: Option<i32>,
             ) -> Result<RawQueryResult> {
-                self.conn.query(table, columns, expr, limit)
+                self.wrapped_connection_methods()?
+                    .query(table, columns, expr, limit)
             }
             fn insert(
                 &self,
@@ -24,7 +22,8 @@ macro_rules! connection_method_wrapper {
                 pkcol: Column,
                 values: &[SqlVal],
             ) -> Result<SqlVal> {
-                self.conn.insert(table, columns, pkcol, values)
+                self.wrapped_connection_methods()?
+                    .insert(table, columns, pkcol, values)
             }
             fn insert_or_replace(
                 &self,
@@ -32,7 +31,8 @@ macro_rules! connection_method_wrapper {
                 columns: &[Column],
                 values: &[SqlVal],
             ) -> Result<()> {
-                self.conn.insert_or_replace(table, columns, values)
+                self.wrapped_connection_methods()?
+                    .insert_or_replace(table, columns, values)
             }
             fn update(
                 &self,
@@ -42,13 +42,14 @@ macro_rules! connection_method_wrapper {
                 columns: &[Column],
                 values: &[SqlVal],
             ) -> Result<()> {
-                self.conn.update(table, pkcol, pk, columns, values)
+                self.wrapped_connection_methods()?
+                    .update(table, pkcol, pk, columns, values)
             }
             fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
-                self.conn.delete_where(table, expr)
+                self.wrapped_connection_methods()?.delete_where(table, expr)
             }
             fn has_table(&self, table: &'static str) -> Result<bool> {
-                self.conn.has_table(table)
+                self.wrapped_connection_methods()?.has_table(table)
             }
         }
     };

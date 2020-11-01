@@ -39,6 +39,7 @@ pub trait BackendConnection: ConnectionMethods + Send + 'static {
     fn transaction(&mut self) -> Result<Transaction>;
     /// Retrieve the backend backend this connection
     fn backend(&self) -> Box<dyn Backend>;
+    fn backend_name(&self) -> &'static str;
 }
 
 /// Database connection. May be a connection to any type of database
@@ -50,6 +51,9 @@ impl Connection {
     pub fn execute(&self, sql: impl AsRef<str>) -> Result<()> {
         self.conn.execute(sql.as_ref())
     }
+    fn wrapped_connection_methods(&mut self) -> Result<&mut dyn BackendConnection> {
+        Ok(self.conn.as_mut())
+    }
 }
 impl BackendConnection for Connection {
     fn transaction(&mut self) -> Result<Transaction> {
@@ -57,6 +61,9 @@ impl BackendConnection for Connection {
     }
     fn backend(&self) -> Box<dyn Backend> {
         self.conn.backend()
+    }
+    fn backend_name(&self) -> &'static str {
+        self.conn.backend_name()
     }
 }
 connection_method_wrapper!(Connection);

@@ -38,9 +38,10 @@ pub trait Migration: PartialEq {
     /// must be in the state of the migration prior to this one
     fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
         let tx = conn.transaction()?;
+        let backend_name = conn.backend_name();
         let sql = self
-            .up_sql(tx.backend_name())?
-            .ok_or_else(|| Error::UnknownBackend(tx.backend_name().to_string()))?;
+            .up_sql(backend_name)?
+            .ok_or_else(|| Error::UnknownBackend(backend_name.to_string()))?;
         tx.execute(&sql)?;
         tx.insert_or_replace(
             PropaneMigration::TABLE,

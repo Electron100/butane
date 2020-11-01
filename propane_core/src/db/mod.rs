@@ -25,6 +25,7 @@ use std::vec::Vec;
 mod connmethods;
 mod helper;
 mod macros;
+pub mod pg;
 pub mod sqlite;
 
 // Macros are always exported at the root of the crate
@@ -48,11 +49,11 @@ pub struct Connection {
     conn: Box<dyn BackendConnection>,
 }
 impl Connection {
-    pub fn execute(&self, sql: impl AsRef<str>) -> Result<()> {
+    pub fn execute(&mut self, sql: impl AsRef<str>) -> Result<()> {
         self.conn.execute(sql.as_ref())
     }
-    fn wrapped_connection_methods(&mut self) -> Result<&mut dyn BackendConnection> {
-        Ok(self.conn.as_mut())
+    fn wrapped_connection_methods(&self) -> Result<&dyn BackendConnection> {
+        Ok(self.conn.as_ref())
     }
 }
 impl BackendConnection for Connection {
@@ -146,6 +147,10 @@ trait BackendTransaction<'c>: ConnectionMethods {
     /// that no methods should be called after commit. This trait is
     /// not public, and that behavior is enforced by Transaction
     fn commit(&mut self) -> Result<()>;
+
+    // Workaround for https://github.com/rust-lang/rfcs/issues/2765
+    fn connection_methods(&self) -> &dyn ConnectionMethods;
+    fn connection_methods_mut(&mut self) -> &mut dyn ConnectionMethods;
 }
 
 /// Database transaction.
@@ -164,54 +169,9 @@ impl<'c> Transaction<'c> {
         self.trans.deref_mut().commit()
     }
     // TODO need rollback method
-}
-impl ConnectionMethods for Transaction<'_> {
-    fn backend_name(&self) -> &'static str {
-        self.trans.backend_name()
-    }
-    fn execute(&self, sql: &str) -> Result<()> {
-        self.trans.execute(sql)
-    }
-    fn query(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        expr: Option<BoolExpr>,
-        limit: Option<i32>,
-    ) -> Result<RawQueryResult> {
-        self.trans.query(table, columns, expr, limit)
-    }
-    fn insert(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        pkcol: Column,
-        values: &[SqlVal],
-    ) -> Result<SqlVal> {
-        self.trans.insert(table, columns, pkcol, values)
-    }
-    fn insert_or_replace(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()> {
-        self.trans.insert_or_replace(table, columns, values)
-    }
-    fn update(
-        &self,
-        table: &'static str,
-        pkcol: Column,
-        pk: SqlVal,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()> {
-        self.trans.update(table, pkcol, pk, columns, values)
-    }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
-        self.trans.delete_where(table, expr)
-    }
-    fn has_table(&self, table: &'static str) -> Result<bool> {
-        self.trans.has_table(table)
+    fn wrapped_connection_methods(&self) -> Result<&dyn ConnectionMethods> {
+        let a: &dyn BackendTransaction<'c> = self.trans.as_ref();
+        Ok(a.connection_methods())
     }
 }
+connection_method_wrapper!(Transaction<'_>);

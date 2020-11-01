@@ -59,7 +59,13 @@ impl SQLiteConnection {
             .map(|conn| SQLiteConnection { conn })
             .map_err(|e| e.into())
     }
+
+    fn wrapped_connection_methods<'a>(&'a self) -> Result<GenericConnection<'a>> {
+        Ok(GenericConnection { conn: &self.conn })
+    }
 }
+connection_method_wrapper!(SQLiteConnection);
+
 impl BackendConnection for SQLiteConnection {
     fn transaction<'c>(&'c mut self) -> Result<Transaction<'c>> {
         let trans: rusqlite::Transaction<'_> = self.conn.transaction()?;
@@ -69,65 +75,23 @@ impl BackendConnection for SQLiteConnection {
     fn backend(&self) -> Box<dyn Backend> {
         Box::new(SQLiteBackend {})
     }
-}
-impl ConnectionMethods for SQLiteConnection {
-    fn backend_name(&self) -> &'static str {
-        self.conn.backend_name()
-    }
-    fn execute(&self, sql: &str) -> Result<()> {
-        <rusqlite::Connection as ConnectionMethods>::execute(&self.conn, sql)
-    }
-    fn query(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        expr: Option<BoolExpr>,
-        limit: Option<i32>,
-    ) -> Result<RawQueryResult> {
-        self.conn.query(table, columns, expr, limit)
-    }
-    fn insert(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        pkcol: Column,
-        values: &[SqlVal],
-    ) -> Result<SqlVal> {
-        self.conn.insert(table, columns, pkcol, values)
-    }
-    fn insert_or_replace(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()> {
-        self.conn.insert_or_replace(table, columns, values)
-    }
-    fn update(
-        &self,
-        table: &'static str,
-        pkcol: Column,
-        pk: SqlVal,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()> {
-        self.conn.update(table, pkcol, pk, columns, values)
-    }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
-        self.conn.delete_where(table, expr)
-    }
-    fn has_table(&self, table: &'static str) -> Result<bool> {
-        self.conn.has_table(table)
-    }
-}
-
-impl ConnectionMethods for rusqlite::Connection {
     fn backend_name(&self) -> &'static str {
         "sqlite"
     }
+}
+
+// Used to provide a single implementation of ConnectionMethods that
+// can be used across both SQLiteConnection and SQLiteTransaction
+struct GenericConnection<'a> {
+    conn: &'a rusqlite::Connection,
+}
+
+impl ConnectionMethods for GenericConnection<'_> {
     fn execute(&self, sql: &str) -> Result<()> {
-        eprintln!("execute sql {}", sql);
-        self.execute_batch(sql.as_ref())?;
+        if cfg!(feature = "debug") {
+            eprintln!("execute sql {}", sql);
+        }
+        self.conn.execute_batch(sql.as_ref())?;
         Ok(())
     }
 
@@ -157,7 +121,7 @@ impl ConnectionMethods for rusqlite::Connection {
             eprintln!("query sql {}", sqlquery);
         }
 
-        let mut stmt = self.prepare(&sqlquery)?;
+        let mut stmt = self.conn.prepare(&sqlquery)?;
         let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
         rows.collect()
     }
@@ -173,8 +137,9 @@ impl ConnectionMethods for rusqlite::Connection {
         if cfg!(feature = "debug") {
             eprintln!("insert sql {}", sql);
         }
-        self.execute(&sql, &values.iter().collect::<Vec<_>>())?;
-        let pk: SqlVal = self.query_row_and_then(
+        self.conn
+            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
+        let pk: SqlVal = self.conn.query_row_and_then(
             &format!(
                 "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
                 pkcol.name(),
@@ -193,7 +158,8 @@ impl ConnectionMethods for rusqlite::Connection {
     ) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(table, columns, true, &mut sql);
-        self.execute(&sql, &values.iter().collect::<Vec<_>>())?;
+        self.conn
+            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
         Ok(())
     }
     fn update(
@@ -210,7 +176,8 @@ impl ConnectionMethods for rusqlite::Connection {
         if cfg!(feature = "debug") {
             eprintln!("update sql {}", sql);
         }
-        self.execute(&sql, &placeholder_values.iter().collect::<Vec<_>>())?;
+        self.conn
+            .execute(&sql, &placeholder_values.iter().collect::<Vec<_>>())?;
         Ok(())
     }
     fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
@@ -222,12 +189,13 @@ impl ConnectionMethods for rusqlite::Connection {
             &mut values,
             &mut sql,
         );
-        let cnt = self.execute(&sql, &values)?;
+        let cnt = self.conn.execute(&sql, &values)?;
         Ok(cnt)
     }
     fn has_table(&self, table: &'static str) -> Result<bool> {
-        let mut stmt =
-            self.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
         let mut rows = stmt.query(&[table])?;
         Ok(rows.next()?.is_some())
     }
@@ -246,7 +214,13 @@ impl<'c> SqliteTransaction<'c> {
             Some(trans) => Ok(trans),
         }
     }
+    fn wrapped_connection_methods<'a>(&'a self) -> Result<GenericConnection<'a>> {
+        Ok(GenericConnection {
+            conn: self.get()?.deref(),
+        })
+    }
 }
+connection_method_wrapper!(SqliteTransaction<'_>);
 impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
@@ -254,58 +228,12 @@ impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
             Some(trans) => Ok(trans.commit()?),
         }
     }
-}
-impl ConnectionMethods for SqliteTransaction<'_> {
-    fn backend_name(&self) -> &'static str {
-        "sqlite"
+    // Workaround for https://github.com/rust-lang/rfcs/issues/2765
+    fn connection_methods(&self) -> &dyn ConnectionMethods {
+        self
     }
-    fn execute(&self, sql: &str) -> Result<()> {
-        <rusqlite::Connection as ConnectionMethods>::execute(self.get()?.deref(), sql)
-    }
-    fn query(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        expr: Option<BoolExpr>,
-        limit: Option<i32>,
-    ) -> Result<RawQueryResult> {
-        self.get()?.query(table, columns, expr, limit)
-    }
-    fn insert(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        pkcol: Column,
-        values: &[SqlVal],
-    ) -> Result<SqlVal> {
-        self.get()?.insert(table, columns, pkcol, values)
-    }
-    fn insert_or_replace(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()> {
-        self.get()?.insert_or_replace(table, columns, values)
-    }
-    fn update(
-        &self,
-        table: &'static str,
-        pkcol: Column,
-        pk: SqlVal,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()> {
-        self.get()?.update(table, pkcol, pk, columns, values)
-    }
-    fn delete(&self, table: &'static str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
-        self.get()?.delete(table, pkcol, pk)
-    }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
-        self.get()?.delete_where(table, expr)
-    }
-    fn has_table(&self, table: &'static str) -> Result<bool> {
-        self.get()?.has_table(table)
+    fn connection_methods_mut(&mut self) -> &mut dyn ConnectionMethods {
+        self
     }
 }
 

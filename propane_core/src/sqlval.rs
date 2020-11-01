@@ -66,6 +66,31 @@ impl SqlVal {
             _ => Err(CannotConvertSqlVal(SqlType::Blob, self.clone())),
         }
     }
+
+    /// Tests if this sqlval is compatible with the given
+    /// `SqlType`. There are no implicit type conversions (i.e. if
+    /// this is a `SqlVal::Bool`, it is only compatible with
+    /// `SqlType::Bool`, not with `SqlType::Int`, even though an int
+    /// contains enough information to encode a bool. `SqlVal::Int` is
+    /// always compatible with `SqlType::BigInt`. It is only
+    /// compatible with `SqlType::Int` if this particular value is
+    /// small enough
+    pub fn is_compatible(&self, ty: SqlType, null_allowed: bool) -> bool {
+        match self {
+            SqlVal::Null => null_allowed,
+            SqlVal::Bool(_) => ty == SqlType::Bool,
+            SqlVal::Int(i) => match ty {
+                SqlType::BigInt => true,
+                SqlType::Int => *i > (i32::MIN as i64) && *i < (i32::MAX as i64),
+                _ => false,
+            },
+            SqlVal::Real(_) => ty == SqlType::Real,
+            SqlVal::Text(_) => ty == SqlType::Text,
+            #[cfg(feature = "datetime")]
+            SqlVal::Timestamp(_) => ty == SqlType::Timestamp,
+            SqlVal::Blob(_) => ty == SqlType::Blob,
+        }
+    }
 }
 impl fmt::Display for SqlVal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

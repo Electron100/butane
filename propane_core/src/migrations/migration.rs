@@ -37,8 +37,8 @@ pub trait Migration: PartialEq {
     /// must be for the same type of database as this and the database
     /// must be in the state of the migration prior to this one
     fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
-        let tx = conn.transaction()?;
         let backend_name = conn.backend_name();
+        let tx = conn.transaction()?;
         let sql = self
             .up_sql(backend_name)?
             .ok_or_else(|| Error::UnknownBackend(backend_name.to_string()))?;

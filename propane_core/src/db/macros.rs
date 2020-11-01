@@ -2,11 +2,11 @@
 macro_rules! connection_method_wrapper {
     ($ty:path) => {
         impl ConnectionMethods for $ty {
-            fn execute(&mut self, sql: &str) -> Result<()> {
+            fn execute(&self, sql: &str) -> Result<()> {
                 self.wrapped_connection_methods()?.execute(sql)
             }
             fn query(
-                &mut self,
+                &self,
                 table: &'static str,
                 columns: &[Column],
                 expr: Option<BoolExpr>,

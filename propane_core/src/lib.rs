@@ -139,9 +139,13 @@ pub enum Error {
     SQLite(#[from] rusqlite::Error),
     #[error("Sqlite error {0}")]
     SQLiteFromSQL(rusqlite::types::FromSqlError),
+    #[error("Postgres error {0}")]
+    Postgres(#[from] postgres::Error),
     #[cfg(feature = "datetime")]
     #[error("Chrono error {0}")]
     Chrono(#[from] chrono::ParseError),
+    #[error("RefCell error {0}")]
+    CellBorrow(#[from] std::cell::BorrowMutError),
 }
 
 impl From<rusqlite::types::FromSqlError> for Error {

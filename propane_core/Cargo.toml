@@ -9,10 +9,13 @@ datetime = ["chrono"]
 debug = ["exec_time"]
 
 [dependencies]
+bytes = "0.5" #todo should be part of postgres feature
 fs2 = "0.4"
 hex = "0.4"
 lazycell = "1.2"
 log = "0.4"
+# todo figure out how to enable postgres with-chrono only if both postgres and chrono features are selected
+postgres={ version = "0.18", features = ["with-chrono-0_4"] }
 proc-macro2 = "1.0"
 quote = "1.0"
 rusqlite = "0.22.0"

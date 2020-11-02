@@ -6,45 +6,51 @@ use crate::migrations::adb::AColumn;
 use crate::query::Expr::{Condition, Placeholder, Val};
 use crate::query::{BoolExpr::*, Expr, Join};
 use crate::{query, Result, SqlType, SqlVal};
+use std::borrow::Cow;
 use std::fmt::Write;
 
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
 
+pub trait PlaceholderSource {
+    fn next_placeholder(&mut self) -> Cow<str>;
+}
+
 /// Writes to `w` the SQL to express the expression given in `expr`. Values contained in `expr` are rendered
 /// as placeholders in the SQL string and the actual values are added to `values`.
-pub fn sql_for_expr<F, W>(expr: Expr, f: F, values: &mut Vec<SqlVal>, w: &mut W)
+pub fn sql_for_expr<F, P, W>(expr: Expr, f: F, values: &mut Vec<SqlVal>, pls: &mut P, w: &mut W)
 where
-    F: Fn(Expr, &mut Vec<SqlVal>, &mut W),
+    F: Fn(Expr, &mut Vec<SqlVal>, &mut P, &mut W),
+    P: PlaceholderSource,
     W: Write,
 {
     match expr {
         Expr::Column(name) => w.write_str(name),
         Val(v) => {
             values.push(v);
-            w.write_str("?")
+            w.write_str(&pls.next_placeholder())
         }
-        Placeholder => w.write_str("?"),
+        Placeholder => w.write_str(&pls.next_placeholder()),
         Condition(c) => match *c {
             True => write!(w, "TRUE"),
             Eq(col, ex) => match ex {
                 Expr::Val(SqlVal::Null) => write!(w, "{} IS NULL", col),
-                _ => write!(w, "{} = ", col).and_then(|_| Ok(f(ex, values, w))),
+                _ => write!(w, "{} = ", col).and_then(|_| Ok(f(ex, values, pls, w))),
             },
             Ne(col, ex) => match ex {
                 Expr::Val(SqlVal::Null) => write!(w, "{} IS NOT NULL", col),
-                _ => write!(w, "{} <> ", col).and_then(|_| Ok(f(ex, values, w))),
+                _ => write!(w, "{} <> ", col).and_then(|_| Ok(f(ex, values, pls, w))),
             },
-            Lt(col, ex) => write!(w, "{} < ", col).and_then(|_| Ok(f(ex, values, w))),
-            Gt(col, ex) => write!(w, "{} > ", col).and_then(|_| Ok(f(ex, values, w))),
-            Le(col, ex) => write!(w, "{} <= ", col).and_then(|_| Ok(f(ex, values, w))),
-            Ge(col, ex) => write!(w, "{} >= ", col).and_then(|_| Ok(f(ex, values, w))),
-            Like(col, ex) => write!(w, "{} like ", col).and_then(|_| Ok(f(ex, values, w))),
+            Lt(col, ex) => write!(w, "{} < ", col).and_then(|_| Ok(f(ex, values, pls, w))),
+            Gt(col, ex) => write!(w, "{} > ", col).and_then(|_| Ok(f(ex, values, pls, w))),
+            Le(col, ex) => write!(w, "{} <= ", col).and_then(|_| Ok(f(ex, values, pls, w))),
+            Ge(col, ex) => write!(w, "{} >= ", col).and_then(|_| Ok(f(ex, values, pls, w))),
+            Like(col, ex) => write!(w, "{} like ", col).and_then(|_| Ok(f(ex, values, pls, w))),
             AllOf(conds) => {
                 let mut remaining = conds.len();
                 for cond in conds {
                     // todo avoid the extra boxing
-                    f(Condition(Box::new(cond)), values, w);
+                    f(Condition(Box::new(cond)), values, pls, w);
                     if remaining > 1 {
                         write!(w, " AND ").unwrap();
                         remaining -= 1;
@@ -53,18 +59,18 @@ where
                 Ok(())
             }
             And(a, b) => {
-                f(Condition(a), values, w);
+                f(Condition(a), values, pls, w);
                 write!(w, " AND ").unwrap();
-                f(Condition(b), values, w);
+                f(Condition(b), values, pls, w);
                 Ok(())
             }
             Or(a, b) => {
-                f(Condition(a), values, w);
+                f(Condition(a), values, pls, w);
                 write!(w, " OR ").unwrap();
-                f(Condition(b), values, w);
+                f(Condition(b), values, pls, w);
                 Ok(())
             }
-            Not(a) => write!(w, "NOT ").and_then(|_| Ok(f(Condition(a), values, w))),
+            Not(a) => write!(w, "NOT ").and_then(|_| Ok(f(Condition(a), values, pls, w))),
             Subquery {
                 col,
                 tbl2,
@@ -72,7 +78,7 @@ where
                 expr,
             } => {
                 write!(w, "{} IN (SELECT {} FROM {} WHERE ", col, tbl2_col, tbl2).unwrap();
-                f(Expr::Condition(expr), values, w);
+                f(Expr::Condition(expr), values, pls, w);
                 write!(w, ")").unwrap();
                 Ok(())
             }
@@ -89,7 +95,7 @@ where
                 write!(w, " FROM {} ", tbl2).unwrap();
                 sql_joins(joins, w);
                 write!(w, " WHERE ").unwrap();
-                f(Expr::Condition(expr), values, w);
+                f(Expr::Condition(expr), values, pls, w);
                 write!(w, ")").unwrap();
                 Ok(())
             }
@@ -117,18 +123,14 @@ pub fn sql_select(columns: &[Column], table: &'static str, w: &mut impl Write) {
 pub fn sql_insert_with_placeholders(
     table: &'static str,
     columns: &[Column],
-    allow_replace: bool,
+    pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
-    write!(w, "INSERT ").unwrap();
-    if allow_replace {
-        write!(w, "OR REPLACE ").unwrap();
-    }
-    write!(w, "INTO {} (", table).unwrap();
+    write!(w, "INSERT INTO {} (", table).unwrap();
     list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold("", |sep, _| {
-        write!(w, "{}?", sep).unwrap();
+        write!(w, "{}{}", sep, pls.next_placeholder()).unwrap();
         ", "
     });
     write!(w, ")").unwrap();
@@ -138,14 +140,15 @@ pub fn sql_update_with_placeholders(
     table: &'static str,
     pkcol: Column,
     columns: &[Column],
+    pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
     write!(w, "UPDATE {} SET ", table).unwrap();
     columns.iter().fold("", |sep, c| {
-        write!(w, "{}{} = ?", sep, c.name()).unwrap();
+        write!(w, "{}{} = {}", sep, c.name(), pls.next_placeholder()).unwrap();
         ", "
     });
-    write!(w, " WHERE {} = ?", pkcol.name()).unwrap();
+    write!(w, " WHERE {} = {}", pkcol.name(), pls.next_placeholder()).unwrap();
 }
 
 pub fn sql_limit(limit: i32, w: &mut impl Write) {

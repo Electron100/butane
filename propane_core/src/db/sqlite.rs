@@ -111,6 +111,7 @@ impl ConnectionMethods for GenericConnection<'_> {
             sql_for_expr(
                 query::Expr::Condition(Box::new(expr)),
                 &mut values,
+                &mut SQLitePlaceholderSource::new(),
                 &mut sqlquery,
             );
         }
@@ -133,7 +134,12 @@ impl ConnectionMethods for GenericConnection<'_> {
         values: &[SqlVal],
     ) -> Result<SqlVal> {
         let mut sql = String::new();
-        helper::sql_insert_with_placeholders(table, columns, false, &mut sql);
+        helper::sql_insert_with_placeholders(
+            table,
+            columns,
+            &mut SQLitePlaceholderSource::new(),
+            &mut sql,
+        );
         if cfg!(feature = "debug") {
             eprintln!("insert sql {}", sql);
         }
@@ -157,7 +163,7 @@ impl ConnectionMethods for GenericConnection<'_> {
         values: &[SqlVal],
     ) -> Result<()> {
         let mut sql = String::new();
-        helper::sql_insert_with_placeholders(table, columns, true, &mut sql);
+        sql_insert_or_update(table, columns, &mut sql);
         self.conn
             .execute(&sql, &values.iter().collect::<Vec<_>>())?;
         Ok(())
@@ -171,7 +177,13 @@ impl ConnectionMethods for GenericConnection<'_> {
         values: &[SqlVal],
     ) -> Result<()> {
         let mut sql = String::new();
-        helper::sql_update_with_placeholders(table, pkcol, columns, &mut sql);
+        helper::sql_update_with_placeholders(
+            table,
+            pkcol,
+            columns,
+            &mut SQLitePlaceholderSource::new(),
+            &mut sql,
+        );
         let placeholder_values = [values, &[pk]].concat();
         if cfg!(feature = "debug") {
             eprintln!("update sql {}", sql);
@@ -274,11 +286,15 @@ fn row_from_rusqlite(row: &rusqlite::Row, cols: &[Column]) -> Result<Row> {
     Ok(Row::new(vals))
 }
 
-fn sql_for_expr<W>(expr: query::Expr, values: &mut Vec<SqlVal>, w: &mut W)
-where
+fn sql_for_expr<W>(
+    expr: query::Expr,
+    values: &mut Vec<SqlVal>,
+    pls: &mut SQLitePlaceholderSource,
+    w: &mut W,
+) where
     W: Write,
 {
-    helper::sql_for_expr(expr, &sql_for_expr, values, w)
+    helper::sql_for_expr(expr, &sql_for_expr, values, pls, w)
 }
 
 fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result<SqlVal> {
@@ -450,4 +466,29 @@ fn change_column(
     new_table.name = old_table.name.clone();
     current.replace_table(new_table);
     result
+}
+
+pub fn sql_insert_or_update(table: &'static str, columns: &[Column], w: &mut impl Write) {
+    write!(w, "INSERT OR REPLACE ").unwrap();
+    write!(w, "INTO {} (", table).unwrap();
+    helper::list_columns(columns, w);
+    write!(w, ") VALUES (").unwrap();
+    columns.iter().fold("", |sep, _| {
+        write!(w, "{}?", sep).unwrap();
+        ", "
+    });
+    write!(w, ")").unwrap();
+}
+
+struct SQLitePlaceholderSource {}
+impl SQLitePlaceholderSource {
+    fn new() -> Self {
+        SQLitePlaceholderSource {}
+    }
+}
+impl helper::PlaceholderSource for SQLitePlaceholderSource {
+    fn next_placeholder(&mut self) -> Cow<str> {
+        // sqlite placeholder is always a question mark.
+        return Cow::Borrowed("?");
+    }
 }

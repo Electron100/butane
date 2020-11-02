@@ -16,7 +16,8 @@ use chrono::naive::NaiveDateTime;
 pub enum SqlVal {
     Null,
     Bool(bool),
-    Int(i64),
+    Int(i32),
+    BigInt(i64),
     Real(f64),
     Text(String),
     Blob(Vec<u8>),
@@ -30,10 +31,17 @@ impl SqlVal {
             _ => Err(CannotConvertSqlVal(SqlType::Bool, self.clone())),
         }
     }
-    pub fn integer(&self) -> Result<i64> {
+    pub fn integer(&self) -> Result<i32> {
         match self {
             SqlVal::Int(val) => Ok(*val),
             _ => Err(CannotConvertSqlVal(SqlType::Int, self.clone())),
+        }
+    }
+    pub fn bigint(&self) -> Result<i64> {
+        match self {
+            SqlVal::Int(val) => Ok(*val as i64),
+            SqlVal::BigInt(val) => Ok(*val),
+            _ => Err(CannotConvertSqlVal(SqlType::BigInt, self.clone())),
         }
     }
     pub fn real(&self) -> Result<f64> {
@@ -71,19 +79,13 @@ impl SqlVal {
     /// `SqlType`. There are no implicit type conversions (i.e. if
     /// this is a `SqlVal::Bool`, it is only compatible with
     /// `SqlType::Bool`, not with `SqlType::Int`, even though an int
-    /// contains enough information to encode a bool. `SqlVal::Int` is
-    /// always compatible with `SqlType::BigInt`. It is only
-    /// compatible with `SqlType::Int` if this particular value is
-    /// small enough
+    /// contains enough information to encode a bool.
     pub fn is_compatible(&self, ty: SqlType, null_allowed: bool) -> bool {
         match self {
             SqlVal::Null => null_allowed,
             SqlVal::Bool(_) => ty == SqlType::Bool,
-            SqlVal::Int(i) => match ty {
-                SqlType::BigInt => true,
-                SqlType::Int => *i > (i32::MIN as i64) && *i < (i32::MAX as i64),
-                _ => false,
-            },
+            SqlVal::Int(_) => ty == SqlType::Int,
+            SqlVal::BigInt(_) => ty == SqlType::BigInt,
             SqlVal::Real(_) => ty == SqlType::Real,
             SqlVal::Text(_) => ty == SqlType::Text,
             #[cfg(feature = "datetime")]
@@ -99,6 +101,7 @@ impl fmt::Display for SqlVal {
             SqlVal::Null => f.write_str("NULL"),
             SqlVal::Bool(val) => val.fmt(f),
             Int(val) => val.fmt(f),
+            BigInt(val) => val.fmt(f),
             Real(val) => val.fmt(f),
             Text(val) => val.fmt(f),
             Blob(val) => f.write_str(&hex::encode(val)),
@@ -184,9 +187,9 @@ macro_rules! impl_prim_sql {
 }
 
 impl_prim_sql!(bool, Bool, Bool);
-impl_prim_sql!(i64, Int, BigInt);
+impl_prim_sql!(i64, BigInt, BigInt);
 impl_prim_sql!(i32, Int, Int);
-impl_prim_sql!(u32, Int, BigInt);
+impl_prim_sql!(u32, BigInt, BigInt);
 impl_prim_sql!(u16, Int, Int);
 impl_prim_sql!(i16, Int, Int);
 impl_prim_sql!(f64, Real, Real);

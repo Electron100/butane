@@ -209,6 +209,7 @@ pub fn sql_literal_value(val: SqlVal) -> String {
         SqlVal::Null => "NULL".to_string(),
         SqlVal::Bool(val) => val.to_string(),
         Int(val) => val.to_string(),
+        BigInt(val) => val.to_string(),
         Real(val) => val.to_string(),
         Text(val) => format!("'{}'", val),
         Blob(val) => format!("x'{}'", hex::encode_upper(val)),

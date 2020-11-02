@@ -242,7 +242,8 @@ impl rusqlite::ToSql for SqlVal {
         use rusqlite::types::{ToSqlOutput::Borrowed, ToSqlOutput::Owned, Value, ValueRef};
         Ok(match self {
             SqlVal::Bool(b) => Owned(Value::Integer(if *b { 1 } else { 0 })),
-            SqlVal::Int(i) => Owned(Value::Integer(*i)),
+            SqlVal::Int(i) => Owned(Value::Integer(*i as i64)),
+            SqlVal::BigInt(i) => Owned(Value::Integer(*i)),
             SqlVal::Real(r) => Owned(Value::Real(*r)),
             SqlVal::Text(t) => Borrowed(ValueRef::Text(t.as_ref())),
             SqlVal::Blob(b) => Borrowed(ValueRef::Blob(&b)),
@@ -287,8 +288,8 @@ fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result
     let ret = || -> Result<SqlVal> {
         Ok(match col.ty() {
             SqlType::Bool => SqlVal::Bool(val.as_i64()? != 0),
-            SqlType::Int => SqlVal::Int(val.as_i64()?),
-            SqlType::BigInt => SqlVal::Int(val.as_i64()?),
+            SqlType::Int => SqlVal::Int(val.as_i64()? as i32),
+            SqlType::BigInt => SqlVal::BigInt(val.as_i64()?),
             SqlType::Real => SqlVal::Real(val.as_f64()?),
             SqlType::Text => SqlVal::Text(val.as_str()?.to_string()),
             #[cfg(feature = "datetime")]

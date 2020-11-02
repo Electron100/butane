@@ -87,8 +87,11 @@ impl Row {
             .get(idx)
             .ok_or_else(|| BoundsError(format!("{}th column not present in row", idx)))
     }
-    pub fn get_int(&self, idx: usize) -> Result<i64> {
+    pub fn get_int(&self, idx: usize) -> Result<i32> {
         self.get(idx)?.integer()
+    }
+    pub fn get_bigint(&self, idx: usize) -> Result<i64> {
+        self.get(idx)?.bigint()
     }
     pub fn get_bool(&self, idx: usize) -> Result<bool> {
         self.get(idx)?.bool()

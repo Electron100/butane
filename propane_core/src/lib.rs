@@ -111,8 +111,10 @@ pub enum Error {
     BoundsError(String),
     #[error("Type mismatch converting SqlVal. Expected {0}, found value {1:?}")]
     CannotConvertSqlVal(SqlType, SqlVal),
-    #[error("Mismatch between sql types and rust types while loading data for column {0}.")]
-    SqlResultTypeMismatch(String),
+    #[error(
+        "Mismatch between sql types and rust types while loading data for column {col}. {detail}"
+    )]
+    SqlResultTypeMismatch { col: String, detail: String },
     #[error("SqlType not known for {0}")]
     UnknownSqlType(String),
     #[error("Value has not been loaded from the database")]
@@ -131,6 +133,8 @@ pub enum Error {
     Internal,
     #[error("Cannot resolve type {0}. Are you missing a #[propane_type] attribute?")]
     CannotResolveType(String),
+    #[error("Auto fields are only supported for integer fields. {0} cannot be auto.")]
+    InvalidAuto(String),
     #[error("(De)serialization error {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("IO error {0}")]
@@ -152,7 +156,10 @@ impl From<rusqlite::types::FromSqlError> for Error {
     fn from(e: rusqlite::types::FromSqlError) -> Self {
         use rusqlite::types::FromSqlError;
         match &e {
-            FromSqlError::InvalidType => Error::SqlResultTypeMismatch("unknown".to_string()),
+            FromSqlError::InvalidType => Error::SqlResultTypeMismatch {
+                col: "unknown".to_string(),
+                detail: "unknown".to_string(),
+            },
             FromSqlError::OutOfRange(_) => Error::OutOfRange,
             FromSqlError::Other(_) => Error::SQLiteFromSQL(e),
             _ => Error::SQLiteFromSQL(e),

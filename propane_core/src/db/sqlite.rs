@@ -318,7 +318,10 @@ fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result
     }();
     // Automatic error conversion won't have preserved the column name for any errors
     ret.map_err(|e| match e {
-        Error::SqlResultTypeMismatch(_) => Error::SqlResultTypeMismatch(col.name().to_string()),
+        Error::SqlResultTypeMismatch { .. } => Error::SqlResultTypeMismatch {
+            col: col.name().to_string(),
+            detail: String::new(),
+        },
         e => e,
     })
 }

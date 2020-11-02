@@ -43,7 +43,7 @@ pub trait Migration: PartialEq {
             .up_sql(backend_name)?
             .ok_or_else(|| Error::UnknownBackend(backend_name.to_string()))?;
         tx.execute(&sql)?;
-        tx.insert_or_replace(
+        tx.insert_only(
             PropaneMigration::TABLE,
             PropaneMigration::COLUMNS,
             &[self.name().as_ref().to_sql()],

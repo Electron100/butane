@@ -19,17 +19,22 @@ pub trait ConnectionMethods {
         expr: Option<BoolExpr>,
         limit: Option<i32>,
     ) -> Result<RawQueryResult>;
-    fn insert(
+    fn insert_returning_pk(
         &self,
         table: &'static str,
         columns: &[Column],
-        pkcol: Column,
+        pkcol: &Column,
         values: &[SqlVal],
     ) -> Result<SqlVal>;
+    /// Like `insert_returning_pk` but with no return value
+    fn insert_only(&self, table: &'static str, columns: &[Column], values: &[SqlVal])
+        -> Result<()>;
+    /// Insert unless there's a conflict on the primary key column, in which case update
     fn insert_or_replace(
         &self,
         table: &'static str,
         columns: &[Column],
+        pkcol: &Column,
         values: &[SqlVal],
     ) -> Result<()>;
     fn update(

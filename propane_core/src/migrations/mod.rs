@@ -233,7 +233,12 @@ impl DataObject for PropaneMigration {
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);
         values.push(self.name.to_sql());
-        conn.insert_or_replace(Self::TABLE, <Self as DataResult>::COLUMNS, &values)
+        conn.insert_or_replace(
+            Self::TABLE,
+            <Self as DataResult>::COLUMNS,
+            &Column::new(Self::PKCOL, SqlType::Text),
+            &values,
+        )
     }
     fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
         conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())

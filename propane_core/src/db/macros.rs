@@ -15,24 +15,34 @@ macro_rules! connection_method_wrapper {
                 self.wrapped_connection_methods()?
                     .query(table, columns, expr, limit)
             }
-            fn insert(
+            fn insert_returning_pk(
                 &self,
                 table: &'static str,
                 columns: &[Column],
-                pkcol: Column,
+                pkcol: &Column,
                 values: &[SqlVal],
             ) -> Result<SqlVal> {
                 self.wrapped_connection_methods()?
-                    .insert(table, columns, pkcol, values)
+                    .insert_returning_pk(table, columns, pkcol, values)
             }
-            fn insert_or_replace(
+            fn insert_only(
                 &self,
                 table: &'static str,
                 columns: &[Column],
                 values: &[SqlVal],
             ) -> Result<()> {
                 self.wrapped_connection_methods()?
-                    .insert_or_replace(table, columns, values)
+                    .insert_only(table, columns, values)
+            }
+            fn insert_or_replace(
+                &self,
+                table: &'static str,
+                columns: &[Column],
+                pkcol: &Column,
+                values: &[SqlVal],
+            ) -> Result<()> {
+                self.wrapped_connection_methods()?
+                    .insert_or_replace(table, columns, pkcol, values)
             }
             fn update(
                 &self,

@@ -71,7 +71,7 @@ where
     pub fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
         while !self.new_values.is_empty() {
-            conn.insert_or_replace(
+            conn.insert_only(
                 self.item_table,
                 &self.columns(),
                 &[owner.clone(), self.new_values.pop().unwrap()],

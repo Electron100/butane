@@ -129,6 +129,7 @@ impl Backend for Box<dyn Backend> {
 pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
         "sqlite" => Some(Box::new(sqlite::SQLiteBackend::new())),
+        pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         _ => None,
     }
 }

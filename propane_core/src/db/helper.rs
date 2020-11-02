@@ -174,7 +174,7 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
     })
 }
 
-fn list_columns(columns: &[Column], w: &mut impl Write) {
+pub fn list_columns(columns: &[Column], w: &mut impl Write) {
     let mut colnames: Vec<&'static str> = Vec::new();
     columns.iter().for_each(|c| colnames.push(c.name()));
     write!(w, "{}", colnames.as_slice().join(",")).unwrap();

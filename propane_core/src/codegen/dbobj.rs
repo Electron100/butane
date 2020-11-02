@@ -79,7 +79,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     }
                 } else {
                     #(#values)*
-                    let pk = conn.insert(Self::TABLE, &[#insert_cols], pkcol, &values)?;
+                    let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
                     #(#post_insert)*
                 }
                 Ok(())

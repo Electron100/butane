@@ -19,6 +19,8 @@ use exec_time::exec_time;
 
 use crate::connection_method_wrapper;
 
+pub(crate) const BACKEND_NAME: &str = "pg";
+
 /// Pg [Backend][crate::db::Backend] implementation.
 #[derive(Default)]
 pub struct PgBackend {}
@@ -34,7 +36,7 @@ impl PgBackend {
 }
 impl Backend for PgBackend {
     fn name(&self) -> &'static str {
-        "sqlite"
+        BACKEND_NAME
     }
 
     fn create_migration_sql(&self, current: &ADB, ops: &[Operation]) -> Result<String> {
@@ -80,7 +82,7 @@ impl BackendConnection for PgConnection {
         Box::new(PgBackend {})
     }
     fn backend_name(&self) -> &'static str {
-        "pg"
+        BACKEND_NAME
     }
 }
 
@@ -125,6 +127,7 @@ where
             sql_for_expr(
                 query::Expr::Condition(Box::new(expr)),
                 &mut values,
+                &mut PgPlaceholderSource::new(),
                 &mut sqlquery,
             );
         }
@@ -143,15 +146,20 @@ where
             .map(|r| row_from_postgres(&r, columns))
             .collect()
     }
-    fn insert(
+    fn insert_returning_pk(
         &self,
         table: &'static str,
         columns: &[Column],
-        pkcol: Column,
+        pkcol: &Column,
         values: &[SqlVal],
     ) -> Result<SqlVal> {
         let mut sql = String::new();
-        helper::sql_insert_with_placeholders(table, columns, false, &mut sql);
+        helper::sql_insert_with_placeholders(
+            table,
+            columns,
+            &mut PgPlaceholderSource::new(),
+            &mut sql,
+        );
         write!(&mut sql, " RETURNING {}", pkcol.name()).unwrap();
         if cfg!(feature = "debug") {
             eprintln!("insert sql {}", sql);
@@ -163,18 +171,38 @@ where
             .try_borrow_mut()?
             .query_raw(sql.as_str(), values.iter().map(sqlval_for_pg_query))?
             .map_err(|e| Error::Postgres(e))
-            .map(|r| sql_val_from_postgres(&r, 0, &pkcol))
+            .map(|r| sql_val_from_postgres(&r, 0, pkcol))
             .nth(0)?;
         pk.ok_or(Error::Internal)
     }
-    fn insert_or_replace(
+    fn insert_only(
         &self,
         table: &'static str,
         columns: &[Column],
         values: &[SqlVal],
     ) -> Result<()> {
         let mut sql = String::new();
-        helper::sql_insert_with_placeholders(table, columns, true, &mut sql);
+        helper::sql_insert_with_placeholders(
+            table,
+            columns,
+            &mut PgPlaceholderSource::new(),
+            &mut sql,
+        );
+        let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
+        self.client
+            .try_borrow_mut()?
+            .execute(sql.as_str(), params.as_slice())?;
+        Ok(())
+    }
+    fn insert_or_replace(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlVal],
+    ) -> Result<()> {
+        let mut sql = String::new();
+        sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
         self.client
             .try_borrow_mut()?
@@ -190,7 +218,13 @@ where
         values: &[SqlVal],
     ) -> Result<()> {
         let mut sql = String::new();
-        helper::sql_update_with_placeholders(table, pkcol, columns, &mut sql);
+        helper::sql_update_with_placeholders(
+            table,
+            pkcol,
+            columns,
+            &mut PgPlaceholderSource::new(),
+            &mut sql,
+        );
         let placeholder_values = [values, &[pk]].concat();
         let params: Vec<&DynToSqlPg> = placeholder_values
             .iter()
@@ -211,6 +245,7 @@ where
         sql_for_expr(
             query::Expr::Condition(Box::new(expr)),
             &mut values,
+            &mut PgPlaceholderSource::new(),
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
@@ -225,7 +260,7 @@ where
         let stmt = self
             .client
             .try_borrow_mut()?
-            .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=?;")?;
+            .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;")?;
         let rows = self.client.try_borrow_mut()?.query(&stmt, &[&table])?;
         Ok(!rows.is_empty())
     }
@@ -282,6 +317,7 @@ impl postgres::types::ToSql for SqlVal {
         match self {
             SqlVal::Bool(b) => b.to_sql(ty, out),
             SqlVal::Int(i) => i.to_sql(ty, out),
+            SqlVal::BigInt(i) => i.to_sql(ty, out),
             SqlVal::Real(r) => r.to_sql(ty, out),
             SqlVal::Text(t) => t.to_sql(ty, out),
             SqlVal::Blob(b) => b.to_sql(ty, out),
@@ -323,10 +359,8 @@ impl<'a> postgres::types::FromSql<'a> for SqlVal {
         use postgres::types::Type;
         match ty {
             &Type::BOOL => Ok(SqlVal::Bool(bool::from_sql(ty, raw)?)),
-            &Type::INT2 => Ok(SqlVal::Int(i16::from_sql(ty, raw)? as i64)),
-            &Type::INT4 => Ok(SqlVal::Int(i32::from_sql(ty, raw)? as i64)),
-            &Type::INT8 => Ok(SqlVal::Int(i64::from_sql(ty, raw)?)),
-            &Type::FLOAT4 => Ok(SqlVal::Real(f32::from_sql(ty, raw)? as f64)),
+            &Type::INT4 => Ok(SqlVal::Int(i32::from_sql(ty, raw)?)),
+            &Type::INT8 => Ok(SqlVal::BigInt(i64::from_sql(ty, raw)?)),
             &Type::FLOAT8 => Ok(SqlVal::Real(f64::from_sql(ty, raw)?)),
             &Type::TEXT => Ok(SqlVal::Text(String::from_sql(ty, raw)?)),
             &Type::BYTEA => Ok(SqlVal::Blob(Vec::<u8>::from_sql(ty, raw)?)),
@@ -371,11 +405,15 @@ fn row_from_postgres(row: &postgres::Row, cols: &[Column]) -> Result<Row> {
     Ok(Row::new(vals))
 }
 
-fn sql_for_expr<W>(expr: query::Expr, values: &mut Vec<SqlVal>, w: &mut W)
-where
+fn sql_for_expr<W>(
+    expr: query::Expr,
+    values: &mut Vec<SqlVal>,
+    pls: &mut PgPlaceholderSource,
+    w: &mut W,
+) where
     W: Write,
 {
-    helper::sql_for_expr(expr, &sql_for_expr, values, w)
+    helper::sql_for_expr(expr, &sql_for_expr, values, pls, w)
 }
 
 fn sql_val_from_postgres<I>(row: &postgres::Row, idx: I, col: &Column) -> Result<SqlVal>
@@ -383,34 +421,41 @@ where
     I: postgres::row::RowIndex + std::fmt::Display,
 {
     let sqlval: SqlVal = row.try_get(idx)?;
-    if !sqlval.is_compatible(col.ty(), true) {
+    if sqlval.is_compatible(col.ty(), true) {
         Ok(sqlval)
     } else {
-        Err(Error::SqlResultTypeMismatch(col.name().to_string()))
+        Err(Error::SqlResultTypeMismatch {
+            col: col.name().to_string(),
+            detail: format!(
+                "{:?} is not compatible with expected column type {}",
+                &sqlval,
+                col.ty()
+            ),
+        })
     }
 }
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
-        Operation::AddTable(table) => Ok(create_table(&table)),
+        Operation::AddTable(table) => Ok(create_table(&table)?),
         Operation::RemoveTable(name) => Ok(drop_table(&name)),
         Operation::AddColumn(tbl, col) => add_column(&tbl, &col),
-        Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, &tbl, &name)),
-        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, &tbl, &old, Some(new))),
+        Operation::RemoveColumn(tbl, name) => remove_column(current, &tbl, &name),
+        Operation::ChangeColumn(tbl, old, new) => change_column(current, &tbl, &old, Some(new)),
     }
 }
 
-fn create_table(table: &ATable) -> String {
+fn create_table(table: &ATable) -> Result<String> {
     let coldefs = table
         .columns
         .iter()
         .map(define_column)
-        .collect::<Vec<String>>()
+        .collect::<Result<Vec<String>>>()?
         .join(",\n");
-    format!("CREATE TABLE {} (\n{}\n);", table.name, coldefs)
+    Ok(format!("CREATE TABLE {} (\n{}\n);", table.name, coldefs))
 }
 
-fn define_column(col: &AColumn) -> String {
+fn define_column(col: &AColumn) -> Result<String> {
     let mut constraints: Vec<String> = Vec::new();
     if !col.nullable() {
         constraints.push("NOT NULL".to_string());
@@ -418,38 +463,33 @@ fn define_column(col: &AColumn) -> String {
     if col.is_pk() {
         constraints.push("PRIMARY KEY".to_string());
     }
-    if col.is_auto() && !col.is_pk() {
-        // integer primary key is automatically an alias for ROWID,
-        // and we only allow auto on integer types
-        constraints.push("AUTOINCREMENT".to_string());
-    }
-    format!(
+    Ok(format!(
         "{} {} {}",
         &col.name(),
-        col_sqltype(col),
+        col_sqltype(col)?,
         constraints.join(" ")
-    )
+    ))
 }
 
-fn col_sqltype(col: &AColumn) -> &'static str {
-    match col.sqltype() {
-        Ok(ty) => sqltype(ty),
-        // sqlite doesn't actually require that the column type be
-        // specified
-        Err(_) => "",
-    }
-}
-
-fn sqltype(ty: SqlType) -> &'static str {
-    match ty {
-        SqlType::Bool => "INTEGER",
-        SqlType::Int => "INTEGER",
-        SqlType::BigInt => "INTEGER",
-        SqlType::Real => "REAL",
-        SqlType::Text => "TEXT",
-        #[cfg(feature = "datetime")]
-        SqlType::Timestamp => "TEXT",
-        SqlType::Blob => "BLOB",
+fn col_sqltype(col: &AColumn) -> Result<&'static str> {
+    let ty = col.sqltype()?;
+    if col.is_auto() {
+        match ty {
+            SqlType::Int => Ok("SERIAL"),
+            SqlType::BigInt => Ok("BIGSERIAL"),
+            _ => Err(Error::InvalidAuto(col.name().to_string())),
+        }
+    } else {
+        Ok(match ty {
+            SqlType::Bool => "BOOLEAN",
+            SqlType::Int => "INTEGER",
+            SqlType::BigInt => "BIGINT",
+            SqlType::Real => "DOUBLE PRECISION",
+            SqlType::Text => "TEXT",
+            #[cfg(feature = "datetime")]
+            SqlType::Timestamp => "TIMESTAMP",
+            SqlType::Blob => "BYTEA",
+        })
     }
 }
 
@@ -462,12 +502,12 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     Ok(format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         tbl_name,
-        define_column(col),
+        define_column(col)?,
         helper::sql_literal_value(default)
     ))
 }
 
-fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {
+fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String> {
     let old = current
         .get_table(tbl_name)
         .and_then(|table| table.column(name))
@@ -479,7 +519,7 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {
                 "Cannot remove column {} that does not exist from table {}",
                 name, tbl_name
             );
-            "".to_string()
+            Ok(String::new())
         }
     }
 }
@@ -506,7 +546,7 @@ fn change_column(
     tbl_name: &str,
     old: &AColumn,
     new: Option<&AColumn>,
-) -> String {
+) -> Result<String> {
     let table = current.get_table(tbl_name);
     if table.is_none() {
         warn!(
@@ -514,7 +554,7 @@ fn change_column(
             &old.name(),
             tbl_name
         );
-        return "".to_string();
+        return Ok(String::new());
     }
     let old_table = table.unwrap();
     let mut new_table = old_table.clone();
@@ -524,7 +564,7 @@ fn change_column(
         None => new_table.remove_column(old.name()),
     }
     let stmts: [&str; 4] = [
-        &create_table(&new_table),
+        &create_table(&new_table)?,
         &copy_table(&old_table, &new_table),
         &drop_table(&old_table.name),
         &format!("ALTER TABLE {} RENAME TO {};", &new_table.name, tbl_name),
@@ -532,5 +572,47 @@ fn change_column(
     let result = stmts.join("\n");
     new_table.name = old_table.name.clone();
     current.replace_table(new_table);
-    result
+    Ok(result)
+}
+
+pub fn sql_insert_or_replace_with_placeholders(
+    table: &'static str,
+    columns: &[Column],
+    pkcol: &Column,
+    w: &mut impl Write,
+) {
+    write!(w, "INSERT ").unwrap();
+    write!(w, "INTO {} (", table).unwrap();
+    helper::list_columns(columns, w);
+    write!(w, ") VALUES (").unwrap();
+    columns.iter().fold(1, |n, _| {
+        let sep = if n == 1 { "" } else { ", " };
+        write!(w, "{}${}", sep, n).unwrap();
+        n + 1
+    });
+    write!(w, ")").unwrap();
+    write!(w, " ON CONFLICT ({}) DO UPDATE SET (", pkcol.name()).unwrap();
+    helper::list_columns(columns, w);
+    write!(w, ") = (").unwrap();
+    columns.iter().fold("", |sep, c| {
+        write!(w, "{}excluded.{}", sep, c.name()).unwrap();
+        ", "
+    });
+    write!(w, ")").unwrap();
+}
+
+struct PgPlaceholderSource {
+    n: i8,
+}
+impl PgPlaceholderSource {
+    fn new() -> Self {
+        PgPlaceholderSource { n: 1 }
+    }
+}
+impl helper::PlaceholderSource for PgPlaceholderSource {
+    fn next_placeholder(&mut self) -> Cow<str> {
+        let ret = Cow::Owned(format!("${}", self.n));
+        self.n += 1;
+        ret
+    }
 }

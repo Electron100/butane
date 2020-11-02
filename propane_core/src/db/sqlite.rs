@@ -126,11 +126,11 @@ impl ConnectionMethods for GenericConnection<'_> {
         let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
         rows.collect()
     }
-    fn insert(
+    fn insert_returning_pk(
         &self,
         table: &'static str,
         columns: &[Column],
-        pkcol: Column,
+        pkcol: &Column,
         values: &[SqlVal],
     ) -> Result<SqlVal> {
         let mut sql = String::new();
@@ -156,10 +156,31 @@ impl ConnectionMethods for GenericConnection<'_> {
         )?;
         Ok(pk)
     }
+    fn insert_only(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        values: &[SqlVal],
+    ) -> Result<()> {
+        let mut sql = String::new();
+        helper::sql_insert_with_placeholders(
+            table,
+            columns,
+            &mut SQLitePlaceholderSource::new(),
+            &mut sql,
+        );
+        if cfg!(feature = "debug") {
+            eprintln!("insert sql {}", sql);
+        }
+        self.conn
+            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
+        Ok(())
+    }
     fn insert_or_replace(
         &self,
         table: &'static str,
         columns: &[Column],
+        _pkcol: &Column,
         values: &[SqlVal],
     ) -> Result<()> {
         let mut sql = String::new();
@@ -199,6 +220,7 @@ impl ConnectionMethods for GenericConnection<'_> {
         sql_for_expr(
             query::Expr::Condition(Box::new(expr)),
             &mut values,
+            &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
         let cnt = self.conn.execute(&sql, &values)?;

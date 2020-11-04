@@ -514,6 +514,6 @@ impl SQLitePlaceholderSource {
 impl helper::PlaceholderSource for SQLitePlaceholderSource {
     fn next_placeholder(&mut self) -> Cow<str> {
         // sqlite placeholder is always a question mark.
-        return Cow::Borrowed("?");
+        Cow::Borrowed("?")
     }
 }

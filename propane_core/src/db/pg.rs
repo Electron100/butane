@@ -4,12 +4,10 @@ use super::*;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
 use crate::{Result, SqlType, SqlVal};
-use bytes;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
 #[cfg(feature = "datetime")]
 use log::warn;
-use postgres;
 use postgres::fallible_iterator::FallibleIterator;
 use std::cell::RefCell;
 use std::fmt::Write;
@@ -142,7 +140,7 @@ where
         self.client
             .try_borrow_mut()?
             .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))?
-            .map_err(|e| Error::Postgres(e))
+            .map_err(Error::Postgres)
             .map(|r| row_from_postgres(&r, columns))
             .collect()
     }
@@ -170,7 +168,7 @@ where
             .client
             .try_borrow_mut()?
             .query_raw(sql.as_str(), values.iter().map(sqlval_for_pg_query))?
-            .map_err(|e| Error::Postgres(e))
+            .map_err(Error::Postgres)
             .map(|r| sql_val_from_postgres(&r, 0, pkcol))
             .nth(0)?;
         pk.ok_or(Error::Internal)
@@ -345,7 +343,7 @@ impl postgres::types::ToSql for SqlVal {
             return true;
         }
 
-        return false;
+        false
     }
 
     postgres::types::to_sql_checked!();
@@ -357,15 +355,15 @@ impl<'a> postgres::types::FromSql<'a> for SqlVal {
         raw: &'a [u8],
     ) -> std::result::Result<Self, Box<dyn std::error::Error + 'static + Sync + Send>> {
         use postgres::types::Type;
-        match ty {
-            &Type::BOOL => Ok(SqlVal::Bool(bool::from_sql(ty, raw)?)),
-            &Type::INT4 => Ok(SqlVal::Int(i32::from_sql(ty, raw)?)),
-            &Type::INT8 => Ok(SqlVal::BigInt(i64::from_sql(ty, raw)?)),
-            &Type::FLOAT8 => Ok(SqlVal::Real(f64::from_sql(ty, raw)?)),
-            &Type::TEXT => Ok(SqlVal::Text(String::from_sql(ty, raw)?)),
-            &Type::BYTEA => Ok(SqlVal::Blob(Vec::<u8>::from_sql(ty, raw)?)),
+        match *ty {
+            Type::BOOL => Ok(SqlVal::Bool(bool::from_sql(ty, raw)?)),
+            Type::INT4 => Ok(SqlVal::Int(i32::from_sql(ty, raw)?)),
+            Type::INT8 => Ok(SqlVal::BigInt(i64::from_sql(ty, raw)?)),
+            Type::FLOAT8 => Ok(SqlVal::Real(f64::from_sql(ty, raw)?)),
+            Type::TEXT => Ok(SqlVal::Text(String::from_sql(ty, raw)?)),
+            Type::BYTEA => Ok(SqlVal::Blob(Vec::<u8>::from_sql(ty, raw)?)),
             #[cfg(feature = "datetime")]
-            &Type::TIMESTAMP => Ok(SqlVal::Timestamp(NaiveDateTime::from_sql(ty, raw)?)),
+            Type::TIMESTAMP => Ok(SqlVal::Timestamp(NaiveDateTime::from_sql(ty, raw)?)),
             _ => Err(Box::new(Error::UnknownSqlType(format!("{}", ty)))),
         }
     }
@@ -378,17 +376,17 @@ impl<'a> postgres::types::FromSql<'a> for SqlVal {
 
     fn accepts(ty: &postgres::types::Type) -> bool {
         use postgres::types::Type;
-        match ty {
-            &Type::BOOL => true,
-            &Type::INT2 => true,
-            &Type::INT4 => true,
-            &Type::INT8 => true,
-            &Type::FLOAT4 => true,
-            &Type::FLOAT8 => true,
-            &Type::TEXT => true,
-            &Type::BYTEA => true,
+        match *ty {
+            Type::BOOL => true,
+            Type::INT2 => true,
+            Type::INT4 => true,
+            Type::INT8 => true,
+            Type::FLOAT4 => true,
+            Type::FLOAT8 => true,
+            Type::TEXT => true,
+            Type::BYTEA => true,
             #[cfg(feature = "datetime")]
-            &Type::TIMESTAMP => true,
+            Type::TIMESTAMP => true,
             _ => false,
         }
     }

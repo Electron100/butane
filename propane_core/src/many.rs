@@ -99,11 +99,13 @@ where
                 })
                 .load(conn)?;
             // Now add in the values for things not saved to the db yet
-            vals.append(
-                &mut T::query()
-                    .filter(BoolExpr::In(T::PKCOL, self.new_values.clone()))
-                    .load(conn)?,
-            );
+            if !self.new_values.is_empty() {
+                vals.append(
+                    &mut T::query()
+                        .filter(BoolExpr::In(T::PKCOL, self.new_values.clone()))
+                        .load(conn)?,
+                );
+            }
             Ok(vals)
         });
         vals.map(|v| v.iter())

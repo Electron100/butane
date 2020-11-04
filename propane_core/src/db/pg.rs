@@ -370,6 +370,12 @@ impl<'a> postgres::types::FromSql<'a> for SqlVal {
         }
     }
 
+    fn from_sql_null(
+        _ty: &postgres::types::Type,
+    ) -> std::result::Result<Self, Box<dyn std::error::Error + 'static + Sync + Send>> {
+        Ok(SqlVal::Null)
+    }
+
     fn accepts(ty: &postgres::types::Type) -> bool {
         use postgres::types::Type;
         match ty {

@@ -26,10 +26,17 @@ where
 {
     match expr {
         Expr::Column(name) => w.write_str(name),
-        Val(v) => {
-            values.push(v);
-            w.write_str(&pls.next_placeholder())
-        }
+        Val(v) => match v {
+            // No risk of SQL injection with integers and the
+            // different sizes are tricky with the PG backend's binary
+            // protocol
+            SqlVal::Int(i) => write!(w, "{}", i),
+            SqlVal::BigInt(i) => write!(w, "{}", i),
+            _ => {
+                values.push(v);
+                w.write_str(&pls.next_placeholder())
+            }
+        },
         Placeholder => w.write_str(&pls.next_placeholder()),
         Condition(c) => match *c {
             True => write!(w, "TRUE"),

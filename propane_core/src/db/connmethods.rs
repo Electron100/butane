@@ -92,18 +92,6 @@ impl Row {
             .get(idx)
             .ok_or_else(|| BoundsError(format!("{}th column not present in row", idx)))
     }
-    pub fn get_int(&self, idx: usize) -> Result<i32> {
-        self.get(idx)?.integer()
-    }
-    pub fn get_bigint(&self, idx: usize) -> Result<i64> {
-        self.get(idx)?.bigint()
-    }
-    pub fn get_bool(&self, idx: usize) -> Result<bool> {
-        self.get(idx)?.bool()
-    }
-    pub fn get_real(&self, idx: usize) -> Result<f64> {
-        self.get(idx)?.real()
-    }
 }
 impl IntoIterator for Row {
     type Item = SqlVal;

@@ -49,8 +49,6 @@
 	 + Summary/readme
    + Example like Diesel's
 		 Now in progress
-	 + Optional dependencies for rusqlite
-	 + PG support
 	 + migration downgrade
 	 + Clean up TODOs
 ** vNext

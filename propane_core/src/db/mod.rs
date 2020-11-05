@@ -20,12 +20,13 @@ use std::fs;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::vec::Vec;
 
 mod connmethods;
 mod helper;
 mod macros;
+#[cfg(feature = "pg")]
 pub mod pg;
+#[cfg(feature = "sqlite")]
 pub mod sqlite;
 
 // Macros are always exported at the root of the crate
@@ -128,7 +129,9 @@ impl Backend for Box<dyn Backend> {
 /// Find a backend by name.
 pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
+        #[cfg(feature = "sqlite")]
         "sqlite" => Some(Box::new(sqlite::SQLiteBackend::new())),
+        #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         _ => None,
     }
@@ -162,6 +165,8 @@ pub struct Transaction<'c> {
     trans: Box<dyn BackendTransaction<'c> + 'c>,
 }
 impl<'c> Transaction<'c> {
+    // unused may occur if no backends are selected
+    #[allow(unused)]
     fn new(trans: Box<dyn BackendTransaction<'c> + 'c>) -> Self {
         Transaction { trans }
     }

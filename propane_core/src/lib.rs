@@ -139,10 +139,13 @@ pub enum Error {
     SerdeJson(#[from] serde_json::Error),
     #[error("IO error {0}")]
     IO(#[from] std::io::Error),
+    #[cfg(feature = "sqlite")]
     #[error("Sqlite error {0}")]
     SQLite(#[from] rusqlite::Error),
+    #[cfg(feature = "sqlite")]
     #[error("Sqlite error {0}")]
     SQLiteFromSQL(rusqlite::types::FromSqlError),
+    #[cfg(feature = "pg")]
     #[error("Postgres error {0}")]
     Postgres(#[from] postgres::Error),
     #[cfg(feature = "datetime")]
@@ -152,6 +155,7 @@ pub enum Error {
     CellBorrow(#[from] std::cell::BorrowMutError),
 }
 
+#[cfg(feature = "sqlite")]
 impl From<rusqlite::types::FromSqlError> for Error {
     fn from(e: rusqlite::types::FromSqlError) -> Self {
         use rusqlite::types::FromSqlError;

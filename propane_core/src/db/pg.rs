@@ -6,7 +6,6 @@ use crate::query;
 use crate::{Result, SqlType, SqlVal};
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
-#[cfg(feature = "datetime")]
 use log::warn;
 use postgres::fallible_iterator::FallibleIterator;
 use std::cell::RefCell;

@@ -6,6 +6,8 @@ edition = "2018"
 
 [features]
 default = ["datetime", "uuid"]
+sqlite = ["propane_core/sqlite"]
+pg = ["propane_core/pg"]
 datetime = ["propane_core/datetime", "propane_codegen/datetime"]
 debug = ["propane_core/debug"]
 uuid = ["propane_core/uuid", "propane_codegen/uuid"]

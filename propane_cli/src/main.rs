@@ -134,11 +134,15 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
         eprintln!("Migration {} already exists", name);
         std::process::exit(1);
     }
-    let created = ms.create_migration(
-        &db::sqlite::SQLiteBackend::new(),
-        &name,
-        ms.latest().as_ref(),
-    )?;
+    let spec = db::ConnectionSpec::load(&base_dir()?)?;
+    let backend = match db::get_backend(&spec.backend_name) {
+        Some(backend) => backend,
+        None => {
+            eprintln!("Unknown backend {}", &spec.backend_name);
+            std::process::exit(1);
+        }
+    };
+    let created = ms.create_migration(&backend, &name, ms.latest().as_ref())?;
     if created {
         let cli_state = CliState::load()?;
         if cli_state.embedded {

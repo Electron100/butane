@@ -1,5 +1,7 @@
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::unit_arg)]
+// may occur if no backends are selected
+#![allow(unused)]
 
 use super::Column;
 use crate::migrations::adb::AColumn;

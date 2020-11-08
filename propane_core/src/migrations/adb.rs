@@ -314,8 +314,7 @@ impl AColumn {
 /// Individual operation use to apply a migration.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Operation {
-    //TODO support renames
-    //TODO support changed default
+    //future improvement: support column renames
     AddTable(ATable),
     RemoveTable(String),
     AddColumn(String, AColumn),

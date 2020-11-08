@@ -50,10 +50,10 @@
    + Example like Diesel's
 		 Now in progress
 	 + migration downgrade
-	 + Clean up TODOs
 ** vNext
 	 + foreign key constraints in db, cascade setting
 	 + incremental save
 	 + Many backreferences
+	 + Column renames in migrations
 
 

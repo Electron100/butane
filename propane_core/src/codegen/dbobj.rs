@@ -64,7 +64,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             }
             fn save(&mut self, conn: &impl propane::db::ConnectionMethods) -> propane::Result<()> {
                 #many_save
-                //todo perf use an array on the stack for better
+                //future perf improvement use an array on the stack
                 let mut values: Vec<propane::SqlVal> = Vec::with_capacity(#numdbfields);
                 let pkcol = propane::db::Column::new(
                     #pklit,

@@ -10,7 +10,6 @@ pub use propane_core::{
     SqlVal, ToSql,
 };
 
-// TODO document matches, contains, and any others
 /// Macro to construct a [`BoolExpr`] (for use with a [`Query`]) from
 /// an expression with Rust syntax.
 ///
@@ -24,6 +23,28 @@ pub use propane_core::{
 /// `#[model]` attribute applied) and `expr` is a Rust-like expression
 /// with a boolean value. `Foo`'s fields may be referred to as if they
 /// were variables.
+///
+/// # Rust values
+/// To refer to values from the surrounding rust function, enclose
+/// them in braces, like `filter!(Foo, bar == {bar})`
+///
+/// # Function-like operations
+/// Filters support some operations for which Rust does not have operators and which are instead
+/// represented syntactically as function calls.
+/// * `like`: parameter is a SQL like expression string, e.g. `title.like("M%").
+/// * `matches`: Parmeter is a sub-expression. Use with a
+///   [`ForeignKey`] field to evaluate as true if the referent
+///   matches. For example, to find all posts made in blogs by people
+///   named "Pete" we might say `filter!(Post, `blog.matches(author == "Pete"))`.
+/// * `contains`: Essentially the many-to-many version of `matches`.
+///    Parameter is a sub-expression. Use with a [`Many`]
+///    field to evaluate as true if one of the many referents matches
+///    the given expression. For example, in a blog post model with a field
+///    `tags: Many<Tag>` we could filter to posts with a "cats" with
+///    the following `tags.contains(tag == "cats"). If the expression
+///    is single literal, it is assumed to be used to match the
+///    primary key.
+///
 /// # Examples
 /// ```
 /// # use propane::query::BoolExpr;
@@ -37,6 +58,9 @@ pub use propane_core::{
 ///   nationality: String
 /// }
 /// let e: BoolExpr = filter!(Contestant, nationality == "US" && rank < 42);
+/// let firstplace = 1;
+/// let e2 = filter!(Contestant, rank == { firstplace });
+/// let e3 = filter!(Contestant, name.like("A%"));
 ///```
 ///
 /// [`BoolExpr`]: crate::query::BoolExpr

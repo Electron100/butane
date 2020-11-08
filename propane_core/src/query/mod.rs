@@ -13,8 +13,7 @@ pub use fieldexpr::{DataOrd, FieldExpr, ManyFieldExpr};
 /// Abstract representation of a database expression.
 #[derive(Clone)]
 pub enum Expr {
-    // todo document column name qualification
-    /// A column.
+    /// A column, referenced by name.
     Column(&'static str),
     /// A value.
     Val(SqlVal),

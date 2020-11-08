@@ -58,7 +58,7 @@ where
             AllOf(conds) => {
                 let mut remaining = conds.len();
                 for cond in conds {
-                    // todo avoid the extra boxing
+                    // future perf improvement: figure out a clean way to avoid the extra boxing
                     f(Condition(Box::new(cond)), values, pls, w);
                     if remaining > 1 {
                         write!(w, " AND ").unwrap();

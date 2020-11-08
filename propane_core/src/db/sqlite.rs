@@ -262,6 +262,12 @@ impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
             Some(trans) => Ok(trans.commit()?),
         }
     }
+    fn rollback(&mut self) -> Result<()> {
+        match self.trans.take() {
+            None => Err(Error::Internal),
+            Some(trans) => Ok(trans.rollback()?),
+        }
+    }
     // Workaround for https://github.com/rust-lang/rfcs/issues/2765
     fn connection_methods(&self) -> &dyn ConnectionMethods {
         self

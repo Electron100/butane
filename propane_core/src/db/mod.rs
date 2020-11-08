@@ -151,6 +151,8 @@ trait BackendTransaction<'c>: ConnectionMethods {
     /// that no methods should be called after commit. This trait is
     /// not public, and that behavior is enforced by Transaction
     fn commit(&mut self) -> Result<()>;
+    /// Roll back the transaction. Same comment about consuming self as above.
+    fn rollback(&mut self) -> Result<()>;
 
     // Workaround for https://github.com/rust-lang/rfcs/issues/2765
     fn connection_methods(&self) -> &dyn ConnectionMethods;
@@ -174,7 +176,10 @@ impl<'c> Transaction<'c> {
     pub fn commit(mut self) -> Result<()> {
         self.trans.deref_mut().commit()
     }
-    // TODO need rollback method
+    /// Roll back the transaction. Equivalent to dropping it.
+    pub fn rollback(mut self) -> Result<()> {
+        self.trans.deref_mut().rollback()
+    }
     fn wrapped_connection_methods(&self) -> Result<&dyn ConnectionMethods> {
         let a: &dyn BackendTransaction<'c> = self.trans.as_ref();
         Ok(a.connection_methods())

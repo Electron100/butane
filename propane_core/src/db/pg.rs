@@ -303,6 +303,12 @@ impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
             Some(trans) => Ok(trans.into_inner().commit()?),
         }
     }
+    fn rollback(&mut self) -> Result<()> {
+        match self.trans.take() {
+            None => Err(Error::Internal),
+            Some(trans) => Ok(trans.into_inner().rollback()?),
+        }
+    }
     // Workaround for https://github.com/rust-lang/rfcs/issues/2765
     fn connection_methods(&self) -> &dyn ConnectionMethods {
         self

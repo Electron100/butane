@@ -153,6 +153,9 @@ pub enum Error {
     Chrono(#[from] chrono::ParseError),
     #[error("RefCell error {0}")]
     CellBorrow(#[from] std::cell::BorrowMutError),
+    #[cfg(feature = "tls")]
+    #[error("TLS error {0}")]
+    TLS(#[from] native_tls::Error),
 }
 
 #[cfg(feature = "sqlite")]

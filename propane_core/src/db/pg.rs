@@ -59,13 +59,23 @@ pub struct PgConnection {
 impl PgConnection {
     fn open(params: &str) -> Result<Self> {
         Ok(PgConnection {
-            // TODO add TLS support
-            conn: RefCell::new(postgres::Client::connect(params, postgres::NoTls)?),
+            conn: RefCell::new(Self::connect(params)?),
         })
     }
     // For use with the connection_method_wrapper macro
     fn wrapped_connection_methods<'a>(&'a self) -> Result<PgGenericClient<'a, postgres::Client>> {
         Ok(PgGenericClient { client: &self.conn })
+    }
+    fn connect(params: &str) -> Result<postgres::Client> {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "tls")] {
+                let connector = native_tls::TlsConnector::new()?;
+                let connector = postgres_native_tls::MakeTlsConnector::new(connector);
+            } else {
+                let connector = postgres::NoTls;
+            }
+        }
+        Ok(postgres::Client::connect(params, connector)?)
     }
 }
 connection_method_wrapper!(PgConnection);

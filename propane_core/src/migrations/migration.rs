@@ -1,6 +1,7 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::PropaneMigration;
 use crate::db::ConnectionMethods;
+use crate::query::{BoolExpr, Expr};
 use crate::{db, sqlval::ToSql, DataObject, DataResult, Error, Result};
 use std::borrow::Cow;
 use std::cmp::PartialEq;
@@ -47,6 +48,25 @@ pub trait Migration: PartialEq {
             PropaneMigration::TABLE,
             PropaneMigration::COLUMNS,
             &[self.name().as_ref().to_sql()],
+        )?;
+        tx.commit()
+    }
+
+    /// Un-apply (downgrade) the migration to a database
+    /// connection. The connection must be for the same type of
+    /// database as this and this must be the latest migration applied
+    /// to the database.
+    fn downgrade(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
+        let backend_name = conn.backend_name();
+        let tx = conn.transaction()?;
+        let sql = self
+            .down_sql(backend_name)?
+            .ok_or_else(|| Error::UnknownBackend(backend_name.to_string()))?;
+        tx.execute(&sql)?;
+        let nameval = self.name().as_ref().to_sql();
+        tx.delete_where(
+            PropaneMigration::TABLE,
+            BoolExpr::Eq(PropaneMigration::PKCOL, Expr::Val(nameval)),
         )?;
         tx.commit()
     }

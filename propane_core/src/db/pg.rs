@@ -459,7 +459,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::AddTable(table) => Ok(create_table(&table)?),
         Operation::RemoveTable(name) => Ok(drop_table(&name)),
         Operation::AddColumn(tbl, col) => add_column(&tbl, &col),
-        Operation::RemoveColumn(tbl, name) => remove_column(current, &tbl, &name),
+        Operation::RemoveColumn(tbl, name) => remove_column(&tbl, &name),
         Operation::ChangeColumn(tbl, old, new) => change_column(current, &tbl, &old, Some(new)),
     }
 }
@@ -526,21 +526,8 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     ))
 }
 
-fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String> {
-    let old = current
-        .get_table(tbl_name)
-        .and_then(|table| table.column(name))
-        .cloned();
-    match old {
-        Some(col) => change_column(current, tbl_name, &col, None),
-        None => {
-            warn!(
-                "Cannot remove column {} that does not exist from table {}",
-                name, tbl_name
-            );
-            Ok(String::new())
-        }
-    }
+fn remove_column(tbl_name: &str, name: &str) -> Result<String> {
+    Ok(format!("ALTER TABLE {} DROP COLUMN {};", tbl_name, name))
 }
 
 fn copy_table(old: &ATable, new: &ATable) -> String {

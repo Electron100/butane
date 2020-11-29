@@ -49,7 +49,6 @@
 	 + Summary/readme
    + Example like Diesel's
 		 Now in progress
-	 + migration downgrade
 ** vNext
 	 + foreign key constraints in db, cascade setting
 	 + incremental save

@@ -40,6 +40,12 @@ pub fn sqlite_connection() -> Connection {
     backend.connect(":memory:").unwrap()
 }
 
+pub fn pg_connection() -> (Connection, PgSetupData) {
+    let backend = propane::db::get_backend("pg").unwrap();
+    let data = pg_setup();
+    (backend.connect(&pg_connstr(&data)).unwrap(), data)
+}
+
 pub fn sqlite_setup() {}
 pub fn sqlite_teardown(_: ()) {}
 pub struct PgSetupData {
@@ -121,6 +127,13 @@ pub fn pg_teardown(_data: PgSetupData) {
     // All the work is done by the drop implementation
 }
 
+pub fn pg_connstr(data: &PgSetupData) -> String {
+    format!(
+        "host={} dbname=postgres user=postgres",
+        data.sockdir.to_str().unwrap()
+    )
+}
+
 #[macro_export]
 macro_rules! maketest {
     ($fname:ident, $backend:expr, $connstr:expr, $dataname:ident) => {
@@ -140,17 +153,21 @@ macro_rules! maketest {
 }
 
 #[macro_export]
-macro_rules! testall {
+macro_rules! maketest_pg {
     ($fname:ident) => {
-        maketest!($fname, sqlite, format!(":memory:"), setup_data);
         maketest!(
             $fname,
             pg,
-            format!(
-                "host={} dbname=postgres user=postgres",
-                &setup_data.sockdir.to_str().unwrap()
-            ),
+            crate::common::pg_connstr(&setup_data),
             setup_data
         );
+    };
+}
+
+#[macro_export]
+macro_rules! testall {
+    ($fname:ident) => {
+        maketest!($fname, sqlite, format!(":memory:"), setup_data);
+        maketest_pg!($fname);
     };
 }

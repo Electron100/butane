@@ -171,6 +171,15 @@ fn migration_add_field_sqlite() {
 }
 
 #[test]
+fn migration_add_field_pg() {
+    let (mut conn, _data) = common::pg_connection();
+    migration_add_field(
+        &mut conn,
+        "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;",
+    );
+}
+
+#[test]
 fn migration_add_field_with_default_sqlite() {
     migration_add_field_with_default(
         &mut common::sqlite_connection(),
@@ -179,8 +188,23 @@ fn migration_add_field_with_default_sqlite() {
 }
 
 #[test]
+fn migration_add_field_with_default_pg() {
+    let (mut conn, _data) = common::pg_connection();
+    migration_add_field_with_default(
+        &mut conn,
+        "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 42;",
+    );
+}
+
+#[test]
 fn migration_delete_table_sqlite() {
     migration_delete_table(&mut common::sqlite_connection(), "DROP TABLE Foo;");
+}
+
+#[test]
+fn migration_delete_table_pg() {
+    let (mut conn, _data) = common::pg_connection();
+    migration_delete_table(&mut conn, "DROP TABLE Foo;");
 }
 
 fn test_migrate(

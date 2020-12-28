@@ -20,4 +20,4 @@ doc = false
 doc = false
 
 [dependencies]
-propane = { path = "../../propane", features=["default"] }
+butane = { path = "../../butane", features=["default"] }

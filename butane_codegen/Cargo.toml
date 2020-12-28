@@ -1,0 +1,18 @@
+[package]
+name = "butane_codegen"
+version = "0.1.0"
+authors = ["James Oakley <james@electronstudio.org>"]
+edition = "2018"
+
+[features]
+datetime = []
+
+[dependencies]
+proc-macro2 = "1.0"
+butane_core = { path = "../butane_core", version = "0.1.0" }
+quote = "1.0"
+syn = { version = "1.0", features = ["full", "extra-traits"] }
+uuid = {version = "0.8", optional=true}
+
+[lib]
+proc-macro = true

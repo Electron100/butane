@@ -1,5 +1,5 @@
-use propane::prelude::*;
-use propane::{model, ForeignKey, Many, ObjectState};
+use butane::prelude::*;
+use butane::{model, ForeignKey, Many, ObjectState};
 
 #[model]
 #[derive(Debug, Default, Eq, PartialEq)]
@@ -28,7 +28,7 @@ pub struct Post {
     pub tags: Many<Tag>,
     pub blog: ForeignKey<Blog>,
     pub byline: Option<String>,
-    state: propane::ObjectState,
+    state: butane::ObjectState,
 }
 impl Post {
     pub fn new(blog: &Blog, title: String, body: String) -> Self {

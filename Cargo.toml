@@ -1,10 +1,10 @@
 [workspace]
 
 members = [
-        "propane",
-        "propane_codegen",
-        "propane_core",
-        "propane_cli",
+        "butane",
+        "butane_codegen",
+        "butane_core",
+        "butane_cli",
         "example",
         "examples/getting_started",
         ]

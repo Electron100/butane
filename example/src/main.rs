@@ -1,10 +1,10 @@
 #![allow(dead_code)]
-use propane::db::{Connection, ConnectionSpec};
-use propane::model;
-use propane::{find, query};
-use propane::{ForeignKey, Many};
+use butane::db::{Connection, ConnectionSpec};
+use butane::model;
+use butane::{find, query};
+use butane::{ForeignKey, Many};
 
-use propane::prelude::*;
+use butane::prelude::*;
 
 pub type Result<T> = std::result::Result<T, failure::Error>;
 
@@ -51,7 +51,7 @@ fn query() -> Result<()> {
 
 fn establish_connection() -> Result<Connection> {
     let spec = ConnectionSpec::load(&std::env::current_dir()?)?;
-    let conn = propane::db::connect(&spec)?;
+    let conn = butane::db::connect(&spec)?;
     Ok(conn)
 }
 fn main() {

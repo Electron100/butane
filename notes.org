@@ -24,7 +24,7 @@
 		 tag: String,
 	 }
 
-	 use crate::propane::prelude::*;
+	 use crate::butane::prelude::*;
 
 	 fn query() {
 	   let conn = establish_connection();
@@ -49,8 +49,8 @@
 	 + Summary/readme
    + Example like Diesel's
 		 Now in progress
-	 + propane list prints error on unknown dir
-	 + propane init incorrectly states only sqlite
+	 + butane list prints error on unknown dir
+	 + butane init incorrectly states only sqlite
 ** vNext
 	 + foreign key constraints in db, cascade setting
 	 + incremental save

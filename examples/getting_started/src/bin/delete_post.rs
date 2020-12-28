@@ -1,6 +1,6 @@
 use self::models::Post;
 use getting_started::*;
-use propane::query;
+use butane::query;
 use std::env::args;
 
 fn main() {

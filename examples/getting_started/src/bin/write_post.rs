@@ -1,6 +1,6 @@
 use getting_started::*;
 use models::Blog;
-use propane::prelude::*;
+use butane::prelude::*;
 use std::io::{stdin, Read};
 
 fn main() {

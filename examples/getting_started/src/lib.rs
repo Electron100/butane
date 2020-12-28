@@ -1,11 +1,11 @@
 pub mod models;
 
 use models::{Blog, Post};
-use propane::db::{Connection, ConnectionSpec};
-use propane::prelude::*;
+use butane::db::{Connection, ConnectionSpec};
+use butane::prelude::*;
 
 pub fn establish_connection() -> Connection {
-    propane::db::connect(&ConnectionSpec::load("propane/connection.json").unwrap()).unwrap()
+    butane::db::connect(&ConnectionSpec::load("butane/connection.json").unwrap()).unwrap()
 }
 
 pub fn create_blog(conn: &Connection, name: impl Into<String>) -> Blog {

@@ -1,6 +1,6 @@
 use getting_started::models::*;
 use getting_started::*;
-use propane::query;
+use butane::query;
 
 fn main() {
     let conn = establish_connection();

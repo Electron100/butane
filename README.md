@@ -18,7 +18,7 @@ implementation detail to the API consumer.
 * Propane, and its migration system especially, expects to own the
   database. It can be used with an existing database accessed also by
   other consumers, but it is not a design goal and there is no
-  facility to infer propane models from an existing database schema.
+  facility to infer butane models from an existing database schema.
 * API ergonomics are prioritized above performance. This does not mean
   Propane is slow, but that when given a choice between a simple,
   straightforward API and ekeing out the smallest possible overhead,

@@ -1,7 +1,7 @@
 #![allow(clippy::expect_fun_call)]
 use self::models::Post;
 use getting_started::*;
-use propane::prelude::*;
+use butane::prelude::*;
 use std::env::args;
 
 fn main() {

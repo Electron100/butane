@@ -10,6 +10,7 @@ sqlite = ["propane_core/sqlite"]
 pg = ["propane_core/pg"]
 datetime = ["propane_core/datetime", "propane_codegen/datetime"]
 debug = ["propane_core/debug"]
+tls = ["propane_core/tls"]
 uuid = ["propane_core/uuid", "propane_codegen/uuid"]
 
 [dependencies]

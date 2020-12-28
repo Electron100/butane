@@ -6,7 +6,8 @@ use proc_macro2::{Ident, Span, TokenTree};
 use quote::{quote, ToTokens};
 use syn::parse_quote;
 use syn::{
-    Attribute, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta, MetaNameValue, NestedMeta,
+    punctuated::Punctuated, Attribute, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta,
+    MetaNameValue, NestedMeta,
 };
 
 #[macro_export]
@@ -53,10 +54,14 @@ where
     let impltraits = dbobj::impl_dbobject(&ast_struct, &config);
     let fieldexprs = dbobj::add_fieldexprs(&ast_struct);
 
-    let fields = match remove_helper_field_attributes(&mut ast_struct.fields) {
-        Ok(fields) => &fields.named,
-        Err(err) => return err,
-    };
+    let fields: Punctuated<Field, syn::token::Comma> =
+        match remove_helper_field_attributes(&mut ast_struct.fields) {
+            Ok(fields) => fields.named.clone(),
+            Err(err) => return err,
+        };
+
+    // If the program already declared a state field, remove it
+    let fields = remove_existing_state_field(fields);
 
     let ident = ast_struct.ident;
 
@@ -222,6 +227,28 @@ fn remove_helper_field_attributes(
         }
         _ => Err(make_compile_error!("Fields must be named")),
     }
+}
+
+// We allow model structs to declare the state: propane::ObjectState
+// field for convenience so it doesn't appear so magical, but then we
+// recreate it.
+fn remove_existing_state_field(
+    fields: Punctuated<Field, syn::token::Comma>,
+) -> Punctuated<Field, syn::token::Comma> {
+    fields
+        .into_iter()
+        .filter(|f| match (&f.ident, &f.ty) {
+            (Some(ident), syn::Type::Path(typ)) => {
+                ident != "state"
+                    || typ
+                        .path
+                        .segments
+                        .last()
+                        .map_or(true, |seg| seg.ident != "ObjectState")
+            }
+            (_, _) => true,
+        })
+        .collect()
 }
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {

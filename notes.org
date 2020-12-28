@@ -49,6 +49,8 @@
 	 + Summary/readme
    + Example like Diesel's
 		 Now in progress
+	 + propane list prints error on unknown dir
+	 + propane init incorrectly states only sqlite
 ** vNext
 	 + foreign key constraints in db, cascade setting
 	 + incremental save

@@ -17,6 +17,7 @@ struct Blog {
 
 #[model]
 struct Post {
+    #[auto]
     id: i64,
     title: String,
     body: String,
@@ -40,7 +41,7 @@ fn query() -> Result<()> {
     let unliked_posts = query!(Post, published == true && likes < 5).load(&conn)?;
     let _blog: &Blog = unliked_posts.first().unwrap().blog.load(&conn)?;
     let _tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn);
-    //let tagged_posts2 = query!(Post, tags.contains(tag = "dinosaurs")).load(&conn);
+    //let tagged_posts2 = query!(Post, tags.contains(tag == "dinosaurs")).load(&conn);
     let blog: Blog = find!(Blog, name == "Bears", &conn).unwrap();
     let _posts_in_blog = query!(Post, blog == { &blog }).load(&conn);
     let _posts_in_blog2 = query!(Post, blog == { blog }).load(&conn);

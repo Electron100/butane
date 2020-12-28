@@ -1,7 +1,7 @@
-# Propane
+# Butane
 **An experimental ORM for Rust with a focus on simplicity and on writing Rust, not SQL**
 
-Propane takes an object-oriented approach to database operations. It
+Butane takes an object-oriented approach to database operations. It
 may be thought of as much as an object-persistence system as an ORM --
 the fact that it is backed by a SQL database is mostly an
 implementation detail to the API consumer.
@@ -15,12 +15,12 @@ implementation detail to the API consumer.
 * Write entirely or nearly entirely the same code regardless of database backend
 
 ## Limitations
-* Propane, and its migration system especially, expects to own the
+* Butane, and its migration system especially, expects to own the
   database. It can be used with an existing database accessed also by
   other consumers, but it is not a design goal and there is no
   facility to infer butane models from an existing database schema.
 * API ergonomics are prioritized above performance. This does not mean
-  Propane is slow, but that when given a choice between a simple,
+  Butane is slow, but that when given a choice between a simple,
   straightforward API and ekeing out the smallest possible overhead,
   the API will win.
   
@@ -65,10 +65,10 @@ let posts = query!(Post, published == true).limit(5).load(&conn)?;
 
 
 ## Features
-Propane exposes several featues to Cargo. By default, no backends are
+Butane exposes several featues to Cargo. By default, no backends are
 enabled: you will want to enabled either `sqlite` or `pg`:
 * `default`: Turns on `datetime` and `uuid`
-* `debug`: Used in developing Propane, not expected to be enabled by consumers.
+* `debug`: Used in developing Butane, not expected to be enabled by consumers.
 * `datetime`: Support for timestamps (using `chrono::NaiveDateTime`)
 * `pg`: Support for PostgreSQL
 * `sqlite`: Support for SQLite.
@@ -77,7 +77,7 @@ enabled: you will want to enabled either `sqlite` or `pg`:
 
 
 ## Roadmap
-Propane is young. The following features are currently missing, but planned
+Butane is young. The following features are currently missing, but planned
 * Foreign key constraints
 * Incremental object save
 * Backreferences in `Many`
@@ -87,8 +87,8 @@ Propane is young. The following features are currently missing, but planned
 * Benchmarking and performance tuning
 
 ## Comparison to Diesel
-Propane is inspired by Diesel and by Django's ORM. If you're looking
-for a mature, performant, and flexible ORM, go use Diesel. Propane
+Butane is inspired by Diesel and by Django's ORM. If you're looking
+for a mature, performant, and flexible ORM, go use Diesel. Butane
 doesn't aim to be better than Diesel, but makes some _different_ decisions, including:
 
 1. It is more object-oriented, at the cost of flexibility.
@@ -107,7 +107,7 @@ doesn't aim to be better than Diesel, but makes some _different_ decisions, incl
         .load::<Post>(&conn)?
    ```
    
-   whereas for Propane, you would instead write
+   whereas for Butane, you would instead write
    
    ```rust
    let posts = query!(Post, published == true).limit(5).load(&conn)?;

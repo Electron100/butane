@@ -27,7 +27,7 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 /// Used internally by butane to track state about the object.
 ///
 /// Includes information such as whether it has actually been created
-/// in the database yet. Propane automatically creates the field
+/// in the database yet. Butane automatically creates the field
 /// `state: ObjectState` on `#[model]` structs. When initializing the
 /// state field, use `ObjectState::default()`.
 #[derive(Clone, Default, Debug)]
@@ -102,7 +102,7 @@ pub trait ModelTyped {
     type Model: DataObject;
 }
 
-/// Propane errors.
+/// Butane errors.
 #[derive(Debug, ThisError)]
 pub enum Error {
     #[error("No such object exists")]

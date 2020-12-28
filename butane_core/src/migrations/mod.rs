@@ -74,24 +74,24 @@ pub trait Migrations {
     /// Get the last migration that has been applied to the database or None
     /// if no migrations have been applied
     fn last_applied_migration(&self, conn: &impl ConnectionMethods) -> Result<Option<Self::M>> {
-        if !conn.has_table(PropaneMigration::TABLE)? {
+        if !conn.has_table(ButaneMigration::TABLE)? {
             return Ok(None);
         }
-        let migrations: Result<Vec<PropaneMigration>> = conn
+        let migrations: Result<Vec<ButaneMigration>> = conn
             .query(
-                PropaneMigration::TABLE,
-                PropaneMigration::COLUMNS,
+                ButaneMigration::TABLE,
+                ButaneMigration::COLUMNS,
                 None,
                 None,
             )?
             .into_iter()
-            .map(PropaneMigration::from_row)
+            .map(ButaneMigration::from_row)
             .collect();
         let migrations = migrations?;
 
         let mut m_opt = self.latest();
         while let Some(m) = m_opt {
-            if migrations.contains(&PropaneMigration {
+            if migrations.contains(&ButaneMigration {
                 name: m.name().to_string(),
             }) {
                 return Ok(Some(m));
@@ -201,10 +201,10 @@ pub fn copy_migration(from: &impl Migration, to: &mut impl MigrationMut) -> Resu
 }
 
 #[derive(PartialEq)]
-struct PropaneMigration {
+struct ButaneMigration {
     name: String,
 }
-impl DataResult for PropaneMigration {
+impl DataResult for ButaneMigration {
     type DBO = Self;
     const COLUMNS: &'static [Column] = &[Column::new("name", SqlType::Text)];
     fn from_row(row: Row) -> Result<Self> {
@@ -214,7 +214,7 @@ impl DataResult for PropaneMigration {
             ));
         }
         let mut it = row.into_iter();
-        Ok(PropaneMigration {
+        Ok(ButaneMigration {
             name: FromSql::from_sql(it.next().unwrap())?,
         })
     }
@@ -222,7 +222,7 @@ impl DataResult for PropaneMigration {
         query::Query::new("butane_migrations")
     }
 }
-impl DataObject for PropaneMigration {
+impl DataObject for ButaneMigration {
     type PKType = String;
     type Fields = (); // we don't need Fields as we never filter
     const PKCOL: &'static str = "name";

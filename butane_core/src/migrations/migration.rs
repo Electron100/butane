@@ -1,5 +1,5 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
-use super::PropaneMigration;
+use super::ButaneMigration;
 use crate::db::ConnectionMethods;
 use crate::query::{BoolExpr, Expr};
 use crate::{db, sqlval::ToSql, DataObject, DataResult, Error, Result};
@@ -45,8 +45,8 @@ pub trait Migration: PartialEq {
             .ok_or_else(|| Error::UnknownBackend(backend_name.to_string()))?;
         tx.execute(&sql)?;
         tx.insert_only(
-            PropaneMigration::TABLE,
-            PropaneMigration::COLUMNS,
+            ButaneMigration::TABLE,
+            ButaneMigration::COLUMNS,
             &[self.name().as_ref().to_sql()],
         )?;
         tx.commit()
@@ -65,8 +65,8 @@ pub trait Migration: PartialEq {
         tx.execute(&sql)?;
         let nameval = self.name().as_ref().to_sql();
         tx.delete_where(
-            PropaneMigration::TABLE,
-            BoolExpr::Eq(PropaneMigration::PKCOL, Expr::Val(nameval)),
+            ButaneMigration::TABLE,
+            BoolExpr::Eq(ButaneMigration::PKCOL, Expr::Val(nameval)),
         )?;
         tx.commit()
     }

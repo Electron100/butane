@@ -1,9 +1,9 @@
-use chrono::Utc;
-use clap::{Arg, ArgMatches};
 use butane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
 use butane::{db, migrations};
+use chrono::Utc;
+use clap::{Arg, ArgMatches};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
@@ -238,7 +238,7 @@ fn get_migrations() -> Result<FsMigrations> {
 
 fn base_dir() -> Result<PathBuf> {
     std::env::current_dir()
-        .map(|d| d.join("butane"))
+        .map(|d| d.join(".butane"))
         .map_err(|e| e.into())
 }
 

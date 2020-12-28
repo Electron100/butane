@@ -10,7 +10,7 @@ pub mod blog;
 
 pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {
     let mut root = std::env::current_dir().unwrap();
-    root.push("butane/migrations");
+    root.push(".butane/migrations");
     let mut disk_migrations = butane::migrations::from_root(&root);
     let disk_current = disk_migrations.current();
     // Create an in-memory Migrations and write only to that. This

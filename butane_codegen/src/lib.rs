@@ -3,10 +3,10 @@
 
 extern crate proc_macro;
 
+use butane_core::*;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
-use butane_core::*;
 use quote::quote;
 use std::path::PathBuf;
 use syn::{Expr, Ident};
@@ -144,7 +144,7 @@ fn migrations_dir() -> PathBuf {
     let mut dir = PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR expected to be set"),
     );
-    dir.push("butane");
+    dir.push(".butane");
     dir.push("migrations");
     dir
 }

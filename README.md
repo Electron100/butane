@@ -118,7 +118,16 @@ doesn't aim to be better than Diesel, but makes some _different_ decisions, incl
    Which form is preferable is primarily an aesthetic
    judgement.
 5. Differences between database backends are largely hidden.
+6. Diesel is overall significantly more mature and full-featured.
 
 
 
 
+## License
+Butane is licensed under either of the [MIT license](LICENSE-MIT) or
+the [Apache License, Version 2.0](LICENSE-APACHE) at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally
+submitted for inclusion in Butane by you, as defined in the Apache-2.0
+license, shall be dual licensed as above, without any additional terms
+or conditions.

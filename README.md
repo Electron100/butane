@@ -63,7 +63,7 @@ Queries are performed ergonmically with the `query!` macro.
 let posts = query!(Post, published == true).limit(5).load(&conn)?;
 ```
 
-For a detailed tutorial, see the [getting started guide](docs/getting-started.md)
+For a detailed tutorial, see the [getting started guide](https://electron100.github.io/butane/getting-started).
 ## Features
 Butane exposes several featues to Cargo. By default, no backends are
 enabled: you will want to enabled either `sqlite` or `pg`:

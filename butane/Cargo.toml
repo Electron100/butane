@@ -3,6 +3,12 @@ name = "butane"
 version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
+description = "An ORM with a focus on simplicity and on writing Rust, not SQL."
+readme = "../README.md"
+keywords = ["database", "orm", "sql"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Electron100/butane"
+documentation = "https://docs.rs/butane/"
 
 [features]
 default = ["datetime", "uuid"]
@@ -25,3 +31,6 @@ butane_core = { path = "../butane_core", version = "0.1.0" }
 quote = "1.0"
 proc-macro2="1.0"
 uuid_for_test = {package="uuid", version = "0.8", features=["v4"] }
+
+[package.metadata.docs.rs]
+all-features = true

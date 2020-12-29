@@ -90,7 +90,7 @@ pub trait DataObject: DataResult<DBO = Self> {
             .load(conn)?
             .into_iter()
             .nth(0)
-            .ok_or_else(|| Error::NoSuchObject)
+            .ok_or(Error::NoSuchObject)
     }
     /// Save the object to the database.
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;

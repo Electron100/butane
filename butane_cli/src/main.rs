@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-type Result<T> = std::result::Result<T, failure::Error>;
+type Result<T> = std::result::Result<T, anyhow::Error>;
 
 fn main() {
     let app = clap::App::new("butane")
@@ -117,7 +117,7 @@ fn init<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
 
     let spec = db::ConnectionSpec::new(name, connstr);
     db::connect(&spec)?; // ensure we can
-    std::fs::create_dir(base_dir()?)?;
+    std::fs::create_dir_all(base_dir()?)?;
     spec.save(&base_dir()?)?;
 
     Ok(())

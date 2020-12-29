@@ -31,6 +31,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68803225a7b13e47191bab76f2687382b60d259e8cf37f6e1893658b84bb9479"
+
+[[package]]
 name = "async-trait"
 version = "0.1.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -110,10 +116,10 @@ dependencies = [
 name = "butane_cli"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "butane",
  "chrono",
  "clap",
- "failure",
  "quote 1.0.7",
  "serde",
  "serde_json",

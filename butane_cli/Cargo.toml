@@ -3,6 +3,11 @@ name = "butane_cli"
 version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
+description = "The CLI for the Butane ORM"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Electron100/butane"
+documentation = "https://docs.rs/butane/"
 
 [[bin]]
 name = "butane"

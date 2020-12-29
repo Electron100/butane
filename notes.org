@@ -46,15 +46,17 @@
 )
 * Roadmap
 ** Required for initial release
-	 + Summary/readme
-   + Example like Diesel's
-		 Now in progress
-	 + butane list prints error on unknown dir
-	 + butane init incorrectly states only sqlite
+	 + API doc links in getting-started.md once published
 ** vNext
 	 + foreign key constraints in db, cascade setting
 	 + incremental save
 	 + Many backreferences
 	 + Column renames in migrations
+	 + prepared/reusable queries
+	 + Connection pooling
+	 + SqlType/SqlVal Custom
+	 + More precise spans in macro errors for invalid field names
+	 + Remove timestamp from migration names
+
 
 

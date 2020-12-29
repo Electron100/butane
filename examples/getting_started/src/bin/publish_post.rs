@@ -1,7 +1,7 @@
 #![allow(clippy::expect_fun_call)]
 use self::models::Post;
-use getting_started::*;
 use butane::prelude::*;
+use getting_started::*;
 use std::env::args;
 
 fn main() {
@@ -15,6 +15,6 @@ fn main() {
     let mut post = Post::get(&conn, id).expect(&format!("Unable to find post {}", id));
     // Just a normal Rust assignment, no fancy set methods
     post.published = true;
-    post.save(&conn).expect("Unable to update post");
+    post.save(&conn).unwrap();
     println!("Published post {}", post.title);
 }

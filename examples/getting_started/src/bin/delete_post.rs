@@ -1,6 +1,6 @@
 use self::models::Post;
-use getting_started::*;
 use butane::query;
+use getting_started::*;
 use std::env::args;
 
 fn main() {

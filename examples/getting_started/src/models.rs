@@ -2,7 +2,7 @@ use butane::prelude::*;
 use butane::{model, ForeignKey, Many, ObjectState};
 
 #[model]
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Default)]
 pub struct Blog {
     #[auto]
     pub id: i64,
@@ -24,10 +24,10 @@ pub struct Post {
     pub title: String,
     pub body: String,
     pub published: bool,
-    pub likes: i32,
     pub tags: Many<Tag>,
     pub blog: ForeignKey<Blog>,
     pub byline: Option<String>,
+    pub likes: i32,
     state: butane::ObjectState,
 }
 impl Post {
@@ -37,10 +37,10 @@ impl Post {
             title,
             body,
             published: false,
-            likes: 0,
             tags: Many::default(),
             blog: blog.into(),
             byline: None,
+            likes: 0,
             state: ObjectState::default(),
         }
     }

@@ -80,11 +80,13 @@ enabled: you will want to enabled either `sqlite` or `pg`:
 Butane is young. The following features are currently missing, but planned
 * Foreign key constraints
 * Incremental object save
-* Backreferences in `Many`
+* Backreferences for `ForeignKey` and `Many`.
 * Field/column rename support in migrations
 * Prepared/reusable queries
 * Connection pooling (R2D2 support)
 * Benchmarking and performance tuning
+* Support for other databases such as MySQL or SQL Server are not
+  explicitly planned, but contributions are welcome.
 
 ## Comparison to Diesel
 Butane is inspired by Diesel and by Django's ORM. If you're looking

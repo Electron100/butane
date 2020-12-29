@@ -1,4 +1,4 @@
-pub use butane_codegen::{dataresult, model, butane_type};
+pub use butane_codegen::{butane_type, dataresult, model};
 pub use butane_core::db;
 pub use butane_core::fkey::ForeignKey;
 pub use butane_core::many::Many;
@@ -31,7 +31,7 @@ pub use butane_core::{
 /// # Function-like operations
 /// Filters support some operations for which Rust does not have operators and which are instead
 /// represented syntactically as function calls.
-/// * `like`: parameter is a SQL like expression string, e.g. `title.like("M%").
+/// * `like`: parameter is a SQL LIKE expression string, e.g. `title.like("M%").
 /// * `matches`: Parmeter is a sub-expression. Use with a
 ///   [`ForeignKey`] field to evaluate as true if the referent
 ///   matches. For example, to find all posts made in blogs by people

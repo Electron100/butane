@@ -1,6 +1,6 @@
+use butane::query;
 use getting_started::models::*;
 use getting_started::*;
-use butane::query;
 
 fn main() {
     let conn = establish_connection();
@@ -10,7 +10,7 @@ fn main() {
         .expect("Error loading posts");
     println!("Displaying {} posts", results.len());
     for post in results {
-        println!("{}", post.title);
+        println!("{} ({} likes)", post.title, post.likes);
         println!("----------\n");
         println!("{}", post.body);
     }

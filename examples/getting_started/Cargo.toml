@@ -20,4 +20,4 @@ doc = false
 doc = false
 
 [dependencies]
-butane = { path = "../../butane", features=["default"] }
+butane = { path = "../../butane", features=["default", "sqlite"] }

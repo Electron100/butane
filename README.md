@@ -63,7 +63,7 @@ Queries are performed ergonmically with the `query!` macro.
 let posts = query!(Post, published == true).limit(5).load(&conn)?;
 ```
 
-
+For a detailed tutorial, see the [getting started guide](docs/getting-started.md)
 ## Features
 Butane exposes several featues to Cargo. By default, no backends are
 enabled: you will want to enabled either `sqlite` or `pg`:
@@ -120,8 +120,8 @@ doesn't aim to be better than Diesel, but makes some _different_ decisions, incl
 5. Differences between database backends are largely hidden.
 6. Diesel is overall significantly more mature and full-featured.
 
-
-
+For a detailed tutorial, see [the getting started
+guide](https://electron100.github.io/butane/getting-started).
 
 ## License
 Butane is licensed under either of the [MIT license](LICENSE-MIT) or

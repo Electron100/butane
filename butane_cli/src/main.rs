@@ -1,7 +1,7 @@
 use butane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
-use butane::{db, migrations};
+use butane::{db, db::Connection, migrations};
 use chrono::Utc;
 use clap::{Arg, ArgMatches};
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ fn main() {
                     Arg::with_name("BACKEND")
                         .required(true)
                         .index(1)
-                        .help("Database backend to use. Currently only 'sqlite' is supported."),
+                        .help("Database backend to use. 'sqlite' or 'pg'"),
                 )
                 .arg(
                     Arg::with_name("CONNECTION")
@@ -48,6 +48,16 @@ fn main() {
             clap::SubCommand::with_name("embed").about("Embed migrations in the source code"),
         )
         .subcommand(
+            clap::SubCommand::with_name("rollback")
+                .about("Rollback migrations. With no arguments, undoes the latest migration. If the name of a migration is specified, rolls back until that migration is the latest applied migration")
+                .arg(
+                    Arg::with_name("NAME")
+                        .required(false)
+                        .index(1)
+                        .help("Migration to roll back to"),
+                ),
+        )
+        .subcommand(
             clap::SubCommand::with_name("delete")
                 .about("Delete a table")
                 .setting(clap::AppSettings::ArgRequiredElseHelp)
@@ -68,6 +78,7 @@ fn main() {
         ("init", sub_args) => handle_error(init(sub_args)),
         ("makemigration", sub_args) => handle_error(make_migration(sub_args)),
         ("migrate", _) => handle_error(migrate()),
+        ("rollback", sub_args) => handle_error(rollback(sub_args)),
         ("embed", _) => handle_error(embed()),
         ("list", _) => handle_error(list_migrations()),
         ("delete", Some(sub_args)) => match sub_args.subcommand() {
@@ -134,7 +145,7 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
         eprintln!("Migration {} already exists", name);
         std::process::exit(1);
     }
-    let spec = db::ConnectionSpec::load(&base_dir()?)?;
+    let spec = load_connspec()?;
     let backend = match db::get_backend(&spec.backend_name) {
         Some(backend) => backend,
         None => {
@@ -157,7 +168,7 @@ fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
 }
 
 fn migrate() -> Result<()> {
-    let spec = db::ConnectionSpec::load(&base_dir()?)?;
+    let spec = load_connspec()?;
     let mut conn = db::connect(&spec)?;
     let to_apply = get_migrations()?.unapplied_migrations(&conn)?;
     println!("{} migrations to apply", to_apply.len());
@@ -165,6 +176,51 @@ fn migrate() -> Result<()> {
         println!("Applying migration {}", m.name());
         m.apply(&mut conn)?;
     }
+    Ok(())
+}
+
+fn rollback<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
+    let spec = load_connspec()?;
+    let conn = db::connect(&spec)?;
+
+    match args.map(|a| a.value_of("NAME")).flatten() {
+        Some(to) => rollback_to(conn, to),
+        None => rollback_latest(conn),
+    }
+}
+
+fn rollback_to(mut conn: Connection, to: &str) -> Result<()> {
+    let ms = get_migrations()?;
+    let to_migration = match ms.get_migration(to) {
+        Some(m) => m,
+        None => {
+            eprintln!("No such migration!");
+            std::process::exit(1);
+        }
+    };
+
+    let to_unapply = ms.migrations_since(&to_migration)?;
+    if to_unapply.is_empty() {
+        eprintln!("That is the latest migration, not rolling back to anything. If you expected something to happen, try specifying the migration to rollback to.");
+    }
+    for m in to_unapply.into_iter().rev() {
+        println!("Rolling back migration  {}", m.name());
+        m.downgrade(&mut conn)?;
+    }
+    Ok(())
+}
+
+fn rollback_latest(mut conn: Connection) -> Result<()> {
+    match get_migrations()?.latest() {
+        Some(m) => {
+            println!("Rolling back migration  {}", m.name());
+            m.downgrade(&mut conn)?;
+        }
+        None => {
+            eprintln!("No migrations applied!");
+            std::process::exit(1)
+        }
+    };
     Ok(())
 }
 
@@ -204,8 +260,19 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {{
     Ok(())
 }
 
+fn load_connspec() -> Result<db::ConnectionSpec> {
+    match db::ConnectionSpec::load(&base_dir()?) {
+        Ok(spec) => Ok(spec),
+        Err(butane::Error::IO(_)) => {
+            eprintln!("No Butane connection info found. Did you run butane init?");
+            std::process::exit(1);
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 fn list_migrations() -> Result<()> {
-    let spec = db::ConnectionSpec::load(&base_dir()?)?;
+    let spec = load_connspec()?;
     let conn = db::connect(&spec)?;
     let ms = get_migrations()?;
     let unapplied = ms.unapplied_migrations(&conn)?;

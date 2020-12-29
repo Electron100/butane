@@ -130,6 +130,15 @@ impl<T: DataResult> Query<T> {
         self
     }
 
+    /// Executes the query against `conn` and returns the first result (if any).
+    pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
+        conn.query(self.table, T::COLUMNS, self.filter, Some(1))?
+            .into_iter()
+            .map(T::from_row)
+            .nth(0)
+            .transpose()
+    }
+
     /// Executes the query against `conn`.
     pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
         conn.query(self.table, T::COLUMNS, self.filter, self.limit)?

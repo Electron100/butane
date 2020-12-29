@@ -21,7 +21,7 @@ butane = { version = "0.1", features=["default", "sqlite"] }
 
 Substitute another backend instead of "sqlite" as desired ("pg" for
 PostgreSQL). This will apply throughout this guide, we'll assume
-sqlite, but pg can be used instead.
+SQLite, but Postgres can be used instead.
 
 A word on error-handling: for simplicity, this example unwraps errors
 to panic on failure. In a real program, you would of course handle
@@ -79,8 +79,8 @@ mpl Blog {
 ```
 
 The `#[model]` attribute does the heavy lifting here:
-1. it generates automatic impls of `butane::DataResult` and
-   `butane::DataObject`.
+1. it generates automatic impls of [`butane::DataResult`] and
+   [`butane::DataObject`].
 2. It adds an additional field `state: butane::ObjectState` used to
    store internal Butane state information. In general we can ignore
    this field, but it must be initialized when the struct is
@@ -100,7 +100,7 @@ integer types and will cause the underlying column to be
 `AUTOINCREMENT` for SQLite or `SERIAL`/`BIGSERIAL` for
 PostgreSQL. Since it's marked as `#[auto]` the value of `id` at
 construction time doesn't matter: it will be automatically set when
-the object is created (via its `save` method).
+the object is created (via its [`save`] method).
 
 Now let's add a model to represent a blog post, and in the process take a look at a few more features.
 
@@ -448,3 +448,8 @@ And that's it! Now we can use our new field.
 While there are lots of aspects of Butane not covered in this
 tutorial, hopefully it's conveyed an idea of how to get started. More
 details can be found in the API docs.
+
+
+[`butane::DataResult`]: https://docs.rs/butane/0.1.0/butane/trait.DataResult.html
+[`butane::DataObject`]: https://docs.rs/butane/0.1.0/butane/trait.DataObject.html
+[`save`]: https://docs.rs/butane/0.1.0/butane/trait.DataObject.html#tymethod.save

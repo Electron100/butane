@@ -17,16 +17,6 @@ implementation detail to the API consumer.
 * Ability to embed migrations in Rust code (so that a library may easily bundle its migrations)
 * SQLite and PostgreSQL backends
 * Write entirely or nearly entirely the same code regardless of database backend
-
-## Limitations
-* Butane, and its migration system especially, expects to own the
-  database. It can be used with an existing database accessed also by
-  other consumers, but it is not a design goal and there is no
-  facility to infer butane models from an existing database schema.
-* API ergonomics are prioritized above performance. This does not mean
-  Butane is slow, but that when given a choice between a simple,
-  straightforward API and ekeing out the smallest possible overhead,
-  the API will win.
   
 ## Getting Started
 _Models_, declared with struct attributes define the database
@@ -60,6 +50,7 @@ Changes to the instance are only applied to the database when saved:
 
 ``` rust
 post.published = true;
+post.save(conn)?;
 ```
 
 Queries are performed ergonmically with the `query!` macro.
@@ -68,7 +59,7 @@ let posts = query!(Post, published == true).limit(5).load(&conn)?;
 ```
 
 For a detailed tutorial, see the [Getting Started Guide](https://electron100.github.io/butane/getting-started).
-## Features
+## Cargo Features
 Butane exposes several featues to Cargo. By default, no backends are
 enabled: you will want to enabled either `sqlite` or `pg`:
 * `default`: Turns on `datetime` and `uuid`
@@ -79,6 +70,15 @@ enabled: you will want to enabled either `sqlite` or `pg`:
 * `tls`: Support for TLS when using PostgreSQL.
 * `uuid`: Support for UUIDs (using the `uuid` crate)
 
+## Limitations
+* Butane, and its migration system especially, expects to own the
+  database. It can be used with an existing database accessed also by
+  other consumers, but it is not a design goal and there is no
+  facility to infer butane models from an existing database schema.
+* API ergonomics are prioritized above performance. This does not mean
+  Butane is slow, but that when given a choice between a simple,
+  straightforward API and ekeing out the smallest possible overhead,
+  the API will win.
 
 ## Roadmap
 Butane is young. The following features are currently missing, but planned

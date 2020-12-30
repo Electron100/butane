@@ -1,5 +1,6 @@
 [![Latest Version](https://img.shields.io/crates/v/butane.svg)](https://crates.io/crates/butane)
 [![docs](https://docs.rs/butane/badge.svg)](https://docs.rs/butane)
+[![Build Status](https://img.shields.io/github/workflow/status/Electron100/butane/CI/master)](https://github.com/Electron100/butane/actions?query=branch%3Amaster)
 
 # Butane
 **An experimental ORM for Rust with a focus on simplicity and on writing Rust, not SQL**

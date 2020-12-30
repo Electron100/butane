@@ -105,6 +105,7 @@ version = "0.1.0"
 dependencies = [
  "butane_codegen",
  "butane_core",
+ "cfg-if 1.0.0",
  "chrono",
  "paste",
  "proc-macro2 1.0.24",

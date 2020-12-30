@@ -9,9 +9,11 @@ build :
 	cd butane && cargo build --features sqlite
 	cargo build --all-features
 
-
-check : build test doc
+lint :
 	cargo clippy --all-features -- -D warnings
+
+
+check : build test doc lint
 
 
 test :

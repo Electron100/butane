@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - actions
+  pull_request:
+    branches:
+      - master
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: make build
+    - name: Lint
+      run: make lint
+    - name: Test Core
+      run: cd butane_core && cargo test --all-features
+    - name: Test Codegen
+      run: cd butane_codegen && cargo test --all-features
+    - name: Test with SQLite
+      run: cd butane && cargo test --features "default,sqlite"
+    # TODO support the PostgreSQL tests, will require running in a container

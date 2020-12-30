@@ -1,10 +1,10 @@
-use proc_macro2::TokenStream;
 use butane::migrations::{
     adb::DeferredSqlType, adb::TypeKey, MemMigrations, Migration, MigrationMut, Migrations,
     MigrationsMut,
 };
 use butane::{db::Connection, prelude::*, SqlType, SqlVal};
-use butane_core::codegen::{model_with_migrations, butane_type_with_migrations};
+use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 mod common;
@@ -162,6 +162,7 @@ fn current_migration_custom_type() {
     assert_eq!(col.sqltype().unwrap(), SqlType::Text);
 }
 
+#[cfg(feature = "sqlite")]
 #[test]
 fn migration_add_field_sqlite() {
     migration_add_field(
@@ -177,6 +178,7 @@ fn migration_add_field_sqlite() {
     );
 }
 
+#[cfg(feature = "pg")]
 #[test]
 fn migration_add_field_pg() {
     let (mut conn, _data) = common::pg_connection();
@@ -187,6 +189,7 @@ fn migration_add_field_pg() {
     );
 }
 
+#[cfg(feature = "sqlite")]
 #[test]
 fn migration_add_field_with_default_sqlite() {
     migration_add_field_with_default(
@@ -197,6 +200,7 @@ fn migration_add_field_with_default_sqlite() {
     );
 }
 
+#[cfg(feature = "pg")]
 #[test]
 fn migration_add_field_with_default_pg() {
     let (mut conn, _data) = common::pg_connection();
@@ -207,6 +211,7 @@ fn migration_add_field_with_default_pg() {
     );
 }
 
+#[cfg(feature = "sqlite")]
 #[test]
 fn migration_delete_table_sqlite() {
     migration_delete_table(
@@ -216,6 +221,7 @@ fn migration_delete_table_sqlite() {
     );
 }
 
+#[cfg(feature = "pg")]
 #[test]
 fn migration_delete_table_pg() {
     let (mut conn, _data) = common::pg_connection();

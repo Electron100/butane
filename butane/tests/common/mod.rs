@@ -167,7 +167,15 @@ macro_rules! maketest_pg {
 #[macro_export]
 macro_rules! testall {
     ($fname:ident) => {
-        maketest!($fname, sqlite, format!(":memory:"), setup_data);
-        maketest_pg!($fname);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "sqlite")] {
+                maketest!($fname, sqlite, format!(":memory:"), setup_data);
+            }
+        }
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "pg")] {
+                maketest_pg!($fname);
+            }
+        }
     };
 }

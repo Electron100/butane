@@ -1,6 +1,6 @@
 [package]
 name = "butane"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
 description = "An ORM with a focus on simplicity and on writing Rust, not SQL."
@@ -21,15 +21,14 @@ tls = ["butane_core/tls"]
 uuid = ["butane_core/uuid", "butane_codegen/uuid"]
 
 [dependencies]
-butane_codegen = { path = "../butane_codegen", version = "0.1.0" }
-butane_core = { path = "../butane_core", version = "0.1.0" }
+butane_codegen = { path = "../butane_codegen", version = "0.2.0" }
+butane_core = { path = "../butane_core", version = "0.2.0" }
 
 
 [dev-dependencies]
 cfg-if = "1.0"
 paste = "0.1"
 chrono = { version = "0.4", features=["serde"] }
-butane_core = { path = "../butane_core", version = "0.1.0" }
 quote = "1.0"
 proc-macro2="1.0"
 uuid_for_test = {package="uuid", version = "0.8", features=["v4"] }

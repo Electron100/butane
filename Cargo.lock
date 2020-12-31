@@ -101,7 +101,7 @@ dependencies = [
 
 [[package]]
 name = "butane"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "butane_codegen",
  "butane_core",
@@ -128,7 +128,7 @@ dependencies = [
 
 [[package]]
 name = "butane_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "butane_core",
  "proc-macro2 1.0.24",
@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "butane_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytes 0.5.6",
  "cfg-if 1.0.0",

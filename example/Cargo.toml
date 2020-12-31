@@ -6,4 +6,4 @@ edition = "2018"
 
 [dependencies]
 failure = "0.1.5"
-butane = { path="../butane", version="0.1" }
+butane = { path="../butane"}

@@ -1,8 +1,8 @@
 use crate::db::ConnectionMethods;
-use crate::pkey::{PrimaryKey, PrimaryKeyRef};
 use crate::*;
 use lazycell::LazyCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
 
 /// Used to implement a relationship between models.
@@ -102,11 +102,16 @@ impl<T: DataObject> Clone for ForeignKey<T> {
         }
     }
 }
-impl<T: DataObject> PartialEq<ForeignKey<T>> for ForeignKey<T> {
-    fn eq(&self, other: &ForeignKey<T>) -> bool {
-        self.ensure_valpk().eq(other.ensure_valpk())
+
+impl<T> AsPrimaryKey<T> for ForeignKey<T>
+where
+    T: DataObject,
+{
+    fn as_pk(&self) -> Cow<T::PKType> {
+        Cow::Owned(self.pk())
     }
 }
+
 impl<T: DataObject> Eq for ForeignKey<T> {}
 impl<T: DataObject> Debug for ForeignKey<T> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
@@ -149,53 +154,16 @@ where
         })
     }
 }
-impl<T> PartialEq<T> for ForeignKey<T>
+impl<T, U> PartialEq<U> for ForeignKey<T>
 where
+    U: AsPrimaryKey<T>,
     T: DataObject,
 {
-    fn eq(&self, other: &T) -> bool {
+    fn eq(&self, other: &U) -> bool {
         match self.val.borrow() {
-            Some(t) => t.pk().eq(other.pk()),
+            Some(t) => t.pk().eq(&other.as_pk()),
             None => match self.valpk.borrow() {
-                Some(valpk) => valpk.eq(&other.pk().to_sql()),
-                None => panic!("Invalid foreign key state"),
-            },
-        }
-    }
-}
-impl<T> PartialEq<&T> for ForeignKey<T>
-where
-    T: DataObject,
-{
-    fn eq(&self, other: &&T) -> bool {
-        self.eq(*other)
-    }
-}
-
-impl<T> PartialEq<PrimaryKey<T>> for ForeignKey<T>
-where
-    T: DataObject,
-{
-    fn eq(&self, otherpk: &PrimaryKey<T>) -> bool {
-        match self.val.borrow() {
-            Some(t) => t.pk().eq(otherpk.as_ref()),
-            None => match self.valpk.borrow() {
-                Some(valpk) => valpk.eq(&otherpk.as_ref().to_sql()),
-                None => panic!("Invalid foreign key state"),
-            },
-        }
-    }
-}
-
-impl<'a, T> PartialEq<PrimaryKeyRef<'a, T>> for ForeignKey<T>
-where
-    T: DataObject,
-{
-    fn eq(&self, otherpk: &PrimaryKeyRef<'a, T>) -> bool {
-        match self.val.borrow() {
-            Some(t) => t.pk().eq(otherpk.pk()),
-            None => match self.valpk.borrow() {
-                Some(valpk) => valpk.eq(&otherpk.pk().to_sql()),
+                Some(valpk) => valpk.eq(&other.as_pk().to_sql()),
                 None => panic!("Invalid foreign key state"),
             },
         }

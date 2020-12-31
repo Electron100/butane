@@ -10,7 +10,6 @@ pub mod db;
 pub mod fkey;
 pub mod many;
 pub mod migrations;
-pub mod pkey;
 pub mod query;
 pub mod sqlval;
 
@@ -68,7 +67,7 @@ pub trait DataResult: Sized {
 /// `#[model]` attribute.
 pub trait DataObject: DataResult<DBO = Self> {
     /// The type of the primary key field.
-    type PKType: FieldType + Clone + PartialEq;
+    type PKType: PrimaryKeyType;
     type Fields: Default;
     /// The name of the primary key column.
     const PKCOL: &'static str;

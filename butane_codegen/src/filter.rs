@@ -5,10 +5,7 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{spanned::Spanned, BinOp, Expr, ExprBinary, ExprMethodCall, ExprPath, Ident, LitStr};
 
 pub fn for_expr(dbres: &Ident, expr: &Expr) -> TokenStream2 {
-    handle_expr(
-        &quote!(<#dbres as butane::DataResult>::DBO::fields()),
-        expr,
-    )
+    handle_expr(&quote!(<#dbres as butane::DataResult>::DBO::fields()), expr)
 }
 
 pub fn handle_expr(fields: &impl ToTokens, expr: &Expr) -> TokenStream2 {
@@ -46,12 +43,12 @@ fn handle_bin_op(fields: &impl ToTokens, binop: &ExprBinary) -> TokenStream2 {
     let left = handle_expr(fields, &binop.left);
     let right = handle_expr(fields, &binop.right);
     match binop.op {
-        BinOp::Eq(_) => quote!(#left.eq(#right)),
-        BinOp::Ne(_) => quote!(#left.ne(#right)),
-        BinOp::Lt(_) => quote!(#left.lt(#right)),
-        BinOp::Gt(_) => quote!(#left.gt(#right)),
-        BinOp::Le(_) => quote!(#left.le(#right)),
-        BinOp::Ge(_) => quote!(#left.ge(#right)),
+        BinOp::Eq(_) => quote!(#left.eq(&#right)),
+        BinOp::Ne(_) => quote!(#left.ne(&#right)),
+        BinOp::Lt(_) => quote!(#left.lt(&#right)),
+        BinOp::Gt(_) => quote!(#left.gt(&#right)),
+        BinOp::Le(_) => quote!(#left.le(&#right)),
+        BinOp::Ge(_) => quote!(#left.ge(&#right)),
         BinOp::And(_) => quote!(butane::query::BoolExpr::And(Box::new(#left), Box::new(#right))),
         BinOp::Or(_) => quote!(butane::query::BoolExpr::Or(Box::new(#left), Box::new(#right))),
         _ => quote!(compile_error!("Unsupported binary operator")),

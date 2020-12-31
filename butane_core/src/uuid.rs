@@ -1,5 +1,6 @@
 use crate::{
-    Error::CannotConvertSqlVal, FieldType, FromSql, IntoSql, Result, SqlType, SqlVal, ToSql,
+    Error::CannotConvertSqlVal, FieldType, FromSql, IntoSql, PrimaryKeyType, Result, SqlType,
+    SqlVal, ToSql,
 };
 use uuid::Uuid;
 
@@ -38,3 +39,5 @@ impl FieldType for Uuid {
     const SQLTYPE: SqlType = SqlType::Blob;
     type RefType = Self;
 }
+
+impl PrimaryKeyType for Uuid {}

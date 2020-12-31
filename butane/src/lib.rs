@@ -3,11 +3,10 @@ pub use butane_core::db;
 pub use butane_core::fkey::ForeignKey;
 pub use butane_core::many::Many;
 pub use butane_core::migrations;
-pub use butane_core::pkey::{PrimaryKey, PrimaryKeyRef};
 pub use butane_core::query;
 pub use butane_core::{
-    DataObject, DataResult, Error, FieldType, FromSql, IntoSql, ObjectState, Result, SqlType,
-    SqlVal, ToSql,
+    AsPrimaryKey, DataObject, DataResult, Error, FieldType, FromSql, IntoSql, ObjectState, Result,
+    SqlType, SqlVal, ToSql,
 };
 
 /// Macro to construct a [`BoolExpr`] (for use with a [`Query`]) from

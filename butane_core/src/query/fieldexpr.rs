@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 
 macro_rules! binary_op {
     ($func_name:ident, $bound:path, $cond:ident) => {
-        pub fn $func_name<U>(&self, val: U) -> BoolExpr
+        pub fn $func_name<U>(&self, val: &U) -> BoolExpr
         where
             T: $bound,
             U: ToSql,

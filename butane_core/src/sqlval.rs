@@ -1,5 +1,6 @@
-use crate::{Error::CannotConvertSqlVal, Result, SqlType};
+use crate::{DataObject, Error::CannotConvertSqlVal, Result, SqlType};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::fmt;
 
 #[cfg(feature = "datetime")]
@@ -152,6 +153,25 @@ pub trait FieldType: ToSql + IntoSql + FromSql {
     type RefType: ?Sized + ToSql;
 }
 
+/// Marker trait for a type suitable for being a primary key
+pub trait PrimaryKeyType: FieldType + Clone + PartialEq {}
+
+/// Trait for referencing the primary key for a given model. Used to
+/// implement ForeignKey equality tests.
+pub trait AsPrimaryKey<T: DataObject> {
+    fn as_pk(&self) -> Cow<<T as DataObject>::PKType>;
+}
+
+impl<P, T> AsPrimaryKey<T> for P
+where
+    P: PrimaryKeyType,
+    T: DataObject<PKType = P>,
+{
+    fn as_pk(&self) -> Cow<P> {
+        Cow::Borrowed(&self)
+    }
+}
+
 macro_rules! impl_prim_sql {
     ($prim:ty, $variant:ident, $sqltype:ident) => {
         impl_prim_sql! {$prim, $variant, $sqltype, $prim}
@@ -183,6 +203,8 @@ macro_rules! impl_prim_sql {
             const SQLTYPE: SqlType = SqlType::$sqltype;
             type RefType = $reftype;
         }
+
+        impl PrimaryKeyType for $prim {}
     };
 }
 

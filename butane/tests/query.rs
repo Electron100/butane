@@ -1,9 +1,9 @@
-use chrono::{TimeZone, Utc};
-use paste;
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::query::BoolExpr;
 use butane::{filter, find, query};
+use chrono::{TimeZone, Utc};
+use paste;
 
 mod common;
 use common::blog;
@@ -103,7 +103,9 @@ fn fkey_match(conn: Connection) {
     let blog: Blog = find!(Blog, name == "Cats", &conn).unwrap();
     let mut posts = query!(Post, blog == { &blog }).load(&conn).unwrap();
     let posts2 = query!(Post, blog == { blog }).load(&conn).unwrap();
-    let posts3 = query!(Post, blog.matches(name == "Cats"))
+    let blog_id = blog.id;
+    let posts3 = query!(Post, blog == { blog_id }).load(&conn).unwrap();
+    let posts4 = query!(Post, blog.matches(name == "Cats"))
         .load(&conn)
         .unwrap();
 
@@ -113,6 +115,7 @@ fn fkey_match(conn: Connection) {
     assert_eq!(posts[1].title, "Sir Charles");
     assert_eq!(posts, posts2);
     assert_eq!(posts, posts3);
+    assert_eq!(posts, posts4);
 }
 testall!(fkey_match);
 

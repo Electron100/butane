@@ -112,6 +112,18 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 other.eq(self)
             }
         }
+        impl butane::AsPrimaryKey<#tyname> for #tyname {
+            fn as_pk(&self) -> std::borrow::Cow<<Self as butane::DataObject>::PKType> {
+                use butane::DataObject;
+                std::borrow::Cow::Borrowed(self.pk())
+            }
+        }
+        impl butane::AsPrimaryKey<#tyname> for &#tyname {
+            fn as_pk(&self) -> std::borrow::Cow<<#tyname as butane::DataObject>::PKType> {
+                use butane::DataObject;
+                std::borrow::Cow::Borrowed(self.pk())
+            }
+        }
     )
 }
 

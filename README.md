@@ -65,6 +65,7 @@ enabled: you will want to enabled either `sqlite` or `pg`:
 * `default`: Turns on `datetime` and `uuid`
 * `debug`: Used in developing Butane, not expected to be enabled by consumers.
 * `datetime`: Support for timestamps (using `chrono::NaiveDateTime`)
+* `log`: Log certain warnings to the `log` crate facade (target "butane")
 * `pg`: Support for PostgreSQL
 * `sqlite`: Support for SQLite.
 * `tls`: Support for TLS when using PostgreSQL.

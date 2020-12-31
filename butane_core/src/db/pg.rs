@@ -6,7 +6,6 @@ use crate::query;
 use crate::{Result, SqlType, SqlVal};
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
-use log::warn;
 use postgres::fallible_iterator::FallibleIterator;
 use std::cell::RefCell;
 use std::fmt::Write;
@@ -555,11 +554,11 @@ fn change_column(
 ) -> Result<String> {
     let table = current.get_table(tbl_name);
     if table.is_none() {
-        warn!(
+        crate::log_warn(format!(
             "Cannot alter column {} from table {} that does not exist",
             &old.name(),
             tbl_name
-        );
+        ));
         return Ok(String::new());
     }
     let old_table = table.unwrap();

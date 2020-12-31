@@ -16,6 +16,7 @@ sqlite = ["butane_core/sqlite"]
 pg = ["butane_core/pg"]
 datetime = ["butane_core/datetime", "butane_codegen/datetime"]
 debug = ["butane_core/debug"]
+log = ["butane_core/log"]
 tls = ["butane_core/tls"]
 uuid = ["butane_core/uuid", "butane_codegen/uuid"]
 

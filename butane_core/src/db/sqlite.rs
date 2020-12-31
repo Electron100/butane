@@ -2,11 +2,10 @@
 use super::helper;
 use super::*;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
-use crate::query;
+use crate::{log_warn, query};
 use crate::{Result, SqlType, SqlVal};
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
-use log::warn;
 use std::fmt::Write;
 
 #[cfg(feature = "debug")]
@@ -439,10 +438,10 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {
     match old {
         Some(col) => change_column(current, tbl_name, &col, None),
         None => {
-            warn!(
+            log_warn(format!(
                 "Cannot remove column {} that does not exist from table {}",
                 name, tbl_name
-            );
+            ));
             "".to_string()
         }
     }
@@ -473,11 +472,11 @@ fn change_column(
 ) -> String {
     let table = current.get_table(tbl_name);
     if table.is_none() {
-        warn!(
+        log_warn(format!(
             "Cannot alter column {} from table {} that does not exist",
             &old.name(),
             tbl_name
-        );
+        ));
         return "".to_string();
     }
     let old_table = table.unwrap();

@@ -207,3 +207,13 @@ impl std::fmt::Display for SqlType {
         .fmt(f)
     }
 }
+
+#[cfg(feature = "log")]
+fn log_warn(msg: impl std::fmt::Display) {
+    log::warn!(target: "butane", "{}", msg);
+}
+
+#[cfg(not(feature = "log"))]
+fn log_warn(_msg: impl std::fmt::Display) {
+    // No-op
+}

@@ -45,8 +45,6 @@
   published BOOLEAN NOT NULL DEFAULT 'f'
 )
 * Roadmap
-** Required for initial release
-	 + API doc links in getting-started.md once published
 ** vNext
 	 + foreign key constraints in db, cascade setting
 	 + incremental save

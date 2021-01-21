@@ -87,7 +87,7 @@ impl Row {
     pub fn is_empty(&self) -> bool {
         self.vals.is_empty()
     }
-    pub fn get<'a>(&'a self, idx: usize) -> Result<&'a SqlVal> {
+    pub fn get(&self, idx: usize) -> Result<&SqlVal> {
         self.vals
             .get(idx)
             .ok_or_else(|| BoundsError(format!("{}th column not present in row", idx)))

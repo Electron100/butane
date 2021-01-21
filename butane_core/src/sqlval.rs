@@ -51,7 +51,7 @@ impl SqlVal {
             _ => Err(CannotConvertSqlVal(SqlType::Real, self.clone())),
         }
     }
-    pub fn text<'a>(&'a self) -> Result<&'a str> {
+    pub fn text(&self) -> Result<&str> {
         match self {
             SqlVal::Text(val) => Ok(val),
             _ => Err(CannotConvertSqlVal(SqlType::Text, self.clone())),
@@ -63,7 +63,7 @@ impl SqlVal {
             _ => Err(CannotConvertSqlVal(SqlType::Text, self.clone())),
         }
     }
-    pub fn blob<'a>(&'a self) -> Result<&'a [u8]> {
+    pub fn blob(&self) -> Result<&[u8]> {
         match self {
             SqlVal::Blob(val) => Ok(val),
             _ => Err(CannotConvertSqlVal(SqlType::Blob, self.clone())),

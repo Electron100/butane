@@ -62,7 +62,7 @@ impl PgConnection {
         })
     }
     // For use with the connection_method_wrapper macro
-    fn wrapped_connection_methods<'a>(&'a self) -> Result<PgGenericClient<'a, postgres::Client>> {
+    fn wrapped_connection_methods(&self) -> Result<PgGenericClient<postgres::Client>> {
         Ok(PgGenericClient { client: &self.conn })
     }
     fn connect(params: &str) -> Result<postgres::Client> {
@@ -388,6 +388,7 @@ impl<'a> postgres::types::FromSql<'a> for SqlVal {
         Ok(SqlVal::Null)
     }
 
+    #[allow(clippy::match_like_matches_macro)]
     fn accepts(ty: &postgres::types::Type) -> bool {
         use postgres::types::Type;
         match *ty {

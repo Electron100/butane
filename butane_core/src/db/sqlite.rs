@@ -59,7 +59,7 @@ impl SQLiteConnection {
             .map_err(|e| e.into())
     }
 
-    fn wrapped_connection_methods<'a>(&'a self) -> Result<GenericConnection<'a>> {
+    fn wrapped_connection_methods(&self) -> Result<GenericConnection> {
         Ok(GenericConnection { conn: &self.conn })
     }
 }
@@ -247,7 +247,7 @@ impl<'c> SqliteTransaction<'c> {
             Some(trans) => Ok(trans),
         }
     }
-    fn wrapped_connection_methods<'a>(&'a self) -> Result<GenericConnection<'a>> {
+    fn wrapped_connection_methods(&self) -> Result<GenericConnection> {
         Ok(GenericConnection {
             conn: self.get()?.deref(),
         })

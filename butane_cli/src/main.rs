@@ -117,7 +117,7 @@ fn default_name() -> String {
     Utc::now().format("%Y%m%d_%H%M%S%3f").to_string()
 }
 
-fn init<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
+fn init(args: Option<&ArgMatches>) -> Result<()> {
     let args = args.unwrap();
     let name = args.value_of("BACKEND").unwrap();
     let connstr = args.value_of("CONNECTION").unwrap();
@@ -134,7 +134,7 @@ fn init<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
     Ok(())
 }
 
-fn make_migration<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
+fn make_migration(args: Option<&ArgMatches>) -> Result<()> {
     let name_arg = args.map(|a| a.value_of("NAME")).flatten();
     let name = match name_arg {
         Some(name) => format!("{}_{}", default_name(), name),
@@ -179,7 +179,7 @@ fn migrate() -> Result<()> {
     Ok(())
 }
 
-fn rollback<'a>(args: Option<&ArgMatches<'a>>) -> Result<()> {
+fn rollback(args: Option<&ArgMatches>) -> Result<()> {
     let spec = load_connspec()?;
     let conn = db::connect(&spec)?;
 

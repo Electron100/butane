@@ -1,12 +1,10 @@
 #![allow(dead_code)] //this module is used by multiple tests, not all use all parts
 use butane::db::{Backend, Connection};
 use butane::migrations::{MemMigrations, Migration, Migrations, MigrationsMut};
-use std::io::{BufRead, BufReader, Read, Write};
-use std::path::PathBuf;
-use std::process::{ChildStderr, Command, Stdio};
-use uuid_for_test::Uuid;
 
 pub mod blog;
+pub mod pg;
+pub use pg::*;
 
 pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {
     let mut root = std::env::current_dir().unwrap();
@@ -40,99 +38,8 @@ pub fn sqlite_connection() -> Connection {
     backend.connect(":memory:").unwrap()
 }
 
-pub fn pg_connection() -> (Connection, PgSetupData) {
-    let backend = butane::db::get_backend("pg").unwrap();
-    let data = pg_setup();
-    (backend.connect(&pg_connstr(&data)).unwrap(), data)
-}
-
 pub fn sqlite_setup() {}
 pub fn sqlite_teardown(_: ()) {}
-pub struct PgSetupData {
-    pub dir: PathBuf,
-    pub sockdir: PathBuf,
-    pub proc: std::process::Child,
-    // stderr from the child process
-    pub stderr: BufReader<ChildStderr>,
-}
-impl Drop for PgSetupData {
-    fn drop(&mut self) {
-        self.proc.kill().ok();
-        let mut buf = String::new();
-        self.stderr.read_to_string(&mut buf).unwrap();
-        eprintln!("postgres stderr is {}", buf);
-        std::fs::remove_dir_all(&self.dir).unwrap();
-    }
-}
-
-pub fn pg_setup() -> PgSetupData {
-    // create a temporary directory
-    let dir = std::env::current_dir()
-        .unwrap()
-        .join("tmp_pg")
-        .join(Uuid::new_v4().to_string());
-    std::fs::create_dir_all(&dir).unwrap();
-
-    // Run initdb to create a postgres cluster in our temporary director
-    let output = Command::new("initdb")
-        .arg("-D")
-        .arg(&dir)
-        .arg("-U")
-        .arg("postgres")
-        .output()
-        .expect("failed to run initdb");
-    if !output.status.success() {
-        std::io::stdout().write_all(&output.stdout).unwrap();
-        std::io::stderr().write_all(&output.stderr).unwrap();
-        panic!("postgres initdb failed")
-    }
-
-    let sockdir = dir.join("socket");
-    std::fs::create_dir(&sockdir).unwrap();
-
-    // Run postgres to actually create the server
-    let mut proc = Command::new("postgres")
-        .arg("-D")
-        .arg(&dir)
-        .arg("-k")
-        .arg(&sockdir)
-        .arg("-h")
-        .arg("")
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("failed to run postgres");
-    let mut buf = String::new();
-    let mut stderr = BufReader::new(proc.stderr.take().unwrap());
-    loop {
-        buf.clear();
-        stderr.read_line(&mut buf).unwrap();
-        if buf.contains("ready to accept connections") {
-            break;
-        }
-        if proc.try_wait().unwrap().is_some() {
-            buf.clear();
-            stderr.read_to_string(&mut buf).unwrap();
-            eprint!("{}", buf);
-            panic!("postgres process died");
-        }
-    }
-    PgSetupData {
-        dir,
-        sockdir,
-        proc,
-        stderr,
-    }
-}
-pub fn pg_teardown(_data: PgSetupData) {
-    // All the work is done by the drop implementation
-}
-
-pub fn pg_connstr(data: &PgSetupData) -> String {
-    format!(
-        "host={} dbname=postgres user=postgres",
-        data.sockdir.to_str().unwrap()
-    )
-}
 
 #[macro_export]
 macro_rules! maketest {
@@ -158,7 +65,7 @@ macro_rules! maketest_pg {
         maketest!(
             $fname,
             pg,
-            crate::common::pg_connstr(&setup_data),
+            &crate::common::pg_connstr(&setup_data),
             setup_data
         );
     };
@@ -169,7 +76,7 @@ macro_rules! testall {
     ($fname:ident) => {
         cfg_if::cfg_if! {
             if #[cfg(feature = "sqlite")] {
-                maketest!($fname, sqlite, format!(":memory:"), setup_data);
+                maketest!($fname, sqlite, &format!(":memory:"), setup_data);
             }
         }
         cfg_if::cfg_if! {

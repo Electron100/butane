@@ -27,10 +27,12 @@ butane_core = { path = "../butane_core", version = "0.2.0" }
 
 [dev-dependencies]
 cfg-if = "1.0"
+exec_time = { version="0.1.4" }
 paste = "0.1"
 chrono = { version = "0.4", features=["serde"] }
 quote = "1.0"
 proc-macro2="1.0"
+once_cell="1.5.2"
 uuid_for_test = {package="uuid", version = "0.8", features=["v4"] }
 
 [package.metadata.docs.rs]

@@ -1,7 +1,7 @@
 use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
-use lazycell::LazyCell;
+use once_cell::unsync::OnceCell;
 
 /// Used to implement a many-to-many relationship between models.
 ///
@@ -19,7 +19,7 @@ where
     owner: Option<SqlVal>,
     owner_type: SqlType,
     new_values: Vec<SqlVal>,
-    all_values: LazyCell<Vec<T>>,
+    all_values: OnceCell<Vec<T>>,
 }
 impl<T> Many<T>
 where
@@ -37,7 +37,7 @@ where
             owner: None,
             owner_type: SqlType::Int,
             new_values: Vec::new(),
-            all_values: LazyCell::new(),
+            all_values: OnceCell::new(),
         }
     }
 
@@ -49,20 +49,20 @@ where
         self.item_table = item_table;
         self.owner = Some(owner);
         self.owner_type = owner_type;
-        self.all_values = LazyCell::new();
+        self.all_values = OnceCell::new();
     }
 
     /// Adds a value.
     pub fn add(&mut self, new_val: &T) {
         // all_values is now out of date, so clear it
-        self.all_values = LazyCell::new();
+        self.all_values = OnceCell::new();
         self.new_values.push(new_val.pk().to_sql())
     }
 
     /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
     pub fn get(&self) -> Result<impl Iterator<Item = &T>> {
         self.all_values
-            .borrow()
+            .get()
             .ok_or(Error::ValueNotLoaded)
             .map(|v| v.iter())
     }
@@ -84,7 +84,7 @@ where
     /// Loads the values referred to by this foreign key from the
     /// database if necessary and returns a reference to the them.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
-        let vals: Result<&Vec<T>> = self.all_values.try_borrow_with(|| {
+        let vals: Result<&Vec<T>> = self.all_values.get_or_try_init(|| {
             //if we don't have an owner then there are no values
             let owner: &SqlVal = match &self.owner {
                 Some(o) => o,

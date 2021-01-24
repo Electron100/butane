@@ -1,6 +1,6 @@
 use crate::db::ConnectionMethods;
 use crate::*;
-use lazycell::LazyCell;
+use once_cell::unsync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
@@ -25,26 +25,27 @@ pub struct ForeignKey<T>
 where
     T: DataObject,
 {
-    // At least one must be initialized, but both need not be
-    val: LazyCell<T>,
-    valpk: LazyCell<SqlVal>,
+    // At least one must be initialized (enforced internally by this
+    // type), but both need not be
+    val: OnceCell<T>,
+    valpk: OnceCell<SqlVal>,
 }
 impl<T: DataObject> ForeignKey<T> {
     pub fn from_pk(pk: T::PKType) -> Self {
         let ret = Self::new_raw();
-        ret.valpk.fill(pk.into_sql()).unwrap();
+        ret.valpk.set(pk.into_sql()).unwrap();
         ret
     }
     /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
     pub fn get(&self) -> Result<&T> {
-        self.val.borrow().ok_or(Error::ValueNotLoaded)
+        self.val.get().ok_or(Error::ValueNotLoaded)
     }
 
     /// Returns a reference to the primary key of the value.
     pub fn pk(&self) -> T::PKType {
-        match self.val.borrow() {
+        match self.val.get() {
             Some(v) => v.pk().clone(),
-            None => match self.valpk.borrow() {
+            None => match self.valpk.get() {
                 Some(pk) => T::PKType::from_sql(pk.clone()).unwrap(),
                 None => panic!("Invalid foreign key state"),
             },
@@ -54,35 +55,35 @@ impl<T: DataObject> ForeignKey<T> {
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to it.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
-        self.val.try_borrow_with(|| {
-            let pk: SqlVal = self.valpk.borrow().unwrap().clone();
+        self.val.get_or_try_init(|| {
+            let pk: SqlVal = self.valpk.get().unwrap().clone();
             T::get(conn, &T::PKType::from_sql(pk)?)
         })
     }
 
     fn new_raw() -> Self {
         ForeignKey {
-            val: LazyCell::new(),
-            valpk: LazyCell::new(),
+            val: OnceCell::new(),
+            valpk: OnceCell::new(),
         }
     }
 
     fn ensure_valpk(&self) -> &SqlVal {
-        match self.valpk.borrow() {
+        match self.valpk.get() {
             Some(sqlval) => return &sqlval,
-            None => match self.val.borrow() {
-                Some(val) => self.valpk.fill(val.pk().to_sql()).unwrap(),
+            None => match self.val.get() {
+                Some(val) => self.valpk.set(val.pk().to_sql()).unwrap(),
                 None => panic!("Invalid foreign key state"),
             },
         }
-        &self.valpk.borrow().unwrap()
+        &self.valpk.get().unwrap()
     }
 }
 
 impl<T: DataObject> From<T> for ForeignKey<T> {
     fn from(obj: T) -> Self {
         let ret = Self::new_raw();
-        ret.val.fill(obj).ok();
+        ret.val.set(obj).ok();
         ret
     }
 }
@@ -97,7 +98,7 @@ impl<T: DataObject> Clone for ForeignKey<T> {
         // it's cloneable. Then we wouldn't have to ensure the pk
         self.ensure_valpk();
         ForeignKey {
-            val: LazyCell::new(),
+            val: OnceCell::new(),
             valpk: self.valpk.clone(),
         }
     }
@@ -149,8 +150,8 @@ where
 {
     fn from_sql(val: SqlVal) -> Result<Self> {
         Ok(ForeignKey {
-            valpk: lazy_cell_from(val),
-            val: LazyCell::new(),
+            valpk: val.into(),
+            val: OnceCell::new(),
         })
     }
 }
@@ -160,9 +161,9 @@ where
     T: DataObject,
 {
     fn eq(&self, other: &U) -> bool {
-        match self.val.borrow() {
+        match self.val.get() {
             Some(t) => t.pk().eq(&other.as_pk()),
-            None => match self.valpk.borrow() {
+            None => match self.valpk.get() {
                 Some(valpk) => valpk.eq(&other.as_pk().to_sql()),
                 None => panic!("Invalid foreign key state"),
             },
@@ -194,10 +195,4 @@ where
     {
         Ok(Self::from_pk(T::PKType::deserialize(deserializer)?))
     }
-}
-
-fn lazy_cell_from<T>(val: T) -> LazyCell<T> {
-    let ret = LazyCell::new();
-    ret.fill(val).ok();
-    ret
 }

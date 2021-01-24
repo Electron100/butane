@@ -22,7 +22,7 @@ bytes = { version="0.5", optional=true}
 cfg-if = "1.0"
 fs2 = "0.4" # for file locks
 hex = "0.4"
-lazycell = "1.3"
+once_cell="1.5"
 log = { version="0.4", optional=true }
 postgres={ version = "0.18", optional = true}
 postgres-native-tls={ version = "0.4", optional = true }

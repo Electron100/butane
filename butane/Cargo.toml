@@ -6,6 +6,7 @@ edition = "2018"
 description = "An ORM with a focus on simplicity and on writing Rust, not SQL."
 readme = "../README.md"
 keywords = ["database", "orm", "sql"]
+categories = ["database"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Electron100/butane"
 documentation = "https://docs.rs/butane/"

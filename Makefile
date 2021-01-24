@@ -18,6 +18,8 @@ check : build test doc lint
 
 test :
 	cargo test --all-features
+	# mirror the CI run which doesn't do pg right now
+	cd butane && cargo build --features "default,sqlite" --tests
 
 clean :
 	cargo clean

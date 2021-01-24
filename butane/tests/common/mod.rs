@@ -3,7 +3,9 @@ use butane::db::{Backend, Connection, ConnectionSpec};
 use butane::migrations::{MemMigrations, Migration, Migrations, MigrationsMut};
 
 pub mod blog;
+#[cfg(feature = "pg")]
 pub mod pg;
+#[cfg(feature = "pg")]
 pub use pg::*;
 
 pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {

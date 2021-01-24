@@ -14,6 +14,9 @@ use exec_time::exec_time;
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
+/// The name of the sqlite backend.
+pub const BACKEND_NAME: &str = "sqlite";
+
 /// SQLite [Backend][crate::db::Backend] implementation.
 #[derive(Default)]
 pub struct SQLiteBackend {}
@@ -29,7 +32,7 @@ impl SQLiteBackend {
 }
 impl Backend for SQLiteBackend {
     fn name(&self) -> &'static str {
-        "sqlite"
+        BACKEND_NAME
     }
 
     fn create_migration_sql(&self, current: &ADB, ops: &[Operation]) -> Result<String> {
@@ -76,6 +79,9 @@ impl BackendConnection for SQLiteConnection {
     }
     fn backend_name(&self) -> &'static str {
         "sqlite"
+    }
+    fn is_closed(&self) -> bool {
+        false
     }
 }
 

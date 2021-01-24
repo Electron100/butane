@@ -62,14 +62,15 @@ For a detailed tutorial, see the [Getting Started Guide](https://electron100.git
 ## Cargo Features
 Butane exposes several featues to Cargo. By default, no backends are
 enabled: you will want to enabled either `sqlite` or `pg`:
-* `default`: Turns on `datetime` and `uuid`
+* `default`: Turns on `datetime` and `uuid`.
 * `debug`: Used in developing Butane, not expected to be enabled by consumers.
-* `datetime`: Support for timestamps (using `chrono::NaiveDateTime`)
-* `log`: Log certain warnings to the `log` crate facade (target "butane")
-* `pg`: Support for PostgreSQL
+* `datetime`: Support for timestamps (using `chrono::NaiveDateTime`).
+* `log`: Log certain warnings to the `log` crate facade (target "butane").
+* `pg`: Support for PostgreSQL.
+* `r2d2`: R2D2 support (`propane::db::ConnectionManager`).
 * `sqlite`: Support for SQLite.
 * `tls`: Support for TLS when using PostgreSQL.
-* `uuid`: Support for UUIDs (using the `uuid` crate)
+* `uuid`: Support for UUIDs (using the `uuid` crate).
 
 ## Limitations
 * Butane, and its migration system especially, expects to own the
@@ -88,7 +89,6 @@ Butane is young. The following features are currently missing, but planned
 * Backreferences for `ForeignKey` and `Many`.
 * Field/column rename support in migrations
 * Prepared/reusable queries
-* Connection pooling (R2D2 support)
 * Benchmarking and performance tuning
 * Support for other databases such as MySQL or SQL Server are not
   explicitly planned, but contributions are welcome.

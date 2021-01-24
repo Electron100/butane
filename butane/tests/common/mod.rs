@@ -1,5 +1,5 @@
 #![allow(dead_code)] //this module is used by multiple tests, not all use all parts
-use butane::db::{Backend, Connection};
+use butane::db::{Backend, Connection, ConnectionSpec};
 use butane::migrations::{MemMigrations, Migration, Migrations, MigrationsMut};
 
 pub mod blog;
@@ -36,6 +36,10 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {
 pub fn sqlite_connection() -> Connection {
     let backend = butane::db::get_backend("sqlite").unwrap();
     backend.connect(":memory:").unwrap()
+}
+
+pub fn sqlite_connspec() -> ConnectionSpec {
+    ConnectionSpec::new(butane::db::sqlite::BACKEND_NAME, ":memory:")
 }
 
 pub fn sqlite_setup() {}

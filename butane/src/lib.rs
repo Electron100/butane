@@ -1,5 +1,4 @@
 pub use butane_codegen::{butane_type, dataresult, model};
-pub use butane_core::db;
 pub use butane_core::fkey::ForeignKey;
 pub use butane_core::many::Many;
 pub use butane_core::migrations;
@@ -8,6 +7,15 @@ pub use butane_core::{
     AsPrimaryKey, DataObject, DataResult, Error, FieldType, FromSql, IntoSql, ObjectState, Result,
     SqlType, SqlVal, ToSql,
 };
+
+#[cfg(feature = "r2d2")]
+mod r2;
+
+pub mod db {
+    #[cfg(feature = "r2d2")]
+    pub use crate::r2::ConnectionManager;
+    pub use butane_core::db::*;
+}
 
 /// Macro to construct a [`BoolExpr`] (for use with a [`Query`]) from
 /// an expression with Rust syntax.

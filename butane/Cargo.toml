@@ -23,6 +23,7 @@ uuid = ["butane_core/uuid", "butane_codegen/uuid"]
 [dependencies]
 butane_codegen = { path = "../butane_codegen", version = "0.2.0" }
 butane_core = { path = "../butane_core", version = "0.2.0" }
+r2d2 = {version="0.8", optional=true}
 
 
 [dev-dependencies]

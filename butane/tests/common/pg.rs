@@ -11,6 +11,14 @@ pub fn pg_connection() -> (Connection, PgSetupData) {
     (backend.connect(&pg_connstr(&data)).unwrap(), data)
 }
 
+pub fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
+    let data = pg_setup();
+    (
+        ConnectionSpec::new(butane::db::pg::BACKEND_NAME, pg_connstr(&data)),
+        data,
+    )
+}
+
 struct PgServerState {
     pub dir: PathBuf,
     pub sockdir: PathBuf,

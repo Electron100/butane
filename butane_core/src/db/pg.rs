@@ -15,7 +15,8 @@ use exec_time::exec_time;
 
 use crate::connection_method_wrapper;
 
-pub(crate) const BACKEND_NAME: &str = "pg";
+/// The name of the postgres backend.
+pub const BACKEND_NAME: &str = "pg";
 
 /// Pg [Backend][crate::db::Backend] implementation.
 #[derive(Default)]
@@ -89,6 +90,9 @@ impl BackendConnection for PgConnection {
     }
     fn backend_name(&self) -> &'static str {
         BACKEND_NAME
+    }
+    fn is_closed(&self) -> bool {
+        self.conn.borrow().is_closed()
     }
 }
 

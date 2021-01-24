@@ -42,6 +42,9 @@ pub trait BackendConnection: ConnectionMethods + Send + 'static {
     /// Retrieve the backend backend this connection
     fn backend(&self) -> Box<dyn Backend>;
     fn backend_name(&self) -> &'static str;
+    /// Tests if the connection has been closed. Backends which do not
+    /// support this check should return false.
+    fn is_closed(&self) -> bool;
 }
 
 /// Database connection. May be a connection to any type of database
@@ -66,6 +69,9 @@ impl BackendConnection for Connection {
     }
     fn backend_name(&self) -> &'static str {
         self.conn.backend_name()
+    }
+    fn is_closed(&self) -> bool {
+        self.conn.is_closed()
     }
 }
 connection_method_wrapper!(Connection);
@@ -130,7 +136,7 @@ impl Backend for Box<dyn Backend> {
 pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
         #[cfg(feature = "sqlite")]
-        "sqlite" => Some(Box::new(sqlite::SQLiteBackend::new())),
+        sqlite::BACKEND_NAME => Some(Box::new(sqlite::SQLiteBackend::new())),
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         _ => None,

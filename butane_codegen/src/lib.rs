@@ -14,7 +14,7 @@ use syn::{Expr, Ident};
 mod filter;
 
 /// Attribute macro which marks a struct as being a data model and
-/// generates an implementation of [DataObject][crate::DataObject]. This
+/// generates an implementation of [`DataObject`](butane_core::DataObject). This
 /// macro will also write information to disk at compile time necessary to
 /// generate migrations
 ///
@@ -55,6 +55,23 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     codegen::model_with_migrations(input.into(), &mut migrations_for_dir()).into()
 }
 
+/// Attribute macro which generates an implementation of
+/// [`DataResult`](butane_core::DataResult). Continuing with our blog
+/// post example from [model](macro@model), we could create a `DataResult` with
+/// only some of the fields from `Post` (to avoid fetching all of them in a query).
+///
+/// ```ignore
+/// #[dataresult(Post)]
+/// pub struct PostMetadata {
+///   pub id: i64,
+///   pub title: String,
+///   pub pub_time: Option<NaiveDateTime>,
+/// }
+/// ```
+///
+/// Note that the attribute takes a parameter saying which Model this
+/// result is a subset of. Every field named in the DataResult must be
+/// present in the Model.
 #[proc_macro_attribute]
 pub fn dataresult(args: TokenStream, input: TokenStream) -> TokenStream {
     codegen::dataresult(args.into(), input.into()).into()

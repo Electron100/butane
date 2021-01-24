@@ -51,10 +51,6 @@
 	 + Many backreferences
 	 + Column renames in migrations
 	 + prepared/reusable queries
-	 + Connection pooling
 	 + SqlType/SqlVal Custom
 	 + More precise spans in macro errors for invalid field names
 	 + Remove timestamp from migration names
-
-
-

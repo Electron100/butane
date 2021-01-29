@@ -19,6 +19,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+      # Postgresql setup adapted from Diesel CI
+    - name: Setup postgres
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpq-dev postgresql
+        echo "host  all  postgres  127.0.0.1/32  trust" > sudo tee -a /etc/postgresql/10/main/pg_hba.conf
+        sudo service postgresql restart && sleep 3
+        echo BUTANE_PG_CONNSTR="host=localhost user=postgres/" >> $GITHUB_ENV
     - name: Build
       run: make build
     - name: Lint
@@ -27,6 +35,5 @@ jobs:
       run: cd butane_core && cargo test --all-features
     - name: Test Codegen
       run: cd butane_codegen && cargo test --all-features
-    - name: Test with SQLite
-      run: cd butane && cargo test --features "default,sqlite"
-    # TODO support the PostgreSQL tests, will require running in a container
+    - name: Test
+      run: cd butane && cargo test --features --all-features

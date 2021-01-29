@@ -36,4 +36,4 @@ jobs:
     - name: Test Codegen
       run: cd butane_codegen && cargo test --all-features
     - name: Test
-      run: cd butane && cargo test --features --all-features
+      run: cd butane && cargo test --all-features

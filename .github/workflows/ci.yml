@@ -25,8 +25,9 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y postgresql
+        sudo ls /etc/postgresql
         echo "host  all  all  127.0.0.1/32  trust" > sudo tee -a /etc/postgresql/10/main/pg_hba.conf
-        cat /etc/postgresql/10/main/pg_hba.conf
+        sudo cat /etc/postgresql/10/main/pg_hba.conf
         sudo service postgresql restart && sleep 3
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable" >> $GITHUB_ENV
     - name: Build

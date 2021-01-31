@@ -226,6 +226,6 @@ pub fn sql_literal_value(val: SqlVal) -> String {
         Text(val) => format!("'{}'", val),
         Blob(val) => format!("x'{}'", hex::encode_upper(val)),
         #[cfg(feature = "datetime")]
-        Timestamp(ndt) => ndt.format("%+").to_string(),
+        Timestamp(ndt) => ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string(),
     }
 }

@@ -60,6 +60,20 @@ pub enum BoolExpr {
     },
 }
 
+/// Represents the direction of a sort.
+#[derive(Clone)]
+pub enum OrderDirection {
+    Ascending,
+    Descending,
+}
+
+/// Represents a sorting term (ORDER BY in SQL).
+#[derive(Clone)]
+pub struct Order {
+    pub direction: OrderDirection,
+    pub column: &'static str,
+}
+
 #[derive(Clone)]
 pub enum Join {
     /// Inner join `join_table` where `col1` is equal to
@@ -100,6 +114,7 @@ pub struct Query<T: DataResult> {
     table: &'static str,
     filter: Option<BoolExpr>,
     limit: Option<i32>,
+    sort: Vec<Order>,
     phantom: PhantomData<T>,
 }
 impl<T: DataResult> Query<T> {
@@ -111,6 +126,7 @@ impl<T: DataResult> Query<T> {
             table,
             filter: None,
             limit: None,
+            sort: Vec::new(),
             phantom: PhantomData,
         }
     }
@@ -130,9 +146,28 @@ impl<T: DataResult> Query<T> {
         self
     }
 
+    /// Order the query results by the given column. Multiple calls to
+    /// this method may be made, with earlier calls taking precedence.
+    /// It is recommended to use the [`colname!`](butane::colname)
+    /// macro to construct the column name in a typesafe manner.
+    pub fn order(mut self, column: &'static str, direction: OrderDirection) -> Query<T> {
+        self.sort.push(Order { direction, column });
+        self
+    }
+
+    /// Shorthand for `order(column, OrderDirection::Ascending)`
+    pub fn order_asc(self, column: &'static str) -> Query<T> {
+        self.order(column, OrderDirection::Ascending)
+    }
+
+    /// Shorthand for `order(column, OrderDirection::Descending)`
+    pub fn order_desc(self, column: &'static str) -> Query<T> {
+        self.order(column, OrderDirection::Descending)
+    }
+
     /// Executes the query against `conn` and returns the first result (if any).
     pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        conn.query(self.table, T::COLUMNS, self.filter, Some(1))?
+        conn.query(self.table, T::COLUMNS, self.filter, Some(1), None)?
             .into_iter()
             .map(T::from_row)
             .nth(0)
@@ -141,7 +176,12 @@ impl<T: DataResult> Query<T> {
 
     /// Executes the query against `conn`.
     pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
-        conn.query(self.table, T::COLUMNS, self.filter, self.limit)?
+        let sort = if self.sort.is_empty() {
+            None
+        } else {
+            Some(self.sort.as_slice())
+        };
+        conn.query(self.table, T::COLUMNS, self.filter, self.limit, sort)?
             .into_iter()
             .map(T::from_row)
             .collect()

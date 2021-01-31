@@ -6,7 +6,7 @@
 use super::Column;
 use crate::migrations::adb::AColumn;
 use crate::query::Expr::{Condition, Placeholder, Val};
-use crate::query::{BoolExpr::*, Expr, Join};
+use crate::query::{BoolExpr::*, Expr, Join, Order, OrderDirection};
 use crate::{query, Result, SqlType, SqlVal};
 use std::borrow::Cow;
 use std::fmt::Write;
@@ -162,6 +162,18 @@ pub fn sql_update_with_placeholders(
 
 pub fn sql_limit(limit: i32, w: &mut impl Write) {
     write!(w, " LIMIT {}", limit).unwrap();
+}
+
+pub fn sql_order(order: &[Order], w: &mut impl Write) {
+    write!(w, " ORDER BY ").unwrap();
+    order.iter().fold("", |sep, o| {
+        let sql_dir = match o.direction {
+            OrderDirection::Ascending => "ASC",
+            OrderDirection::Descending => "DESC",
+        };
+        write!(w, "{}{} {}", sep, o.column, sql_dir).unwrap();
+        ", "
+    });
 }
 
 pub fn column_default(col: &AColumn) -> Result<SqlVal> {

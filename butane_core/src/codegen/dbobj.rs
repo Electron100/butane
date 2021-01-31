@@ -266,7 +266,7 @@ fn fieldexpr_func(
             )
         }
     };
-    let fnid = Ident::new(&format!("fieldexpr_{}", fid), f.span());
+    let fnid = Ident::new(&format!("{}", fid), f.span());
     quote!(
         #vis fn #fnid(&self) -> #field_expr_type {
             #field_expr_ctor

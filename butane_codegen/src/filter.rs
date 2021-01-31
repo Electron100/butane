@@ -130,7 +130,7 @@ fn fieldexpr<F>(fields: &impl ToTokens, field: &F) -> TokenStream2
 where
     F: ToTokens + Spanned,
 {
-    let fieldexpr_ident = ident(&format!("fieldexpr_{}", field.into_token_stream()));
+    let fieldexpr_ident = ident(&format!("{}", field.into_token_stream()));
     let span = field.span();
     quote_spanned!(span=> #fields.#fieldexpr_ident())
 }

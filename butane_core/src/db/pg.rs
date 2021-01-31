@@ -128,6 +128,7 @@ where
         columns: &[Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
+        order: Option<&[query::Order]>,
     ) -> Result<RawQueryResult> {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
@@ -144,6 +145,11 @@ where
         if let Some(limit) = limit {
             helper::sql_limit(limit, &mut sqlquery)
         }
+
+        if let Some(order) = order {
+            helper::sql_order(order, &mut sqlquery)
+        }
+
         if cfg!(feature = "debug") {
             eprintln!("query sql {}", sqlquery);
         }

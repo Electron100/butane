@@ -83,6 +83,7 @@ pub trait Migrations {
                 ButaneMigration::COLUMNS,
                 None,
                 None,
+                None,
             )?
             .into_iter()
             .map(ButaneMigration::from_row)

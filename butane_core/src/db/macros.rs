@@ -11,9 +11,10 @@ macro_rules! connection_method_wrapper {
                 columns: &[Column],
                 expr: Option<BoolExpr>,
                 limit: Option<i32>,
+                sort: Option<&[crate::query::Order]>,
             ) -> Result<RawQueryResult> {
                 self.wrapped_connection_methods()?
-                    .query(table, columns, expr, limit)
+                    .query(table, columns, expr, limit, sort)
             }
             fn insert_returning_pk(
                 &self,

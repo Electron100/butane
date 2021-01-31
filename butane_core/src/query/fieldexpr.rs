@@ -56,6 +56,10 @@ where
         }
     }
 
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
     binary_op!(eq, std::cmp::PartialEq<U>, Eq);
     binary_op!(ne, std::cmp::PartialEq<U>, Ne);
     binary_op!(lt, DataOrd<U>, Lt);

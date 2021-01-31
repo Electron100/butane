@@ -1,7 +1,7 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::query::BoolExpr;
-use butane::{filter, find, query};
+use butane::{colname, filter, find, query};
 use chrono::{TimeZone, Utc};
 use paste;
 
@@ -165,13 +165,13 @@ fn by_timestamp(conn: Connection) {
 
     // Now find all posts published before 1971. Assume we haven't gone
     // back in time to run these unit tests.
-    let mut posts = query!(
+    let posts = query!(
         Post,
         pub_time < { Utc.ymd(1972, 1, 1).and_hms(1, 1, 1).naive_utc() }
     )
+    .order_desc(colname!(Post, pub_time))
     .load(&conn)
     .unwrap();
-    posts.sort_by(|p1, p2| p1.id.partial_cmp(&p2.id).unwrap());
     assert_eq!(posts[0].title, "The Tiger");
     assert_eq!(posts[1].title, "Sir Charles");
 }

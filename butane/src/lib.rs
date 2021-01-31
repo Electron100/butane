@@ -105,6 +105,18 @@ macro_rules! query {
     };
 }
 
+/// Typesafe way to refer to a column name. Use as
+/// `colname!(MODEL_TYPE, FIELD_NAME)`. E.g. For a model type `Foo`
+/// with a field `bar`, `colname!(Foo, bar) would return `"bar"`, but
+/// `colname!(Foo, bat)` would be a compiler error (assuming `Foo`
+/// does not have such a field.
+#[macro_export]
+macro_rules! colname {
+    ($model:ident, $col:ident) => {
+        $model::fields().$col().name()
+    };
+}
+
 /// Finds a specific database object.
 ///
 /// Use as `find!(Foo, expr, conn)`, where `Foo` is a model type and

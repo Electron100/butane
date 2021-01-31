@@ -2,6 +2,7 @@
 use super::helper;
 use super::*;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
+use crate::query::Order;
 use crate::{log_warn, query};
 use crate::{Result, SqlType, SqlVal};
 #[cfg(feature = "datetime")]
@@ -107,6 +108,7 @@ impl ConnectionMethods for GenericConnection<'_> {
         columns: &[Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
+        order: Option<&[Order]>,
     ) -> Result<RawQueryResult> {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
@@ -123,6 +125,11 @@ impl ConnectionMethods for GenericConnection<'_> {
         if let Some(limit) = limit {
             helper::sql_limit(limit, &mut sqlquery)
         }
+
+        if let Some(order) = order {
+            helper::sql_order(order, &mut sqlquery)
+        }
+
         if cfg!(feature = "debug") {
             eprintln!("query sql {}", sqlquery);
         }

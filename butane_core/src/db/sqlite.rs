@@ -122,9 +122,6 @@ impl ConnectionMethods for GenericConnection<'_> {
                 &mut sqlquery,
             );
         }
-        if let Some(limit) = limit {
-            helper::sql_limit(limit, &mut sqlquery)
-        }
 
         if let Some(order) = order {
             helper::sql_order(order, &mut sqlquery)
@@ -132,6 +129,10 @@ impl ConnectionMethods for GenericConnection<'_> {
 
         if cfg!(feature = "debug") {
             eprintln!("query sql {}", sqlquery);
+        if let Some(limit) = limit {
+            helper::sql_limit(limit, &mut sqlquery)
+        }
+
         }
 
         let mut stmt = self.conn.prepare(&sqlquery)?;

@@ -142,12 +142,13 @@ where
                 &mut sqlquery,
             );
         }
-        if let Some(limit) = limit {
-            helper::sql_limit(limit, &mut sqlquery)
-        }
 
         if let Some(order) = order {
             helper::sql_order(order, &mut sqlquery)
+        }
+
+        if let Some(limit) = limit {
+            helper::sql_limit(limit, &mut sqlquery)
         }
 
         if cfg!(feature = "debug") {

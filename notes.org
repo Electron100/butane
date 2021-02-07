@@ -54,3 +54,7 @@
 	 + SqlType/SqlVal Custom
 	 + More precise spans in macro errors for invalid field names
 	 + Remove timestamp from migration names
+	 + auto FieldType for primitive enums
+	 + small int type
+	 + NaiveDate, maybe non-naive versions
+	 + BUG: add and remove columns in same migration can lose added column

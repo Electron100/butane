@@ -212,8 +212,11 @@ impl_prim_sql!(bool, Bool, Bool);
 impl_prim_sql!(i64, BigInt, BigInt);
 impl_prim_sql!(i32, Int, Int);
 impl_prim_sql!(u32, BigInt, BigInt);
+// TODO need a small int type
 impl_prim_sql!(u16, Int, Int);
 impl_prim_sql!(i16, Int, Int);
+impl_prim_sql!(u8, Int, Int);
+impl_prim_sql!(i8, Int, Int);
 impl_prim_sql!(f64, Real, Real);
 impl_prim_sql!(f32, Real, Real);
 impl_prim_sql!(String, Text, Text, str);

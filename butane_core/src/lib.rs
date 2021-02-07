@@ -208,11 +208,21 @@ impl std::fmt::Display for SqlType {
 }
 
 #[cfg(feature = "log")]
-fn log_warn(msg: impl std::fmt::Display) {
-    log::warn!(target: "butane", "{}", msg);
-}
+pub use log::debug;
+#[cfg(feature = "log")]
+pub use log::warn;
 
 #[cfg(not(feature = "log"))]
-fn log_warn(_msg: impl std::fmt::Display) {
-    // No-op
+mod btlog {
+    // this module is just for grouping -- macro_export puts them in the crate root
+    #[macro_export]
+    macro_rules! debug {
+        (target: $target:expr, $($arg:tt)+) => {};
+        ($($arg:tt)+) => {};
+    }
+    #[macro_export]
+    macro_rules! warn {
+        (target: $target:expr, $($arg:tt)+) => {};
+        ($($arg:tt)+) => {};
+    }
 }

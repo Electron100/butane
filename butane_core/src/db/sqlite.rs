@@ -1,9 +1,10 @@
 //! SQLite database backend
 use super::helper;
 use super::*;
+use crate::debug;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
+use crate::query;
 use crate::query::Order;
-use crate::{log_warn, query};
 use crate::{Result, SqlType, SqlVal};
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
@@ -94,8 +95,8 @@ struct GenericConnection<'a> {
 
 impl ConnectionMethods for GenericConnection<'_> {
     fn execute(&self, sql: &str) -> Result<()> {
-        if cfg!(feature = "debug") {
-            eprintln!("execute sql {}", sql);
+        if cfg!(feature = "log") {
+            debug!("execute sql {}", sql);
         }
         self.conn.execute_batch(sql.as_ref())?;
         Ok(())
@@ -127,13 +128,11 @@ impl ConnectionMethods for GenericConnection<'_> {
             helper::sql_order(order, &mut sqlquery)
         }
 
-        if cfg!(feature = "debug") {
-            eprintln!("query sql {}", sqlquery);
         if let Some(limit) = limit {
             helper::sql_limit(limit, &mut sqlquery)
         }
 
-        }
+        debug!("query sql {}", sqlquery);
 
         let mut stmt = self.conn.prepare(&sqlquery)?;
         let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
@@ -153,8 +152,8 @@ impl ConnectionMethods for GenericConnection<'_> {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
-        if cfg!(feature = "debug") {
-            eprintln!("insert sql {}", sql);
+        if cfg!(feature = "log") {
+            debug!("insert sql {}", sql);
         }
         self.conn
             .execute(&sql, &values.iter().collect::<Vec<_>>())?;
@@ -182,8 +181,8 @@ impl ConnectionMethods for GenericConnection<'_> {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
-        if cfg!(feature = "debug") {
-            eprintln!("insert sql {}", sql);
+        if cfg!(feature = "log") {
+            debug!("insert sql {}", sql);
         }
         self.conn
             .execute(&sql, &values.iter().collect::<Vec<_>>())?;
@@ -219,8 +218,8 @@ impl ConnectionMethods for GenericConnection<'_> {
             &mut sql,
         );
         let placeholder_values = [values, &[pk]].concat();
-        if cfg!(feature = "debug") {
-            eprintln!("update sql {}", sql);
+        if cfg!(feature = "log") {
+            debug!("update sql {}", sql);
         }
         self.conn
             .execute(&sql, &placeholder_values.iter().collect::<Vec<_>>())?;
@@ -452,10 +451,11 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {
     match old {
         Some(col) => change_column(current, tbl_name, &col, None),
         None => {
-            log_warn(format!(
+            crate::warn!(
                 "Cannot remove column {} that does not exist from table {}",
-                name, tbl_name
-            ));
+                name,
+                tbl_name
+            );
             "".to_string()
         }
     }
@@ -486,11 +486,11 @@ fn change_column(
 ) -> String {
     let table = current.get_table(tbl_name);
     if table.is_none() {
-        log_warn(format!(
+        crate::warn!(
             "Cannot alter column {} from table {} that does not exist",
             &old.name(),
             tbl_name
-        ));
+        );
         return "".to_string();
     }
     let old_table = table.unwrap();

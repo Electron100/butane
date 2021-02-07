@@ -2,7 +2,7 @@
 use super::helper;
 use super::*;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
-use crate::query;
+use crate::{debug, query};
 use crate::{Result, SqlType, SqlVal};
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
@@ -114,8 +114,8 @@ where
     T: postgres::GenericClient,
 {
     fn execute(&self, sql: &str) -> Result<()> {
-        if cfg!(feature = "debug") {
-            eprintln!("execute sql {}", sql);
+        if cfg!(feature = "log") {
+            debug!("execute sql {}", sql);
         }
         self.client.borrow_mut().batch_execute(sql.as_ref())?;
         Ok(())
@@ -151,8 +151,8 @@ where
             helper::sql_limit(limit, &mut sqlquery)
         }
 
-        if cfg!(feature = "debug") {
-            eprintln!("query sql {}", sqlquery);
+        if cfg!(feature = "log") {
+            debug!("query sql {}", sqlquery);
         }
 
         let stmt = self.client.try_borrow_mut()?.prepare(&sqlquery)?;
@@ -178,8 +178,8 @@ where
             &mut sql,
         );
         write!(&mut sql, " RETURNING {}", pkcol.name()).unwrap();
-        if cfg!(feature = "debug") {
-            eprintln!("insert sql {}", sql);
+        if cfg!(feature = "log") {
+            debug!("insert sql {}", sql);
         }
 
         // use query instead of execute so we can get our result back
@@ -247,8 +247,8 @@ where
             .iter()
             .map(|v| v as &DynToSqlPg)
             .collect();
-        if cfg!(feature = "debug") {
-            eprintln!("update sql {}", sql);
+        if cfg!(feature = "log") {
+            debug!("update sql {}", sql);
         }
         self.client
             .try_borrow_mut()?
@@ -566,11 +566,11 @@ fn change_column(
 ) -> Result<String> {
     let table = current.get_table(tbl_name);
     if table.is_none() {
-        crate::log_warn(format!(
+        crate::warn!(
             "Cannot alter column {} from table {} that does not exist",
             &old.name(),
             tbl_name
-        ));
+        );
         return Ok(String::new());
     }
     let old_table = table.unwrap();

@@ -1,6 +1,8 @@
 mod common;
 #[cfg(feature = "r2d2")]
 use butane::db;
+#[cfg(feature = "r2d2")]
+use r2d2_for_test as r2d2;
 
 #[cfg(all(feature = "sqlite", feature = "r2d2"))]
 #[test]

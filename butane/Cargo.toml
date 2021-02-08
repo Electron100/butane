@@ -1,6 +1,6 @@
 [package]
 name = "butane"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
 description = "An ORM with a focus on simplicity and on writing Rust, not SQL."
@@ -18,13 +18,13 @@ pg = ["butane_core/pg"]
 datetime = ["butane_core/datetime", "butane_codegen/datetime"]
 debug = ["butane_core/debug"]
 log = ["butane_core/log"]
+r2d2 = ["butane_core/r2d2"]
 tls = ["butane_core/tls"]
 uuid = ["butane_core/uuid", "butane_codegen/uuid"]
 
 [dependencies]
 butane_codegen = { path = "../butane_codegen", version = "0.2.0" }
 butane_core = { path = "../butane_core", version = "0.2.0" }
-r2d2 = {version="0.8", optional=true}
 
 
 [dev-dependencies]
@@ -35,6 +35,7 @@ chrono = { version = "0.4", features=["serde"] }
 quote = "1.0"
 proc-macro2="1.0"
 once_cell="1.5.2"
+r2d2_for_test = {package="r2d2", version = "0.8"}
 uuid_for_test = {package="uuid", version = "0.8", features=["v4"] }
 
 [package.metadata.docs.rs]

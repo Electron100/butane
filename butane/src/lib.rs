@@ -8,12 +8,7 @@ pub use butane_core::{
     SqlType, SqlVal, ToSql,
 };
 
-#[cfg(feature = "r2d2")]
-mod r2;
-
 pub mod db {
-    #[cfg(feature = "r2d2")]
-    pub use crate::r2::ConnectionManager;
     pub use butane_core::db::*;
 }
 

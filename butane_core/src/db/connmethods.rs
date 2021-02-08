@@ -105,3 +105,8 @@ impl IntoIterator for Row {
 pub type RawQueryResult = Vec<Row>;
 
 pub type QueryResult<T> = Vec<T>;
+
+pub trait ConnectionMethodWrapper {
+    type Wrapped: ConnectionMethods;
+    fn wrapped_connection_methods(&self) -> Result<&Self::Wrapped>;
+}

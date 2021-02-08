@@ -101,7 +101,7 @@ dependencies = [
 
 [[package]]
 name = "butane"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "butane_codegen",
  "butane_core",
@@ -142,7 +142,7 @@ dependencies = [
 
 [[package]]
 name = "butane_core"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "bytes 0.5.6",
  "cfg-if 1.0.0",
@@ -157,6 +157,7 @@ dependencies = [
  "postgres-native-tls",
  "proc-macro2 1.0.24",
  "quote 1.0.8",
+ "r2d2",
  "rusqlite",
  "serde",
  "serde_json",

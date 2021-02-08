@@ -1,23 +1,23 @@
-use crate::db;
-use crate::db::BackendConnection;
+use super::connmethods::ConnectionMethodWrapper;
+use super::*;
 use crate::Result;
 
 /// R2D2 support for Butane. Implements [`r2d2::ManageConnection`].
 pub struct ConnectionManager {
-    spec: db::ConnectionSpec,
+    spec: ConnectionSpec,
 }
 impl ConnectionManager {
-    pub fn new(spec: db::ConnectionSpec) -> Self {
+    pub fn new(spec: ConnectionSpec) -> Self {
         ConnectionManager { spec }
     }
 }
 
 impl r2d2::ManageConnection for ConnectionManager {
-    type Connection = db::Connection;
+    type Connection = Connection;
     type Error = crate::Error;
 
     fn connect(&self) -> Result<Self::Connection> {
-        db::connect(&self.spec)
+        crate::db::connect(&self.spec)
     }
 
     fn is_valid(&self, conn: &mut Self::Connection) -> Result<()> {
@@ -28,3 +28,12 @@ impl r2d2::ManageConnection for ConnectionManager {
         conn.is_closed()
     }
 }
+
+impl ConnectionMethodWrapper for r2d2::PooledConnection<ConnectionManager> {
+    type Wrapped = Connection;
+    fn wrapped_connection_methods(&self) -> Result<&Connection> {
+        Ok(self.deref())
+    }
+}
+
+connection_method_wrapper!(r2d2::PooledConnection<ConnectionManager>);

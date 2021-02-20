@@ -19,10 +19,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Install postgres
+      # Postgresql setup adapted from Diesel CI
+      # Disable ssl as server doesn't have a trusted cert
+    - name: Setup postgres
       run: |
         sudo apt-get update
         sudo apt-get install -y postgresql
+        sudo sed -i "s/md5/trust/" /etc/postgresql/13/main/pg_hba.conf
+        sudo cat /etc/postgresql/13/main/pg_hba.conf
+        sudo service postgresql restart && sleep 3
+        echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
     - name: Build
       run: make build
     - name: Lint

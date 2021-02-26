@@ -1,6 +1,6 @@
 [package]
 name = "butane_codegen"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
 description = "Macros for Butane. Do not use this crate directly -- use the butane crate."
@@ -13,7 +13,7 @@ datetime = []
 
 [dependencies]
 proc-macro2 = "1.0"
-butane_core = { path = "../butane_core", version = "0.2.0" }
+butane_core = { path = "../butane_core", version = "0.3.0" }
 quote = "1.0"
 syn = { version = "1.0", features = ["full", "extra-traits"] }
 uuid = {version = "0.8", optional=true}

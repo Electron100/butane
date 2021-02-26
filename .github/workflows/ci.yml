@@ -19,6 +19,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+      # Postgresql setup adapted from Diesel CI
+      # Disable ssl as server doesn't have a trusted cert
+    - name: Setup postgres
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql
+        sudo sed -i "s/md5/trust/" /etc/postgresql/13/main/pg_hba.conf
+        sudo cat /etc/postgresql/13/main/pg_hba.conf
+        sudo service postgresql restart && sleep 3
+        echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
     - name: Build
       run: make build
     - name: Lint
@@ -27,6 +37,5 @@ jobs:
       run: cd butane_core && cargo test --all-features
     - name: Test Codegen
       run: cd butane_codegen && cargo test --all-features
-    - name: Test with SQLite
-      run: cd butane && cargo test --features "default,sqlite"
-    # TODO support the PostgreSQL tests, will require running in a container
+    - name: Test
+      run: cd butane && cargo test --all-features

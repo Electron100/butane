@@ -123,7 +123,7 @@ pub fn pg_setup() -> PgSetupData {
     conn.execute(format!("CREATE DATABASE {};", new_dbname))
         .unwrap();
 
-    let connstr = format!("{} dbname={} user=postgres", connstr, new_dbname);
+    let connstr = format!("{} dbname={}", connstr, new_dbname);
     PgSetupData { connstr }
 }
 pub fn pg_teardown(_data: PgSetupData) {

@@ -200,13 +200,19 @@ impl ADB {
             }
             RemoveTable(name) => self.remove_table(&name),
             AddColumn(table, col) => {
-                self.tables.get_mut(&table).map(|t| t.add_column(col));
+                if let Some(t) = self.tables.get_mut(&table) {
+                    t.add_column(col);
+                }
             }
             RemoveColumn(table, name) => {
-                self.tables.get_mut(&table).map(|t| t.remove_column(&name));
+                if let Some(t) = self.tables.get_mut(&table) {
+                    t.remove_column(&name);
+                }
             }
             ChangeColumn(table, _, new) => {
-                self.tables.get_mut(&table).map(|t| t.replace_column(new));
+                if let Some(t) = self.tables.get_mut(&table) {
+                    t.replace_column(new);
+                }
             }
         }
     }

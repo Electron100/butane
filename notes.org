@@ -57,4 +57,4 @@
 	 + auto FieldType for primitive enums
 	 + small int type
 	 + NaiveDate, maybe non-naive versions
-	 + BUG: add and remove columns in same migration can lose added column
+

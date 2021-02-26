@@ -37,11 +37,15 @@ impl Backend for SQLiteBackend {
         BACKEND_NAME
     }
 
-    fn create_migration_sql(&self, current: &ADB, ops: &[Operation]) -> Result<String> {
+    fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {
         let mut current: ADB = (*current).clone();
         Ok(ops
-            .iter()
-            .map(|o| sql_for_op(&mut current, o))
+            .into_iter()
+            .map(|o| {
+                let sql = sql_for_op(&mut current, &o);
+                current.transform_with(o);
+                sql
+            })
             .collect::<Result<Vec<String>>>()?
             .join("\n"))
     }

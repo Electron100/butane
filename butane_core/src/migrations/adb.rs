@@ -191,6 +191,25 @@ impl ADB {
         }
         Ok(())
     }
+
+    pub fn transform_with(&mut self, op: Operation) {
+        use Operation::*;
+        match op {
+            AddTable(table) => {
+                self.tables.insert(table.name.clone(), table);
+            }
+            RemoveTable(name) => self.remove_table(&name),
+            AddColumn(table, col) => {
+                self.tables.get_mut(&table).map(|t| t.add_column(col));
+            }
+            RemoveColumn(table, name) => {
+                self.tables.get_mut(&table).map(|t| t.remove_column(&name));
+            }
+            ChangeColumn(table, _, new) => {
+                self.tables.get_mut(&table).map(|t| t.replace_column(new));
+            }
+        }
+    }
 }
 
 /// Abstract representation of a database table schema.

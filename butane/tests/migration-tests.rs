@@ -213,6 +213,33 @@ fn migration_add_field_with_default_pg() {
 
 #[cfg(feature = "sqlite")]
 #[test]
+fn migration_add_and_remove_field_sqlite() {
+    migration_add_and_remove_field(
+        &mut common::sqlite_connection(),
+				// The exact details of futzing a DROP COLUMN in sqlite aren't
+				// important (e.g. the temp table naming is certainly not part
+				// of the API contract), but the goal here is to ensure we're
+				// getting sane looking downgrade sql and a test failure if it
+				// changes. If the change is innocuous, this test should just
+				// be updated.
+        "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, baz FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
+        "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
+    );
+}
+
+#[cfg(feature = "pg")]
+#[test]
+fn migration_add_and_remove_field_pg() {
+    let (mut conn, _data) = common::pg_connection();
+    migration_add_and_remove_field(
+        &mut conn,
+        "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;ALTER TABLE Foo DROP COLUMN bar;",
+        "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';ALTER TABLE Foo DROP COLUMN baz;",
+    );
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
 fn migration_delete_table_sqlite() {
     migration_delete_table(
         &mut common::sqlite_connection(),
@@ -310,6 +337,23 @@ fn migration_add_field_with_default(conn: &mut Connection, up_sql: &str, down_sq
             id: i64,
             bar: String,
             #[default=42]
+            baz: u32,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql);
+}
+
+fn migration_add_and_remove_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: String,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
             baz: u32,
         }
     };

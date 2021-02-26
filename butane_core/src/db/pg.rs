@@ -63,6 +63,7 @@ impl PgConnection {
         })
     }
     // For use with the connection_method_wrapper macro
+    #[allow(clippy::unnecessary_wraps)]
     fn wrapped_connection_methods(&self) -> Result<PgGenericClient<postgres::Client>> {
         Ok(PgGenericClient { client: &self.conn })
     }
@@ -470,7 +471,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::AddTable(table) => Ok(create_table(&table)?),
         Operation::RemoveTable(name) => Ok(drop_table(&name)),
         Operation::AddColumn(tbl, col) => add_column(&tbl, &col),
-        Operation::RemoveColumn(tbl, name) => remove_column(&tbl, &name),
+        Operation::RemoveColumn(tbl, name) => Ok(remove_column(&tbl, &name)),
         Operation::ChangeColumn(tbl, old, new) => change_column(current, &tbl, &old, Some(new)),
     }
 }
@@ -537,8 +538,8 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     ))
 }
 
-fn remove_column(tbl_name: &str, name: &str) -> Result<String> {
-    Ok(format!("ALTER TABLE {} DROP COLUMN {};", tbl_name, name))
+fn remove_column(tbl_name: &str, name: &str) -> String {
+    format!("ALTER TABLE {} DROP COLUMN {};", tbl_name, name)
 }
 
 fn copy_table(old: &ATable, new: &ATable) -> String {

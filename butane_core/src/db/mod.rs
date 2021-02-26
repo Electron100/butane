@@ -61,6 +61,8 @@ impl Connection {
     pub fn execute(&mut self, sql: impl AsRef<str>) -> Result<()> {
         self.conn.execute(sql.as_ref())
     }
+    // For use with connection_method_wrapper macro
+    #[allow(clippy::unnecessary_wraps)]
     fn wrapped_connection_methods(&self) -> Result<&dyn BackendConnection> {
         Ok(self.conn.as_ref())
     }
@@ -191,6 +193,8 @@ impl<'c> Transaction<'c> {
     pub fn rollback(mut self) -> Result<()> {
         self.trans.deref_mut().rollback()
     }
+    // For use with connection_method_wrapper macro
+    #[allow(clippy::unnecessary_wraps)]
     fn wrapped_connection_methods(&self) -> Result<&dyn ConnectionMethods> {
         let a: &dyn BackendTransaction<'c> = self.trans.as_ref();
         Ok(a.connection_methods())

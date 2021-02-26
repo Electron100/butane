@@ -68,6 +68,8 @@ impl SQLiteConnection {
             .map_err(|e| e.into())
     }
 
+    // For use with connection_method_wrapper macro
+    #[allow(clippy::unnecessary_wraps)]
     fn wrapped_connection_methods(&self) -> Result<GenericConnection> {
         Ok(GenericConnection { conn: &self.conn })
     }

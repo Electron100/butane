@@ -324,7 +324,7 @@ impl IntoSql for Vec<u8> {
 }
 impl FieldType for Vec<u8> {
     const SQLTYPE: SqlType = SqlType::Blob;
-    type RefType = str;
+    type RefType = Self;
 }
 impl PrimaryKeyType for Vec<u8> {}
 

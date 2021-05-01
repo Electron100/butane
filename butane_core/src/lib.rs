@@ -1,4 +1,5 @@
 #![allow(clippy::iter_nth_zero)]
+#![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};

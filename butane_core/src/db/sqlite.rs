@@ -141,7 +141,9 @@ impl ConnectionMethods for GenericConnection<'_> {
         debug!("query sql {}", sqlquery);
 
         let mut stmt = self.conn.prepare(&sqlquery)?;
-        let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
+        let rows = stmt.query_and_then(rusqlite::params_from_iter(values), |row| {
+            row_from_rusqlite(row, columns)
+        })?;
         rows.collect()
     }
     fn insert_returning_pk(
@@ -162,15 +164,15 @@ impl ConnectionMethods for GenericConnection<'_> {
             debug!("insert sql {}", sql);
         }
         self.conn
-            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
+            .execute(&sql, rusqlite::params_from_iter(values))?;
         let pk: SqlVal = self.conn.query_row_and_then(
             &format!(
                 "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
                 pkcol.name(),
                 table
             ),
-            rusqlite::NO_PARAMS,
-            |row| sql_val_from_rusqlite(row.get_raw(0), &pkcol),
+            [],
+            |row| sql_val_from_rusqlite(row.get_ref_unwrap(0), &pkcol),
         )?;
         Ok(pk)
     }
@@ -191,7 +193,7 @@ impl ConnectionMethods for GenericConnection<'_> {
             debug!("insert sql {}", sql);
         }
         self.conn
-            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
+            .execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(())
     }
     fn insert_or_replace(
@@ -204,7 +206,7 @@ impl ConnectionMethods for GenericConnection<'_> {
         let mut sql = String::new();
         sql_insert_or_update(table, columns, &mut sql);
         self.conn
-            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
+            .execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(())
     }
     fn update(
@@ -228,7 +230,7 @@ impl ConnectionMethods for GenericConnection<'_> {
             debug!("update sql {}", sql);
         }
         self.conn
-            .execute(&sql, &placeholder_values.iter().collect::<Vec<_>>())?;
+            .execute(&sql, rusqlite::params_from_iter(placeholder_values))?;
         Ok(())
     }
     fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
@@ -241,7 +243,9 @@ impl ConnectionMethods for GenericConnection<'_> {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
-        let cnt = self.conn.execute(&sql, &values)?;
+        let cnt = self
+            .conn
+            .execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(cnt)
     }
     fn has_table(&self, table: &'static str) -> Result<bool> {
@@ -338,7 +342,7 @@ fn row_from_rusqlite(row: &rusqlite::Row, cols: &[Column]) -> Result<Row> {
     vals.reserve(cols.len());
     for i in 0..cols.len() {
         let col = cols.get(i).unwrap();
-        vals.push(sql_val_from_rusqlite(row.get_raw(i), col)?);
+        vals.push(sql_val_from_rusqlite(row.get_ref_unwrap(i), col)?);
     }
     Ok(Row::new(vals))
 }

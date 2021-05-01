@@ -13,7 +13,7 @@
 //!    database backend. It is returned by the `connect` method.
 
 use crate::query::BoolExpr;
-use crate::{migrations::adb, Error, Result, SqlVal};
+use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fs;

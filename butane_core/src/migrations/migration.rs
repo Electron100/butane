@@ -47,7 +47,7 @@ pub trait Migration: PartialEq {
         tx.insert_only(
             ButaneMigration::TABLE,
             ButaneMigration::COLUMNS,
-            &[self.name().as_ref().to_sql()],
+            &[self.name().as_ref().to_sql_ref()],
         )?;
         tx.commit()
     }

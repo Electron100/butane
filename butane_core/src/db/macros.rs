@@ -21,7 +21,7 @@ macro_rules! connection_method_wrapper {
                 table: &'static str,
                 columns: &[Column],
                 pkcol: &Column,
-                values: &[SqlVal],
+                values: &[SqlValRef<'_>],
             ) -> Result<SqlVal> {
                 self.wrapped_connection_methods()?
                     .insert_returning_pk(table, columns, pkcol, values)
@@ -30,7 +30,7 @@ macro_rules! connection_method_wrapper {
                 &self,
                 table: &'static str,
                 columns: &[Column],
-                values: &[SqlVal],
+                values: &[SqlValRef<'_>],
             ) -> Result<()> {
                 self.wrapped_connection_methods()?
                     .insert_only(table, columns, values)
@@ -40,7 +40,7 @@ macro_rules! connection_method_wrapper {
                 table: &'static str,
                 columns: &[Column],
                 pkcol: &Column,
-                values: &[SqlVal],
+                values: &[SqlValRef<'_>],
             ) -> Result<()> {
                 self.wrapped_connection_methods()?
                     .insert_or_replace(table, columns, pkcol, values)
@@ -49,9 +49,9 @@ macro_rules! connection_method_wrapper {
                 &self,
                 table: &'static str,
                 pkcol: Column,
-                pk: SqlVal,
+                pk: SqlValRef,
                 columns: &[Column],
-                values: &[SqlVal],
+                values: &[SqlValRef<'_>],
             ) -> Result<()> {
                 self.wrapped_connection_methods()?
                     .update(table, pkcol, pk, columns, values)

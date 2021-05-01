@@ -65,7 +65,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             fn save(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
                 #many_save
                 //future perf improvement use an array on the stack
-                let mut values: Vec<butane::SqlVal> = Vec::with_capacity(#numdbfields);
+                let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(#numdbfields);
                 let pkcol = butane::db::Column::new(
                     #pklit,
                     <#pktype as butane::FieldType>::SQLTYPE);
@@ -74,7 +74,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     if values.len() > 0 {
                         conn.update(Self::TABLE,
                                     pkcol,
-                                    butane::ToSql::to_sql(self.pk()),
+                                    butane::ToSql::to_sql_ref(self.pk()),
                                     &[#save_cols], &values)?;
                     }
                 } else {
@@ -95,11 +95,19 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 use butane::DataObject;
                 butane::ToSql::to_sql(self.pk())
             }
+            fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                use butane::DataObject;
+                butane::ToSql::to_sql_ref(self.pk())
+            }
         }
         impl butane::ToSql for &#tyname {
             fn to_sql(&self) -> butane::SqlVal {
                 use butane::DataObject;
                 butane::ToSql::to_sql(self.pk())
+            }
+            fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                use butane::DataObject;
+                butane::ToSql::to_sql_ref(self.pk())
             }
         }
         impl PartialEq<butane::ForeignKey<#tyname>> for #tyname {
@@ -382,7 +390,7 @@ where
             let ident = f.ident.clone().unwrap();
             if is_row_field(f) {
                 if !is_auto(f) {
-                    quote!(values.push(butane::ToSql::to_sql(&self.#ident));)
+                    quote!(values.push(butane::ToSql::to_sql_ref(&self.#ident));)
                 } else {
                     quote!()
                 }

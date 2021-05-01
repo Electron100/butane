@@ -6,6 +6,19 @@ use std::fmt;
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum SqlValRef<'a> {
+    Null,
+    Bool(bool),
+    Int(i32),
+    BigInt(i64),
+    Real(f64),
+    Text(&'a str),
+    Blob(&'a [u8]),
+    #[cfg(feature = "datetime")]
+    Timestamp(NaiveDateTime), // NaiveDateTime is Copy
+}
+
 /// A database value.
 ///
 /// For conversion between `SqlVal` and other types, see [`FromSql`], [`IntoSql`], and [`ToSql`].
@@ -26,6 +39,10 @@ pub enum SqlVal {
     Timestamp(NaiveDateTime),
 }
 impl SqlVal {
+    pub fn as_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::from(self)
+    }
+
     pub fn bool(&self) -> Result<bool> {
         match self {
             SqlVal::Bool(val) => Ok(*val),
@@ -117,9 +134,10 @@ impl fmt::Display for SqlVal {
 /// Unlike [`IntoSql`][crate::IntoSql], the value is not consumed.
 pub trait ToSql {
     fn to_sql(&self) -> SqlVal;
+    fn to_sql_ref(&self) -> SqlValRef<'_>;
 }
 
-/// Used to convert another type to a `SqlVal`.
+/// Used to convert another type to a `SqlVal` or `SqlValRef`.
 ///
 /// The value is consumed. For a non-consuming trait, see
 /// [`ToSql`][crate::ToSql].
@@ -136,13 +154,54 @@ where
     }
 }
 
-/// Used to convert a `SqlVal` into another type.
+/// Used to convert a `SqlVal` or `SqlValRef` into another type.
 ///
 /// The `SqlVal` is consumed.
 pub trait FromSql {
     fn from_sql(val: SqlVal) -> Result<Self>
     where
         Self: Sized;
+
+    fn from_sql_ref(val: SqlValRef<'_>) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Self::from_sql(val.into())
+    }
+}
+
+impl From<SqlValRef<'_>> for SqlVal {
+    fn from(vref: SqlValRef) -> SqlVal {
+        use SqlValRef::*;
+        match vref {
+            Null => SqlVal::Null,
+            Bool(v) => SqlVal::Bool(v),
+            Int(v) => SqlVal::Int(v),
+            BigInt(v) => SqlVal::BigInt(v),
+            Real(v) => SqlVal::Real(v),
+            Text(v) => SqlVal::Text(v.to_string()),
+            Blob(v) => SqlVal::Blob(v.into()),
+            #[cfg(feature = "datetime")]
+            Timestamp(v) => SqlVal::Timestamp(v),
+        }
+    }
+}
+
+impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
+    fn from(val: &'a SqlVal) -> SqlValRef<'a> {
+        use SqlVal::*;
+        match val {
+            Null => SqlValRef::Null,
+            Bool(v) => SqlValRef::Bool(*v),
+            Int(v) => SqlValRef::Int(*v),
+            BigInt(v) => SqlValRef::BigInt(*v),
+            Real(v) => SqlValRef::Real(*v),
+            Text(v) => SqlValRef::Text(v.as_ref()),
+            Blob(v) => SqlValRef::Blob(v.as_ref()),
+            #[cfg(feature = "datetime")]
+            Timestamp(v) => SqlValRef::Timestamp(*v),
+        }
+    }
 }
 
 /// Type suitable for being a database column.
@@ -172,11 +231,8 @@ where
     }
 }
 
-macro_rules! impl_prim_sql {
+macro_rules! impl_basic_from_sql {
     ($prim:ty, $variant:ident, $sqltype:ident) => {
-        impl_prim_sql! {$prim, $variant, $sqltype, $prim}
-    };
-    ($prim:ty, $variant:ident, $sqltype:ident, $reftype: ty) => {
         impl FromSql for $prim {
             fn from_sql(val: SqlVal) -> Result<Self> {
                 if let SqlVal::$variant(val) = val {
@@ -189,6 +245,15 @@ macro_rules! impl_prim_sql {
                 }
             }
         }
+    };
+}
+
+macro_rules! impl_prim_sql {
+    ($prim:ty, $variant:ident, $sqltype:ident) => {
+        impl_prim_sql! {$prim, $variant, $sqltype, $prim}
+    };
+    ($prim:ty, $variant:ident, $sqltype:ident, $reftype: ty) => {
+        impl_basic_from_sql!($prim, $variant, $sqltype);
         impl IntoSql for $prim {
             fn into_sql(self) -> SqlVal {
                 SqlVal::$variant(self.into())
@@ -197,6 +262,9 @@ macro_rules! impl_prim_sql {
         impl ToSql for $prim {
             fn to_sql(&self) -> SqlVal {
                 self.clone().into_sql()
+            }
+            fn to_sql_ref(&self) -> SqlValRef<'_> {
+                SqlValRef::$variant(self.clone().into())
             }
         }
         impl FieldType for $prim {
@@ -219,19 +287,86 @@ impl_prim_sql!(u8, Int, Int);
 impl_prim_sql!(i8, Int, Int);
 impl_prim_sql!(f64, Real, Real);
 impl_prim_sql!(f32, Real, Real);
-impl_prim_sql!(String, Text, Text, str);
-impl_prim_sql!(Vec<u8>, Blob, Blob);
+
+impl_basic_from_sql!(String, Text, Text);
+impl ToSql for String {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Text(self.clone())
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Text(self)
+    }
+}
+impl IntoSql for String {
+    fn into_sql(self) -> SqlVal {
+        SqlVal::Text(self)
+    }
+}
+impl FieldType for String {
+    const SQLTYPE: SqlType = SqlType::Text;
+    type RefType = str;
+}
+impl PrimaryKeyType for String {}
+
+impl_basic_from_sql!(Vec<u8>, Blob, Blob);
+impl ToSql for Vec<u8> {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Blob(self.clone())
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Blob(self)
+    }
+}
+impl IntoSql for Vec<u8> {
+    fn into_sql(self) -> SqlVal {
+        SqlVal::Blob(self)
+    }
+}
+impl FieldType for Vec<u8> {
+    const SQLTYPE: SqlType = SqlType::Blob;
+    type RefType = str;
+}
+impl PrimaryKeyType for Vec<u8> {}
+
 #[cfg(feature = "datetime")]
-impl_prim_sql!(NaiveDateTime, Timestamp, Timestamp);
+impl_basic_from_sql!(NaiveDateTime, Timestamp, Timestamp);
+#[cfg(feature = "datetime")]
+impl ToSql for NaiveDateTime {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Timestamp(*self)
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Timestamp(*self)
+    }
+}
+#[cfg(feature = "datetime")]
+impl IntoSql for NaiveDateTime {
+    fn into_sql(self) -> SqlVal {
+        SqlVal::Timestamp(self)
+    }
+}
+#[cfg(feature = "datetime")]
+impl FieldType for NaiveDateTime {
+    const SQLTYPE: SqlType = SqlType::Timestamp;
+    type RefType = str;
+}
+#[cfg(feature = "datetime")]
+impl PrimaryKeyType for NaiveDateTime {}
 
 impl ToSql for &str {
     fn to_sql(&self) -> SqlVal {
         SqlVal::Text((*self).to_string())
     }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Text(self)
+    }
 }
 impl ToSql for str {
     fn to_sql(&self) -> SqlVal {
         SqlVal::Text(self.to_string())
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Text(self)
     }
 }
 
@@ -243,6 +378,12 @@ where
         match self {
             None => SqlVal::Null,
             Some(v) => v.to_sql(),
+        }
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        match self {
+            None => SqlValRef::Null,
+            Some(v) => v.to_sql_ref(),
         }
     }
 }

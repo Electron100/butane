@@ -74,7 +74,10 @@ where
             conn.insert_only(
                 self.item_table,
                 &self.columns(),
-                &[owner.clone(), self.new_values.pop().unwrap()],
+                &[
+                    owner.as_ref(),
+                    self.new_values.pop().unwrap().as_ref().clone(),
+                ],
             )?;
         }
         self.new_values.clear();

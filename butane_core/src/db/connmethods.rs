@@ -3,7 +3,7 @@
 
 use super::Error::BoundsError;
 use crate::query::{BoolExpr, Expr, Order};
-use crate::{Result, SqlType, SqlVal};
+use crate::{Result, SqlType, SqlVal, SqlValRef};
 use std::vec::Vec;
 
 /// Methods available on a database connection. Most users do not need
@@ -25,26 +25,30 @@ pub trait ConnectionMethods {
         table: &'static str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<SqlVal>;
     /// Like `insert_returning_pk` but with no return value
-    fn insert_only(&self, table: &'static str, columns: &[Column], values: &[SqlVal])
-        -> Result<()>;
+    fn insert_only(
+        &self,
+        table: &'static str,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()>;
     /// Insert unless there's a conflict on the primary key column, in which case update
     fn insert_or_replace(
         &self,
         table: &'static str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<()>;
     fn update(
         &self,
         table: &'static str,
         pkcol: Column,
-        pk: SqlVal,
+        pk: SqlValRef,
         columns: &[Column],
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<()>;
     fn delete(&self, table: &'static str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
         self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))?;

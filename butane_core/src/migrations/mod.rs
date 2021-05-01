@@ -1,7 +1,7 @@
 //! For working with migrations. If using the butane CLI tool, it is
 //! not necessary to use these types directly.
 use crate::db::{Column, ConnectionMethods, Row};
-use crate::sqlval::{FromSql, SqlVal, ToSql};
+use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
 
 use std::path::Path;
@@ -232,8 +232,8 @@ impl DataObject for ButaneMigration {
         &self.name
     }
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
-        let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);
-        values.push(self.name.to_sql());
+        let mut values: Vec<SqlValRef<'_>> = Vec::with_capacity(2usize);
+        values.push(self.name.to_sql_ref());
         conn.insert_or_replace(
             Self::TABLE,
             <Self as DataResult>::COLUMNS,

@@ -5,7 +5,7 @@ use crate::debug;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
 use crate::query::Order;
-use crate::{Result, SqlType, SqlVal};
+use crate::{Result, SqlType, SqlVal, SqlValRef};
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
 use std::fmt::Write;
@@ -149,7 +149,7 @@ impl ConnectionMethods for GenericConnection<'_> {
         table: &'static str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
@@ -178,7 +178,7 @@ impl ConnectionMethods for GenericConnection<'_> {
         &self,
         table: &'static str,
         columns: &[Column],
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
@@ -199,7 +199,7 @@ impl ConnectionMethods for GenericConnection<'_> {
         table: &'static str,
         columns: &[Column],
         _pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef],
     ) -> Result<()> {
         let mut sql = String::new();
         sql_insert_or_update(table, columns, &mut sql);
@@ -211,9 +211,9 @@ impl ConnectionMethods for GenericConnection<'_> {
         &self,
         table: &'static str,
         pkcol: Column,
-        pk: SqlVal,
+        pk: SqlValRef,
         columns: &[Column],
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
         let mut sql = String::new();
         helper::sql_update_with_placeholders(
@@ -296,22 +296,33 @@ impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
 }
 
 impl rusqlite::ToSql for SqlVal {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        use rusqlite::types::{ToSqlOutput::Borrowed, ToSqlOutput::Owned, Value, ValueRef};
-        Ok(match self {
-            SqlVal::Bool(b) => Owned(Value::Integer(if *b { 1 } else { 0 })),
-            SqlVal::Int(i) => Owned(Value::Integer(*i as i64)),
-            SqlVal::BigInt(i) => Owned(Value::Integer(*i)),
-            SqlVal::Real(r) => Owned(Value::Real(*r)),
-            SqlVal::Text(t) => Borrowed(ValueRef::Text(t.as_ref())),
-            SqlVal::Blob(b) => Borrowed(ValueRef::Blob(&b)),
-            #[cfg(feature = "datetime")]
-            SqlVal::Timestamp(dt) => {
-                let f = dt.format(SQLITE_DT_FORMAT);
-                Owned(Value::Text(f.to_string()))
-            }
-            SqlVal::Null => Owned(Value::Null),
-        })
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(sqlvalref_to_sqlite(&self.as_ref()))
+    }
+}
+
+impl<'a> rusqlite::ToSql for SqlValRef<'a> {
+    fn to_sql<'b>(&'b self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'a>> {
+        Ok(sqlvalref_to_sqlite(self))
+    }
+}
+
+fn sqlvalref_to_sqlite<'a, 'b>(valref: &'b SqlValRef<'a>) -> rusqlite::types::ToSqlOutput<'a> {
+    use rusqlite::types::{ToSqlOutput::Borrowed, ToSqlOutput::Owned, Value, ValueRef};
+    use SqlValRef::*;
+    match valref {
+        Bool(b) => Owned(Value::Integer(*b as i64)),
+        Int(i) => Owned(Value::Integer(*i as i64)),
+        BigInt(i) => Owned(Value::Integer(*i)),
+        Real(r) => Owned(Value::Real(*r)),
+        Text(t) => Borrowed(ValueRef::Text(t.as_bytes())),
+        Blob(b) => Borrowed(ValueRef::Blob(&b)),
+        #[cfg(feature = "datetime")]
+        Timestamp(dt) => {
+            let f = dt.format(SQLITE_DT_FORMAT);
+            Owned(Value::Text(f.to_string()))
+        }
+        Null => Owned(Value::Null),
     }
 }
 

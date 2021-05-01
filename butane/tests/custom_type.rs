@@ -1,8 +1,8 @@
-use paste;
 use butane::db::Connection;
 use butane::prelude::*;
-use butane::{model, butane_type, query};
-use butane::{FieldType, FromSql, IntoSql, ObjectState, SqlType, SqlVal, ToSql};
+use butane::{butane_type, model, query};
+use butane::{FieldType, FromSql, IntoSql, ObjectState, SqlType, SqlVal, SqlValRef, ToSql};
+use paste;
 
 mod common;
 
@@ -16,14 +16,14 @@ enum Frobnozzle {
 
 impl ToSql for Frobnozzle {
     fn to_sql(&self) -> SqlVal {
-        SqlVal::Text(
-            match self {
-                Frobnozzle::Foo => "Foo",
-                Frobnozzle::Bar => "Bar",
-                Frobnozzle::Baz => "Baz",
-            }
-            .to_string(),
-        )
+        self.to_sql_ref().into()
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Text(match self {
+            Frobnozzle::Foo => "Foo",
+            Frobnozzle::Bar => "Bar",
+            Frobnozzle::Baz => "Baz",
+        })
     }
 }
 impl IntoSql for Frobnozzle {

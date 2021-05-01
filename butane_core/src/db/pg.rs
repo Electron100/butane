@@ -3,7 +3,7 @@ use super::helper;
 use super::*;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
 use crate::{debug, query};
-use crate::{Result, SqlType, SqlVal};
+use crate::{Result, SqlType, SqlVal, SqlValRef};
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
 use postgres::fallible_iterator::FallibleIterator;
@@ -104,9 +104,13 @@ where
     client: &'a RefCell<T>,
 }
 
-type DynToSqlPg = (dyn postgres::types::ToSql + Sync);
+type DynToSqlPg<'a> = (dyn postgres::types::ToSql + Sync + 'a);
 
 fn sqlval_for_pg_query(v: &SqlVal) -> &dyn postgres::types::ToSql {
+    v as &dyn postgres::types::ToSql
+}
+
+fn sqlvalref_for_pg_query<'a>(v: &'a SqlValRef<'a>) -> &'a dyn postgres::types::ToSql {
     v as &dyn postgres::types::ToSql
 }
 
@@ -169,7 +173,7 @@ where
         table: &'static str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
@@ -187,7 +191,7 @@ where
         let pk: Option<SqlVal> = self
             .client
             .try_borrow_mut()?
-            .query_raw(sql.as_str(), values.iter().map(sqlval_for_pg_query))?
+            .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query))?
             .map_err(Error::Postgres)
             .map(|r| sql_val_from_postgres(&r, 0, pkcol))
             .nth(0)?;
@@ -197,7 +201,7 @@ where
         &self,
         table: &'static str,
         columns: &[Column],
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
@@ -212,12 +216,12 @@ where
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
-    fn insert_or_replace(
+    fn insert_or_replace<'a>(
         &self,
         table: &'static str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef<'a>],
     ) -> Result<()> {
         let mut sql = String::new();
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
@@ -231,9 +235,9 @@ where
         &self,
         table: &'static str,
         pkcol: Column,
-        pk: SqlVal,
+        pk: SqlValRef,
         columns: &[Column],
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
         let mut sql = String::new();
         helper::sql_update_with_placeholders(
@@ -338,16 +342,34 @@ impl postgres::types::ToSql for SqlVal {
         postgres::types::IsNull,
         Box<dyn std::error::Error + 'static + Sync + Send>,
     > {
+        self.as_ref().to_sql(ty, out)
+    }
+    fn accepts(ty: &postgres::types::Type) -> bool {
+        SqlValRef::<'_>::accepts(ty)
+    }
+    postgres::types::to_sql_checked!();
+}
+
+impl<'a> postgres::types::ToSql for SqlValRef<'a> {
+    fn to_sql(
+        &self,
+        ty: &postgres::types::Type,
+        out: &mut bytes::BytesMut,
+    ) -> std::result::Result<
+        postgres::types::IsNull,
+        Box<dyn std::error::Error + 'static + Sync + Send>,
+    > {
+        use SqlValRef::*;
         match self {
-            SqlVal::Bool(b) => b.to_sql(ty, out),
-            SqlVal::Int(i) => i.to_sql(ty, out),
-            SqlVal::BigInt(i) => i.to_sql(ty, out),
-            SqlVal::Real(r) => r.to_sql(ty, out),
-            SqlVal::Text(t) => t.to_sql(ty, out),
-            SqlVal::Blob(b) => b.to_sql(ty, out),
+            Bool(b) => b.to_sql(ty, out),
+            Int(i) => i.to_sql(ty, out),
+            BigInt(i) => i.to_sql(ty, out),
+            Real(r) => r.to_sql(ty, out),
+            Text(t) => t.to_sql(ty, out),
+            Blob(b) => b.to_sql(ty, out),
             #[cfg(feature = "datetime")]
-            SqlVal::Timestamp(dt) => dt.to_sql(ty, out),
-            SqlVal::Null => Option::<bool>::None.to_sql(ty, out),
+            Timestamp(dt) => dt.to_sql(ty, out),
+            Null => Option::<bool>::None.to_sql(ty, out),
         }
     }
 

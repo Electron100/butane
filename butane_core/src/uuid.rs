@@ -1,12 +1,15 @@
 use crate::{
     Error::CannotConvertSqlVal, FieldType, FromSql, IntoSql, PrimaryKeyType, Result, SqlType,
-    SqlVal, ToSql,
+    SqlVal, SqlValRef, ToSql,
 };
 use uuid::Uuid;
 
 impl ToSql for Uuid {
     fn to_sql(&self) -> SqlVal {
         SqlVal::Blob(self.as_bytes().to_vec())
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Blob(self.as_bytes())
     }
 }
 impl IntoSql for Uuid {

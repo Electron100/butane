@@ -5,7 +5,7 @@ pub use butane_core::migrations;
 pub use butane_core::query;
 pub use butane_core::{
     AsPrimaryKey, DataObject, DataResult, Error, FieldType, FromSql, IntoSql, ObjectState, Result,
-    SqlType, SqlVal, ToSql,
+    SqlType, SqlVal, SqlValRef, ToSql,
 };
 
 pub mod db {

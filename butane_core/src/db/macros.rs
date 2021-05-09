@@ -3,7 +3,7 @@ macro_rules! connection_method_wrapper {
     ($ty:path) => {
         impl ConnectionMethods for $ty {
             fn execute(&self, sql: &str) -> Result<()> {
-                self.wrapped_connection_methods()?.execute(sql)
+                ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
             }
             fn query(
                 &self,

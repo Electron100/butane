@@ -70,8 +70,8 @@ impl SQLiteConnection {
 
     // For use with connection_method_wrapper macro
     #[allow(clippy::unnecessary_wraps)]
-    fn wrapped_connection_methods(&self) -> Result<GenericConnection> {
-        Ok(GenericConnection { conn: &self.conn })
+    fn wrapped_connection_methods(&self) -> Result<&rusqlite::Connection> {
+        Ok(&self.conn)
     }
 }
 connection_method_wrapper!(SQLiteConnection);
@@ -93,18 +93,12 @@ impl BackendConnection for SQLiteConnection {
     }
 }
 
-// Used to provide a single implementation of ConnectionMethods that
-// can be used across both SQLiteConnection and SQLiteTransaction
-struct GenericConnection<'a> {
-    conn: &'a rusqlite::Connection,
-}
-
-impl ConnectionMethods for GenericConnection<'_> {
+impl ConnectionMethods for rusqlite::Connection {
     fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
             debug!("execute sql {}", sql);
         }
-        self.conn.execute_batch(sql.as_ref())?;
+        self.execute_batch(sql.as_ref())?;
         Ok(())
     }
 
@@ -140,7 +134,7 @@ impl ConnectionMethods for GenericConnection<'_> {
 
         debug!("query sql {}", sqlquery);
 
-        let mut stmt = self.conn.prepare(&sqlquery)?;
+        let mut stmt = self.prepare(&sqlquery)?;
         let rows = stmt.query_and_then(rusqlite::params_from_iter(values), |row| {
             row_from_rusqlite(row, columns)
         })?;
@@ -163,9 +157,8 @@ impl ConnectionMethods for GenericConnection<'_> {
         if cfg!(feature = "log") {
             debug!("insert sql {}", sql);
         }
-        self.conn
-            .execute(&sql, rusqlite::params_from_iter(values))?;
-        let pk: SqlVal = self.conn.query_row_and_then(
+        self.execute(&sql, rusqlite::params_from_iter(values))?;
+        let pk: SqlVal = self.query_row_and_then(
             &format!(
                 "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
                 pkcol.name(),
@@ -192,8 +185,7 @@ impl ConnectionMethods for GenericConnection<'_> {
         if cfg!(feature = "log") {
             debug!("insert sql {}", sql);
         }
-        self.conn
-            .execute(&sql, rusqlite::params_from_iter(values))?;
+        self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(())
     }
     fn insert_or_replace(
@@ -205,8 +197,7 @@ impl ConnectionMethods for GenericConnection<'_> {
     ) -> Result<()> {
         let mut sql = String::new();
         sql_insert_or_update(table, columns, &mut sql);
-        self.conn
-            .execute(&sql, rusqlite::params_from_iter(values))?;
+        self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(())
     }
     fn update(
@@ -229,8 +220,7 @@ impl ConnectionMethods for GenericConnection<'_> {
         if cfg!(feature = "log") {
             debug!("update sql {}", sql);
         }
-        self.conn
-            .execute(&sql, rusqlite::params_from_iter(placeholder_values))?;
+        self.execute(&sql, rusqlite::params_from_iter(placeholder_values))?;
         Ok(())
     }
     fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
@@ -243,15 +233,12 @@ impl ConnectionMethods for GenericConnection<'_> {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
-        let cnt = self
-            .conn
-            .execute(&sql, rusqlite::params_from_iter(values))?;
+        let cnt = self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(cnt)
     }
     fn has_table(&self, table: &'static str) -> Result<bool> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
+        let mut stmt =
+            self.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
         let mut rows = stmt.query(&[table])?;
         Ok(rows.next()?.is_some())
     }
@@ -270,10 +257,8 @@ impl<'c> SqliteTransaction<'c> {
             Some(trans) => Ok(trans),
         }
     }
-    fn wrapped_connection_methods(&self) -> Result<GenericConnection> {
-        Ok(GenericConnection {
-            conn: self.get()?.deref(),
-        })
+    fn wrapped_connection_methods(&self) -> Result<&rusqlite::Connection> {
+        Ok(self.get()?.deref())
     }
 }
 connection_method_wrapper!(SqliteTransaction<'_>);

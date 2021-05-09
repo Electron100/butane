@@ -7,13 +7,12 @@ use crate::{Result, SqlType, SqlVal, SqlValRef};
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
 use postgres::fallible_iterator::FallibleIterator;
+use postgres::GenericClient;
 use std::cell::RefCell;
 use std::fmt::Write;
 
 #[cfg(feature = "debug")]
 use exec_time::exec_time;
-
-use crate::connection_method_wrapper;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
@@ -62,11 +61,6 @@ impl PgConnection {
             conn: RefCell::new(Self::connect(params)?),
         })
     }
-    // For use with the connection_method_wrapper macro
-    #[allow(clippy::unnecessary_wraps)]
-    fn wrapped_connection_methods(&self) -> Result<PgGenericClient<postgres::Client>> {
-        Ok(PgGenericClient { client: &self.conn })
-    }
     fn connect(params: &str) -> Result<postgres::Client> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "tls")] {
@@ -79,7 +73,12 @@ impl PgConnection {
         Ok(postgres::Client::connect(params, connector)?)
     }
 }
-connection_method_wrapper!(PgConnection);
+impl PgConnectionLike for PgConnection {
+    type Client = postgres::Client;
+    fn cell(&self) -> Result<&RefCell<Self::Client>> {
+        Ok(&self.conn)
+    }
+}
 impl BackendConnection for PgConnection {
     fn transaction<'c>(&'c mut self) -> Result<Transaction<'c>> {
         let trans: postgres::Transaction<'_> = self.conn.get_mut().transaction()?;
@@ -97,13 +96,6 @@ impl BackendConnection for PgConnection {
     }
 }
 
-struct PgGenericClient<'a, T>
-where
-    T: postgres::GenericClient,
-{
-    client: &'a RefCell<T>,
-}
-
 type DynToSqlPg<'a> = (dyn postgres::types::ToSql + Sync + 'a);
 
 fn sqlval_for_pg_query(v: &SqlVal) -> &dyn postgres::types::ToSql {
@@ -114,15 +106,22 @@ fn sqlvalref_for_pg_query<'a>(v: &'a SqlValRef<'a>) -> &'a dyn postgres::types::
     v as &dyn postgres::types::ToSql
 }
 
-impl<T> ConnectionMethods for PgGenericClient<'_, T>
+/// Shared functionality between connection and
+/// transaction. Implementation detail. Semver exempt.
+pub trait PgConnectionLike {
+    type Client: postgres::GenericClient;
+    fn cell(&self) -> Result<&RefCell<Self::Client>>;
+}
+
+impl<T> ConnectionMethods for T
 where
-    T: postgres::GenericClient,
+    T: PgConnectionLike,
 {
     fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
             debug!("execute sql {}", sql);
         }
-        self.client.borrow_mut().batch_execute(sql.as_ref())?;
+        self.cell()?.try_borrow_mut()?.batch_execute(sql.as_ref())?;
         Ok(())
     }
 
@@ -160,8 +159,8 @@ where
             debug!("query sql {}", sqlquery);
         }
 
-        let stmt = self.client.try_borrow_mut()?.prepare(&sqlquery)?;
-        self.client
+        let stmt = self.cell()?.try_borrow_mut()?.prepare(&sqlquery)?;
+        self.cell()?
             .try_borrow_mut()?
             .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))?
             .map_err(Error::Postgres)
@@ -189,7 +188,7 @@ where
 
         // use query instead of execute so we can get our result back
         let pk: Option<SqlVal> = self
-            .client
+            .cell()?
             .try_borrow_mut()?
             .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query))?
             .map_err(Error::Postgres)
@@ -211,7 +210,7 @@ where
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.client
+        self.cell()?
             .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
@@ -226,7 +225,7 @@ where
         let mut sql = String::new();
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.client
+        self.cell()?
             .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
@@ -255,7 +254,7 @@ where
         if cfg!(feature = "log") {
             debug!("update sql {}", sql);
         }
-        self.client
+        self.cell()?
             .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
@@ -272,7 +271,7 @@ where
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
         let cnt = self
-            .client
+            .cell()?
             .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(cnt as usize)
@@ -280,10 +279,10 @@ where
     fn has_table(&self, table: &'static str) -> Result<bool> {
         // future improvement, should be schema-aware
         let stmt = self
-            .client
+            .cell()?
             .try_borrow_mut()?
             .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;")?;
-        let rows = self.client.try_borrow_mut()?.query(&stmt, &[&table])?;
+        let rows = self.cell()?.try_borrow_mut()?.query(&stmt, &[&table])?;
         Ok(!rows.is_empty())
     }
 }
@@ -303,13 +302,13 @@ impl<'c> PgTransaction<'c> {
             Some(trans) => Ok(trans),
         }
     }
-    fn wrapped_connection_methods(&self) -> Result<PgGenericClient<'_, postgres::Transaction<'c>>> {
-        Ok(PgGenericClient {
-            client: self.get()?,
-        })
+}
+impl<'c> PgConnectionLike for PgTransaction<'c> {
+    type Client = postgres::Transaction<'c>;
+    fn cell(&self) -> Result<&RefCell<Self::Client>> {
+        self.get()
     }
 }
-connection_method_wrapper!(PgTransaction<'_>);
 
 impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
     fn commit(&mut self) -> Result<()> {

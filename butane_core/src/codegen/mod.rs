@@ -261,11 +261,7 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
         Some(ident) => *ident == "id",
         None => false,
     });
-    if let Some(id_field) = pk_by_name {
-        Some(id_field.clone())
-    } else {
-        None
-    }
+    pk_by_name.cloned()
 }
 
 fn is_auto(field: &Field) -> bool {

@@ -1,8 +1,8 @@
-use paste;
 use butane::db::Connection;
 use butane::prelude::*;
-use butane::{find, model, butane_type, query};
+use butane::{butane_type, find, model, query};
 use butane::{ForeignKey, ObjectState};
+use paste;
 
 mod common;
 
@@ -212,3 +212,54 @@ fn only_pk(conn: Connection) {
     obj.save(&conn).unwrap();
 }
 testall!(only_pk);
+
+fn basic_committed_transaction(mut conn: Connection) {
+    let tr = conn.transaction().unwrap();
+
+    // Create an object with a transaction and commit it
+    let mut foo = Foo::new(1);
+    foo.bar = 42;
+    foo.save(&tr).unwrap();
+    tr.commit().unwrap();
+
+    // Find the object
+    let foo2 = Foo::get(&conn, 1).unwrap();
+    assert_eq!(foo, foo2);
+}
+testall!(basic_committed_transaction);
+
+fn basic_dropped_transaction(mut conn: Connection) {
+    // Create an object with a transaction but never commit it
+    {
+        let tr = conn.transaction().unwrap();
+        let mut foo = Foo::new(1);
+        foo.bar = 42;
+        foo.save(&tr).unwrap();
+    }
+
+    // Find the object
+    match Foo::get(&conn, 1) {
+        Ok(_) => panic!("object should not exist"),
+        Err(butane::Error::NoSuchObject) => (),
+        Err(e) => panic!("Unexpected error {}", e),
+    }
+}
+testall!(basic_dropped_transaction);
+
+fn basic_rollback_transaction(mut conn: Connection) {
+    let tr = conn.transaction().unwrap();
+
+    // Create an object with a transaction but then roll back the transaction
+    let mut foo = Foo::new(1);
+    foo.bar = 42;
+    foo.save(&tr).unwrap();
+    tr.rollback().unwrap();
+
+    // Find the object
+    match Foo::get(&conn, 1) {
+        Ok(_) => panic!("object should not exist"),
+        Err(butane::Error::NoSuchObject) => (),
+        Err(e) => panic!("Unexpected error {}", e),
+    }
+}
+testall!(basic_rollback_transaction);

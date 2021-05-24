@@ -1,4 +1,5 @@
 //! Postgresql database backend
+use super::connmethods::VecRows;
 use super::helper;
 use super::*;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
@@ -10,9 +11,6 @@ use postgres::fallible_iterator::FallibleIterator;
 use postgres::GenericClient;
 use std::cell::RefCell;
 use std::fmt::Write;
-
-#[cfg(feature = "debug")]
-use exec_time::exec_time;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
@@ -125,15 +123,14 @@ where
         Ok(())
     }
 
-    #[cfg_attr(feature = "debug", exec_time)]
-    fn query(
-        &self,
+    fn query<'a, 'b, 'c: 'a>(
+        &'c self,
         table: &'static str,
-        columns: &[Column],
+        columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
         order: Option<&[query::Order]>,
-    ) -> Result<RawQueryResult> {
+    ) -> Result<RawQueryResult<'a>> {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
         let mut values: Vec<SqlVal> = Vec::new();
@@ -160,12 +157,18 @@ where
         }
 
         let stmt = self.cell()?.try_borrow_mut()?.prepare(&sqlquery)?;
-        self.cell()?
+        // todo avoid intermediate vec?
+        let rowvec: Vec<postgres::Row> = self
+            .cell()?
             .try_borrow_mut()?
             .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))?
             .map_err(Error::Postgres)
-            .map(|r| row_from_postgres(&r, columns))
-            .collect()
+            .map(|r| {
+                check_columns(&r, columns)?;
+                Ok(r)
+            })
+            .collect()?;
+        Ok(Box::new(VecRows::new(rowvec)))
     }
     fn insert_returning_pk(
         &self,
@@ -194,7 +197,7 @@ where
             .map_err(Error::Postgres)
             .map(|r| sql_val_from_postgres(&r, 0, pkcol))
             .nth(0)?;
-        pk.ok_or(Error::Internal)
+        pk.ok_or_else(|| Error::Internal("could not get pk".to_string()))
     }
     fn insert_only(
         &self,
@@ -298,9 +301,12 @@ impl<'c> PgTransaction<'c> {
     }
     fn get(&self) -> Result<&RefCell<postgres::Transaction<'c>>> {
         match &self.trans {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans),
         }
+    }
+    fn already_consumed() -> Error {
+        Error::Internal("transaction has already been consumed".to_string())
     }
 }
 impl<'c> PgConnectionLike for PgTransaction<'c> {
@@ -313,13 +319,13 @@ impl<'c> PgConnectionLike for PgTransaction<'c> {
 impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.into_inner().commit()?),
         }
     }
     fn rollback(&mut self) -> Result<()> {
         match self.trans.take() {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.into_inner().rollback()?),
         }
     }
@@ -396,21 +402,25 @@ impl<'a> postgres::types::ToSql for SqlValRef<'a> {
     postgres::types::to_sql_checked!();
 }
 
-impl<'a> postgres::types::FromSql<'a> for SqlVal {
+impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
     fn from_sql(
         ty: &postgres::types::Type,
         raw: &'a [u8],
     ) -> std::result::Result<Self, Box<dyn std::error::Error + 'static + Sync + Send>> {
         use postgres::types::Type;
         match *ty {
-            Type::BOOL => Ok(SqlVal::Bool(bool::from_sql(ty, raw)?)),
-            Type::INT4 => Ok(SqlVal::Int(i32::from_sql(ty, raw)?)),
-            Type::INT8 => Ok(SqlVal::BigInt(i64::from_sql(ty, raw)?)),
-            Type::FLOAT8 => Ok(SqlVal::Real(f64::from_sql(ty, raw)?)),
-            Type::TEXT => Ok(SqlVal::Text(String::from_sql(ty, raw)?)),
-            Type::BYTEA => Ok(SqlVal::Blob(Vec::<u8>::from_sql(ty, raw)?)),
+            Type::BOOL => Ok(SqlValRef::Bool(bool::from_sql(ty, raw)?)),
+            Type::INT4 => Ok(SqlValRef::Int(i32::from_sql(ty, raw)?)),
+            Type::INT8 => Ok(SqlValRef::BigInt(i64::from_sql(ty, raw)?)),
+            Type::FLOAT8 => Ok(SqlValRef::Real(f64::from_sql(ty, raw)?)),
+            Type::TEXT => Ok(SqlValRef::Text(postgres::types::FromSql::from_sql(
+                ty, raw,
+            )?)),
+            Type::BYTEA => Ok(SqlValRef::Blob(postgres::types::FromSql::from_sql(
+                ty, raw,
+            )?)),
             #[cfg(feature = "datetime")]
-            Type::TIMESTAMP => Ok(SqlVal::Timestamp(NaiveDateTime::from_sql(ty, raw)?)),
+            Type::TIMESTAMP => Ok(SqlValRef::Timestamp(NaiveDateTime::from_sql(ty, raw)?)),
             _ => Err(Box::new(Error::UnknownSqlType(format!("{}", ty)))),
         }
     }
@@ -418,7 +428,7 @@ impl<'a> postgres::types::FromSql<'a> for SqlVal {
     fn from_sql_null(
         _ty: &postgres::types::Type,
     ) -> std::result::Result<Self, Box<dyn std::error::Error + 'static + Sync + Send>> {
-        Ok(SqlVal::Null)
+        Ok(SqlValRef::Null)
     }
 
     #[allow(clippy::match_like_matches_macro)]
@@ -440,21 +450,25 @@ impl<'a> postgres::types::FromSql<'a> for SqlVal {
     }
 }
 
-fn row_from_postgres(row: &postgres::Row, cols: &[Column]) -> Result<Row> {
-    let mut vals: Vec<SqlVal> = Vec::new();
+fn check_columns(row: &postgres::Row, cols: &[Column]) -> Result<()> {
     if cols.len() != row.len() {
-        panic!(
+        Err(Error::Internal(format!(
             "postgres returns columns {} doesn't match requested columns {}",
             row.len(),
             cols.len()
-        )
+        )))
+    } else {
+        Ok(())
     }
-    vals.reserve(cols.len());
-    for i in 0..cols.len() {
-        let col = cols.get(i).unwrap();
-        vals.push(sql_val_from_postgres(row, i, col)?);
+}
+
+impl BackendRow for postgres::Row {
+    fn get(&self, idx: usize, _ty: SqlType) -> Result<SqlValRef> {
+        Ok(self.try_get(idx)?)
     }
-    Ok(Row::new(vals))
+    fn len(&self) -> usize {
+        postgres::Row::len(self)
+    }
 }
 
 fn sql_for_expr<W>(
@@ -472,7 +486,8 @@ fn sql_val_from_postgres<I>(row: &postgres::Row, idx: I, col: &Column) -> Result
 where
     I: postgres::row::RowIndex + std::fmt::Display,
 {
-    let sqlval: SqlVal = row.try_get(idx)?;
+    let sqlref: SqlValRef = row.try_get(idx)?;
+    let sqlval: SqlVal = sqlref.into();
     if sqlval.is_compatible(col.ty(), true) {
         Ok(sqlval)
     } else {

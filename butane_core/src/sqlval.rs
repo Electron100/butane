@@ -162,6 +162,7 @@ pub trait FromSql {
     where
         Self: Sized;
 
+    //todo
     fn from_sql_ref(val: SqlValRef<'_>) -> Result<Self>
     where
         Self: Sized,

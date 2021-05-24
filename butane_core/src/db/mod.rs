@@ -37,7 +37,9 @@ pub use r2::ConnectionManager;
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
 
-pub use connmethods::{Column, ConnectionMethods, QueryResult, RawQueryResult, Row};
+pub use connmethods::{
+    BackendRow, BackendRows, Column, ConnectionMethods, QueryResult, RawQueryResult,
+};
 
 /// Database connection.
 pub trait BackendConnection: ConnectionMethods + Send + 'static {
@@ -200,4 +202,5 @@ impl<'c> Transaction<'c> {
         Ok(a.connection_methods())
     }
 }
+
 connection_method_wrapper!(Transaction<'_>);

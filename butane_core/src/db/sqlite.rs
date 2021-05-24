@@ -1,6 +1,7 @@
 //! SQLite database backend
 use super::helper;
 use super::*;
+use crate::db::connmethods::BackendRows;
 use crate::debug;
 use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
 use crate::query;
@@ -8,10 +9,10 @@ use crate::query::Order;
 use crate::{Result, SqlType, SqlVal, SqlValRef};
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
+use fallible_streaming_iterator::FallibleStreamingIterator;
+use pin_project::pin_project;
 use std::fmt::Write;
-
-#[cfg(feature = "debug")]
-use exec_time::exec_time;
+use std::pin::Pin;
 
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -102,15 +103,14 @@ impl ConnectionMethods for rusqlite::Connection {
         Ok(())
     }
 
-    #[cfg_attr(feature = "debug", exec_time)]
-    fn query(
-        &self,
+    fn query<'a, 'b, 'c: 'a>(
+        &'c self,
         table: &'static str,
-        columns: &[Column],
+        columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
         order: Option<&[Order]>,
-    ) -> Result<RawQueryResult> {
+    ) -> Result<RawQueryResult<'a>> {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
         let mut values: Vec<SqlVal> = Vec::new();
@@ -134,11 +134,9 @@ impl ConnectionMethods for rusqlite::Connection {
 
         debug!("query sql {}", sqlquery);
 
-        let mut stmt = self.prepare(&sqlquery)?;
-        let rows = stmt.query_and_then(rusqlite::params_from_iter(values), |row| {
-            row_from_rusqlite(row, columns)
-        })?;
-        rows.collect()
+        let stmt = self.prepare(&sqlquery)?;
+        let adapter = QueryAdapter::new(stmt, rusqlite::params_from_iter(values))?;
+        Ok(Box::new(adapter))
     }
     fn insert_returning_pk(
         &self,
@@ -253,25 +251,28 @@ impl<'c> SqliteTransaction<'c> {
     }
     fn get(&self) -> Result<&rusqlite::Transaction<'c>> {
         match &self.trans {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans),
         }
     }
     fn wrapped_connection_methods(&self) -> Result<&rusqlite::Connection> {
         Ok(self.get()?.deref())
     }
+    fn already_consumed() -> Error {
+        Error::Internal("transaction has already been consumed".to_string())
+    }
 }
 connection_method_wrapper!(SqliteTransaction<'_>);
 impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.commit()?),
         }
     }
     fn rollback(&mut self) -> Result<()> {
         match self.trans.take() {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.rollback()?),
         }
     }
@@ -315,21 +316,75 @@ fn sqlvalref_to_sqlite<'a, 'b>(valref: &'b SqlValRef<'a>) -> rusqlite::types::To
     }
 }
 
-fn row_from_rusqlite(row: &rusqlite::Row, cols: &[Column]) -> Result<Row> {
-    let mut vals: Vec<SqlVal> = Vec::new();
-    if cols.len() != row.column_count() {
-        panic!(
-            "sqlite returns columns {} doesn't match requested columns {}",
-            row.column_count(),
-            cols.len()
-        )
+#[pin_project]
+struct QueryAdapterInner<'a> {
+    stmt: rusqlite::Statement<'a>,
+    // will always be Some when the constructor has finished. We use an option only to get the
+    // stmt in place before we can reference it.
+    rows: Option<rusqlite::Rows<'a>>,
+}
+
+impl<'a> QueryAdapterInner<'a> {
+    fn new(stmt: rusqlite::Statement<'a>, params: impl rusqlite::Params) -> Result<Pin<Box<Self>>> {
+        let mut q = Box::pin(QueryAdapterInner { stmt, rows: None });
+        unsafe {
+            //Soundness: we pin a QueryAdapterInner value containing
+            //  both the stmt and the rows referencing the statement
+            //  together. It is not possible to drop/move the stmt without
+            //  bringing the referencing rows along with it.
+            let q_ref = Pin::get_unchecked_mut(Pin::as_mut(&mut q));
+            let stmt_ref: *mut rusqlite::Statement<'a> = &mut q_ref.stmt;
+            q_ref.rows = Some((&mut *stmt_ref).query(params)?)
+        }
+        Ok(q)
     }
-    vals.reserve(cols.len());
-    for i in 0..cols.len() {
-        let col = cols.get(i).unwrap();
-        vals.push(sql_val_from_rusqlite(row.get_ref_unwrap(i), col)?);
+
+    fn next<'b>(self: Pin<&'b mut Self>) -> Result<Option<&'b rusqlite::Row<'b>>> {
+        let this = self.project();
+        let rows: &mut rusqlite::Rows<'a> = this.rows.as_mut().unwrap();
+        Ok(rows.next()?)
     }
-    Ok(Row::new(vals))
+
+    fn current(self: Pin<&Self>) -> Option<&rusqlite::Row> {
+        let this = self.project_ref();
+        this.rows.as_ref().unwrap().get()
+    }
+}
+
+struct QueryAdapter<'a> {
+    inner: Pin<Box<QueryAdapterInner<'a>>>,
+}
+impl<'a> QueryAdapter<'a> {
+    fn new(stmt: rusqlite::Statement<'a>, params: impl rusqlite::Params) -> Result<Self> {
+        Ok(QueryAdapter {
+            inner: QueryAdapterInner::new(stmt, params)?,
+        })
+    }
+}
+
+impl<'a> BackendRows for QueryAdapter<'a> {
+    fn next<'b>(&'b mut self) -> Result<Option<&'b (dyn BackendRow + 'b)>> {
+        Ok(self
+            .inner
+            .as_mut()
+            .next()?
+            .map(|row| row as &dyn BackendRow))
+    }
+    fn current<'b>(&'b self) -> Option<&'b (dyn BackendRow + 'b)> {
+        self.inner
+            .as_ref()
+            .current()
+            .map(|row| row as &dyn BackendRow)
+    }
+}
+
+impl BackendRow for rusqlite::Row<'_> {
+    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef> {
+        sql_valref_from_rusqlite(self.get_ref(idx)?, ty)
+    }
+    fn len(&self) -> usize {
+        self.column_count()
+    }
 }
 
 fn sql_for_expr<W>(
@@ -344,31 +399,25 @@ fn sql_for_expr<W>(
 }
 
 fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result<SqlVal> {
+    sql_valref_from_rusqlite(val, col.ty()).map(|v| v.into())
+}
+
+fn sql_valref_from_rusqlite(val: rusqlite::types::ValueRef, ty: SqlType) -> Result<SqlValRef> {
     if let rusqlite::types::ValueRef::Null = val {
-        return Ok(SqlVal::Null);
+        return Ok(SqlValRef::Null);
     }
-    let ret = || -> Result<SqlVal> {
-        Ok(match col.ty() {
-            SqlType::Bool => SqlVal::Bool(val.as_i64()? != 0),
-            SqlType::Int => SqlVal::Int(val.as_i64()? as i32),
-            SqlType::BigInt => SqlVal::BigInt(val.as_i64()?),
-            SqlType::Real => SqlVal::Real(val.as_f64()?),
-            SqlType::Text => SqlVal::Text(val.as_str()?.to_string()),
-            #[cfg(feature = "datetime")]
-            SqlType::Timestamp => SqlVal::Timestamp(NaiveDateTime::parse_from_str(
-                val.as_str()?,
-                SQLITE_DT_FORMAT,
-            )?),
-            SqlType::Blob => SqlVal::Blob(val.as_blob()?.into()),
-        })
-    }();
-    // Automatic error conversion won't have preserved the column name for any errors
-    ret.map_err(|e| match e {
-        Error::SqlResultTypeMismatch { .. } => Error::SqlResultTypeMismatch {
-            col: col.name().to_string(),
-            detail: String::new(),
-        },
-        e => e,
+    Ok(match ty {
+        SqlType::Bool => SqlValRef::Bool(val.as_i64()? != 0),
+        SqlType::Int => SqlValRef::Int(val.as_i64()? as i32),
+        SqlType::BigInt => SqlValRef::BigInt(val.as_i64()?),
+        SqlType::Real => SqlValRef::Real(val.as_f64()?),
+        SqlType::Text => SqlValRef::Text(val.as_str()?),
+        #[cfg(feature = "datetime")]
+        SqlType::Timestamp => SqlValRef::Timestamp(NaiveDateTime::parse_from_str(
+            val.as_str()?,
+            SQLITE_DT_FORMAT,
+        )?),
+        SqlType::Blob => SqlValRef::Blob(val.as_blob()?),
     })
 }
 

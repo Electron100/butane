@@ -1,9 +1,11 @@
 //! For working with migrations. If using the butane CLI tool, it is
 //! not necessary to use these types directly.
-use crate::db::{Column, ConnectionMethods, Row};
+use crate::db::BackendRows;
+use crate::db::{Column, ConnectionMethods};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
 
+use fallible_iterator::FallibleIterator;
 use std::path::Path;
 
 pub mod adb;
@@ -77,7 +79,7 @@ pub trait Migrations {
         if !conn.has_table(ButaneMigration::TABLE)? {
             return Ok(None);
         }
-        let migrations: Result<Vec<ButaneMigration>> = conn
+        let migrations: Vec<ButaneMigration> = conn
             .query(
                 ButaneMigration::TABLE,
                 ButaneMigration::COLUMNS,
@@ -85,10 +87,8 @@ pub trait Migrations {
                 None,
                 None,
             )?
-            .into_iter()
-            .map(ButaneMigration::from_row)
-            .collect();
-        let migrations = migrations?;
+            .mapped(ButaneMigration::from_row)
+            .collect()?;
 
         let mut m_opt = self.latest();
         while let Some(m) = m_opt {
@@ -208,15 +208,14 @@ struct ButaneMigration {
 impl DataResult for ButaneMigration {
     type DBO = Self;
     const COLUMNS: &'static [Column] = &[Column::new("name", SqlType::Text)];
-    fn from_row(row: Row) -> Result<Self> {
+    fn from_row(row: &dyn db::BackendRow) -> Result<Self> {
         if row.len() != 1usize {
             return Err(Error::BoundsError(
                 "Row has the wrong number of columns for this DataResult".to_string(),
             ));
         }
-        let mut it = row.into_iter();
         Ok(ButaneMigration {
-            name: FromSql::from_sql(it.next().unwrap())?,
+            name: FromSql::from_sql_ref(row.get(0, SqlType::Text).unwrap())?,
         })
     }
     fn query() -> query::Query<Self> {

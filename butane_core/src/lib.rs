@@ -17,7 +17,7 @@ pub mod sqlval;
 #[cfg(feature = "uuid")]
 pub mod uuid;
 
-use db::{Column, ConnectionMethods, Row};
+use db::{BackendRow, Column, ConnectionMethods};
 
 pub use query::Query;
 pub use sqlval::*;
@@ -55,7 +55,7 @@ pub trait DataResult: Sized {
     /// Corresponding object type.
     type DBO: DataObject;
     const COLUMNS: &'static [Column];
-    fn from_row(row: Row) -> Result<Self>
+    fn from_row<'a>(row: &(dyn BackendRow + 'a)) -> Result<Self>
     where
         Self: Sized;
     /// Create a blank query (matching all rows) for this type.
@@ -129,8 +129,8 @@ pub enum Error {
     UnknownBackend(String),
     #[error("Range error")]
     OutOfRange,
-    #[error("Internal logic error")]
-    Internal,
+    #[error("Internal logic error {0}")]
+    Internal(String),
     #[error("Cannot resolve type {0}. Are you missing a #[butane_type] attribute?")]
     CannotResolveType(String),
     #[error("Auto fields are only supported for integer fields. {0} cannot be auto.")]

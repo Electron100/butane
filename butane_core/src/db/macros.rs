@@ -5,14 +5,14 @@ macro_rules! connection_method_wrapper {
             fn execute(&self, sql: &str) -> Result<()> {
                 ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
             }
-            fn query(
-                &self,
+            fn query<'a, 'b, 'c: 'a>(
+                &'c self,
                 table: &'static str,
-                columns: &[Column],
+                columns: &'b [Column],
                 expr: Option<BoolExpr>,
                 limit: Option<i32>,
                 sort: Option<&[crate::query::Order]>,
-            ) -> Result<RawQueryResult> {
+            ) -> Result<RawQueryResult<'a>> {
                 self.wrapped_connection_methods()?
                     .query(table, columns, expr, limit, sort)
             }

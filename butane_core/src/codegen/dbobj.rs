@@ -177,12 +177,11 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident) -> TokenStream2 {
                         const COLUMNS: &'static [butane::db::Column] = &[
                                 #cols
                         ];
-                        fn from_row(mut row: butane::db::Row) -> butane::Result<Self> {
+                        fn from_row(mut row: &dyn butane::db::BackendRow) -> butane::Result<Self> {
                                 if row.len() != #numdbfields {
                                         return Err(butane::Error::BoundsError(
                                                 "Found unexpected number of columns in row for DataResult".to_string()));
                                 }
-                                let mut it = row.into_iter();
                                 #ctor
                                 #many_init
                                 Ok(obj)
@@ -300,11 +299,18 @@ fn fields_type(tyname: &Ident) -> Ident {
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
+    let mut i: usize = 0;
     fields(&ast_struct)
         .map(|f| {
             let ident = f.ident.clone().unwrap();
             if is_row_field(f) {
-                quote!(#ident: butane::FromSql::from_sql(it.next().unwrap())?)
+                let fty = &f.ty;
+                let ret = quote!(
+                        #ident: butane::FromSql::from_sql_ref(
+                                row.get(#i, <#fty as butane::FieldType>::SQLTYPE)?)?
+                );
+                i += 1;
+                ret
             } else if is_many_to_many(f) {
                 quote!(#ident: butane::Many::new())
             } else {

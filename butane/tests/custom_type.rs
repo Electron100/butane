@@ -32,20 +32,20 @@ impl IntoSql for Frobnozzle {
     }
 }
 impl FromSql for Frobnozzle {
-    fn from_sql(val: SqlVal) -> Result<Self, butane::Error> {
+    fn from_sql_ref(val: SqlValRef) -> Result<Self, butane::Error> {
         match val {
-            SqlVal::Text(ref s) => match s.as_ref() {
+            SqlValRef::Text(s) => match s {
                 "Foo" => Ok(Self::Foo),
                 "Bar" => Ok(Self::Bar),
                 "Baz" => Ok(Self::Baz),
                 _ => Err(butane::Error::CannotConvertSqlVal(
                     SqlType::Text,
-                    val.clone(),
+                    val.into(),
                 )),
             },
             _ => Err(butane::Error::CannotConvertSqlVal(
                 SqlType::Text,
-                val.clone(),
+                val.into(),
             )),
         }
     }

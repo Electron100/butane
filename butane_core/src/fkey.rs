@@ -46,7 +46,7 @@ impl<T: DataObject> ForeignKey<T> {
         match self.val.get() {
             Some(v) => v.pk().clone(),
             None => match self.valpk.get() {
-                Some(pk) => T::PKType::from_sql(pk.clone()).unwrap(),
+                Some(pk) => T::PKType::from_sql_ref(pk.as_ref()).unwrap(),
                 None => panic!("Invalid foreign key state"),
             },
         }
@@ -56,8 +56,8 @@ impl<T: DataObject> ForeignKey<T> {
     /// database if necessary and returns a reference to it.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
         self.val.get_or_try_init(|| {
-            let pk: SqlVal = self.valpk.get().unwrap().clone();
-            T::get(conn, &T::PKType::from_sql(pk)?)
+            let pk = self.valpk.get().unwrap();
+            T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?)
         })
     }
 
@@ -151,9 +151,9 @@ impl<T> FromSql for ForeignKey<T>
 where
     T: DataObject,
 {
-    fn from_sql(val: SqlVal) -> Result<Self> {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
         Ok(ForeignKey {
-            valpk: val.into(),
+            valpk: SqlVal::from(valref).into(),
             val: OnceCell::new(),
         })
     }

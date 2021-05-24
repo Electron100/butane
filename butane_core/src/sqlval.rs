@@ -158,16 +158,21 @@ where
 ///
 /// The `SqlVal` is consumed.
 pub trait FromSql {
-    fn from_sql(val: SqlVal) -> Result<Self>
+    /// Used to convert a SqlValRef into another type.
+    fn from_sql_ref(val: SqlValRef<'_>) -> Result<Self>
     where
         Self: Sized;
 
-    //todo
-    fn from_sql_ref(val: SqlValRef<'_>) -> Result<Self>
+    /// Used to convert a SqlVal into another type. The default
+    /// implementation calls `Self::from_sql_ref(val.as_ref())`, which
+    /// may be inefficient. This method is chiefly used only for
+    /// primary keys: a more efficient implementation is unlikely to
+    /// provide benefits for types not used as primary keys.
+    fn from_sql(val: SqlVal) -> Result<Self>
     where
         Self: Sized,
     {
-        Self::from_sql(val.into())
+        Self::from_sql_ref(val.as_ref())
     }
 }
 
@@ -232,17 +237,30 @@ where
     }
 }
 
+macro_rules! sql_conv_err {
+    ($val:ident, $sqltype:ident) => {
+        Err(crate::Error::CannotConvertSqlVal(
+            SqlType::$sqltype,
+            $val.into(),
+        ))
+    };
+}
+
 macro_rules! impl_basic_from_sql {
     ($prim:ty, $variant:ident, $sqltype:ident) => {
         impl FromSql for $prim {
+            fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+                if let SqlValRef::$variant(val) = valref {
+                    Ok(val as $prim)
+                } else {
+                    sql_conv_err!(valref, $sqltype)
+                }
+            }
             fn from_sql(val: SqlVal) -> Result<Self> {
                 if let SqlVal::$variant(val) = val {
                     Ok(val as $prim)
                 } else {
-                    Err(crate::Error::CannotConvertSqlVal(
-                        SqlType::$sqltype,
-                        val.clone(),
-                    ))
+                    sql_conv_err!(val, $sqltype)
                 }
             }
         }
@@ -289,7 +307,22 @@ impl_prim_sql!(i8, Int, Int);
 impl_prim_sql!(f64, Real, Real);
 impl_prim_sql!(f32, Real, Real);
 
-impl_basic_from_sql!(String, Text, Text);
+impl FromSql for String {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+        if let SqlValRef::Text(val) = valref {
+            Ok(val.to_string())
+        } else {
+            sql_conv_err!(valref, Text)
+        }
+    }
+    fn from_sql(val: SqlVal) -> Result<Self> {
+        if let SqlVal::Text(val) = val {
+            Ok(val)
+        } else {
+            sql_conv_err!(val, Text)
+        }
+    }
+}
 impl ToSql for String {
     fn to_sql(&self) -> SqlVal {
         SqlVal::Text(self.clone())
@@ -309,7 +342,22 @@ impl FieldType for String {
 }
 impl PrimaryKeyType for String {}
 
-impl_basic_from_sql!(Vec<u8>, Blob, Blob);
+impl FromSql for Vec<u8> {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+        if let SqlValRef::Blob(val) = valref {
+            Ok(Vec::from(val))
+        } else {
+            sql_conv_err!(valref, Blob)
+        }
+    }
+    fn from_sql(val: SqlVal) -> Result<Self> {
+        if let SqlVal::Blob(val) = val {
+            Ok(val)
+        } else {
+            sql_conv_err!(val, Blob)
+        }
+    }
+}
 impl ToSql for Vec<u8> {
     fn to_sql(&self) -> SqlVal {
         SqlVal::Blob(self.clone())
@@ -403,10 +451,10 @@ impl<T> FromSql for Option<T>
 where
     T: FromSql,
 {
-    fn from_sql(val: SqlVal) -> Result<Self> {
-        Ok(match val {
-            SqlVal::Null => None,
-            _ => Some(T::from_sql(val)?),
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+        Ok(match valref {
+            SqlValRef::Null => None,
+            _ => Some(T::from_sql_ref(valref)?),
         })
     }
 }

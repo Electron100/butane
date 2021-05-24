@@ -18,24 +18,27 @@ impl IntoSql for Uuid {
     }
 }
 impl FromSql for Uuid {
-    fn from_sql(val: SqlVal) -> Result<Self> {
-        match val {
-            SqlVal::Blob(ref bytes) => {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+        match valref {
+            SqlValRef::Blob(bytes) => {
                 if let Ok(uuid) = Uuid::from_slice(&bytes) {
                     return Ok(uuid);
                 }
             }
             // Generally we expect uuid to be a blob, but if we get a
             // string we can try to work with it.
-            SqlVal::Text(ref text) => {
+            SqlValRef::Text(text) => {
                 if let Ok(uuid) = Uuid::parse_str(&text) {
                     return Ok(uuid);
                 }
             }
             _ => (),
         }
-        Err(CannotConvertSqlVal(SqlType::Blob, val))
+        Err(CannotConvertSqlVal(SqlType::Blob, valref.into()))
     }
+    // No point in implementing a `from_sql` method for greater
+    // efficiency since to construct the UUID we always end up copying
+    // the bytes.
 }
 
 impl FieldType for Uuid {

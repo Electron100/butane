@@ -7,6 +7,21 @@ use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Seriali
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
+/// Identifier for a type as used in a database column. Supports both
+/// [SqlType](crate::SqlType) and identifiers known only by name. The
+/// latter is used for custom types. `SqlType::Custom` cannot easily be used
+/// directly at compile time when the proc macro serializing type information runs.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum TypeIdentifier {
+    Ty(SqlType),
+    Name(String),
+}
+impl From<SqlType> for TypeIdentifier {
+    fn from(ty: SqlType) -> Self {
+        TypeIdentifier::Ty(ty)
+    }
+}
+
 /// Key used to help resolve `DeferredSqlType`
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TypeKey {
@@ -89,7 +104,7 @@ impl Ord for TypeKey {
 #[derive(Debug)]
 struct TypeResolver {
     // The types of some columns may not be known right away
-    types: HashMap<TypeKey, SqlType>,
+    types: HashMap<TypeKey, TypeIdentifier>,
 }
 impl TypeResolver {
     fn new() -> Self {
@@ -97,10 +112,10 @@ impl TypeResolver {
             types: HashMap::new(),
         }
     }
-    fn find_type(&self, key: &TypeKey) -> Option<SqlType> {
-        self.types.get(key).copied()
+    fn find_type(&self, key: &TypeKey) -> Option<TypeIdentifier> {
+        self.types.get(key).cloned()
     }
-    fn insert(&mut self, key: TypeKey, ty: SqlType) -> bool {
+    fn insert(&mut self, key: TypeKey, ty: TypeIdentifier) -> bool {
         use std::collections::hash_map::Entry;
         let entry = self.types.entry(key);
         match entry {
@@ -111,7 +126,7 @@ impl TypeResolver {
             }
         }
     }
-    fn insert_pk(&mut self, key: &str, ty: SqlType) -> bool {
+    fn insert_pk(&mut self, key: &str, ty: TypeIdentifier) -> bool {
         self.insert(TypeKey::PK(key.to_string()), ty)
     }
 }
@@ -157,9 +172,9 @@ impl ADB {
             changed = false;
             for table in &mut self.tables.values_mut() {
                 if let Some(pk) = table.pk() {
-                    let pktype = pk.sqltype();
+                    let pktype = pk.typeid();
                     if let Ok(pktype) = pktype {
-                        changed |= resolver.insert_pk(&table.name, pktype);
+                        changed |= resolver.insert_pk(&table.name, pktype.clone());
                     }
                 }
                 for col in &mut table.columns {
@@ -169,11 +184,14 @@ impl ADB {
             for (key, ty) in self.extra_types.iter_mut() {
                 match ty {
                     DeferredSqlType::Known(ty) => {
-                        changed |= resolver.insert(key.clone(), *ty) || changed;
+                        changed |= resolver.insert(key.clone(), ty.clone().into()) || changed;
+                    }
+                    DeferredSqlType::KnownId(ty) => {
+                        changed |= resolver.insert(key.clone(), ty.clone()) || changed;
                     }
                     DeferredSqlType::Deferred(tykey) => {
                         if let Some(sqltype) = resolver.find_type(tykey) {
-                            *ty = DeferredSqlType::Known(sqltype);
+                            *ty = sqltype.into();
                             changed = true;
                         }
                     }
@@ -255,17 +273,31 @@ impl ATable {
 /// SqlType which may not yet be known.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DeferredSqlType {
-    Known(SqlType),
+    Known(SqlType), // Kept for backwards deserialization compat, supplanted by KnownId
+    KnownId(TypeIdentifier),
     Deferred(TypeKey),
 }
 impl DeferredSqlType {
-    fn resolve(&self, resolver: &TypeResolver) -> Result<SqlType> {
+    fn resolve(&self, resolver: &TypeResolver) -> Result<TypeIdentifier> {
         match self {
-            DeferredSqlType::Known(t) => Ok(*t),
+            DeferredSqlType::KnownId(t) => Ok(t.clone()),
+            DeferredSqlType::Known(t) => Ok(t.clone().into()),
             DeferredSqlType::Deferred(key) => resolver
                 .find_type(&key)
                 .ok_or_else(|| crate::Error::UnknownSqlType(key.to_string())),
         }
+    }
+    fn is_known(&self) -> bool {
+        match self {
+            DeferredSqlType::Known(_) => true,
+            DeferredSqlType::KnownId(_) => true,
+            DeferredSqlType::Deferred(_) => false,
+        }
+    }
+}
+impl From<TypeIdentifier> for DeferredSqlType {
+    fn from(id: TypeIdentifier) -> Self {
+        DeferredSqlType::KnownId(id)
     }
 }
 
@@ -313,19 +345,20 @@ impl AColumn {
     pub fn default(&self) -> &Option<SqlVal> {
         &self.default
     }
-    pub fn sqltype(&self) -> Result<SqlType> {
+    pub fn typeid(&self) -> Result<TypeIdentifier> {
         match &self.sqltype {
-            DeferredSqlType::Known(t) => Ok(*t),
+            DeferredSqlType::KnownId(t) => Ok(t.clone()),
+            DeferredSqlType::Known(t) => Ok(t.clone().into()),
             DeferredSqlType::Deferred(t) => Err(crate::Error::UnknownSqlType(t.to_string())),
         }
     }
     /// Returns true if the type was previously unresolved but is now resolved
     fn resolve_type(&mut self, resolver: &'_ TypeResolver) -> bool {
-        if let DeferredSqlType::Known(_) = self.sqltype {
+        if self.sqltype.is_known() {
             // Already resolved, nothing to do
             false
         } else if let Ok(ty) = self.sqltype.resolve(resolver) {
-            self.sqltype = DeferredSqlType::Known(ty);
+            self.sqltype = DeferredSqlType::KnownId(ty);
             true
         } else {
             false

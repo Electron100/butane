@@ -1,6 +1,6 @@
 use butane::migrations::{
-    adb::DeferredSqlType, adb::TypeKey, MemMigrations, Migration, MigrationMut, Migrations,
-    MigrationsMut,
+    adb::DeferredSqlType, adb::TypeIdentifier, adb::TypeKey, MemMigrations, Migration,
+    MigrationMut, Migrations, MigrationsMut,
 };
 use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
@@ -29,7 +29,7 @@ fn current_migration_basic() {
     assert!(!idcol.nullable());
     assert!(idcol.is_pk());
     assert_eq!(*idcol.default(), None);
-    assert_eq!(idcol.sqltype().unwrap(), SqlType::BigInt);
+    assert_eq!(idcol.typeid().unwrap(), TypeIdentifier::Ty(SqlType::BigInt));
     assert!(!idcol.is_auto());
 
     let barcol = table.column("bar").unwrap();
@@ -37,7 +37,7 @@ fn current_migration_basic() {
     assert!(!barcol.nullable());
     assert!(!barcol.is_pk());
     assert_eq!(*barcol.default(), None);
-    assert_eq!(barcol.sqltype().unwrap(), SqlType::Text);
+    assert_eq!(barcol.typeid().unwrap(), TypeIdentifier::Ty(SqlType::Text));
     assert!(!barcol.is_auto());
 
     assert_eq!(table.pk(), Some(idcol))
@@ -122,7 +122,7 @@ fn current_migration_nullable_col() {
     let table = db.get_table("Foo").expect("No Foo table");
     let col = table.column("bar").unwrap();
     assert!(col.nullable());
-    assert_eq!(col.sqltype().unwrap(), SqlType::Text);
+    assert_eq!(col.typeid().unwrap(), TypeIdentifier::Ty(SqlType::Text));
 }
 
 #[test]
@@ -153,13 +153,13 @@ fn current_migration_custom_type() {
     assert_eq!(
         db.types()
             .get(&TypeKey::CustomType("Frobnozzle".to_string())),
-        Some(&DeferredSqlType::Known(SqlType::Text))
+        Some(&DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Text)))
     );
     let table = db
         .get_table("HasCustomField")
         .expect("No HasCustomField table");
     let col = table.column("frob").expect("No frob field");
-    assert_eq!(col.sqltype().unwrap(), SqlType::Text);
+    assert_eq!(col.typeid().unwrap(), TypeIdentifier::Ty(SqlType::Text));
 }
 
 #[cfg(feature = "sqlite")]

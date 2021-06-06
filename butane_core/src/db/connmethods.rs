@@ -72,8 +72,8 @@ impl Column {
     pub fn name(&self) -> &'static str {
         self.name
     }
-    pub fn ty(&self) -> SqlType {
-        self.ty
+    pub fn ty(&self) -> &SqlType {
+        &self.ty
     }
 }
 

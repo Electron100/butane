@@ -4,9 +4,10 @@
 #![allow(unused)]
 
 use super::Column;
-use crate::migrations::adb::AColumn;
+use crate::migrations::adb::{AColumn, TypeIdentifier};
 use crate::query::Expr::{Condition, Placeholder, Val};
 use crate::query::{BoolExpr::*, Expr, Join, Order, OrderDirection};
+use crate::Error;
 use crate::{query, Result, SqlType, SqlVal};
 use std::borrow::Cow;
 use std::fmt::Write;
@@ -183,15 +184,19 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
     if col.nullable() {
         return Ok(SqlVal::Null);
     }
-    Ok(match col.sqltype()? {
-        SqlType::Bool => SqlVal::Bool(false),
-        SqlType::Int => SqlVal::Int(0),
-        SqlType::BigInt => SqlVal::Int(0),
-        SqlType::Real => SqlVal::Real(0.0),
-        SqlType::Text => SqlVal::Text("".to_string()),
-        SqlType::Blob => SqlVal::Blob(Vec::new()),
-        #[cfg(feature = "datetime")]
-        SqlType::Timestamp => SqlVal::Timestamp(NaiveDateTime::from_timestamp(0, 0)),
+    Ok(match col.typeid()? {
+        TypeIdentifier::Ty(ty) => match ty {
+            SqlType::Bool => SqlVal::Bool(false),
+            SqlType::Int => SqlVal::Int(0),
+            SqlType::BigInt => SqlVal::Int(0),
+            SqlType::Real => SqlVal::Real(0.0),
+            SqlType::Text => SqlVal::Text("".to_string()),
+            SqlType::Blob => SqlVal::Blob(Vec::new()),
+            #[cfg(feature = "datetime")]
+            SqlType::Timestamp => SqlVal::Timestamp(NaiveDateTime::from_timestamp(0, 0)),
+            SqlType::Custom(_) => return Err(Error::NoCustomDefault),
+        },
+        TypeIdentifier::Name(_) => return Err(Error::NoCustomDefault),
     })
 }
 
@@ -227,17 +232,18 @@ fn sql_column(col: query::Column, w: &mut impl Write) {
     .unwrap()
 }
 
-pub fn sql_literal_value(val: SqlVal) -> String {
+pub fn sql_literal_value(val: SqlVal) -> Result<String> {
     use SqlVal::*;
     match val {
-        SqlVal::Null => "NULL".to_string(),
-        SqlVal::Bool(val) => val.to_string(),
-        Int(val) => val.to_string(),
-        BigInt(val) => val.to_string(),
-        Real(val) => val.to_string(),
-        Text(val) => format!("'{}'", val),
-        Blob(val) => format!("x'{}'", hex::encode_upper(val)),
+        SqlVal::Null => Ok("NULL".to_string()),
+        SqlVal::Bool(val) => Ok(val.to_string()),
+        Int(val) => Ok(val.to_string()),
+        BigInt(val) => Ok(val.to_string()),
+        Real(val) => Ok(val.to_string()),
+        Text(val) => Ok(format!("'{}'", val)),
+        Blob(val) => Ok(format!("x'{}'", hex::encode_upper(val))),
         #[cfg(feature = "datetime")]
-        Timestamp(ndt) => ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string(),
+        Timestamp(ndt) => Ok(ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string()),
+        Custom(val) => Err(Error::LiteralForCustomUnsupported((*val).clone())),
     }
 }

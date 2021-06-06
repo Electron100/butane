@@ -51,7 +51,7 @@
 	 + Many backreferences
 	 + Column renames in migrations
 	 + prepared/reusable queries
-	 + SqlType/SqlVal Custom
+	 + Improved custom support, including raw sql where clauses
 	 + More precise spans in macro errors for invalid field names
 	 + Remove timestamp from migration names
 	 + auto FieldType for primitive enums

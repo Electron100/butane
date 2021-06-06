@@ -115,7 +115,7 @@ where
     }
     pub fn columns(&self) -> [Column; 2] {
         [
-            Column::new("owner", self.owner_type),
+            Column::new("owner", self.owner_type.clone()),
             Column::new("has", <T::PKType as FieldType>::SQLTYPE),
         ]
     }

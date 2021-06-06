@@ -3,7 +3,7 @@ use super::helper;
 use super::*;
 use crate::db::connmethods::BackendRows;
 use crate::debug;
-use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
+use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::query;
 use crate::query::Order;
 use crate::{Result, SqlType, SqlVal, SqlValRef};
@@ -11,6 +11,7 @@ use crate::{Result, SqlType, SqlVal, SqlValRef};
 use chrono::naive::NaiveDateTime;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use pin_project::pin_project;
+use std::borrow::Cow;
 use std::fmt::Write;
 use std::pin::Pin;
 
@@ -313,6 +314,7 @@ fn sqlvalref_to_sqlite<'a, 'b>(valref: &'b SqlValRef<'a>) -> rusqlite::types::To
             Owned(Value::Text(f.to_string()))
         }
         Null => Owned(Value::Null),
+        Custom(_) => panic!("Custom types not supported in sqlite"),
     }
 }
 
@@ -380,7 +382,7 @@ impl<'a> BackendRows for QueryAdapter<'a> {
 
 impl BackendRow for rusqlite::Row<'_> {
     fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef> {
-        sql_valref_from_rusqlite(self.get_ref(idx)?, ty)
+        sql_valref_from_rusqlite(self.get_ref(idx)?, &ty)
     }
     fn len(&self) -> usize {
         self.column_count()
@@ -402,7 +404,10 @@ fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result
     sql_valref_from_rusqlite(val, col.ty()).map(|v| v.into())
 }
 
-fn sql_valref_from_rusqlite(val: rusqlite::types::ValueRef, ty: SqlType) -> Result<SqlValRef> {
+fn sql_valref_from_rusqlite<'a>(
+    val: rusqlite::types::ValueRef<'a>,
+    ty: &SqlType,
+) -> Result<SqlValRef<'a>> {
     if let rusqlite::types::ValueRef::Null = val {
         return Ok(SqlValRef::Null);
     }
@@ -418,6 +423,9 @@ fn sql_valref_from_rusqlite(val: rusqlite::types::ValueRef, ty: SqlType) -> Resu
             SQLITE_DT_FORMAT,
         )?),
         SqlType::Blob => SqlValRef::Blob(val.as_blob()?),
+        SqlType::Custom(v) => {
+            return Err(Error::IncompatibleCustomT(v.deref().clone(), BACKEND_NAME))
+        }
     })
 }
 
@@ -462,16 +470,17 @@ fn define_column(col: &AColumn) -> String {
     )
 }
 
-fn col_sqltype(col: &AColumn) -> &'static str {
-    match col.sqltype() {
-        Ok(ty) => sqltype(ty),
+fn col_sqltype(col: &AColumn) -> Cow<str> {
+    match col.typeid() {
+        Ok(TypeIdentifier::Ty(ty)) => Cow::Borrowed(sqltype(&ty)),
+        Ok(TypeIdentifier::Name(name)) => Cow::Owned(name),
         // sqlite doesn't actually require that the column type be
         // specified
-        Err(_) => "",
+        Err(_) => Cow::Borrowed(""),
     }
 }
 
-fn sqltype(ty: SqlType) -> &'static str {
+fn sqltype(ty: &SqlType) -> &'static str {
     match ty {
         SqlType::Bool => "INTEGER",
         SqlType::Int => "INTEGER",
@@ -481,6 +490,7 @@ fn sqltype(ty: SqlType) -> &'static str {
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => "TEXT",
         SqlType::Blob => "BLOB",
+        SqlType::Custom(_) => panic!("Custom types not supported by sqlite backend"),
     }
 }
 
@@ -494,7 +504,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         tbl_name,
         define_column(col),
-        helper::sql_literal_value(default)
+        helper::sql_literal_value(default)?
     ))
 }
 

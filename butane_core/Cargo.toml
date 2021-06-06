@@ -32,6 +32,7 @@ postgres-native-tls={ version = "0.5", optional = true }
 proc-macro2 = "1.0"
 pin-project = "1"
 quote = "1.0"
+regex = "1.5"
 r2d2 = {version="0.8", optional=true}
 rusqlite = {version = "0.25", optional = true}
 serde = { version = "1.0", features=["derive"] }

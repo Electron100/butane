@@ -9,7 +9,7 @@ use fallible_iterator::FallibleIterator;
 use std::path::Path;
 
 pub mod adb;
-use adb::{AColumn, ATable, DeferredSqlType, Operation, ADB};
+use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeIdentifier, ADB};
 
 mod migration;
 pub use migration::{Migration, MigrationMut};
@@ -164,7 +164,7 @@ fn migrations_table() -> ATable {
     let mut table = ATable::new("butane_migrations".to_string());
     let col = AColumn::new(
         "name",
-        DeferredSqlType::Known(SqlType::Text),
+        DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Text)),
         false, // nullable
         true,  // pk
         false, // auto

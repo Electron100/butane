@@ -1,12 +1,16 @@
+use crate::custom::{SqlValCustom, SqlValRefCustom};
 use crate::{DataObject, Error::CannotConvertSqlVal, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt;
 
+#[cfg(feature = "pg")]
+use crate::custom::SqlTypeCustom;
+
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum SqlValRef<'a> {
     Null,
     Bool(bool),
@@ -17,6 +21,34 @@ pub enum SqlValRef<'a> {
     Blob(&'a [u8]),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime), // NaiveDateTime is Copy
+    Custom(SqlValRefCustom<'a>),
+}
+impl SqlValRef<'_> {
+    // if this is Null
+    pub fn sqltype(&self) -> Option<SqlType> {
+        match self {
+            SqlValRef::Null => None,
+            SqlValRef::Bool(_) => Some(SqlType::Bool),
+            SqlValRef::Int(_) => Some(SqlType::Int),
+            SqlValRef::BigInt(_) => Some(SqlType::BigInt),
+            SqlValRef::Real(_) => Some(SqlType::Real),
+            SqlValRef::Text(_) => Some(SqlType::Text),
+            #[cfg(feature = "datetime")]
+            SqlValRef::Timestamp(_) => Some(SqlType::Timestamp),
+            SqlValRef::Blob(_) => Some(SqlType::Blob),
+            #[cfg(feature = "pg")]
+            SqlValRef::Custom(c) => match c {
+                SqlValRefCustom::PgToSql { ty, .. } => {
+                    Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone())))
+                }
+                SqlValRefCustom::PgBytes { ty, .. } => {
+                    Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone())))
+                }
+            },
+            #[cfg(not(feature = "pg"))]
+            SqlValRef::Custom(_) => None,
+        }
+    }
 }
 
 /// A database value.
@@ -37,6 +69,7 @@ pub enum SqlVal {
     Blob(Vec<u8>),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime),
+    Custom(Box<SqlValCustom>),
 }
 impl SqlVal {
     pub fn as_ref(&self) -> SqlValRef<'_> {
@@ -98,17 +131,33 @@ impl SqlVal {
     /// this is a `SqlVal::Bool`, it is only compatible with
     /// `SqlType::Bool`, not with `SqlType::Int`, even though an int
     /// contains enough information to encode a bool.
-    pub fn is_compatible(&self, ty: SqlType, null_allowed: bool) -> bool {
+    #[allow(unreachable_patterns)]
+    pub fn is_compatible(&self, t: &SqlType, null_allowed: bool) -> bool {
+        match self.sqltype() {
+            None => null_allowed,
+            Some(self_ty) => *t == self_ty,
+        }
+    }
+
+    // Returns the SqlType most appropriate to this value or None
+    // if this is Null
+    pub fn sqltype(&self) -> Option<SqlType> {
         match self {
-            SqlVal::Null => null_allowed,
-            SqlVal::Bool(_) => ty == SqlType::Bool,
-            SqlVal::Int(_) => ty == SqlType::Int,
-            SqlVal::BigInt(_) => ty == SqlType::BigInt,
-            SqlVal::Real(_) => ty == SqlType::Real,
-            SqlVal::Text(_) => ty == SqlType::Text,
+            SqlVal::Null => None,
+            SqlVal::Bool(_) => Some(SqlType::Bool),
+            SqlVal::Int(_) => Some(SqlType::Int),
+            SqlVal::BigInt(_) => Some(SqlType::BigInt),
+            SqlVal::Real(_) => Some(SqlType::Real),
+            SqlVal::Text(_) => Some(SqlType::Text),
             #[cfg(feature = "datetime")]
-            SqlVal::Timestamp(_) => ty == SqlType::Timestamp,
-            SqlVal::Blob(_) => ty == SqlType::Blob,
+            SqlVal::Timestamp(_) => Some(SqlType::Timestamp),
+            SqlVal::Blob(_) => Some(SqlType::Blob),
+            #[cfg(feature = "pg")]
+            SqlVal::Custom(c) => match c.as_ref() {
+                SqlValCustom::Pg { ty, .. } => Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone()))),
+            },
+            #[cfg(not(feature = "pg"))]
+            SqlVal::Custom(_) => None,
         }
     }
 }
@@ -125,6 +174,7 @@ impl fmt::Display for SqlVal {
             Blob(val) => f.write_str(&hex::encode(val)),
             #[cfg(feature = "datetime")]
             Timestamp(val) => val.format("%+").fmt(f),
+            Custom(val) => val.fmt(f),
         }
     }
 }
@@ -189,6 +239,7 @@ impl From<SqlValRef<'_>> for SqlVal {
             Blob(v) => SqlVal::Blob(v.into()),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlVal::Timestamp(v),
+            Custom(v) => SqlVal::Custom(Box::new(v.into())),
         }
     }
 }
@@ -206,6 +257,7 @@ impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
             Blob(v) => SqlValRef::Blob(v.as_ref()),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlValRef::Timestamp(*v),
+            Custom(v) => SqlValRef::Custom(v.as_valref()),
         }
     }
 }

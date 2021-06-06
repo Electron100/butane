@@ -2,9 +2,11 @@
 use super::connmethods::VecRows;
 use super::helper;
 use super::*;
-use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
+use crate::custom::{SqlTypeCustom, SqlValRefCustom};
+use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::{debug, query};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
+use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
 use postgres::fallible_iterator::FallibleIterator;
@@ -155,8 +157,13 @@ where
         if cfg!(feature = "log") {
             debug!("query sql {}", sqlquery);
         }
+        eprintln!("query sql {}", sqlquery);
 
-        let stmt = self.cell()?.try_borrow_mut()?.prepare(&sqlquery)?;
+        let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
+        let stmt = self
+            .cell()?
+            .try_borrow_mut()?
+            .prepare_typed(&sqlquery, types.as_ref())?;
         // todo avoid intermediate vec?
         let rowvec: Vec<postgres::Row> = self
             .cell()?
@@ -358,7 +365,7 @@ impl postgres::types::ToSql for SqlVal {
 impl<'a> postgres::types::ToSql for SqlValRef<'a> {
     fn to_sql(
         &self,
-        ty: &postgres::types::Type,
+        requested_ty: &postgres::types::Type,
         out: &mut bytes::BytesMut,
     ) -> std::result::Result<
         postgres::types::IsNull,
@@ -366,40 +373,47 @@ impl<'a> postgres::types::ToSql for SqlValRef<'a> {
     > {
         use SqlValRef::*;
         match self {
-            Bool(b) => b.to_sql(ty, out),
-            Int(i) => i.to_sql(ty, out),
-            BigInt(i) => i.to_sql(ty, out),
-            Real(r) => r.to_sql(ty, out),
-            Text(t) => t.to_sql(ty, out),
-            Blob(b) => b.to_sql(ty, out),
+            Bool(b) => b.to_sql_checked(requested_ty, out),
+            Int(i) => i.to_sql_checked(requested_ty, out),
+            BigInt(i) => i.to_sql_checked(requested_ty, out),
+            Real(r) => r.to_sql_checked(requested_ty, out),
+            Text(t) => t.to_sql_checked(requested_ty, out),
+            Blob(b) => b.to_sql_checked(requested_ty, out),
             #[cfg(feature = "datetime")]
-            Timestamp(dt) => dt.to_sql(ty, out),
-            Null => Option::<bool>::None.to_sql(ty, out),
+            Timestamp(dt) => dt.to_sql_checked(requested_ty, out),
+            Null => Ok(postgres::types::IsNull::Yes),
+            Custom(SqlValRefCustom::PgToSql { ty, tosql }) => {
+                check_type_match(&ty, &requested_ty)?;
+                tosql.to_sql_checked(requested_ty, out)
+            }
+            Custom(SqlValRefCustom::PgBytes { ty, data }) => {
+                check_type_match(&ty, &requested_ty)?;
+                out.put(*data);
+                Ok(postgres::types::IsNull::No)
+            }
         }
     }
-
-    fn accepts(ty: &postgres::types::Type) -> bool {
-        // Unfortunately this is a type method rather than an instance method.
-        // Declare acceptance of all the types we can support and hope it works out OK
-        if bool::accepts(ty)
-            || i32::accepts(ty)
-            || i64::accepts(ty)
-            || f64::accepts(ty)
-            || String::accepts(ty)
-            || Vec::<u8>::accepts(ty)
-        {
-            return true;
-        }
-
-        #[cfg(feature = "datetime")]
-        if NaiveDateTime::accepts(ty) {
-            return true;
-        }
-
-        false
+    fn accepts(_ty: &postgres::types::Type) -> bool {
+        // Unfortunately this is a type method rather than an instance
+        // method.  Declare acceptance of all the types we can support
+        // and do the actual checking in the to_sql method
+        true
     }
-
     postgres::types::to_sql_checked!();
+}
+
+fn check_type_match(
+    ty1: &postgres::types::Type,
+    ty2: &postgres::types::Type,
+) -> std::result::Result<(), Box<dyn std::error::Error + 'static + Sync + Send>> {
+    if ty1 == ty2 {
+        Ok(())
+    } else {
+        Err(Box::new(crate::Error::Internal(format!(
+            "postgres type mismatch. Wanted {} but have {}",
+            ty1, ty2
+        ))))
+    }
 }
 
 impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
@@ -421,7 +435,10 @@ impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
             )?)),
             #[cfg(feature = "datetime")]
             Type::TIMESTAMP => Ok(SqlValRef::Timestamp(NaiveDateTime::from_sql(ty, raw)?)),
-            _ => Err(Box::new(Error::UnknownSqlType(format!("{}", ty)))),
+            _ => Ok(SqlValRef::Custom(SqlValRefCustom::PgBytes {
+                ty: ty.clone(),
+                data: raw,
+            })),
         }
     }
 
@@ -432,21 +449,12 @@ impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
     }
 
     #[allow(clippy::match_like_matches_macro)]
-    fn accepts(ty: &postgres::types::Type) -> bool {
-        use postgres::types::Type;
-        match *ty {
-            Type::BOOL => true,
-            Type::INT2 => true,
-            Type::INT4 => true,
-            Type::INT8 => true,
-            Type::FLOAT4 => true,
-            Type::FLOAT8 => true,
-            Type::TEXT => true,
-            Type::BYTEA => true,
-            #[cfg(feature = "datetime")]
-            Type::TIMESTAMP => true,
-            _ => false,
-        }
+    fn accepts(_ty: &postgres::types::Type) -> bool {
+        // Unfortunately this is a type method rather than an instance
+        // method, so we don't actually know what we can
+        // support. Declare acceptance of all and do any actual type
+        // checking in from_sql.
+        true
     }
 }
 
@@ -538,25 +546,32 @@ fn define_column(col: &AColumn) -> Result<String> {
     ))
 }
 
-fn col_sqltype(col: &AColumn) -> Result<&'static str> {
-    let ty = col.sqltype()?;
-    if col.is_auto() {
-        match ty {
-            SqlType::Int => Ok("SERIAL"),
-            SqlType::BigInt => Ok("BIGSERIAL"),
-            _ => Err(Error::InvalidAuto(col.name().to_string())),
+fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
+    match col.typeid()? {
+        TypeIdentifier::Name(name) => Ok(Cow::Owned(name)),
+        TypeIdentifier::Ty(ty) => {
+            if col.is_auto() {
+                match ty {
+                    SqlType::Int => Ok(Cow::Borrowed("SERIAL")),
+                    SqlType::BigInt => Ok(Cow::Borrowed("BIGSERIAL")),
+                    _ => Err(Error::InvalidAuto(col.name().to_string())),
+                }
+            } else {
+                Ok(match ty {
+                    SqlType::Bool => Cow::Borrowed("BOOLEAN"),
+                    SqlType::Int => Cow::Borrowed("INTEGER"),
+                    SqlType::BigInt => Cow::Borrowed("BIGINT"),
+                    SqlType::Real => Cow::Borrowed("DOUBLE PRECISION"),
+                    SqlType::Text => Cow::Borrowed("TEXT"),
+                    #[cfg(feature = "datetime")]
+                    SqlType::Timestamp => Cow::Borrowed("TIMESTAMP"),
+                    SqlType::Blob => Cow::Borrowed("BYTEA"),
+                    SqlType::Custom(c) => match c {
+                        SqlTypeCustom::Pg(ref ty) => Cow::Owned(ty.name().to_string()),
+                    },
+                })
+            }
         }
-    } else {
-        Ok(match ty {
-            SqlType::Bool => "BOOLEAN",
-            SqlType::Int => "INTEGER",
-            SqlType::BigInt => "BIGINT",
-            SqlType::Real => "DOUBLE PRECISION",
-            SqlType::Text => "TEXT",
-            #[cfg(feature = "datetime")]
-            SqlType::Timestamp => "TIMESTAMP",
-            SqlType::Blob => "BYTEA",
-        })
     }
 }
 
@@ -570,7 +585,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         tbl_name,
         define_column(col)?,
-        helper::sql_literal_value(default)
+        helper::sql_literal_value(default)?
     ))
 }
 
@@ -653,6 +668,25 @@ pub fn sql_insert_or_replace_with_placeholders(
         ", "
     });
     write!(w, ")").unwrap();
+}
+
+fn pgtype_for_val(val: &SqlVal) -> postgres::types::Type {
+    use postgres::types::Type;
+    match val.sqltype() {
+        None => Type::UNKNOWN,
+        Some(SqlType::Bool) => postgres::types::Type::BOOL,
+        Some(SqlType::Int) => postgres::types::Type::INT4,
+        Some(SqlType::BigInt) => postgres::types::Type::INT8,
+        Some(SqlType::Real) => postgres::types::Type::FLOAT8,
+        Some(SqlType::Text) => postgres::types::Type::TEXT,
+        Some(SqlType::Blob) => postgres::types::Type::BYTEA,
+        #[cfg(feature = "datetime")]
+        Some(SqlType::Timestamp) => postgres::types::Type::TIMESTAMP,
+        Some(SqlType::Custom(inner)) => match inner {
+            #[cfg(feature = "pg")]
+            SqlTypeCustom::Pg(ty, ..) => ty,
+        },
+    }
 }
 
 struct PgPlaceholderSource {

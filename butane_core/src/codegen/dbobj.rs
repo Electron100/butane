@@ -1,5 +1,5 @@
 use super::*;
-use crate::migrations::adb::DeferredSqlType;
+use crate::migrations::adb::{DeferredSqlType, TypeIdentifier};
 use crate::SqlType;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
@@ -358,8 +358,8 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
     for f in fields(ast_struct) {
         if is_auto(f) {
             match get_primitive_sql_type(&f.ty) {
-                Some(DeferredSqlType::Known(SqlType::Int)) => (),
-                Some(DeferredSqlType::Known(SqlType::BigInt)) => (),
+                Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int))) => (),
+                Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::BigInt))) => (),
                 _ => {
                     return Some(quote_spanned!(
                         f.span() =>

@@ -179,7 +179,7 @@ impl fmt::Display for SqlVal {
     }
 }
 
-/// Used to convert another type to a `SqlVal`.
+/// Used to convert another type to a `SqlVal` or `SqlValRef`.
 ///
 /// Unlike [`IntoSql`][crate::IntoSql], the value is not consumed.
 pub trait ToSql {
@@ -187,7 +187,7 @@ pub trait ToSql {
     fn to_sql_ref(&self) -> SqlValRef<'_>;
 }
 
-/// Used to convert another type to a `SqlVal` or `SqlValRef`.
+/// Used to convert another type to a `SqlVal`.
 ///
 /// The value is consumed. For a non-consuming trait, see
 /// [`ToSql`][crate::ToSql].

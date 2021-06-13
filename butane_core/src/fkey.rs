@@ -130,11 +130,6 @@ where
     fn to_sql_ref(&self) -> SqlValRef<'_> {
         self.ensure_valpk().as_ref()
     }
-}
-impl<T> IntoSql for ForeignKey<T>
-where
-    T: DataObject,
-{
     fn into_sql(self) -> SqlVal {
         self.ensure_valpk();
         self.valpk.into_inner().unwrap()

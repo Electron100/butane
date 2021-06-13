@@ -7,7 +7,7 @@ mod custom_pg {
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
     use butane::prelude::*;
     use butane::{butane_type, db::Connection, model, ObjectState};
-    use butane::{FieldType, FromSql, IntoSql, SqlType, SqlVal, SqlValRef, ToSql};
+    use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
     use geo_types;
     use postgres;
     use std::result::Result;
@@ -31,11 +31,6 @@ mod custom_pg {
         }
         fn to_sql(&self) -> SqlVal {
             self.to_sql_ref().into()
-        }
-    }
-    impl IntoSql for Point {
-        fn into_sql(self) -> SqlVal {
-            self.to_sql()
         }
     }
 

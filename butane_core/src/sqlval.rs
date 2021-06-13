@@ -53,10 +53,9 @@ impl SqlValRef<'_> {
 
 /// A database value.
 ///
-/// For conversion between `SqlVal` and other types, see [`FromSql`], [`IntoSql`], and [`ToSql`].
+/// For conversion between `SqlVal` and other types, see [`FromSql`] and [`ToSql`].
 ///
 /// [`FromSql`]: crate::FromSql
-/// [`IntoSql`]: crate::IntoSql
 /// [`ToSql`]: crate::ToSql
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SqlVal {
@@ -180,24 +179,23 @@ impl fmt::Display for SqlVal {
 }
 
 /// Used to convert another type to a `SqlVal` or `SqlValRef`.
-///
-/// Unlike [`IntoSql`][crate::IntoSql], the value is not consumed.
 pub trait ToSql {
     fn to_sql(&self) -> SqlVal;
     fn to_sql_ref(&self) -> SqlValRef<'_>;
-}
-
-/// Used to convert another type to a `SqlVal`.
-///
-/// The value is consumed. For a non-consuming trait, see
-/// [`ToSql`][crate::ToSql].
-pub trait IntoSql {
-    fn into_sql(self) -> SqlVal;
+    /// The default implementation simply calls `to_sql`. Provide an
+    /// alternative implementation if greater efficiency can be
+    /// realized by consuming self.
+    fn into_sql(self) -> SqlVal
+    where
+        Self: Sized,
+    {
+        self.to_sql()
+    }
 }
 
 impl<T> From<T> for SqlVal
 where
-    T: IntoSql,
+    T: ToSql,
 {
     fn from(val: T) -> Self {
         val.into_sql()
@@ -263,7 +261,7 @@ impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
 }
 
 /// Type suitable for being a database column.
-pub trait FieldType: ToSql + IntoSql + FromSql {
+pub trait FieldType: ToSql + FromSql {
     const SQLTYPE: SqlType;
     /// Reference type. Used for ergonomics with String (which has
     /// reference type str). For most, it is Self
@@ -325,17 +323,15 @@ macro_rules! impl_prim_sql {
     };
     ($prim:ty, $variant:ident, $sqltype:ident, $reftype: ty) => {
         impl_basic_from_sql!($prim, $variant, $sqltype);
-        impl IntoSql for $prim {
-            fn into_sql(self) -> SqlVal {
-                SqlVal::$variant(self.into())
-            }
-        }
         impl ToSql for $prim {
             fn to_sql(&self) -> SqlVal {
                 self.clone().into_sql()
             }
             fn to_sql_ref(&self) -> SqlValRef<'_> {
                 SqlValRef::$variant(self.clone().into())
+            }
+            fn into_sql(self) -> SqlVal {
+                SqlVal::$variant(self.into())
             }
         }
         impl FieldType for $prim {
@@ -382,8 +378,6 @@ impl ToSql for String {
     fn to_sql_ref(&self) -> SqlValRef<'_> {
         SqlValRef::Text(self)
     }
-}
-impl IntoSql for String {
     fn into_sql(self) -> SqlVal {
         SqlVal::Text(self)
     }
@@ -417,8 +411,6 @@ impl ToSql for Vec<u8> {
     fn to_sql_ref(&self) -> SqlValRef<'_> {
         SqlValRef::Blob(self)
     }
-}
-impl IntoSql for Vec<u8> {
     fn into_sql(self) -> SqlVal {
         SqlVal::Blob(self)
     }
@@ -439,9 +431,6 @@ impl ToSql for NaiveDateTime {
     fn to_sql_ref(&self) -> SqlValRef<'_> {
         SqlValRef::Timestamp(*self)
     }
-}
-#[cfg(feature = "datetime")]
-impl IntoSql for NaiveDateTime {
     fn into_sql(self) -> SqlVal {
         SqlVal::Timestamp(self)
     }
@@ -487,11 +476,6 @@ where
             Some(v) => v.to_sql_ref(),
         }
     }
-}
-impl<T> IntoSql for Option<T>
-where
-    T: IntoSql,
-{
     fn into_sql(self) -> SqlVal {
         match self {
             None => SqlVal::Null,

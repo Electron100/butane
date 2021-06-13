@@ -1,7 +1,7 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::{butane_type, model, query};
-use butane::{FieldType, FromSql, IntoSql, ObjectState, SqlType, SqlVal, SqlValRef, ToSql};
+use butane::{FieldType, FromSql, ObjectState, SqlType, SqlVal, SqlValRef, ToSql};
 use paste;
 
 mod common;
@@ -24,11 +24,6 @@ impl ToSql for Frobnozzle {
             Frobnozzle::Bar => "Bar",
             Frobnozzle::Baz => "Baz",
         })
-    }
-}
-impl IntoSql for Frobnozzle {
-    fn into_sql(self) -> SqlVal {
-        self.to_sql()
     }
 }
 impl FromSql for Frobnozzle {

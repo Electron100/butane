@@ -2,7 +2,7 @@
 
 use crate::fkey::ForeignKey;
 use crate::query::{BoolExpr, Column, Expr, Join};
-use crate::sqlval::{FieldType, IntoSql, SqlVal, ToSql};
+use crate::sqlval::{FieldType, SqlVal, ToSql};
 use crate::DataObject;
 use std::borrow::Borrow;
 use std::cmp::{PartialEq, PartialOrd};

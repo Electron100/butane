@@ -242,6 +242,7 @@ fn remove_helper_field_attributes(
                         && !a.path.is_ident("auto")
                         && !a.path.is_ident("sqltype")
                         && !a.path.is_ident("default")
+                        && !a.path.is_ident("unique")
                 });
             }
             Ok(fields)
@@ -287,6 +288,10 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
 
 fn is_auto(field: &Field) -> bool {
     field.attrs.iter().any(|attr| attr.path.is_ident("auto"))
+}
+
+fn is_unique(field: &Field) -> bool {
+    field.attrs.iter().any(|attr| attr.path.is_ident("unique"))
 }
 
 fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {

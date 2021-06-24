@@ -49,6 +49,7 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
                 is_nullable(&f),
                 f == &pk,
                 is_auto(&f),
+                is_unique(&f),
                 get_default(&f).expect("Malformed default attribute"),
             );
             table.add_column(col);

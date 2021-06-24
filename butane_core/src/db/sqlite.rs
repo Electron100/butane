@@ -462,6 +462,9 @@ fn define_column(col: &AColumn) -> String {
         // and we only allow auto on integer types
         constraints.push("AUTOINCREMENT".to_string());
     }
+    if col.unique() {
+        constraints.push("UNIQUE".to_string());
+    }
     format!(
         "{} {} {}",
         &col.name(),

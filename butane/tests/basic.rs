@@ -3,6 +3,10 @@ use butane::prelude::*;
 use butane::{butane_type, find, model, query};
 use butane::{ForeignKey, ObjectState};
 use paste;
+#[cfg(feature = "pg")]
+use postgres;
+#[cfg(feature = "sqlite")]
+use rusqlite;
 
 mod common;
 
@@ -13,6 +17,7 @@ pub type Whatsit = String;
 #[derive(PartialEq, Eq, Debug, Clone)]
 struct Foo {
     id: i64,
+    #[unique]
     bar: u32,
     baz: Whatsit,
     blobbity: Vec<u8>,
@@ -263,3 +268,27 @@ fn basic_rollback_transaction(mut conn: Connection) {
     }
 }
 testall!(basic_rollback_transaction);
+
+fn basic_unique_field_error_on_non_unique(conn: Connection) {
+    let mut foo1 = Foo::new(1);
+    foo1.bar = 42;
+    foo1.save(&conn).unwrap();
+
+    let mut foo2 = Foo::new(2);
+    foo2.bar = foo1.bar;
+    let e = foo2.save(&conn).unwrap_err();
+    // Make sure the error is one we expect
+    assert!(match e {
+        #[cfg(feature = "sqlite")]
+        butane::Error::SQLite(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error { code, .. },
+            _,
+        )) if code == rusqlite::ffi::ErrorCode::ConstraintViolation => true,
+        #[cfg(feature = "pg")]
+        butane::Error::Postgres(e)
+            if e.code() == Some(&postgres::error::SqlState::UNIQUE_VIOLATION) =>
+            true,
+        _ => false,
+    });
+}
+testall!(basic_unique_field_error_on_non_unique);

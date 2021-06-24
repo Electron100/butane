@@ -538,6 +538,9 @@ fn define_column(col: &AColumn) -> Result<String> {
     if col.is_pk() {
         constraints.push("PRIMARY KEY".to_string());
     }
+    if col.unique() {
+        constraints.push("UNIQUE".to_string());
+    }
     Ok(format!(
         "{} {} {}",
         &col.name(),

@@ -309,6 +309,8 @@ pub struct AColumn {
     nullable: bool,
     pk: bool,
     auto: bool,
+    #[serde(default)]
+    unique: bool,
     default: Option<SqlVal>,
 }
 impl AColumn {
@@ -318,6 +320,7 @@ impl AColumn {
         nullable: bool,
         pk: bool,
         auto: bool,
+        unique: bool,
         default: Option<SqlVal>,
     ) -> Self {
         AColumn {
@@ -326,18 +329,22 @@ impl AColumn {
             nullable,
             pk,
             auto,
+            unique,
             default,
         }
     }
-    /// Simple column that is non-null, non-auto, non-pk with no default
+    /// Simple column that is non-null, non-auto, non-pk, non-unique with no default
     pub fn new_simple(name: impl Into<String>, sqltype: DeferredSqlType) -> Self {
-        Self::new(name, sqltype, false, false, false, None)
+        Self::new(name, sqltype, false, false, false, false, None)
     }
     pub fn name(&self) -> &str {
         &self.name
     }
     pub fn nullable(&self) -> bool {
         self.nullable
+    }
+    pub fn unique(&self) -> bool {
+        self.unique
     }
     pub fn is_pk(&self) -> bool {
         self.pk

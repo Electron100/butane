@@ -1,7 +1,7 @@
 # Getting Started
 This guide gives a brief, high-level overview of the basic CRUD
 operations and features of Butane. The complete code can be found at
-[examples/getting_started](../examples/getting_started). We
+[examples/getting_started](https://github.com/Electron100/butane/tree/master/examples/getting_started). We
 deliberately follow the same goal as [Diesel's getting-started
 guide](https://diesel.rs/guides/getting-started/): building the
 database portions of a blog.
@@ -43,7 +43,7 @@ This will have created an `example.db` sqlite file in the current
 directory as well as a `.butane` subdirectory. Inside that
 subdirectory, we see a `connection.json` file containing our
 connection parameters. At this point, we can add a method (in our
-`lib.rs`) to establish a in code.
+`lib.rs`) to establish a connection in code.
 
 ``` rust
 use butane::db::{Connection, ConnectionSpec};
@@ -54,7 +54,7 @@ pub fn establish_connection() -> Connection {
 
 ## Models
 We can connect to our database, but we can't really do anything
-yet. Let's define some _models_ for our blog objects. We'll start with
+yet. Let's define some _models_ for our blog objects (in `src/models.rs`). We'll start with
 the Blog itself.
 
 ``` rust
@@ -68,7 +68,7 @@ pub struct Blog {
     pub id: i64,
     pub name: String,
 }
-mpl Blog {
+impl Blog {
     pub fn new(name: impl Into<String>) -> Self {
         Blog {
             name: name.into(),
@@ -157,6 +157,14 @@ impl Tag {
 }
 ```
 
+Then we can use them in our `lib.rs`:
+
+```rust
+pub mod models;
+
+use models::{Blog, Post};
+```
+
 Let's build our package now. If we look in the `.butane` directory,
 it has new items! There's a `migrations/current` subdirectory
 recording information about our models. These files are necessary for
@@ -189,7 +197,7 @@ Now that the database matches our models, let's write some more code.
 ## Create
 To create an object in the database, we just instantiate a struct as
 normal, then save it. Let's write `create_blog` and `create_post`
-methods:
+methods (in `lib.rs`):
 
 ``` rust
 use butane::db::{Connection, ConnectionSpec};
@@ -225,7 +233,15 @@ pub fn existing_blog(conn: &Connection) -> Option<Blog> {
 ```
 
 At this point we have everything we need to create a short program to
-write a post. Let's add a `write_post` binary to `Cargo.toml` and write its code.
+write a post. Let's add a `write_post` binary to `Cargo.toml`:
+
+``` rust
+[[bin]]
+name = "write_post"
+doc = false
+```
+
+And write its code (in `src/bin/write_post.rs`).
 
 ``` rust
 use getting_started::*;
@@ -292,7 +308,7 @@ ergonomic and typesafe manner. If we had a typo and wrote
 `query!(Post, publish == true)` ("publish" instead of "published") we'd get a compiler error.
 
 
-Let's add another binary, this one called `show_posts`. 
+Let's add another binary to Cargo.toml, this one called `show_posts`, and write its code (in `src/bin/show_posts.rs`).
 
 ``` rust
 use butane::query;
@@ -322,7 +338,9 @@ published our post yet.
 ## Update
 Let's create yet another program, `publish_post`. It needs to be given
 the id of a post to publish. To publish the post, we find it by id,
-mark it as published, and save it again..
+mark it as published, and save it again.
+
+Add `publish_post` binary to Cargo.toml, and write its code (in `src/bin/publish_post.rs`).
 
 ``` rust
 use self::models::Post;
@@ -354,7 +372,7 @@ post!
 We've gotten most of the way through CRUD. For completeness, let's see
 how to delete a post. This can be done with either the `delete` method
 on `DataObject` (to delete an object we've already loaded) or (more
-commonly) with the `delete` method on `Query` to delete directly. Here's our `delete_post` program:
+commonly) with the `delete` method on `Query` to delete directly. Here's our `delete_post` program (in `src/bin/delete_post.rs`):
 
 ``` rust
 use self::models::Post;

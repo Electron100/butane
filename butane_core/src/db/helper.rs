@@ -124,14 +124,14 @@ where
     .unwrap()
 }
 
-pub fn sql_select(columns: &[Column], table: &'static str, w: &mut impl Write) {
+pub fn sql_select(columns: &[Column], table: &str, w: &mut impl Write) {
     write!(w, "SELECT ").unwrap();
     list_columns(columns, w);
     write!(w, " FROM {}", table).unwrap();
 }
 
 pub fn sql_insert_with_placeholders(
-    table: &'static str,
+    table: &str,
     columns: &[Column],
     pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
@@ -147,7 +147,7 @@ pub fn sql_insert_with_placeholders(
 }
 
 pub fn sql_update_with_placeholders(
-    table: &'static str,
+    table: &str,
     pkcol: Column,
     columns: &[Column],
     pls: &mut impl PlaceholderSource,

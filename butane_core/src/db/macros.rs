@@ -7,7 +7,7 @@ macro_rules! connection_method_wrapper {
             }
             fn query<'a, 'b, 'c: 'a>(
                 &'c self,
-                table: &'static str,
+                table: &str,
                 columns: &'b [Column],
                 expr: Option<BoolExpr>,
                 limit: Option<i32>,
@@ -18,7 +18,7 @@ macro_rules! connection_method_wrapper {
             }
             fn insert_returning_pk(
                 &self,
-                table: &'static str,
+                table: &str,
                 columns: &[Column],
                 pkcol: &Column,
                 values: &[SqlValRef<'_>],
@@ -28,7 +28,7 @@ macro_rules! connection_method_wrapper {
             }
             fn insert_only(
                 &self,
-                table: &'static str,
+                table: &str,
                 columns: &[Column],
                 values: &[SqlValRef<'_>],
             ) -> Result<()> {
@@ -37,7 +37,7 @@ macro_rules! connection_method_wrapper {
             }
             fn insert_or_replace(
                 &self,
-                table: &'static str,
+                table: &str,
                 columns: &[Column],
                 pkcol: &Column,
                 values: &[SqlValRef<'_>],
@@ -47,7 +47,7 @@ macro_rules! connection_method_wrapper {
             }
             fn update(
                 &self,
-                table: &'static str,
+                table: &str,
                 pkcol: Column,
                 pk: SqlValRef,
                 columns: &[Column],
@@ -56,10 +56,10 @@ macro_rules! connection_method_wrapper {
                 self.wrapped_connection_methods()?
                     .update(table, pkcol, pk, columns, values)
             }
-            fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
+            fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
                 self.wrapped_connection_methods()?.delete_where(table, expr)
             }
-            fn has_table(&self, table: &'static str) -> Result<bool> {
+            fn has_table(&self, table: &str) -> Result<bool> {
                 self.wrapped_connection_methods()?.has_table(table)
             }
         }

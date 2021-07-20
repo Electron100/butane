@@ -127,7 +127,7 @@ where
 
     fn query<'a, 'b, 'c: 'a>(
         &'c self,
-        table: &'static str,
+        table: &str,
         columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
@@ -179,7 +179,7 @@ where
     }
     fn insert_returning_pk(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         pkcol: &Column,
         values: &[SqlValRef<'_>],
@@ -206,12 +206,7 @@ where
             .nth(0)?;
         pk.ok_or_else(|| Error::Internal("could not get pk".to_string()))
     }
-    fn insert_only(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlValRef<'_>],
-    ) -> Result<()> {
+    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
             table,
@@ -227,7 +222,7 @@ where
     }
     fn insert_or_replace<'a>(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         pkcol: &Column,
         values: &[SqlValRef<'a>],
@@ -242,7 +237,7 @@ where
     }
     fn update(
         &self,
-        table: &'static str,
+        table: &str,
         pkcol: Column,
         pk: SqlValRef,
         columns: &[Column],
@@ -269,7 +264,7 @@ where
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
+    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
         write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
@@ -286,7 +281,7 @@ where
             .execute(sql.as_str(), params.as_slice())?;
         Ok(cnt as usize)
     }
-    fn has_table(&self, table: &'static str) -> Result<bool> {
+    fn has_table(&self, table: &str) -> Result<bool> {
         // future improvement, should be schema-aware
         let stmt = self
             .cell()?
@@ -648,7 +643,7 @@ fn change_column(
 }
 
 pub fn sql_insert_or_replace_with_placeholders(
-    table: &'static str,
+    table: &str,
     columns: &[Column],
     pkcol: &Column,
     w: &mut impl Write,

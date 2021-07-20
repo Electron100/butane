@@ -14,7 +14,7 @@ pub trait ConnectionMethods {
     fn execute(&self, sql: &str) -> Result<()>;
     fn query<'a, 'b, 'c: 'a>(
         &'c self,
-        table: &'static str,
+        table: &str,
         columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
@@ -22,41 +22,36 @@ pub trait ConnectionMethods {
     ) -> Result<RawQueryResult<'a>>;
     fn insert_returning_pk(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal>;
     /// Like `insert_returning_pk` but with no return value
-    fn insert_only(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlValRef<'_>],
-    ) -> Result<()>;
+    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()>;
     /// Insert unless there's a conflict on the primary key column, in which case update
     fn insert_or_replace(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<()>;
     fn update(
         &self,
-        table: &'static str,
+        table: &str,
         pkcol: Column,
         pk: SqlValRef,
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()>;
-    fn delete(&self, table: &'static str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
+    fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
         self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))?;
         Ok(())
     }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize>;
+    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize>;
     /// Tests if a table exists in the database.
-    fn has_table(&self, table: &'static str) -> Result<bool>;
+    fn has_table(&self, table: &str) -> Result<bool>;
 }
 
 /// Represents a database column. Most users do not need to use this

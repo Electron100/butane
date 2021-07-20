@@ -106,7 +106,7 @@ impl ConnectionMethods for rusqlite::Connection {
 
     fn query<'a, 'b, 'c: 'a>(
         &'c self,
-        table: &'static str,
+        table: &str,
         columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
@@ -141,7 +141,7 @@ impl ConnectionMethods for rusqlite::Connection {
     }
     fn insert_returning_pk(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         pkcol: &Column,
         values: &[SqlValRef<'_>],
@@ -168,12 +168,7 @@ impl ConnectionMethods for rusqlite::Connection {
         )?;
         Ok(pk)
     }
-    fn insert_only(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlValRef<'_>],
-    ) -> Result<()> {
+    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
             table,
@@ -189,7 +184,7 @@ impl ConnectionMethods for rusqlite::Connection {
     }
     fn insert_or_replace(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         _pkcol: &Column,
         values: &[SqlValRef],
@@ -201,7 +196,7 @@ impl ConnectionMethods for rusqlite::Connection {
     }
     fn update(
         &self,
-        table: &'static str,
+        table: &str,
         pkcol: Column,
         pk: SqlValRef,
         columns: &[Column],
@@ -222,7 +217,7 @@ impl ConnectionMethods for rusqlite::Connection {
         self.execute(&sql, rusqlite::params_from_iter(placeholder_values))?;
         Ok(())
     }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
+    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
         write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
@@ -235,7 +230,7 @@ impl ConnectionMethods for rusqlite::Connection {
         let cnt = self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(cnt)
     }
-    fn has_table(&self, table: &'static str) -> Result<bool> {
+    fn has_table(&self, table: &str) -> Result<bool> {
         let mut stmt =
             self.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
         let mut rows = stmt.query(&[table])?;
@@ -580,7 +575,7 @@ fn change_column(
     result
 }
 
-pub fn sql_insert_or_update(table: &'static str, columns: &[Column], w: &mut impl Write) {
+pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write) {
     write!(w, "INSERT OR REPLACE ").unwrap();
     write!(w, "INTO {} (", table).unwrap();
     helper::list_columns(columns, w);

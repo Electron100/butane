@@ -1,6 +1,6 @@
 [package]
 name = "butane_cli"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
 description = "The CLI for the Butane ORM"
@@ -18,7 +18,7 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
 anyhow = "1.0"
-butane = { path="../butane", version="0.4", features=["default", "sqlite", "pg"] }
+butane = { path="../butane", version="0.4.1", features=["default", "sqlite", "pg"] }
 chrono = "0.4"
 clap = "2.33"
 quote = "1.0"

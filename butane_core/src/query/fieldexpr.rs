@@ -4,7 +4,7 @@ use crate::fkey::ForeignKey;
 use crate::query::{BoolExpr, Column, Expr, Join};
 use crate::sqlval::{FieldType, SqlVal, ToSql};
 use crate::DataObject;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::cmp::{PartialEq, PartialOrd};
 use std::marker::PhantomData;
 
@@ -78,7 +78,7 @@ impl<F: DataObject> FieldExpr<ForeignKey<F>> {
     pub fn subfilter(&self, q: BoolExpr) -> BoolExpr {
         BoolExpr::Subquery {
             col: self.name,
-            tbl2: F::TABLE,
+            tbl2: Cow::Borrowed(F::TABLE),
             tbl2_col: F::PKCOL,
             expr: Box::new(q),
         }
@@ -119,7 +119,7 @@ where
         //let many_tbl = format!("{}_{}_Many", O::TABLE, self.name);
         BoolExpr::SubqueryJoin {
             col: O::PKCOL,
-            tbl2: T::TABLE,
+            tbl2: Cow::Borrowed(T::TABLE),
             col2: Column::new(self.many_table, "owner"),
             joins: vec![Join::Inner {
                 join_table: self.many_table,

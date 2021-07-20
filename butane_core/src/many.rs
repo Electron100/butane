@@ -2,6 +2,12 @@ use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use once_cell::unsync::OnceCell;
+use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+
+fn default_oc<T>() -> OnceCell<Vec<T>> {
+    OnceCell::default()
+}
 
 /// Used to implement a many-to-many relationship between models.
 ///
@@ -10,15 +16,18 @@ use once_cell::unsync::OnceCell;
 /// U::PKType. Table name is T_ManyToMany_foo where foo is the name of
 /// the Many field
 //
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Many<T>
 where
     T: DataObject,
 {
-    item_table: &'static str,
+    item_table: Cow<'static, str>,
     owner: Option<SqlVal>,
     owner_type: SqlType,
+    #[serde(skip)]
     new_values: Vec<SqlVal>,
+    #[serde(skip)]
+    #[serde(default = "default_oc")]
     all_values: OnceCell<Vec<T>>,
 }
 impl<T> Many<T>
@@ -33,7 +42,7 @@ where
     /// [`DataObject`]: super::DataObject
     pub fn new() -> Self {
         Many {
-            item_table: "not_initialized",
+            item_table: Cow::Borrowed("not_initialized"),
             owner: None,
             owner_type: SqlType::Int,
             new_values: Vec::new(),
@@ -46,7 +55,7 @@ where
         if self.owner.is_some() {
             return;
         }
-        self.item_table = item_table;
+        self.item_table = Cow::Borrowed(item_table);
         self.owner = Some(owner);
         self.owner_type = owner_type;
         self.all_values = OnceCell::new();
@@ -72,7 +81,7 @@ where
         let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
         while !self.new_values.is_empty() {
             conn.insert_only(
-                self.item_table,
+                &self.item_table,
                 &self.columns(),
                 &[
                     owner.as_ref(),
@@ -96,7 +105,7 @@ where
             let mut vals = T::query()
                 .filter(BoolExpr::Subquery {
                     col: T::PKCOL,
-                    tbl2: self.item_table,
+                    tbl2: self.item_table.clone(),
                     tbl2_col: "has",
                     expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
                 })

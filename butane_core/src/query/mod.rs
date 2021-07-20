@@ -5,11 +5,14 @@
 use crate::db::{BackendRows, ConnectionMethods, QueryResult};
 use crate::{DataResult, Result, SqlVal};
 use fallible_iterator::FallibleIterator;
+use std::borrow::Cow;
 use std::marker::PhantomData;
 
 mod fieldexpr;
 
 pub use fieldexpr::{DataOrd, FieldExpr, ManyFieldExpr};
+
+type TblName = Cow<'static, str>;
 
 /// Abstract representation of a database expression.
 #[derive(Clone)]
@@ -44,7 +47,7 @@ pub enum BoolExpr {
     /// in `tbl2` is true.
     Subquery {
         col: &'static str,
-        tbl2: &'static str,
+        tbl2: TblName,
         tbl2_col: &'static str,
         expr: Box<BoolExpr>,
     },
@@ -54,7 +57,7 @@ pub enum BoolExpr {
     /// in `tbl2` with the specified joins is true.
     SubqueryJoin {
         col: &'static str,
-        tbl2: &'static str,
+        tbl2: TblName,
         col2: Column,
         joins: Vec<Join>,
         expr: Box<BoolExpr>,
@@ -88,21 +91,21 @@ pub enum Join {
 
 #[derive(Clone)]
 pub struct Column {
-    table: Option<&'static str>,
+    table: Option<TblName>,
     name: &'static str,
 }
 impl Column {
     pub fn new(table: &'static str, name: &'static str) -> Self {
         Column {
-            table: Some(table),
+            table: Some(Cow::Borrowed(table)),
             name,
         }
     }
     pub fn unqualified(name: &'static str) -> Self {
         Column { table: None, name }
     }
-    pub fn table(&self) -> Option<&'static str> {
-        self.table
+    pub fn table(&self) -> Option<&str> {
+        self.table.as_ref().map(|t| t.as_ref())
     }
     pub fn name(&self) -> &'static str {
         self.name
@@ -112,7 +115,7 @@ impl Column {
 /// Representation of a database query.
 #[derive(Clone)]
 pub struct Query<T: DataResult> {
-    table: &'static str,
+    table: TblName,
     filter: Option<BoolExpr>,
     limit: Option<i32>,
     sort: Vec<Order>,
@@ -124,7 +127,7 @@ impl<T: DataResult> Query<T> {
     /// `limit`.
     pub fn new(table: &'static str) -> Query<T> {
         Query {
-            table,
+            table: Cow::Borrowed(table),
             filter: None,
             limit: None,
             sort: Vec::new(),
@@ -168,7 +171,7 @@ impl<T: DataResult> Query<T> {
 
     /// Executes the query against `conn` and returns the first result (if any).
     pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        conn.query(self.table, T::COLUMNS, self.filter, Some(1), None)?
+        conn.query(&self.table, T::COLUMNS, self.filter, Some(1), None)?
             .mapped(T::from_row)
             .nth(0)
     }
@@ -180,13 +183,13 @@ impl<T: DataResult> Query<T> {
         } else {
             Some(self.sort.as_slice())
         };
-        conn.query(self.table, T::COLUMNS, self.filter, self.limit, sort)?
+        conn.query(&self.table, T::COLUMNS, self.filter, self.limit, sort)?
             .mapped(T::from_row)
             .collect()
     }
 
     /// Executes the query against `conn` and deletes all matching objects.
     pub fn delete(self, conn: &impl ConnectionMethods) -> Result<usize> {
-        conn.delete_where(self.table, self.filter.unwrap_or(BoolExpr::True))
+        conn.delete_where(&self.table, self.filter.unwrap_or(BoolExpr::True))
     }
 }

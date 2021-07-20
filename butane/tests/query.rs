@@ -1,9 +1,10 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::query::BoolExpr;
-use butane::{colname, filter, find, query};
+use butane::{colname, filter, find, query, Many};
 use chrono::{TimeZone, Utc};
 use paste;
+use serde_json;
 
 mod common;
 use common::blog;
@@ -129,6 +130,19 @@ fn many_load(conn: Connection) {
     assert_eq!(tags[1].tag, "danger");
 }
 testall!(many_load);
+
+fn many_serialize(conn: Connection) {
+    blog::setup_blog(&conn);
+    let post: Post = find!(Post, title == "The Tiger", &conn).unwrap();
+    let tags_json: String = serde_json::to_string(&post.tags).unwrap();
+    let tags: Many<Tag> = serde_json::from_str(&tags_json).unwrap();
+    let tags = tags.load(&conn).unwrap();
+    let mut tags: Vec<&Tag> = tags.collect();
+    tags.sort_by(|t1, t2| (*t1).tag.partial_cmp(&t2.tag).unwrap());
+    assert_eq!(tags[0].tag, "asia");
+    assert_eq!(tags[1].tag, "danger");
+}
+testall!(many_serialize);
 
 fn many_objects_with_tag(conn: Connection) {
     blog::setup_blog(&conn);

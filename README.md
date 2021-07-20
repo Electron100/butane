@@ -69,6 +69,7 @@ enabled: you will want to enabled either `sqlite` or `pg`:
 * `pg`: Support for PostgreSQL.
 * `r2d2`: R2D2 support (`propane::db::ConnectionManager`).
 * `sqlite`: Support for SQLite.
+* `sqlite-bundled`: Bundles sqlite instead of using the system version.
 * `tls`: Support for TLS when using PostgreSQL.
 * `uuid`: Support for UUIDs (using the `uuid` crate).
 

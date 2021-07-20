@@ -13,6 +13,7 @@ repository = "https://github.com/Electron100/butane"
 datetime = ["chrono"]
 debug = ["log"]
 sqlite = ["rusqlite"]
+sqlite-bundled = ["rusqlite/bundled"]
 tls = ["postgres-native-tls", "native-tls"]
 pg = ["postgres", "bytes"]
 

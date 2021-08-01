@@ -86,6 +86,7 @@ pub trait Migrations {
                 None,
                 None,
                 None,
+                None,
             )?
             .mapped(ButaneMigration::from_row)
             .collect()?;

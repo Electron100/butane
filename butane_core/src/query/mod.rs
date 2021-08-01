@@ -118,6 +118,7 @@ pub struct Query<T: DataResult> {
     table: TblName,
     filter: Option<BoolExpr>,
     limit: Option<i32>,
+    offset: Option<i32>,
     sort: Vec<Order>,
     phantom: PhantomData<T>,
 }
@@ -130,6 +131,7 @@ impl<T: DataResult> Query<T> {
             table: Cow::Borrowed(table),
             filter: None,
             limit: None,
+            offset: None,
             sort: Vec::new(),
             phantom: PhantomData,
         }
@@ -147,6 +149,13 @@ impl<T: DataResult> Query<T> {
     /// `self` as this method is expected to be chained.
     pub fn limit(mut self, lim: i32) -> Query<T> {
         self.limit = Some(lim);
+        self
+    }
+
+    ///Skips the first `off` objects before returning them. Returns
+    /// `self` as this method is expected to be chained.
+    pub fn offset(mut self, off: i32) -> Query<T> {
+        self.offset = Some(off);
         self
     }
 
@@ -171,7 +180,7 @@ impl<T: DataResult> Query<T> {
 
     /// Executes the query against `conn` and returns the first result (if any).
     pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        conn.query(&self.table, T::COLUMNS, self.filter, Some(1), None)?
+        conn.query(&self.table, T::COLUMNS, self.filter, Some(1), None, None)?
             .mapped(T::from_row)
             .nth(0)
     }
@@ -183,7 +192,7 @@ impl<T: DataResult> Query<T> {
         } else {
             Some(self.sort.as_slice())
         };
-        conn.query(&self.table, T::COLUMNS, self.filter, self.limit, sort)?
+        conn.query(&self.table, T::COLUMNS, self.filter, self.limit, self.offset, sort)?
             .mapped(T::from_row)
             .collect()
     }

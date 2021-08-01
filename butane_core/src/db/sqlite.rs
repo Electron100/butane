@@ -110,6 +110,7 @@ impl ConnectionMethods for rusqlite::Connection {
         columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
+        offset: Option<i32>,
         order: Option<&[Order]>,
     ) -> Result<RawQueryResult<'a>> {
         let mut sqlquery = String::new();
@@ -131,6 +132,10 @@ impl ConnectionMethods for rusqlite::Connection {
 
         if let Some(limit) = limit {
             helper::sql_limit(limit, &mut sqlquery)
+        }
+
+        if let Some(offset) = offset {
+            helper::sql_offset(offset, &mut sqlquery)
         }
 
         debug!("query sql {}", sqlquery);

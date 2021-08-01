@@ -18,6 +18,7 @@ pub trait ConnectionMethods {
         columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
+        offset: Option<i32>,
         sort: Option<&[Order]>,
     ) -> Result<RawQueryResult<'a>>;
     fn insert_returning_pk(

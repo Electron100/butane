@@ -131,6 +131,7 @@ where
         columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
+        offset: Option<i32>,
         order: Option<&[query::Order]>,
     ) -> Result<RawQueryResult<'a>> {
         let mut sqlquery = String::new();
@@ -152,6 +153,10 @@ where
 
         if let Some(limit) = limit {
             helper::sql_limit(limit, &mut sqlquery)
+        }
+
+        if let Some(offset) = offset {
+            helper::sql_offset(offset, &mut sqlquery)
         }
 
         if cfg!(feature = "log") {

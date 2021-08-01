@@ -165,6 +165,10 @@ pub fn sql_limit(limit: i32, w: &mut impl Write) {
     write!(w, " LIMIT {}", limit).unwrap();
 }
 
+pub fn sql_offset(offset: i32, w: &mut impl Write) {
+    write!(w, " OFFSET {}", offset).unwrap();
+}
+
 pub fn sql_order(order: &[Order], w: &mut impl Write) {
     write!(w, " ORDER BY ").unwrap();
     order.iter().fold("", |sep, o| {

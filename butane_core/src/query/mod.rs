@@ -152,6 +152,11 @@ impl<T: DataResult> Query<T> {
         self
     }
 
+    pub fn offset(mut self, off: i32) -> Query<T> {
+        self.offset = Some(off);
+        self
+    }
+
     /// Order the query results by the given column. Multiple calls to
     /// this method may be made, with earlier calls taking precedence.
     /// It is recommended to use the `colname!`

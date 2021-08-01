@@ -152,6 +152,8 @@ impl<T: DataResult> Query<T> {
         self
     }
 
+    ///Skips the first `off` objects before returning them. Returns
+    /// `self` as this method is expected to be chained.
     pub fn offset(mut self, off: i32) -> Query<T> {
         self.offset = Some(off);
         self

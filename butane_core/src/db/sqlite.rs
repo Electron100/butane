@@ -135,6 +135,12 @@ impl ConnectionMethods for rusqlite::Connection {
         }
 
         if let Some(offset) = offset {
+            if limit == None {
+                // Sqlite only supports offset in conjunction with
+                // limit, so add a max limit if we don't have one
+                // already.
+                helper::sql_limit(i32::MAX, &mut sqlquery)
+            }
             helper::sql_offset(offset, &mut sqlquery)
         }
 

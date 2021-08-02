@@ -32,6 +32,19 @@ fn equality_separate_dataresult(conn: Connection) {
 }
 testall!(equality_separate_dataresult);
 
+fn ordered(conn: Connection) {
+    blog::setup_blog(&conn);
+    let posts = query!(Post, published == true)
+        .order_asc(colname!(Post, title))
+        .load(&conn)
+        .unwrap();
+    assert_eq!(posts.len(), 3);
+    assert_eq!(posts[0].title, "Mount Doom");
+    assert_eq!(posts[1].title, "Sir Charles");
+    assert_eq!(posts[2].title, "The Tiger");
+}
+testall!(ordered);
+
 fn comparison(conn: Connection) {
     blog::setup_blog(&conn);
     let mut posts = query!(Post, likes < 5).load(&conn).unwrap();
@@ -190,3 +203,30 @@ fn by_timestamp(conn: Connection) {
     assert_eq!(posts[1].title, "Sir Charles");
 }
 testall!(by_timestamp);
+
+fn limit(conn: Connection) {
+    blog::setup_blog(&conn);
+    let posts = Post::query()
+        .order_asc(colname!(Post, title))
+        .limit(2)
+        .load(&conn)
+        .unwrap();
+    assert_eq!(posts.len(), 2);
+    assert_eq!(posts[0].title, "Mount Doom");
+    assert_eq!(posts[1].title, "Mt. Everest");
+}
+testall!(limit);
+
+fn offset(conn: Connection) {
+    blog::setup_blog(&conn);
+    // Now get the more posts after the two we got in the limit test above
+    let posts = Post::query()
+        .order_asc(colname!(Post, title))
+        .offset(2)
+        .load(&conn)
+        .unwrap();
+    assert_eq!(posts.len(), 2);
+    assert_eq!(posts[0].title, "Sir Charles");
+    assert_eq!(posts[1].title, "The Tiger");
+}
+testall!(offset);

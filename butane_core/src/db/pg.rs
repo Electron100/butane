@@ -39,7 +39,7 @@ impl Backend for PgBackend {
         let mut current: ADB = (*current).clone();
         Ok(ops
             .iter()
-            .map(|o| sql_for_op(&mut current, &o))
+            .map(|o| sql_for_op(&mut current, o))
             .collect::<Result<Vec<String>>>()?
             .join("\n"))
     }
@@ -383,11 +383,11 @@ impl<'a> postgres::types::ToSql for SqlValRef<'a> {
             Timestamp(dt) => dt.to_sql_checked(requested_ty, out),
             Null => Ok(postgres::types::IsNull::Yes),
             Custom(SqlValRefCustom::PgToSql { ty, tosql }) => {
-                check_type_match(&ty, &requested_ty)?;
+                check_type_match(ty, requested_ty)?;
                 tosql.to_sql_checked(requested_ty, out)
             }
             Custom(SqlValRefCustom::PgBytes { ty, data }) => {
-                check_type_match(&ty, &requested_ty)?;
+                check_type_match(ty, requested_ty)?;
                 out.put(*data);
                 Ok(postgres::types::IsNull::No)
             }
@@ -512,11 +512,11 @@ where
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
-        Operation::AddTable(table) => Ok(create_table(&table)?),
-        Operation::RemoveTable(name) => Ok(drop_table(&name)),
-        Operation::AddColumn(tbl, col) => add_column(&tbl, &col),
-        Operation::RemoveColumn(tbl, name) => Ok(remove_column(&tbl, &name)),
-        Operation::ChangeColumn(tbl, old, new) => change_column(current, &tbl, &old, Some(new)),
+        Operation::AddTable(table) => Ok(create_table(table)?),
+        Operation::RemoveTable(name) => Ok(drop_table(name)),
+        Operation::AddColumn(tbl, col) => add_column(tbl, col),
+        Operation::RemoveColumn(tbl, name) => Ok(remove_column(tbl, name)),
+        Operation::ChangeColumn(tbl, old, new) => change_column(current, tbl, old, Some(new)),
     }
 }
 
@@ -637,7 +637,7 @@ fn change_column(
     }
     let stmts: [&str; 4] = [
         &create_table(&new_table)?,
-        &copy_table(&old_table, &new_table),
+        &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
         &format!("ALTER TABLE {} RENAME TO {};", &new_table.name, tbl_name),
     ];

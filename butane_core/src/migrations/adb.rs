@@ -283,7 +283,7 @@ impl DeferredSqlType {
             DeferredSqlType::KnownId(t) => Ok(t.clone()),
             DeferredSqlType::Known(t) => Ok(t.clone().into()),
             DeferredSqlType::Deferred(key) => resolver
-                .find_type(&key)
+                .find_type(key)
                 .ok_or_else(|| crate::Error::UnknownSqlType(key.to_string())),
         }
     }

@@ -175,7 +175,7 @@ impl ConnectionMethods for rusqlite::Connection {
                 table
             ),
             [],
-            |row| sql_val_from_rusqlite(row.get_ref_unwrap(0), &pkcol),
+            |row| sql_val_from_rusqlite(row.get_ref_unwrap(0), pkcol),
         )?;
         Ok(pk)
     }
@@ -313,7 +313,7 @@ fn sqlvalref_to_sqlite<'a, 'b>(valref: &'b SqlValRef<'a>) -> rusqlite::types::To
         BigInt(i) => Owned(Value::Integer(*i)),
         Real(r) => Owned(Value::Real(*r)),
         Text(t) => Borrowed(ValueRef::Text(t.as_bytes())),
-        Blob(b) => Borrowed(ValueRef::Blob(&b)),
+        Blob(b) => Borrowed(ValueRef::Blob(b)),
         #[cfg(feature = "datetime")]
         Timestamp(dt) => {
             let f = dt.format(SQLITE_DT_FORMAT);
@@ -437,11 +437,11 @@ fn sql_valref_from_rusqlite<'a>(
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
-        Operation::AddTable(table) => Ok(create_table(&table)),
-        Operation::RemoveTable(name) => Ok(drop_table(&name)),
-        Operation::AddColumn(tbl, col) => add_column(&tbl, &col),
-        Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, &tbl, &name)),
-        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, &tbl, &old, Some(new))),
+        Operation::AddTable(table) => Ok(create_table(table)),
+        Operation::RemoveTable(name) => Ok(drop_table(name)),
+        Operation::AddColumn(tbl, col) => add_column(tbl, col),
+        Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, tbl, name)),
+        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new))),
     }
 }
 
@@ -576,7 +576,7 @@ fn change_column(
     }
     let stmts: [&str; 4] = [
         &create_table(&new_table),
-        &copy_table(&old_table, &new_table),
+        &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
         &format!("ALTER TABLE {} RENAME TO {};", &new_table.name, tbl_name),
     ];

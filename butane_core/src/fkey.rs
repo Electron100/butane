@@ -70,13 +70,13 @@ impl<T: DataObject> ForeignKey<T> {
 
     fn ensure_valpk(&self) -> &SqlVal {
         match self.valpk.get() {
-            Some(sqlval) => return &sqlval,
+            Some(sqlval) => return sqlval,
             None => match self.val.get() {
                 Some(val) => self.valpk.set(val.pk().to_sql()).unwrap(),
                 None => panic!("Invalid foreign key state"),
             },
         }
-        &self.valpk.get().unwrap()
+        self.valpk.get().unwrap()
     }
 }
 

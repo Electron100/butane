@@ -16,14 +16,14 @@ impl FromSql for Uuid {
     fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
         match valref {
             SqlValRef::Blob(bytes) => {
-                if let Ok(uuid) = Uuid::from_slice(&bytes) {
+                if let Ok(uuid) = Uuid::from_slice(bytes) {
                     return Ok(uuid);
                 }
             }
             // Generally we expect uuid to be a blob, but if we get a
             // string we can try to work with it.
             SqlValRef::Text(text) => {
-                if let Ok(uuid) = Uuid::parse_str(&text) {
+                if let Ok(uuid) = Uuid::parse_str(text) {
                     return Ok(uuid);
                 }
             }

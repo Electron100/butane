@@ -283,7 +283,7 @@ where
     T: DataObject<PKType = P>,
 {
     fn as_pk(&self) -> Cow<P> {
-        Cow::Borrowed(&self)
+        Cow::Borrowed(self)
     }
 }
 

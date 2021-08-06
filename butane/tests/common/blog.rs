@@ -1,7 +1,7 @@
-use chrono::{naive::NaiveDateTime, offset::Utc};
 use butane::prelude::*;
 use butane::{dataresult, model};
 use butane::{db::Connection, ForeignKey, Many, ObjectState};
+use chrono::{naive::NaiveDateTime, offset::Utc};
 
 #[model]
 #[derive(Debug, Eq, PartialEq)]
@@ -70,6 +70,12 @@ impl Tag {
     }
 }
 
+pub fn create_tag(conn: &Connection, name: &str) -> Tag {
+    let mut tag = Tag::new(name);
+    tag.save(conn).unwrap();
+    tag
+}
+
 /// Sets up two blogs
 /// 1. "Cats"
 /// 2. "Mountains"
@@ -80,12 +86,8 @@ pub fn setup_blog(conn: &Connection) {
     let mut mountains_blog = Blog::new(2, "Mountains");
     mountains_blog.save(conn).unwrap();
 
-    let mut tag_asia = Tag::new("asia");
-    tag_asia.save(conn).unwrap();
-    let mut tag_danger = Tag::new("danger");
-    tag_danger.save(conn).unwrap();
-    let mut tag_monkeys = Tag::new("monkeys");
-    tag_monkeys.save(conn).unwrap();
+    let tag_asia = create_tag(conn, "asia");
+    let tag_danger = create_tag(conn, "danger");
 
     let mut post = Post::new(
         1,

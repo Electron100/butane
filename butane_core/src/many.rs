@@ -27,6 +27,8 @@ where
     #[serde(skip)]
     new_values: Vec<SqlVal>,
     #[serde(skip)]
+    removed_values: Vec<SqlVal>,
+    #[serde(skip)]
     #[serde(default = "default_oc")]
     all_values: OnceCell<Vec<T>>,
 }
@@ -46,6 +48,7 @@ where
             owner: None,
             owner_type: SqlType::Int,
             new_values: Vec::new(),
+            removed_values: Vec::new(),
             all_values: OnceCell::new(),
         }
     }
@@ -66,6 +69,13 @@ where
         // all_values is now out of date, so clear it
         self.all_values = OnceCell::new();
         self.new_values.push(new_val.pk().to_sql())
+    }
+
+    /// Removes a value.
+    pub fn remove(&mut self, val: &T) {
+        // all_values is now out of date, so clear it
+        self.all_values = OnceCell::new();
+        self.removed_values.push(val.pk().to_sql())
     }
 
     /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
@@ -89,12 +99,18 @@ where
                 ],
             )?;
         }
+        if !self.removed_values.is_empty() {
+            conn.delete_where(
+                &self.item_table,
+                BoolExpr::In("has", std::mem::take(&mut self.removed_values)),
+            )?;
+        }
         self.new_values.clear();
         Ok(())
     }
 
     /// Loads the values referred to by this foreign key from the
-    /// database if necessary and returns a reference to the them.
+    /// database if necessary and returns a reference to them.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
         let vals: Result<&Vec<T>> = self.all_values.get_or_try_init(|| {
             //if we don't have an owner then there are no values

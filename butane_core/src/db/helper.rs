@@ -109,16 +109,18 @@ where
                 write!(w, ")").unwrap();
                 Ok(())
             }
-            In(col, vals) => write!(
-                w,
-                "{} IN ({})",
-                col,
-                vals.iter()
-                    .map(|v| v.to_string())
-                    .collect::<Vec<String>>()
-                    .as_slice()
-                    .join(", ")
-            ),
+            In(col, vals) => {
+                write!(w, "{} IN (", col).unwrap();
+                let mut remaining = vals.len();
+                for val in vals {
+                    f(Expr::Val(val), values, pls, w);
+                    if remaining > 1 {
+                        write!(w, ", ").unwrap();
+                        remaining -= 1;
+                    }
+                }
+                write!(w, ")")
+            }
         },
     }
     .unwrap()

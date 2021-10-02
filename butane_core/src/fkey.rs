@@ -27,7 +27,7 @@ where
 {
     // At least one must be initialized (enforced internally by this
     // type), but both need not be
-    val: OnceCell<T>,
+    val: OnceCell<Box<T>>,
     valpk: OnceCell<SqlVal>,
 }
 impl<T: DataObject> ForeignKey<T> {
@@ -38,7 +38,10 @@ impl<T: DataObject> ForeignKey<T> {
     }
     /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
     pub fn get(&self) -> Result<&T> {
-        self.val.get().ok_or(Error::ValueNotLoaded)
+        self.val
+            .get()
+            .map(|v| v.as_ref())
+            .ok_or(Error::ValueNotLoaded)
     }
 
     /// Returns a reference to the primary key of the value.
@@ -55,10 +58,12 @@ impl<T: DataObject> ForeignKey<T> {
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to it.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
-        self.val.get_or_try_init(|| {
-            let pk = self.valpk.get().unwrap();
-            T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?)
-        })
+        self.val
+            .get_or_try_init(|| {
+                let pk = self.valpk.get().unwrap();
+                T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
+            })
+            .map(|v| v.as_ref())
     }
 
     fn new_raw() -> Self {
@@ -83,7 +88,7 @@ impl<T: DataObject> ForeignKey<T> {
 impl<T: DataObject> From<T> for ForeignKey<T> {
     fn from(obj: T) -> Self {
         let ret = Self::new_raw();
-        ret.val.set(obj).ok();
+        ret.val.set(Box::new(obj)).ok();
         ret
     }
 }

@@ -80,6 +80,22 @@ impl HasOnlyPk {
     }
 }
 
+#[model]
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct SelfReferential {
+    pub id: i32,
+    pub reference: Option<ForeignKey<SelfReferential>>,
+}
+impl SelfReferential {
+    fn new(id: i32) -> Self {
+        SelfReferential {
+            id,
+            reference: None,
+            state: ObjectState::default(),
+        }
+    }
+}
+
 fn basic_crud(conn: Connection) {
     //create
     let mut foo = Foo::new(1);
@@ -292,3 +308,18 @@ fn basic_unique_field_error_on_non_unique(conn: Connection) {
     });
 }
 testall!(basic_unique_field_error_on_non_unique);
+
+fn fkey_same_type(conn: Connection) {
+    let mut o1 = SelfReferential::new(1);
+    let mut o2 = SelfReferential::new(2);
+    o2.save(&conn).unwrap();
+    o1.reference = Some(ForeignKey::from_pk(o2.id));
+    o1.save(&conn).unwrap();
+
+    let o1 = SelfReferential::get(&conn, 1).unwrap();
+    assert!(o1.reference.is_some());
+    let inner: SelfReferential = o1.reference.unwrap().load(&conn).unwrap().clone();
+    assert_eq!(inner, o2);
+    assert!(inner.reference.is_none());
+}
+testall!(fkey_same_type);

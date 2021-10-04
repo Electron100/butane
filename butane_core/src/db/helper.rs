@@ -138,14 +138,19 @@ pub fn sql_insert_with_placeholders(
     pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
-    write!(w, "INSERT INTO {} (", table).unwrap();
-    list_columns(columns, w);
-    write!(w, ") VALUES (").unwrap();
-    columns.iter().fold("", |sep, _| {
-        write!(w, "{}{}", sep, pls.next_placeholder()).unwrap();
-        ", "
-    });
-    write!(w, ")").unwrap();
+    write!(w, "INSERT INTO {} ", table).unwrap();
+    if !columns.is_empty() {
+        write!(w, "(").unwrap();
+        list_columns(columns, w);
+        write!(w, ") VALUES (").unwrap();
+        columns.iter().fold("", |sep, _| {
+            write!(w, "{}{}", sep, pls.next_placeholder()).unwrap();
+            ", "
+        });
+        write!(w, ")").unwrap();
+    } else {
+        write!(w, "DEFAULT VALUES ").unwrap();
+    }
 }
 
 pub fn sql_update_with_placeholders(

@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "butane"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "butane_codegen",
  "butane_core",
@@ -160,7 +160,7 @@ dependencies = [
 
 [[package]]
 name = "butane_core"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "bytes",
  "cfg-if",

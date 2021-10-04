@@ -1,9 +1,26 @@
 use butane::db::Connection;
 use butane::prelude::*;
+use butane::{model, Many, ObjectState};
 use paste;
 
 mod common;
-use common::blog::{create_tag, Blog, Post};
+use common::blog::{create_tag, Blog, Post, Tag};
+
+#[model]
+struct AutoPkWithMany {
+    #[auto]
+    id: i64,
+    tags: Many<Tag>,
+}
+impl AutoPkWithMany {
+    fn new() -> Self {
+        AutoPkWithMany {
+            id: -1,
+            tags: Many::default(),
+            state: ObjectState::default(),
+        }
+    }
+}
 
 fn remove_one_from_many(conn: Connection) {
     let mut cats_blog = Blog::new(1, "Cats");
@@ -61,3 +78,17 @@ fn remove_multiple_from_many(conn: Connection) {
     assert_eq!(post2.tags.load(&conn).unwrap().count(), 2);
 }
 testall!(remove_multiple_from_many);
+
+fn can_add_to_many_before_save(conn: Connection) {
+    // Verify that for an object with an auto-pk, we can add items to a Many field before we actually
+    // save the original object (and thus get the actual pk);
+    let mut obj = AutoPkWithMany::new();
+    obj.tags.add(&create_tag(&conn, "blue"));
+    obj.tags.add(&create_tag(&conn, "red"));
+    obj.save(&conn).unwrap();
+
+    let obj = AutoPkWithMany::get(&conn, obj.id).unwrap();
+    let tags = obj.tags.load(&conn).unwrap();
+    assert_eq!(tags.count(), 2);
+}
+testall!(can_add_to_many_before_save);

@@ -63,7 +63,6 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 &self.#pkident
             }
             fn save(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
-                #many_save
                 //future perf improvement use an array on the stack
                 let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(#numdbfields);
                 let pkcol = butane::db::Column::new(
@@ -82,6 +81,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
                     #(#post_insert)*
                 }
+                #many_save
                 Ok(())
             }
             fn delete(&self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
@@ -401,12 +401,10 @@ where
                     quote!()
                 }
             } else if is_many_to_many(f) {
-                quote!(
-                    self.#ident.ensure_init(Self::TABLE, self.pk().clone(), <Self as butane::DataObject>::PKType);
-                    self.#ident.save()?;
-                )
+                // No-op
+                quote!()
             } else {
-								make_compile_error!(f.span()=> "Unexpected struct field")
+                make_compile_error!(f.span()=> "Unexpected struct field")
             }
         })
         .collect()

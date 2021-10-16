@@ -1,7 +1,8 @@
 use butane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
-use butane::{db, db::Connection, migrations};
+use butane::query::BoolExpr;
+use butane::{db, db::Connection, db::ConnectionMethods, migrations};
 use chrono::Utc;
 use clap::{Arg, ArgMatches};
 use serde::{Deserialize, Serialize};
@@ -58,12 +59,18 @@ fn main() {
                 ),
         )
         .subcommand(
+						clap::SubCommand::with_name("clear")
+								.setting(clap::AppSettings::ArgRequiredElseHelp)
+								.about("Clear data")
+								.subcommand(clap::SubCommand::with_name("data")
+														.about("Clear all data from the database. The scehma is left intact, but all instances of all models (i.e. all rows of all tables defined by the models) are deleted")))
+        .subcommand(
             clap::SubCommand::with_name("delete")
                 .about("Delete a table")
                 .setting(clap::AppSettings::ArgRequiredElseHelp)
                 .subcommand(
                     clap::SubCommand::with_name("table")
-                        .about("Delete a table")
+                        .about("Delete a table. Deleting a model in code does not currently lead to deletion of the table.")
                         .arg(
                             Arg::with_name("TABLE")
                                 .required(true)
@@ -81,6 +88,10 @@ fn main() {
         ("rollback", sub_args) => handle_error(rollback(sub_args)),
         ("embed", _) => handle_error(embed()),
         ("list", _) => handle_error(list_migrations()),
+        ("clear", Some(sub_args)) => match sub_args.subcommand() {
+            ("data", Some(_)) => handle_error(clear_data()),
+            (_, _) => eprintln!("Unknown clear command. Try: clear data"),
+        },
         ("delete", Some(sub_args)) => match sub_args.subcommand() {
             ("table", Some(sub_args2)) => {
                 handle_error(delete_table(sub_args2.value_of("TABLE").unwrap()))
@@ -291,6 +302,22 @@ fn delete_table(name: &str) -> Result<()> {
     let mut ms = get_migrations()?;
     let current = ms.current();
     current.delete_table(name)?;
+    Ok(())
+}
+
+fn clear_data() -> Result<()> {
+    let spec = load_connspec()?;
+    let conn = db::connect(&spec)?;
+    let latest = match get_migrations()?.last_applied_migration(&conn)? {
+        Some(m) => m,
+        None => {
+            eprintln!("No migrations have been applied, so no data is recognized.");
+            std::process::exit(1);
+        }
+    };
+    for table in latest.db()?.tables() {
+        conn.delete_where(&table.name, BoolExpr::True)?;
+    }
     Ok(())
 }
 

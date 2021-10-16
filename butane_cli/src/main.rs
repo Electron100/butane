@@ -316,6 +316,7 @@ fn clear_data() -> Result<()> {
         }
     };
     for table in latest.db()?.tables() {
+        println!("Deleting data from {}", &table.name);
         conn.delete_where(&table.name, BoolExpr::True)?;
     }
     Ok(())

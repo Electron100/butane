@@ -437,7 +437,8 @@ fn sql_valref_from_rusqlite<'a>(
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
-        Operation::AddTable(table) => Ok(create_table(table)),
+        Operation::AddTable(table) => Ok(create_table(table, false)),
+        Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
         Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, tbl, name)),
@@ -445,14 +446,15 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     }
 }
 
-fn create_table(table: &ATable) -> String {
+fn create_table(table: &ATable, allow_exists: bool) -> String {
     let coldefs = table
         .columns
         .iter()
         .map(define_column)
         .collect::<Vec<String>>()
         .join(",\n");
-    format!("CREATE TABLE {} (\n{}\n);", table.name, coldefs)
+    let modifier = if allow_exists { "IF NOT EXISTS " } else { "" };
+    format!("CREATE TABLE {}{} (\n{}\n);", modifier, table.name, coldefs)
 }
 
 fn define_column(col: &AColumn) -> String {
@@ -575,7 +577,7 @@ fn change_column(
         None => new_table.remove_column(old.name()),
     }
     let stmts: [&str; 4] = [
-        &create_table(&new_table),
+        &create_table(&new_table, false),
         &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
         &format!("ALTER TABLE {} RENAME TO {};", &new_table.name, tbl_name),

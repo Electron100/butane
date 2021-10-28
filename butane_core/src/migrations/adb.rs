@@ -216,6 +216,9 @@ impl ADB {
             AddTable(table) => {
                 self.tables.insert(table.name.clone(), table);
             }
+            AddTableIfNotExists(table) => {
+                self.tables.insert(table.name.clone(), table);
+            }
             RemoveTable(name) => self.remove_table(&name),
             AddColumn(table, col) => {
                 if let Some(t) = self.tables.get_mut(&table) {
@@ -381,6 +384,7 @@ impl AColumn {
 pub enum Operation {
     //future improvement: support column renames
     AddTable(ATable),
+    AddTableIfNotExists(ATable),
     RemoveTable(String),
     AddColumn(String, AColumn),
     RemoveColumn(String, String),

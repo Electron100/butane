@@ -1,6 +1,7 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
-use super::{Migration, MigrationMut, Migrations, MigrationsMut};
-use crate::Result;
+use super::{ButaneMigration, Migration, MigrationMut, Migrations, MigrationsMut};
+use crate::query::BoolExpr;
+use crate::{ConnectionMethods, DataObject, Result};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -148,6 +149,13 @@ impl MigrationsMut for MemMigrations {
         }
 
         self.migrations.insert(m.name().to_string(), m);
+        Ok(())
+    }
+
+    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+        self.migrations.clear();
+        self.latest = None;
+        conn.delete_where(ButaneMigration::TABLE, BoolExpr::True)?;
         Ok(())
     }
 }

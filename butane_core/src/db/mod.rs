@@ -112,6 +112,12 @@ impl ConnectionSpec {
         let path = conn_complete_if_dir(path.as_ref());
         serde_json::from_reader(fs::File::open(path)?).map_err(|e| e.into())
     }
+    pub fn get_backend(&self) -> Result<Box<dyn Backend>> {
+        match get_backend(&self.backend_name) {
+            Some(backend) => Ok(backend),
+            None => Err(crate::Error::UnknownBackend(self.backend_name.clone())),
+        }
+    }
 }
 
 fn conn_complete_if_dir(path: &Path) -> Cow<Path> {

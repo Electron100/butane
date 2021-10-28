@@ -110,8 +110,21 @@ pub trait MigrationsMut: Migrations
 where
     Self::M: MigrationMut,
 {
+    /// Construct a new, uninitialized migration. You may want to use
+    /// `create_migration` instead, which provides higher-level
+    /// functionality.
     fn new_migration(&self, name: &str) -> Self::M;
+
+    /// Adds a migration constructed from `new_migration` into the set
+    /// of migrations. Should be called after filling in the migration
+    /// details. Unnecessary when using `create_migration`.
     fn add_migration(&mut self, m: Self::M) -> Result<()>;
+
+    /// Clears all migrations -- deleting them from this object (and
+    /// any storage backing it) and deleting the record of their
+    /// existence/application from the database. The database schema
+    /// is not modified, nor is any other data removed. Use carefully.
+    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
     /// Get a pseudo-migration representing the current state as
     /// determined by the last build of models. This does not
@@ -132,18 +145,31 @@ where
         name: &str,
         from: Option<&Self::M>,
     ) -> Result<bool> {
+        let to_db = self.current().db()?;
+        self.create_migration_to(backend, name, from, to_db)
+    }
+
+    /// Create a migration `from` -> `to_db` named `name`. From may be None, in which
+    /// case the migration is created from an empty database.
+    /// Returns true if a migration was created, false if `from` and `current` represent identical states.
+    fn create_migration_to(
+        &mut self,
+        backend: &impl db::Backend,
+        name: &str,
+        from: Option<&Self::M>,
+        to_db: ADB,
+    ) -> Result<bool> {
         let empty_db = Ok(ADB::new());
         let from_none = from.is_none();
         let from_db = from.map_or(empty_db, |m| m.db())?;
-        let to_db = self.current().db()?;
         let mut ops = adb::diff(&from_db, &to_db);
         if ops.is_empty() {
             return Ok(false);
         }
 
         if from_none {
-            // This is the first migration. Create the butane_migration table
-            ops.push(Operation::AddTable(migrations_table()));
+            // This may be the first migration. Create the butane_migration table
+            ops.push(Operation::AddTableIfNotExists(migrations_table()));
         }
 
         let up_sql = backend.create_migration_sql(&from_db, ops)?;

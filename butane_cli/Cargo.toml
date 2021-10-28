@@ -18,7 +18,7 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
 anyhow = "1.0"
-butane = { path="../butane", version="0.4.1", features=["default", "sqlite", "pg"] }
+butane = { path="../butane", version="0.4.3", features=["default", "sqlite", "pg"] }
 chrono = "0.4"
 clap = "2.33"
 quote = "1.0"

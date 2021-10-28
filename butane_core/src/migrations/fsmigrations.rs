@@ -1,7 +1,7 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::fs::{Filesystem, OsFilesystem};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
-use crate::Result;
+use crate::{ConnectionMethods, DataObject, Result};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -317,6 +317,22 @@ impl MigrationsMut for FsMigrations {
             state.latest = Some(m.name().to_string());
             self.save_state(&state)?;
         }
+        Ok(())
+    }
+
+    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+        for entry in std::fs::read_dir(&self.root)? {
+            let entry = entry?;
+            if matches!(entry.path().file_name(), Some(name) if name == "current") {
+                continue;
+            }
+            if entry.file_type()?.is_dir() {
+                std::fs::remove_dir_all(entry.path())?;
+            } else {
+                std::fs::remove_file(entry.path())?;
+            }
+        }
+        conn.delete_where(super::ButaneMigration::TABLE, crate::query::BoolExpr::True)?;
         Ok(())
     }
 }

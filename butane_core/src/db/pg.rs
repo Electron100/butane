@@ -1,19 +1,18 @@
 //! Postgresql database backend
+use super::connmethods::VecRows;
 use super::helper;
 use super::*;
-use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
+use crate::custom::{SqlTypeCustom, SqlValRefCustom};
+use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::{debug, query};
-use crate::{Result, SqlType, SqlVal};
+use crate::{Result, SqlType, SqlVal, SqlValRef};
+use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
 use postgres::fallible_iterator::FallibleIterator;
+use postgres::GenericClient;
 use std::cell::RefCell;
 use std::fmt::Write;
-
-#[cfg(feature = "debug")]
-use exec_time::exec_time;
-
-use crate::connection_method_wrapper;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
@@ -36,7 +35,7 @@ impl Backend for PgBackend {
         BACKEND_NAME
     }
 
-    fn create_migration_sql(&self, current: &ADB, ops: &[Operation]) -> Result<String> {
+    fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {
         let mut current: ADB = (*current).clone();
         Ok(ops
             .iter()
@@ -62,10 +61,6 @@ impl PgConnection {
             conn: RefCell::new(Self::connect(params)?),
         })
     }
-    // For use with the connection_method_wrapper macro
-    fn wrapped_connection_methods(&self) -> Result<PgGenericClient<postgres::Client>> {
-        Ok(PgGenericClient { client: &self.conn })
-    }
     fn connect(params: &str) -> Result<postgres::Client> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "tls")] {
@@ -78,7 +73,12 @@ impl PgConnection {
         Ok(postgres::Client::connect(params, connector)?)
     }
 }
-connection_method_wrapper!(PgConnection);
+impl PgConnectionLike for PgConnection {
+    type Client = postgres::Client;
+    fn cell(&self) -> Result<&RefCell<Self::Client>> {
+        Ok(&self.conn)
+    }
+}
 impl BackendConnection for PgConnection {
     fn transaction<'c>(&'c mut self) -> Result<Transaction<'c>> {
         let trans: postgres::Transaction<'_> = self.conn.get_mut().transaction()?;
@@ -96,40 +96,44 @@ impl BackendConnection for PgConnection {
     }
 }
 
-struct PgGenericClient<'a, T>
-where
-    T: postgres::GenericClient,
-{
-    client: &'a RefCell<T>,
-}
-
-type DynToSqlPg = (dyn postgres::types::ToSql + Sync);
+type DynToSqlPg<'a> = (dyn postgres::types::ToSql + Sync + 'a);
 
 fn sqlval_for_pg_query(v: &SqlVal) -> &dyn postgres::types::ToSql {
     v as &dyn postgres::types::ToSql
 }
 
-impl<T> ConnectionMethods for PgGenericClient<'_, T>
+fn sqlvalref_for_pg_query<'a>(v: &'a SqlValRef<'a>) -> &'a dyn postgres::types::ToSql {
+    v as &dyn postgres::types::ToSql
+}
+
+/// Shared functionality between connection and
+/// transaction. Implementation detail. Semver exempt.
+pub trait PgConnectionLike {
+    type Client: postgres::GenericClient;
+    fn cell(&self) -> Result<&RefCell<Self::Client>>;
+}
+
+impl<T> ConnectionMethods for T
 where
-    T: postgres::GenericClient,
+    T: PgConnectionLike,
 {
     fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
             debug!("execute sql {}", sql);
         }
-        self.client.borrow_mut().batch_execute(sql.as_ref())?;
+        self.cell()?.try_borrow_mut()?.batch_execute(sql.as_ref())?;
         Ok(())
     }
 
-    #[cfg_attr(feature = "debug", exec_time)]
-    fn query(
-        &self,
-        table: &'static str,
-        columns: &[Column],
+    fn query<'a, 'b, 'c: 'a>(
+        &'c self,
+        table: &str,
+        columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
+        offset: Option<i32>,
         order: Option<&[query::Order]>,
-    ) -> Result<RawQueryResult> {
+    ) -> Result<RawQueryResult<'a>> {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
         let mut values: Vec<SqlVal> = Vec::new();
@@ -151,24 +155,39 @@ where
             helper::sql_limit(limit, &mut sqlquery)
         }
 
+        if let Some(offset) = offset {
+            helper::sql_offset(offset, &mut sqlquery)
+        }
+
         if cfg!(feature = "log") {
             debug!("query sql {}", sqlquery);
         }
+        eprintln!("query sql {}", sqlquery);
 
-        let stmt = self.client.try_borrow_mut()?.prepare(&sqlquery)?;
-        self.client
+        let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
+        let stmt = self
+            .cell()?
+            .try_borrow_mut()?
+            .prepare_typed(&sqlquery, types.as_ref())?;
+        // todo avoid intermediate vec?
+        let rowvec: Vec<postgres::Row> = self
+            .cell()?
             .try_borrow_mut()?
             .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))?
             .map_err(Error::Postgres)
-            .map(|r| row_from_postgres(&r, columns))
-            .collect()
+            .map(|r| {
+                check_columns(&r, columns)?;
+                Ok(r)
+            })
+            .collect()?;
+        Ok(Box::new(VecRows::new(rowvec)))
     }
     fn insert_returning_pk(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
@@ -184,20 +203,15 @@ where
 
         // use query instead of execute so we can get our result back
         let pk: Option<SqlVal> = self
-            .client
+            .cell()?
             .try_borrow_mut()?
-            .query_raw(sql.as_str(), values.iter().map(sqlval_for_pg_query))?
+            .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query))?
             .map_err(Error::Postgres)
             .map(|r| sql_val_from_postgres(&r, 0, pkcol))
             .nth(0)?;
-        pk.ok_or(Error::Internal)
+        pk.ok_or_else(|| Error::Internal("could not get pk".to_string()))
     }
-    fn insert_only(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()> {
+    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
             table,
@@ -206,33 +220,33 @@ where
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.client
+        self.cell()?
             .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
-    fn insert_or_replace(
+    fn insert_or_replace<'a>(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef<'a>],
     ) -> Result<()> {
         let mut sql = String::new();
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.client
+        self.cell()?
             .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
     fn update(
         &self,
-        table: &'static str,
+        table: &str,
         pkcol: Column,
-        pk: SqlVal,
+        pk: SqlValRef,
         columns: &[Column],
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
         let mut sql = String::new();
         helper::sql_update_with_placeholders(
@@ -250,12 +264,12 @@ where
         if cfg!(feature = "log") {
             debug!("update sql {}", sql);
         }
-        self.client
+        self.cell()?
             .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
+    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
         write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
@@ -267,18 +281,18 @@ where
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
         let cnt = self
-            .client
+            .cell()?
             .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(cnt as usize)
     }
-    fn has_table(&self, table: &'static str) -> Result<bool> {
+    fn has_table(&self, table: &str) -> Result<bool> {
         // future improvement, should be schema-aware
         let stmt = self
-            .client
+            .cell()?
             .try_borrow_mut()?
             .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;")?;
-        let rows = self.client.try_borrow_mut()?.query(&stmt, &[&table])?;
+        let rows = self.cell()?.try_borrow_mut()?.query(&stmt, &[&table])?;
         Ok(!rows.is_empty())
     }
 }
@@ -294,28 +308,31 @@ impl<'c> PgTransaction<'c> {
     }
     fn get(&self) -> Result<&RefCell<postgres::Transaction<'c>>> {
         match &self.trans {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans),
         }
     }
-    fn wrapped_connection_methods(&self) -> Result<PgGenericClient<'_, postgres::Transaction<'c>>> {
-        Ok(PgGenericClient {
-            client: self.get()?,
-        })
+    fn already_consumed() -> Error {
+        Error::Internal("transaction has already been consumed".to_string())
     }
 }
-connection_method_wrapper!(PgTransaction<'_>);
+impl<'c> PgConnectionLike for PgTransaction<'c> {
+    type Client = postgres::Transaction<'c>;
+    fn cell(&self) -> Result<&RefCell<Self::Client>> {
+        self.get()
+    }
+}
 
 impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.into_inner().commit()?),
         }
     }
     fn rollback(&mut self) -> Result<()> {
         match self.trans.take() {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.into_inner().rollback()?),
         }
     }
@@ -337,102 +354,129 @@ impl postgres::types::ToSql for SqlVal {
         postgres::types::IsNull,
         Box<dyn std::error::Error + 'static + Sync + Send>,
     > {
-        match self {
-            SqlVal::Bool(b) => b.to_sql(ty, out),
-            SqlVal::Int(i) => i.to_sql(ty, out),
-            SqlVal::BigInt(i) => i.to_sql(ty, out),
-            SqlVal::Real(r) => r.to_sql(ty, out),
-            SqlVal::Text(t) => t.to_sql(ty, out),
-            SqlVal::Blob(b) => b.to_sql(ty, out),
-            #[cfg(feature = "datetime")]
-            SqlVal::Timestamp(dt) => dt.to_sql(ty, out),
-            SqlVal::Null => Option::<bool>::None.to_sql(ty, out),
-        }
+        self.as_ref().to_sql(ty, out)
     }
-
     fn accepts(ty: &postgres::types::Type) -> bool {
-        // Unfortunately this is a type method rather than an instance method.
-        // Declare acceptance of all the types we can support and hope it works out OK
-        if bool::accepts(ty)
-            || i32::accepts(ty)
-            || i64::accepts(ty)
-            || f64::accepts(ty)
-            || String::accepts(ty)
-            || Vec::<u8>::accepts(ty)
-        {
-            return true;
-        }
-
-        #[cfg(feature = "datetime")]
-        if NaiveDateTime::accepts(ty) {
-            return true;
-        }
-
-        false
+        SqlValRef::<'_>::accepts(ty)
     }
-
     postgres::types::to_sql_checked!();
 }
 
-impl<'a> postgres::types::FromSql<'a> for SqlVal {
+impl<'a> postgres::types::ToSql for SqlValRef<'a> {
+    fn to_sql(
+        &self,
+        requested_ty: &postgres::types::Type,
+        out: &mut bytes::BytesMut,
+    ) -> std::result::Result<
+        postgres::types::IsNull,
+        Box<dyn std::error::Error + 'static + Sync + Send>,
+    > {
+        use SqlValRef::*;
+        match self {
+            Bool(b) => b.to_sql_checked(requested_ty, out),
+            Int(i) => i.to_sql_checked(requested_ty, out),
+            BigInt(i) => i.to_sql_checked(requested_ty, out),
+            Real(r) => r.to_sql_checked(requested_ty, out),
+            Text(t) => t.to_sql_checked(requested_ty, out),
+            Blob(b) => b.to_sql_checked(requested_ty, out),
+            #[cfg(feature = "datetime")]
+            Timestamp(dt) => dt.to_sql_checked(requested_ty, out),
+            Null => Ok(postgres::types::IsNull::Yes),
+            Custom(SqlValRefCustom::PgToSql { ty, tosql }) => {
+                check_type_match(ty, requested_ty)?;
+                tosql.to_sql_checked(requested_ty, out)
+            }
+            Custom(SqlValRefCustom::PgBytes { ty, data }) => {
+                check_type_match(ty, requested_ty)?;
+                out.put(*data);
+                Ok(postgres::types::IsNull::No)
+            }
+        }
+    }
+    fn accepts(_ty: &postgres::types::Type) -> bool {
+        // Unfortunately this is a type method rather than an instance
+        // method.  Declare acceptance of all the types we can support
+        // and do the actual checking in the to_sql method
+        true
+    }
+    postgres::types::to_sql_checked!();
+}
+
+fn check_type_match(
+    ty1: &postgres::types::Type,
+    ty2: &postgres::types::Type,
+) -> std::result::Result<(), Box<dyn std::error::Error + 'static + Sync + Send>> {
+    if ty1 == ty2 {
+        Ok(())
+    } else {
+        Err(Box::new(crate::Error::Internal(format!(
+            "postgres type mismatch. Wanted {} but have {}",
+            ty1, ty2
+        ))))
+    }
+}
+
+impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
     fn from_sql(
         ty: &postgres::types::Type,
         raw: &'a [u8],
     ) -> std::result::Result<Self, Box<dyn std::error::Error + 'static + Sync + Send>> {
         use postgres::types::Type;
         match *ty {
-            Type::BOOL => Ok(SqlVal::Bool(bool::from_sql(ty, raw)?)),
-            Type::INT4 => Ok(SqlVal::Int(i32::from_sql(ty, raw)?)),
-            Type::INT8 => Ok(SqlVal::BigInt(i64::from_sql(ty, raw)?)),
-            Type::FLOAT8 => Ok(SqlVal::Real(f64::from_sql(ty, raw)?)),
-            Type::TEXT => Ok(SqlVal::Text(String::from_sql(ty, raw)?)),
-            Type::BYTEA => Ok(SqlVal::Blob(Vec::<u8>::from_sql(ty, raw)?)),
+            Type::BOOL => Ok(SqlValRef::Bool(bool::from_sql(ty, raw)?)),
+            Type::INT4 => Ok(SqlValRef::Int(i32::from_sql(ty, raw)?)),
+            Type::INT8 => Ok(SqlValRef::BigInt(i64::from_sql(ty, raw)?)),
+            Type::FLOAT8 => Ok(SqlValRef::Real(f64::from_sql(ty, raw)?)),
+            Type::TEXT => Ok(SqlValRef::Text(postgres::types::FromSql::from_sql(
+                ty, raw,
+            )?)),
+            Type::BYTEA => Ok(SqlValRef::Blob(postgres::types::FromSql::from_sql(
+                ty, raw,
+            )?)),
             #[cfg(feature = "datetime")]
-            Type::TIMESTAMP => Ok(SqlVal::Timestamp(NaiveDateTime::from_sql(ty, raw)?)),
-            _ => Err(Box::new(Error::UnknownSqlType(format!("{}", ty)))),
+            Type::TIMESTAMP => Ok(SqlValRef::Timestamp(NaiveDateTime::from_sql(ty, raw)?)),
+            _ => Ok(SqlValRef::Custom(SqlValRefCustom::PgBytes {
+                ty: ty.clone(),
+                data: raw,
+            })),
         }
     }
 
     fn from_sql_null(
         _ty: &postgres::types::Type,
     ) -> std::result::Result<Self, Box<dyn std::error::Error + 'static + Sync + Send>> {
-        Ok(SqlVal::Null)
+        Ok(SqlValRef::Null)
     }
 
     #[allow(clippy::match_like_matches_macro)]
-    fn accepts(ty: &postgres::types::Type) -> bool {
-        use postgres::types::Type;
-        match *ty {
-            Type::BOOL => true,
-            Type::INT2 => true,
-            Type::INT4 => true,
-            Type::INT8 => true,
-            Type::FLOAT4 => true,
-            Type::FLOAT8 => true,
-            Type::TEXT => true,
-            Type::BYTEA => true,
-            #[cfg(feature = "datetime")]
-            Type::TIMESTAMP => true,
-            _ => false,
-        }
+    fn accepts(_ty: &postgres::types::Type) -> bool {
+        // Unfortunately this is a type method rather than an instance
+        // method, so we don't actually know what we can
+        // support. Declare acceptance of all and do any actual type
+        // checking in from_sql.
+        true
     }
 }
 
-fn row_from_postgres(row: &postgres::Row, cols: &[Column]) -> Result<Row> {
-    let mut vals: Vec<SqlVal> = Vec::new();
+fn check_columns(row: &postgres::Row, cols: &[Column]) -> Result<()> {
     if cols.len() != row.len() {
-        panic!(
+        Err(Error::Internal(format!(
             "postgres returns columns {} doesn't match requested columns {}",
             row.len(),
             cols.len()
-        )
+        )))
+    } else {
+        Ok(())
     }
-    vals.reserve(cols.len());
-    for i in 0..cols.len() {
-        let col = cols.get(i).unwrap();
-        vals.push(sql_val_from_postgres(row, i, col)?);
+}
+
+impl BackendRow for postgres::Row {
+    fn get(&self, idx: usize, _ty: SqlType) -> Result<SqlValRef> {
+        Ok(self.try_get(idx)?)
     }
-    Ok(Row::new(vals))
+    fn len(&self) -> usize {
+        postgres::Row::len(self)
+    }
 }
 
 fn sql_for_expr<W>(
@@ -450,7 +494,8 @@ fn sql_val_from_postgres<I>(row: &postgres::Row, idx: I, col: &Column) -> Result
 where
     I: postgres::row::RowIndex + std::fmt::Display,
 {
-    let sqlval: SqlVal = row.try_get(idx)?;
+    let sqlref: SqlValRef = row.try_get(idx)?;
+    let sqlval: SqlVal = sqlref.into();
     if sqlval.is_compatible(col.ty(), true) {
         Ok(sqlval)
     } else {
@@ -467,22 +512,27 @@ where
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
-        Operation::AddTable(table) => Ok(create_table(&table)?),
-        Operation::RemoveTable(name) => Ok(drop_table(&name)),
-        Operation::AddColumn(tbl, col) => add_column(&tbl, &col),
-        Operation::RemoveColumn(tbl, name) => remove_column(&tbl, &name),
-        Operation::ChangeColumn(tbl, old, new) => change_column(current, &tbl, &old, Some(new)),
+        Operation::AddTable(table) => Ok(create_table(table, false)?),
+        Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)?),
+        Operation::RemoveTable(name) => Ok(drop_table(name)),
+        Operation::AddColumn(tbl, col) => add_column(tbl, col),
+        Operation::RemoveColumn(tbl, name) => Ok(remove_column(tbl, name)),
+        Operation::ChangeColumn(tbl, old, new) => change_column(current, tbl, old, Some(new)),
     }
 }
 
-fn create_table(table: &ATable) -> Result<String> {
+fn create_table(table: &ATable, allow_exists: bool) -> Result<String> {
     let coldefs = table
         .columns
         .iter()
         .map(define_column)
         .collect::<Result<Vec<String>>>()?
         .join(",\n");
-    Ok(format!("CREATE TABLE {} (\n{}\n);", table.name, coldefs))
+    let modifier = if allow_exists { "IF NOT EXISTS " } else { "" };
+    Ok(format!(
+        "CREATE TABLE {}{} (\n{}\n);",
+        modifier, table.name, coldefs
+    ))
 }
 
 fn define_column(col: &AColumn) -> Result<String> {
@@ -493,6 +543,9 @@ fn define_column(col: &AColumn) -> Result<String> {
     if col.is_pk() {
         constraints.push("PRIMARY KEY".to_string());
     }
+    if col.unique() {
+        constraints.push("UNIQUE".to_string());
+    }
     Ok(format!(
         "{} {} {}",
         &col.name(),
@@ -501,25 +554,32 @@ fn define_column(col: &AColumn) -> Result<String> {
     ))
 }
 
-fn col_sqltype(col: &AColumn) -> Result<&'static str> {
-    let ty = col.sqltype()?;
-    if col.is_auto() {
-        match ty {
-            SqlType::Int => Ok("SERIAL"),
-            SqlType::BigInt => Ok("BIGSERIAL"),
-            _ => Err(Error::InvalidAuto(col.name().to_string())),
+fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
+    match col.typeid()? {
+        TypeIdentifier::Name(name) => Ok(Cow::Owned(name)),
+        TypeIdentifier::Ty(ty) => {
+            if col.is_auto() {
+                match ty {
+                    SqlType::Int => Ok(Cow::Borrowed("SERIAL")),
+                    SqlType::BigInt => Ok(Cow::Borrowed("BIGSERIAL")),
+                    _ => Err(Error::InvalidAuto(col.name().to_string())),
+                }
+            } else {
+                Ok(match ty {
+                    SqlType::Bool => Cow::Borrowed("BOOLEAN"),
+                    SqlType::Int => Cow::Borrowed("INTEGER"),
+                    SqlType::BigInt => Cow::Borrowed("BIGINT"),
+                    SqlType::Real => Cow::Borrowed("DOUBLE PRECISION"),
+                    SqlType::Text => Cow::Borrowed("TEXT"),
+                    #[cfg(feature = "datetime")]
+                    SqlType::Timestamp => Cow::Borrowed("TIMESTAMP"),
+                    SqlType::Blob => Cow::Borrowed("BYTEA"),
+                    SqlType::Custom(c) => match c {
+                        SqlTypeCustom::Pg(ref ty) => Cow::Owned(ty.name().to_string()),
+                    },
+                })
+            }
         }
-    } else {
-        Ok(match ty {
-            SqlType::Bool => "BOOLEAN",
-            SqlType::Int => "INTEGER",
-            SqlType::BigInt => "BIGINT",
-            SqlType::Real => "DOUBLE PRECISION",
-            SqlType::Text => "TEXT",
-            #[cfg(feature = "datetime")]
-            SqlType::Timestamp => "TIMESTAMP",
-            SqlType::Blob => "BYTEA",
-        })
     }
 }
 
@@ -533,12 +593,12 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         tbl_name,
         define_column(col)?,
-        helper::sql_literal_value(default)
+        helper::sql_literal_value(default)?
     ))
 }
 
-fn remove_column(tbl_name: &str, name: &str) -> Result<String> {
-    Ok(format!("ALTER TABLE {} DROP COLUMN {};", tbl_name, name))
+fn remove_column(tbl_name: &str, name: &str) -> String {
+    format!("ALTER TABLE {} DROP COLUMN {};", tbl_name, name)
 }
 
 fn copy_table(old: &ATable, new: &ATable) -> String {
@@ -581,8 +641,8 @@ fn change_column(
         None => new_table.remove_column(old.name()),
     }
     let stmts: [&str; 4] = [
-        &create_table(&new_table)?,
-        &copy_table(&old_table, &new_table),
+        &create_table(&new_table, false)?,
+        &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
         &format!("ALTER TABLE {} RENAME TO {};", &new_table.name, tbl_name),
     ];
@@ -593,7 +653,7 @@ fn change_column(
 }
 
 pub fn sql_insert_or_replace_with_placeholders(
-    table: &'static str,
+    table: &str,
     columns: &[Column],
     pkcol: &Column,
     w: &mut impl Write,
@@ -616,6 +676,25 @@ pub fn sql_insert_or_replace_with_placeholders(
         ", "
     });
     write!(w, ")").unwrap();
+}
+
+fn pgtype_for_val(val: &SqlVal) -> postgres::types::Type {
+    use postgres::types::Type;
+    match val.sqltype() {
+        None => Type::UNKNOWN,
+        Some(SqlType::Bool) => postgres::types::Type::BOOL,
+        Some(SqlType::Int) => postgres::types::Type::INT4,
+        Some(SqlType::BigInt) => postgres::types::Type::INT8,
+        Some(SqlType::Real) => postgres::types::Type::FLOAT8,
+        Some(SqlType::Text) => postgres::types::Type::TEXT,
+        Some(SqlType::Blob) => postgres::types::Type::BYTEA,
+        #[cfg(feature = "datetime")]
+        Some(SqlType::Timestamp) => postgres::types::Type::TIMESTAMP,
+        Some(SqlType::Custom(inner)) => match inner {
+            #[cfg(feature = "pg")]
+            SqlTypeCustom::Pg(ty, ..) => ty,
+        },
+    }
 }
 
 struct PgPlaceholderSource {

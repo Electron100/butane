@@ -53,6 +53,7 @@ macro_rules! maketest {
         paste::item! {
             #[test]
             pub fn [<$fname _ $backend>]() {
+								env_logger::try_init().ok();
                 let backend = butane::db::get_backend(&stringify!($backend)).expect("Could not find backend");
 								let $dataname = crate::common::[<$backend _setup>]();
 								eprintln!("connecting to {}", &$connstr);

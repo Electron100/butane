@@ -44,12 +44,20 @@ pub trait Migration: PartialEq {
             .up_sql(backend_name)?
             .ok_or_else(|| Error::UnknownBackend(backend_name.to_string()))?;
         tx.execute(&sql)?;
-        tx.insert_only(
+        self.mark_applied(&tx)?;
+        tx.commit()
+    }
+
+    /// Mark the migration as being applied without doing any
+    /// work. Use carefully -- the caller must ensure that the
+    /// database schema already matches that expected by this
+    /// migration.
+    fn mark_applied(&self, conn: &impl db::ConnectionMethods) -> Result<()> {
+        conn.insert_only(
             ButaneMigration::TABLE,
             ButaneMigration::COLUMNS,
-            &[self.name().as_ref().to_sql()],
-        )?;
-        tx.commit()
+            &[self.name().as_ref().to_sql_ref()],
+        )
     }
 
     /// Un-apply (downgrade) the migration to a database

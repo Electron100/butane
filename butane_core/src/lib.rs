@@ -1,4 +1,5 @@
 #![allow(clippy::iter_nth_zero)]
+#![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
@@ -6,6 +7,7 @@ use std::default::Default;
 use thiserror::Error as ThisError;
 
 pub mod codegen;
+pub mod custom;
 pub mod db;
 pub mod fkey;
 pub mod many;
@@ -16,8 +18,9 @@ pub mod sqlval;
 #[cfg(feature = "uuid")]
 pub mod uuid;
 
-use db::{Column, ConnectionMethods, Row};
+use db::{BackendRow, Column, ConnectionMethods};
 
+use custom::SqlTypeCustom;
 pub use query::Query;
 pub use sqlval::*;
 
@@ -54,7 +57,7 @@ pub trait DataResult: Sized {
     /// Corresponding object type.
     type DBO: DataObject;
     const COLUMNS: &'static [Column];
-    fn from_row(row: Row) -> Result<Self>
+    fn from_row<'a>(row: &(dyn BackendRow + 'a)) -> Result<Self>
     where
         Self: Sized;
     /// Create a blank query (matching all rows) for this type.
@@ -128,12 +131,20 @@ pub enum Error {
     UnknownBackend(String),
     #[error("Range error")]
     OutOfRange,
-    #[error("Internal logic error")]
-    Internal,
+    #[error("Internal logic error {0}")]
+    Internal(String),
     #[error("Cannot resolve type {0}. Are you missing a #[butane_type] attribute?")]
     CannotResolveType(String),
     #[error("Auto fields are only supported for integer fields. {0} cannot be auto.")]
     InvalidAuto(String),
+    #[error("No implicit default available for custom sql types.")]
+    NoCustomDefault,
+    #[error("Backend {1} is not compatible with custom SqlVal {0:?}")]
+    IncompatibleCustom(custom::SqlValCustom, &'static str),
+    #[error("Backend {1} is not compatible with custom SqlType {0:?}")]
+    IncompatibleCustomT(custom::SqlTypeCustom, &'static str),
+    #[error("Literal values for custom types are currently unsupported.")]
+    LiteralForCustomUnsupported(custom::SqlValCustom),
     #[error("(De)serialization error {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("IO error {0}")]
@@ -155,6 +166,8 @@ pub enum Error {
     #[cfg(feature = "tls")]
     #[error("TLS error {0}")]
     TLS(#[from] native_tls::Error),
+    #[error("Generic error {0}")]
+    Generic(#[from] Box<dyn std::error::Error + Sync + Send>),
 }
 
 #[cfg(feature = "sqlite")]
@@ -176,7 +189,7 @@ impl From<rusqlite::types::FromSqlError> for Error {
 /// Enumeration of the types a database value may take.
 ///
 /// See also [`SqlVal`][crate::SqlVal].
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SqlType {
     Bool,
     /// 4 bytes
@@ -189,6 +202,7 @@ pub enum SqlType {
     #[cfg(feature = "datetime")]
     Timestamp,
     Blob,
+    Custom(SqlTypeCustom),
 }
 impl std::fmt::Display for SqlType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -202,6 +216,7 @@ impl std::fmt::Display for SqlType {
             #[cfg(feature = "datetime")]
             Timestamp => "timestamp",
             Blob => "blob",
+            Custom(_) => "custom",
         }
         .fmt(f)
     }

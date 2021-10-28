@@ -1,9 +1,10 @@
-use crate::migrations::adb::{DeferredSqlType, TypeKey};
+use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::{SqlType, SqlVal};
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span, TokenTree};
 use quote::{quote, ToTokens};
+use regex::Regex;
 use syn::parse_quote;
 use syn::{
     punctuated::Punctuated, Attribute, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta,
@@ -112,6 +113,39 @@ pub fn dataresult(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     )
 }
 
+fn parse_butane_type_args(args: TokenStream2) -> std::result::Result<TypeIdentifier, TokenStream2> {
+    let args: Vec<TokenTree> = args.into_iter().collect();
+    if args.is_empty() {
+        return Err(quote!(compile_error!("Expected butane_type(sqltype)");));
+    }
+    let tyid = match &args[0] {
+        TokenTree::Ident(tyid) => tyid.clone(),
+        _ => return Err(quote!(compile_error!("Unexpected tokens in butane_type");)),
+    };
+    if args.len() == 1 {
+        return Ok(match sqltype_from_name(&tyid) {
+            Some(ty) => ty,
+            None => {
+                eprintln!("No SqlType value named {}", tyid.to_string());
+                return Err(quote!(compile_error!("No SqlType value with the given name");));
+            }
+        });
+    } else if tyid == "Custom" {
+        let customerr = quote!(compile_error!("Unexpected tokens custom in butane_type. Expected butane_type(Custom(name))."););
+        return match args.get(1) {
+            Some(TokenTree::Group(g)) if !g.stream().is_empty() => {
+                let customid = g.stream().into_iter().nth(0).unwrap();
+                match customid {
+                    TokenTree::Ident(tyid) => Ok(TypeIdentifier::Name(tyid.to_string())),
+                    _ => Err(customerr),
+                }
+            }
+            _ => Err(customerr),
+        };
+    }
+    Err(quote!(compile_error!("Unexpected tokens in butane_type");))
+}
+
 pub fn butane_type_with_migrations<M>(
     args: TokenStream2,
     input: TokenStream2,
@@ -131,32 +165,19 @@ where
 
     if tyinfo.is_none() {
         // For types below here, we need the SqlType given to us
-        let args: TokenStream2 = args;
-        let args: Vec<TokenTree> = args.into_iter().collect();
-        if args.len() != 1 {
-            return quote!(compile_error!("Expected butane_type(sqltype)"););
-        }
-        let tyid = match &args[0] {
-            TokenTree::Ident(tyid) => tyid.clone(),
-            _ => return quote!(compile_error!("Unexpected tokens in butane_type");),
+        let sqltype = match parse_butane_type_args(args) {
+            Ok(sqltype) => sqltype,
+            Err(t) => return t,
         };
-        let sqltype = match sqltype_from_name(&tyid) {
-            Some(ty) => ty,
-            None => {
-                eprintln!("No SqlType value named {}", tyid.to_string());
-                return quote!(compile_error!("No SqlType value with the given name"););
-            }
-        };
-
         if let Ok(item) = syn::parse2::<ItemStruct>(input.clone()) {
             tyinfo = Some(CustomTypeInfo {
                 name: item.ident.to_string(),
-                ty: DeferredSqlType::Known(sqltype),
+                ty: sqltype.into(),
             });
         } else if let Ok(item) = syn::parse2::<ItemEnum>(input.clone()) {
             tyinfo = Some(CustomTypeInfo {
                 name: item.ident.to_string(),
-                ty: DeferredSqlType::Known(sqltype),
+                ty: sqltype.into(),
             });
         }
     }
@@ -221,6 +242,7 @@ fn remove_helper_field_attributes(
                         && !a.path.is_ident("auto")
                         && !a.path.is_ident("sqltype")
                         && !a.path.is_ident("default")
+                        && !a.path.is_ident("unique")
                 });
             }
             Ok(fields)
@@ -261,15 +283,15 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
         Some(ident) => *ident == "id",
         None => false,
     });
-    if let Some(id_field) = pk_by_name {
-        Some(id_field.clone())
-    } else {
-        None
-    }
+    pk_by_name.cloned()
 }
 
 fn is_auto(field: &Field) -> bool {
     field.attrs.iter().any(|attr| attr.path.is_ident("auto"))
+}
+
+fn is_unique(field: &Field) -> bool {
+    field.attrs.iter().any(|attr| attr.path.is_ident("unique"))
 }
 
 fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
@@ -378,10 +400,18 @@ fn get_default(field: &Field) -> std::result::Result<Option<SqlVal>, CompilerErr
     Ok(Some(sqlval_from_lit(lit)?))
 }
 
+fn some_id(ty: SqlType) -> Option<TypeIdentifier> {
+    Some(TypeIdentifier::Ty(ty))
+}
+
+fn some_known(ty: SqlType) -> Option<DeferredSqlType> {
+    Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(ty)))
+}
+
 /// If the field refers to a primitive, return its SqlType
 fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
     if *ty == parse_quote!(bool) {
-        return Some(DeferredSqlType::Known(SqlType::Bool));
+        return some_known(SqlType::Bool);
     } else if *ty == parse_quote!(u8)
         || *ty == parse_quote!(i8)
         || *ty == parse_quote!(u16)
@@ -389,30 +419,30 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         || *ty == parse_quote!(u16)
         || *ty == parse_quote!(i32)
     {
-        return Some(DeferredSqlType::Known(SqlType::Int));
+        return some_known(SqlType::Int);
     } else if *ty == parse_quote!(u32) || *ty == parse_quote!(i64) {
         // Future improvement: better support unsigned integers
         // here. Sqlite has no u64, though Postgres does
-        return Some(DeferredSqlType::Known(SqlType::BigInt));
+        return some_known(SqlType::BigInt);
     } else if *ty == parse_quote!(f32) || *ty == parse_quote!(f64) {
-        return Some(DeferredSqlType::Known(SqlType::Real));
+        return some_known(SqlType::Real);
     } else if *ty == parse_quote!(String) {
-        return Some(DeferredSqlType::Known(SqlType::Text));
+        return some_known(SqlType::Text);
     } else if *ty == parse_quote!(Vec<u8>) {
-        return Some(DeferredSqlType::Known(SqlType::Blob));
+        return some_known(SqlType::Blob);
     }
 
     #[cfg(feature = "datetime")]
     {
         if *ty == parse_quote!(NaiveDateTime) {
-            return Some(DeferredSqlType::Known(SqlType::Timestamp));
+            return some_known(SqlType::Timestamp);
         }
     }
 
     #[cfg(feature = "uuid")]
     {
         if *ty == parse_quote!(Uuid) || *ty == parse_quote!(uuid::Uuid) {
-            return Some(DeferredSqlType::Known(SqlType::Blob));
+            return some_known(SqlType::Blob);
         }
     }
 
@@ -468,19 +498,30 @@ where
     current_migration.add_type(key, ty)
 }
 
-fn sqltype_from_name(name: &Ident) -> Option<SqlType> {
+fn sqltype_from_name(name: &Ident) -> Option<TypeIdentifier> {
     let name = name.to_string();
     match name.as_ref() {
-        "Bool" => Some(SqlType::Bool),
-        "Int" => Some(SqlType::Int),
-        "BigInt" => Some(SqlType::BigInt),
-        "Real" => Some(SqlType::Real),
-        "Text" => Some(SqlType::Text),
+        "Bool" => return some_id(SqlType::Bool),
+        "Int" => return some_id(SqlType::Int),
+        "BigInt" => return some_id(SqlType::BigInt),
+        "Real" => return some_id(SqlType::Real),
+        "Text" => return some_id(SqlType::Text),
         #[cfg(feature = "datetime")]
-        "Timestamp" => Some(SqlType::Timestamp),
-        "Blob" => Some(SqlType::Blob),
-        _ => None,
+        "Timestamp" => return some_id(SqlType::Timestamp),
+        "Blob" => return some_id(SqlType::Blob),
+        _ => (),
     }
+    if let Some(custom_name) = Regex::new(r"^Custom\((.*)\)$").unwrap().captures(&name) {
+        if let Some(pg_name) = Regex::new(r"^Pg\((.*)\)$")
+            .unwrap()
+            .captures(custom_name.get(1).unwrap().as_str())
+        {
+            return Some(TypeIdentifier::Name(
+                pg_name.get(1).unwrap().as_str().to_string(),
+            ));
+        }
+    }
+    None
 }
 
 #[derive(Debug)]

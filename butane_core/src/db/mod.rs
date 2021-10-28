@@ -13,7 +13,7 @@
 //!    database backend. It is returned by the `connect` method.
 
 use crate::query::BoolExpr;
-use crate::{migrations::adb, Error, Result, SqlVal};
+use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fs;
@@ -37,7 +37,9 @@ pub use r2::ConnectionManager;
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
 
-pub use connmethods::{Column, ConnectionMethods, QueryResult, RawQueryResult, Row};
+pub use connmethods::{
+    BackendRow, BackendRows, Column, ConnectionMethods, QueryResult, RawQueryResult,
+};
 
 /// Database connection.
 pub trait BackendConnection: ConnectionMethods + Send + 'static {
@@ -61,6 +63,8 @@ impl Connection {
     pub fn execute(&mut self, sql: impl AsRef<str>) -> Result<()> {
         self.conn.execute(sql.as_ref())
     }
+    // For use with connection_method_wrapper macro
+    #[allow(clippy::unnecessary_wraps)]
     fn wrapped_connection_methods(&self) -> Result<&dyn BackendConnection> {
         Ok(self.conn.as_ref())
     }
@@ -108,6 +112,12 @@ impl ConnectionSpec {
         let path = conn_complete_if_dir(path.as_ref());
         serde_json::from_reader(fs::File::open(path)?).map_err(|e| e.into())
     }
+    pub fn get_backend(&self) -> Result<Box<dyn Backend>> {
+        match get_backend(&self.backend_name) {
+            Some(backend) => Ok(backend),
+            None => Err(crate::Error::UnknownBackend(self.backend_name.clone())),
+        }
+    }
 }
 
 fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
@@ -121,7 +131,7 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
 /// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
 pub trait Backend {
     fn name(&self) -> &'static str;
-    fn create_migration_sql(&self, current: &adb::ADB, ops: &[adb::Operation]) -> Result<String>;
+    fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
     fn connect(&self, conn_str: &str) -> Result<Connection>;
 }
 
@@ -129,7 +139,7 @@ impl Backend for Box<dyn Backend> {
     fn name(&self) -> &'static str {
         self.deref().name()
     }
-    fn create_migration_sql(&self, current: &adb::ADB, ops: &[adb::Operation]) -> Result<String> {
+    fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         self.deref().create_migration_sql(current, ops)
     }
     fn connect(&self, conn_str: &str) -> Result<Connection> {
@@ -191,9 +201,12 @@ impl<'c> Transaction<'c> {
     pub fn rollback(mut self) -> Result<()> {
         self.trans.deref_mut().rollback()
     }
+    // For use with connection_method_wrapper macro
+    #[allow(clippy::unnecessary_wraps)]
     fn wrapped_connection_methods(&self) -> Result<&dyn ConnectionMethods> {
         let a: &dyn BackendTransaction<'c> = self.trans.as_ref();
         Ok(a.connection_methods())
     }
 }
+
 connection_method_wrapper!(Transaction<'_>);

@@ -4,9 +4,10 @@
 #![allow(unused)]
 
 use super::Column;
-use crate::migrations::adb::AColumn;
+use crate::migrations::adb::{AColumn, TypeIdentifier};
 use crate::query::Expr::{Condition, Placeholder, Val};
 use crate::query::{BoolExpr::*, Expr, Join, Order, OrderDirection};
+use crate::Error;
 use crate::{query, Result, SqlType, SqlVal};
 use std::borrow::Cow;
 use std::fmt::Write;
@@ -108,45 +109,52 @@ where
                 write!(w, ")").unwrap();
                 Ok(())
             }
-            In(col, vals) => write!(
-                w,
-                "{} IN ({})",
-                col,
-                vals.iter()
-                    .map(|v| v.to_string())
-                    .collect::<Vec<String>>()
-                    .as_slice()
-                    .join(", ")
-            ),
+            In(col, vals) => {
+                write!(w, "{} IN (", col).unwrap();
+                let mut remaining = vals.len();
+                for val in vals {
+                    f(Expr::Val(val), values, pls, w);
+                    if remaining > 1 {
+                        write!(w, ", ").unwrap();
+                        remaining -= 1;
+                    }
+                }
+                write!(w, ")")
+            }
         },
     }
     .unwrap()
 }
 
-pub fn sql_select(columns: &[Column], table: &'static str, w: &mut impl Write) {
+pub fn sql_select(columns: &[Column], table: &str, w: &mut impl Write) {
     write!(w, "SELECT ").unwrap();
     list_columns(columns, w);
     write!(w, " FROM {}", table).unwrap();
 }
 
 pub fn sql_insert_with_placeholders(
-    table: &'static str,
+    table: &str,
     columns: &[Column],
     pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
-    write!(w, "INSERT INTO {} (", table).unwrap();
-    list_columns(columns, w);
-    write!(w, ") VALUES (").unwrap();
-    columns.iter().fold("", |sep, _| {
-        write!(w, "{}{}", sep, pls.next_placeholder()).unwrap();
-        ", "
-    });
-    write!(w, ")").unwrap();
+    write!(w, "INSERT INTO {} ", table).unwrap();
+    if !columns.is_empty() {
+        write!(w, "(").unwrap();
+        list_columns(columns, w);
+        write!(w, ") VALUES (").unwrap();
+        columns.iter().fold("", |sep, _| {
+            write!(w, "{}{}", sep, pls.next_placeholder()).unwrap();
+            ", "
+        });
+        write!(w, ")").unwrap();
+    } else {
+        write!(w, "DEFAULT VALUES ").unwrap();
+    }
 }
 
 pub fn sql_update_with_placeholders(
-    table: &'static str,
+    table: &str,
     pkcol: Column,
     columns: &[Column],
     pls: &mut impl PlaceholderSource,
@@ -162,6 +170,10 @@ pub fn sql_update_with_placeholders(
 
 pub fn sql_limit(limit: i32, w: &mut impl Write) {
     write!(w, " LIMIT {}", limit).unwrap();
+}
+
+pub fn sql_offset(offset: i32, w: &mut impl Write) {
+    write!(w, " OFFSET {}", offset).unwrap();
 }
 
 pub fn sql_order(order: &[Order], w: &mut impl Write) {
@@ -183,15 +195,19 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
     if col.nullable() {
         return Ok(SqlVal::Null);
     }
-    Ok(match col.sqltype()? {
-        SqlType::Bool => SqlVal::Bool(false),
-        SqlType::Int => SqlVal::Int(0),
-        SqlType::BigInt => SqlVal::Int(0),
-        SqlType::Real => SqlVal::Real(0.0),
-        SqlType::Text => SqlVal::Text("".to_string()),
-        SqlType::Blob => SqlVal::Blob(Vec::new()),
-        #[cfg(feature = "datetime")]
-        SqlType::Timestamp => SqlVal::Timestamp(NaiveDateTime::from_timestamp(0, 0)),
+    Ok(match col.typeid()? {
+        TypeIdentifier::Ty(ty) => match ty {
+            SqlType::Bool => SqlVal::Bool(false),
+            SqlType::Int => SqlVal::Int(0),
+            SqlType::BigInt => SqlVal::Int(0),
+            SqlType::Real => SqlVal::Real(0.0),
+            SqlType::Text => SqlVal::Text("".to_string()),
+            SqlType::Blob => SqlVal::Blob(Vec::new()),
+            #[cfg(feature = "datetime")]
+            SqlType::Timestamp => SqlVal::Timestamp(NaiveDateTime::from_timestamp(0, 0)),
+            SqlType::Custom(_) => return Err(Error::NoCustomDefault),
+        },
+        TypeIdentifier::Name(_) => return Err(Error::NoCustomDefault),
     })
 }
 
@@ -227,17 +243,18 @@ fn sql_column(col: query::Column, w: &mut impl Write) {
     .unwrap()
 }
 
-pub fn sql_literal_value(val: SqlVal) -> String {
+pub fn sql_literal_value(val: SqlVal) -> Result<String> {
     use SqlVal::*;
     match val {
-        SqlVal::Null => "NULL".to_string(),
-        SqlVal::Bool(val) => val.to_string(),
-        Int(val) => val.to_string(),
-        BigInt(val) => val.to_string(),
-        Real(val) => val.to_string(),
-        Text(val) => format!("'{}'", val),
-        Blob(val) => format!("x'{}'", hex::encode_upper(val)),
+        SqlVal::Null => Ok("NULL".to_string()),
+        SqlVal::Bool(val) => Ok(val.to_string()),
+        Int(val) => Ok(val.to_string()),
+        BigInt(val) => Ok(val.to_string()),
+        Real(val) => Ok(val.to_string()),
+        Text(val) => Ok(format!("'{}'", val)),
+        Blob(val) => Ok(format!("x'{}'", hex::encode_upper(val))),
         #[cfg(feature = "datetime")]
-        Timestamp(ndt) => ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string(),
+        Timestamp(ndt) => Ok(ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string()),
+        Custom(val) => Err(Error::LiteralForCustomUnsupported((*val).clone())),
     }
 }

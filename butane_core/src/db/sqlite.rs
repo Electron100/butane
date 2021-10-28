@@ -1,17 +1,19 @@
 //! SQLite database backend
 use super::helper;
 use super::*;
+use crate::db::connmethods::BackendRows;
 use crate::debug;
-use crate::migrations::adb::{AColumn, ATable, Operation, ADB};
+use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::query;
 use crate::query::Order;
-use crate::{Result, SqlType, SqlVal};
+use crate::{Result, SqlType, SqlVal, SqlValRef};
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
+use fallible_streaming_iterator::FallibleStreamingIterator;
+use pin_project::pin_project;
+use std::borrow::Cow;
 use std::fmt::Write;
-
-#[cfg(feature = "debug")]
-use exec_time::exec_time;
+use std::pin::Pin;
 
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -37,11 +39,15 @@ impl Backend for SQLiteBackend {
         BACKEND_NAME
     }
 
-    fn create_migration_sql(&self, current: &ADB, ops: &[Operation]) -> Result<String> {
+    fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {
         let mut current: ADB = (*current).clone();
         Ok(ops
-            .iter()
-            .map(|o| sql_for_op(&mut current, o))
+            .into_iter()
+            .map(|o| {
+                let sql = sql_for_op(&mut current, &o);
+                current.transform_with(o);
+                sql
+            })
             .collect::<Result<Vec<String>>>()?
             .join("\n"))
     }
@@ -64,8 +70,10 @@ impl SQLiteConnection {
             .map_err(|e| e.into())
     }
 
-    fn wrapped_connection_methods(&self) -> Result<GenericConnection> {
-        Ok(GenericConnection { conn: &self.conn })
+    // For use with connection_method_wrapper macro
+    #[allow(clippy::unnecessary_wraps)]
+    fn wrapped_connection_methods(&self) -> Result<&rusqlite::Connection> {
+        Ok(&self.conn)
     }
 }
 connection_method_wrapper!(SQLiteConnection);
@@ -87,30 +95,24 @@ impl BackendConnection for SQLiteConnection {
     }
 }
 
-// Used to provide a single implementation of ConnectionMethods that
-// can be used across both SQLiteConnection and SQLiteTransaction
-struct GenericConnection<'a> {
-    conn: &'a rusqlite::Connection,
-}
-
-impl ConnectionMethods for GenericConnection<'_> {
+impl ConnectionMethods for rusqlite::Connection {
     fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
             debug!("execute sql {}", sql);
         }
-        self.conn.execute_batch(sql.as_ref())?;
+        self.execute_batch(sql.as_ref())?;
         Ok(())
     }
 
-    #[cfg_attr(feature = "debug", exec_time)]
-    fn query(
-        &self,
-        table: &'static str,
-        columns: &[Column],
+    fn query<'a, 'b, 'c: 'a>(
+        &'c self,
+        table: &str,
+        columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
+        offset: Option<i32>,
         order: Option<&[Order]>,
-    ) -> Result<RawQueryResult> {
+    ) -> Result<RawQueryResult<'a>> {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
         let mut values: Vec<SqlVal> = Vec::new();
@@ -132,18 +134,28 @@ impl ConnectionMethods for GenericConnection<'_> {
             helper::sql_limit(limit, &mut sqlquery)
         }
 
+        if let Some(offset) = offset {
+            if limit == None {
+                // Sqlite only supports offset in conjunction with
+                // limit, so add a max limit if we don't have one
+                // already.
+                helper::sql_limit(i32::MAX, &mut sqlquery)
+            }
+            helper::sql_offset(offset, &mut sqlquery)
+        }
+
         debug!("query sql {}", sqlquery);
 
-        let mut stmt = self.conn.prepare(&sqlquery)?;
-        let rows = stmt.query_and_then(values, |row| Ok(row_from_rusqlite(row, columns)?))?;
-        rows.collect()
+        let stmt = self.prepare(&sqlquery)?;
+        let adapter = QueryAdapter::new(stmt, rusqlite::params_from_iter(values))?;
+        Ok(Box::new(adapter))
     }
     fn insert_returning_pk(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
@@ -155,25 +167,19 @@ impl ConnectionMethods for GenericConnection<'_> {
         if cfg!(feature = "log") {
             debug!("insert sql {}", sql);
         }
-        self.conn
-            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
-        let pk: SqlVal = self.conn.query_row_and_then(
+        self.execute(&sql, rusqlite::params_from_iter(values))?;
+        let pk: SqlVal = self.query_row_and_then(
             &format!(
                 "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
                 pkcol.name(),
                 table
             ),
-            rusqlite::NO_PARAMS,
-            |row| sql_val_from_rusqlite(row.get_raw(0), &pkcol),
+            [],
+            |row| sql_val_from_rusqlite(row.get_ref_unwrap(0), pkcol),
         )?;
         Ok(pk)
     }
-    fn insert_only(
-        &self,
-        table: &'static str,
-        columns: &[Column],
-        values: &[SqlVal],
-    ) -> Result<()> {
+    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
             table,
@@ -184,30 +190,28 @@ impl ConnectionMethods for GenericConnection<'_> {
         if cfg!(feature = "log") {
             debug!("insert sql {}", sql);
         }
-        self.conn
-            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
+        self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(())
     }
     fn insert_or_replace(
         &self,
-        table: &'static str,
+        table: &str,
         columns: &[Column],
         _pkcol: &Column,
-        values: &[SqlVal],
+        values: &[SqlValRef],
     ) -> Result<()> {
         let mut sql = String::new();
         sql_insert_or_update(table, columns, &mut sql);
-        self.conn
-            .execute(&sql, &values.iter().collect::<Vec<_>>())?;
+        self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(())
     }
     fn update(
         &self,
-        table: &'static str,
+        table: &str,
         pkcol: Column,
-        pk: SqlVal,
+        pk: SqlValRef,
         columns: &[Column],
-        values: &[SqlVal],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
         let mut sql = String::new();
         helper::sql_update_with_placeholders(
@@ -221,11 +225,10 @@ impl ConnectionMethods for GenericConnection<'_> {
         if cfg!(feature = "log") {
             debug!("update sql {}", sql);
         }
-        self.conn
-            .execute(&sql, &placeholder_values.iter().collect::<Vec<_>>())?;
+        self.execute(&sql, rusqlite::params_from_iter(placeholder_values))?;
         Ok(())
     }
-    fn delete_where(&self, table: &'static str, expr: BoolExpr) -> Result<usize> {
+    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
         write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
@@ -235,13 +238,12 @@ impl ConnectionMethods for GenericConnection<'_> {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
-        let cnt = self.conn.execute(&sql, &values)?;
+        let cnt = self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(cnt)
     }
-    fn has_table(&self, table: &'static str) -> Result<bool> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
+    fn has_table(&self, table: &str) -> Result<bool> {
+        let mut stmt =
+            self.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
         let mut rows = stmt.query(&[table])?;
         Ok(rows.next()?.is_some())
     }
@@ -256,27 +258,28 @@ impl<'c> SqliteTransaction<'c> {
     }
     fn get(&self) -> Result<&rusqlite::Transaction<'c>> {
         match &self.trans {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans),
         }
     }
-    fn wrapped_connection_methods(&self) -> Result<GenericConnection> {
-        Ok(GenericConnection {
-            conn: self.get()?.deref(),
-        })
+    fn wrapped_connection_methods(&self) -> Result<&rusqlite::Connection> {
+        Ok(self.get()?.deref())
+    }
+    fn already_consumed() -> Error {
+        Error::Internal("transaction has already been consumed".to_string())
     }
 }
 connection_method_wrapper!(SqliteTransaction<'_>);
 impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.commit()?),
         }
     }
     fn rollback(&mut self) -> Result<()> {
         match self.trans.take() {
-            None => Err(Error::Internal),
+            None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.rollback()?),
         }
     }
@@ -290,40 +293,106 @@ impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
 }
 
 impl rusqlite::ToSql for SqlVal {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        use rusqlite::types::{ToSqlOutput::Borrowed, ToSqlOutput::Owned, Value, ValueRef};
-        Ok(match self {
-            SqlVal::Bool(b) => Owned(Value::Integer(if *b { 1 } else { 0 })),
-            SqlVal::Int(i) => Owned(Value::Integer(*i as i64)),
-            SqlVal::BigInt(i) => Owned(Value::Integer(*i)),
-            SqlVal::Real(r) => Owned(Value::Real(*r)),
-            SqlVal::Text(t) => Borrowed(ValueRef::Text(t.as_ref())),
-            SqlVal::Blob(b) => Borrowed(ValueRef::Blob(&b)),
-            #[cfg(feature = "datetime")]
-            SqlVal::Timestamp(dt) => {
-                let f = dt.format(SQLITE_DT_FORMAT);
-                Owned(Value::Text(f.to_string()))
-            }
-            SqlVal::Null => Owned(Value::Null),
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(sqlvalref_to_sqlite(&self.as_ref()))
+    }
+}
+
+impl<'a> rusqlite::ToSql for SqlValRef<'a> {
+    fn to_sql<'b>(&'b self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'a>> {
+        Ok(sqlvalref_to_sqlite(self))
+    }
+}
+
+fn sqlvalref_to_sqlite<'a, 'b>(valref: &'b SqlValRef<'a>) -> rusqlite::types::ToSqlOutput<'a> {
+    use rusqlite::types::{ToSqlOutput::Borrowed, ToSqlOutput::Owned, Value, ValueRef};
+    use SqlValRef::*;
+    match valref {
+        Bool(b) => Owned(Value::Integer(*b as i64)),
+        Int(i) => Owned(Value::Integer(*i as i64)),
+        BigInt(i) => Owned(Value::Integer(*i)),
+        Real(r) => Owned(Value::Real(*r)),
+        Text(t) => Borrowed(ValueRef::Text(t.as_bytes())),
+        Blob(b) => Borrowed(ValueRef::Blob(b)),
+        #[cfg(feature = "datetime")]
+        Timestamp(dt) => {
+            let f = dt.format(SQLITE_DT_FORMAT);
+            Owned(Value::Text(f.to_string()))
+        }
+        Null => Owned(Value::Null),
+        Custom(_) => panic!("Custom types not supported in sqlite"),
+    }
+}
+
+#[pin_project]
+struct QueryAdapterInner<'a> {
+    stmt: rusqlite::Statement<'a>,
+    // will always be Some when the constructor has finished. We use an option only to get the
+    // stmt in place before we can reference it.
+    rows: Option<rusqlite::Rows<'a>>,
+}
+
+impl<'a> QueryAdapterInner<'a> {
+    fn new(stmt: rusqlite::Statement<'a>, params: impl rusqlite::Params) -> Result<Pin<Box<Self>>> {
+        let mut q = Box::pin(QueryAdapterInner { stmt, rows: None });
+        unsafe {
+            //Soundness: we pin a QueryAdapterInner value containing
+            //  both the stmt and the rows referencing the statement
+            //  together. It is not possible to drop/move the stmt without
+            //  bringing the referencing rows along with it.
+            let q_ref = Pin::get_unchecked_mut(Pin::as_mut(&mut q));
+            let stmt_ref: *mut rusqlite::Statement<'a> = &mut q_ref.stmt;
+            q_ref.rows = Some((&mut *stmt_ref).query(params)?)
+        }
+        Ok(q)
+    }
+
+    fn next<'b>(self: Pin<&'b mut Self>) -> Result<Option<&'b rusqlite::Row<'b>>> {
+        let this = self.project();
+        let rows: &mut rusqlite::Rows<'a> = this.rows.as_mut().unwrap();
+        Ok(rows.next()?)
+    }
+
+    fn current(self: Pin<&Self>) -> Option<&rusqlite::Row> {
+        let this = self.project_ref();
+        this.rows.as_ref().unwrap().get()
+    }
+}
+
+struct QueryAdapter<'a> {
+    inner: Pin<Box<QueryAdapterInner<'a>>>,
+}
+impl<'a> QueryAdapter<'a> {
+    fn new(stmt: rusqlite::Statement<'a>, params: impl rusqlite::Params) -> Result<Self> {
+        Ok(QueryAdapter {
+            inner: QueryAdapterInner::new(stmt, params)?,
         })
     }
 }
 
-fn row_from_rusqlite(row: &rusqlite::Row, cols: &[Column]) -> Result<Row> {
-    let mut vals: Vec<SqlVal> = Vec::new();
-    if cols.len() != row.column_count() {
-        panic!(
-            "sqlite returns columns {} doesn't match requested columns {}",
-            row.column_count(),
-            cols.len()
-        )
+impl<'a> BackendRows for QueryAdapter<'a> {
+    fn next<'b>(&'b mut self) -> Result<Option<&'b (dyn BackendRow + 'b)>> {
+        Ok(self
+            .inner
+            .as_mut()
+            .next()?
+            .map(|row| row as &dyn BackendRow))
     }
-    vals.reserve(cols.len());
-    for i in 0..cols.len() {
-        let col = cols.get(i).unwrap();
-        vals.push(sql_val_from_rusqlite(row.get_raw(i), col)?);
+    fn current<'b>(&'b self) -> Option<&'b (dyn BackendRow + 'b)> {
+        self.inner
+            .as_ref()
+            .current()
+            .map(|row| row as &dyn BackendRow)
     }
-    Ok(Row::new(vals))
+}
+
+impl BackendRow for rusqlite::Row<'_> {
+    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef> {
+        sql_valref_from_rusqlite(self.get_ref(idx)?, &ty)
+    }
+    fn len(&self) -> usize {
+        self.column_count()
+    }
 }
 
 fn sql_for_expr<W>(
@@ -338,52 +407,54 @@ fn sql_for_expr<W>(
 }
 
 fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result<SqlVal> {
+    sql_valref_from_rusqlite(val, col.ty()).map(|v| v.into())
+}
+
+fn sql_valref_from_rusqlite<'a>(
+    val: rusqlite::types::ValueRef<'a>,
+    ty: &SqlType,
+) -> Result<SqlValRef<'a>> {
     if let rusqlite::types::ValueRef::Null = val {
-        return Ok(SqlVal::Null);
+        return Ok(SqlValRef::Null);
     }
-    let ret = || -> Result<SqlVal> {
-        Ok(match col.ty() {
-            SqlType::Bool => SqlVal::Bool(val.as_i64()? != 0),
-            SqlType::Int => SqlVal::Int(val.as_i64()? as i32),
-            SqlType::BigInt => SqlVal::BigInt(val.as_i64()?),
-            SqlType::Real => SqlVal::Real(val.as_f64()?),
-            SqlType::Text => SqlVal::Text(val.as_str()?.to_string()),
-            #[cfg(feature = "datetime")]
-            SqlType::Timestamp => SqlVal::Timestamp(NaiveDateTime::parse_from_str(
-                val.as_str()?,
-                SQLITE_DT_FORMAT,
-            )?),
-            SqlType::Blob => SqlVal::Blob(val.as_blob()?.into()),
-        })
-    }();
-    // Automatic error conversion won't have preserved the column name for any errors
-    ret.map_err(|e| match e {
-        Error::SqlResultTypeMismatch { .. } => Error::SqlResultTypeMismatch {
-            col: col.name().to_string(),
-            detail: String::new(),
-        },
-        e => e,
+    Ok(match ty {
+        SqlType::Bool => SqlValRef::Bool(val.as_i64()? != 0),
+        SqlType::Int => SqlValRef::Int(val.as_i64()? as i32),
+        SqlType::BigInt => SqlValRef::BigInt(val.as_i64()?),
+        SqlType::Real => SqlValRef::Real(val.as_f64()?),
+        SqlType::Text => SqlValRef::Text(val.as_str()?),
+        #[cfg(feature = "datetime")]
+        SqlType::Timestamp => SqlValRef::Timestamp(NaiveDateTime::parse_from_str(
+            val.as_str()?,
+            SQLITE_DT_FORMAT,
+        )?),
+        SqlType::Blob => SqlValRef::Blob(val.as_blob()?),
+        SqlType::Custom(v) => {
+            return Err(Error::IncompatibleCustomT(v.deref().clone(), BACKEND_NAME))
+        }
     })
 }
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
-        Operation::AddTable(table) => Ok(create_table(&table)),
-        Operation::RemoveTable(name) => Ok(drop_table(&name)),
-        Operation::AddColumn(tbl, col) => add_column(&tbl, &col),
-        Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, &tbl, &name)),
-        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, &tbl, &old, Some(new))),
+        Operation::AddTable(table) => Ok(create_table(table, false)),
+        Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)),
+        Operation::RemoveTable(name) => Ok(drop_table(name)),
+        Operation::AddColumn(tbl, col) => add_column(tbl, col),
+        Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, tbl, name)),
+        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new))),
     }
 }
 
-fn create_table(table: &ATable) -> String {
+fn create_table(table: &ATable, allow_exists: bool) -> String {
     let coldefs = table
         .columns
         .iter()
         .map(define_column)
         .collect::<Vec<String>>()
         .join(",\n");
-    format!("CREATE TABLE {} (\n{}\n);", table.name, coldefs)
+    let modifier = if allow_exists { "IF NOT EXISTS " } else { "" };
+    format!("CREATE TABLE {}{} (\n{}\n);", modifier, table.name, coldefs)
 }
 
 fn define_column(col: &AColumn) -> String {
@@ -399,6 +470,9 @@ fn define_column(col: &AColumn) -> String {
         // and we only allow auto on integer types
         constraints.push("AUTOINCREMENT".to_string());
     }
+    if col.unique() {
+        constraints.push("UNIQUE".to_string());
+    }
     format!(
         "{} {} {}",
         &col.name(),
@@ -407,16 +481,17 @@ fn define_column(col: &AColumn) -> String {
     )
 }
 
-fn col_sqltype(col: &AColumn) -> &'static str {
-    match col.sqltype() {
-        Ok(ty) => sqltype(ty),
+fn col_sqltype(col: &AColumn) -> Cow<str> {
+    match col.typeid() {
+        Ok(TypeIdentifier::Ty(ty)) => Cow::Borrowed(sqltype(&ty)),
+        Ok(TypeIdentifier::Name(name)) => Cow::Owned(name),
         // sqlite doesn't actually require that the column type be
         // specified
-        Err(_) => "",
+        Err(_) => Cow::Borrowed(""),
     }
 }
 
-fn sqltype(ty: SqlType) -> &'static str {
+fn sqltype(ty: &SqlType) -> &'static str {
     match ty {
         SqlType::Bool => "INTEGER",
         SqlType::Int => "INTEGER",
@@ -426,6 +501,7 @@ fn sqltype(ty: SqlType) -> &'static str {
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => "TEXT",
         SqlType::Blob => "BLOB",
+        SqlType::Custom(_) => panic!("Custom types not supported by sqlite backend"),
     }
 }
 
@@ -439,7 +515,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         tbl_name,
         define_column(col),
-        helper::sql_literal_value(default)
+        helper::sql_literal_value(default)?
     ))
 }
 
@@ -501,8 +577,8 @@ fn change_column(
         None => new_table.remove_column(old.name()),
     }
     let stmts: [&str; 4] = [
-        &create_table(&new_table),
-        &copy_table(&old_table, &new_table),
+        &create_table(&new_table, false),
+        &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
         &format!("ALTER TABLE {} RENAME TO {};", &new_table.name, tbl_name),
     ];
@@ -512,7 +588,7 @@ fn change_column(
     result
 }
 
-pub fn sql_insert_or_update(table: &'static str, columns: &[Column], w: &mut impl Write) {
+pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write) {
     write!(w, "INSERT OR REPLACE ").unwrap();
     write!(w, "INTO {} (", table).unwrap();
     helper::list_columns(columns, w);

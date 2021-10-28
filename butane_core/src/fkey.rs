@@ -27,7 +27,7 @@ where
 {
     // At least one must be initialized (enforced internally by this
     // type), but both need not be
-    val: OnceCell<T>,
+    val: OnceCell<Box<T>>,
     valpk: OnceCell<SqlVal>,
 }
 impl<T: DataObject> ForeignKey<T> {
@@ -38,7 +38,10 @@ impl<T: DataObject> ForeignKey<T> {
     }
     /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
     pub fn get(&self) -> Result<&T> {
-        self.val.get().ok_or(Error::ValueNotLoaded)
+        self.val
+            .get()
+            .map(|v| v.as_ref())
+            .ok_or(Error::ValueNotLoaded)
     }
 
     /// Returns a reference to the primary key of the value.
@@ -46,7 +49,7 @@ impl<T: DataObject> ForeignKey<T> {
         match self.val.get() {
             Some(v) => v.pk().clone(),
             None => match self.valpk.get() {
-                Some(pk) => T::PKType::from_sql(pk.clone()).unwrap(),
+                Some(pk) => T::PKType::from_sql_ref(pk.as_ref()).unwrap(),
                 None => panic!("Invalid foreign key state"),
             },
         }
@@ -55,10 +58,12 @@ impl<T: DataObject> ForeignKey<T> {
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to it.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
-        self.val.get_or_try_init(|| {
-            let pk: SqlVal = self.valpk.get().unwrap().clone();
-            T::get(conn, &T::PKType::from_sql(pk)?)
-        })
+        self.val
+            .get_or_try_init(|| {
+                let pk = self.valpk.get().unwrap();
+                T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
+            })
+            .map(|v| v.as_ref())
     }
 
     fn new_raw() -> Self {
@@ -70,20 +75,20 @@ impl<T: DataObject> ForeignKey<T> {
 
     fn ensure_valpk(&self) -> &SqlVal {
         match self.valpk.get() {
-            Some(sqlval) => return &sqlval,
+            Some(sqlval) => return sqlval,
             None => match self.val.get() {
                 Some(val) => self.valpk.set(val.pk().to_sql()).unwrap(),
                 None => panic!("Invalid foreign key state"),
             },
         }
-        &self.valpk.get().unwrap()
+        self.valpk.get().unwrap()
     }
 }
 
 impl<T: DataObject> From<T> for ForeignKey<T> {
     fn from(obj: T) -> Self {
         let ret = Self::new_raw();
-        ret.val.set(obj).ok();
+        ret.val.set(Box::new(obj)).ok();
         ret
     }
 }
@@ -127,11 +132,9 @@ where
     fn to_sql(&self) -> SqlVal {
         self.ensure_valpk().clone()
     }
-}
-impl<T> IntoSql for ForeignKey<T>
-where
-    T: DataObject,
-{
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        self.ensure_valpk().as_ref()
+    }
     fn into_sql(self) -> SqlVal {
         self.ensure_valpk();
         self.valpk.into_inner().unwrap()
@@ -148,9 +151,9 @@ impl<T> FromSql for ForeignKey<T>
 where
     T: DataObject,
 {
-    fn from_sql(val: SqlVal) -> Result<Self> {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
         Ok(ForeignKey {
-            valpk: val.into(),
+            valpk: SqlVal::from(valref).into(),
             val: OnceCell::new(),
         })
     }

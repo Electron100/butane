@@ -1,5 +1,5 @@
 use super::*;
-use crate::migrations::adb::DeferredSqlType;
+use crate::migrations::adb::{DeferredSqlType, TypeIdentifier};
 use crate::SqlType;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
@@ -23,7 +23,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         return err;
     }
 
-    let pk_field = pk_field(&ast_struct).unwrap();
+    let pk_field = pk_field(ast_struct).unwrap();
     let pktype = &pk_field.ty;
     let pkident = pk_field.ident.clone().unwrap();
     let pklit = make_ident_literal_str(&pkident);
@@ -35,10 +35,10 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     add_post_insert_for_auto(&pk_field, &mut post_insert);
     post_insert.push(quote!(self.state.saved = true;));
 
-    let numdbfields = fields(&ast_struct).filter(|f| is_row_field(f)).count();
-    let many_save: TokenStream2 = fields(&ast_struct).filter(|f| is_many_to_many(f)).map(|f| {
+    let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
+    let many_save: TokenStream2 = fields(ast_struct).filter(|f| is_many_to_many(f)).map(|f| {
         let ident = f.ident.clone().expect("Fields must be named for butane");
-        let many_table_lit = many_table_lit(&ast_struct, f);
+        let many_table_lit = many_table_lit(ast_struct, f);
         let pksqltype =
             quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
         // Save  needs to ensure_initialized
@@ -48,10 +48,10 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         )
     }).collect();
 
-    let values: Vec<TokenStream2> = push_values(&ast_struct, |_| true);
-    let values_no_pk: Vec<TokenStream2> = push_values(&ast_struct, |f: &Field| f != &pk_field);
+    let values: Vec<TokenStream2> = push_values(ast_struct, |_| true);
+    let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
 
-    let dataresult = impl_dataresult(ast_struct, &tyname);
+    let dataresult = impl_dataresult(ast_struct, tyname);
     quote!(
                 #dataresult
         impl butane::DataObject for #tyname {
@@ -63,9 +63,8 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 &self.#pkident
             }
             fn save(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
-                #many_save
                 //future perf improvement use an array on the stack
-                let mut values: Vec<butane::SqlVal> = Vec::with_capacity(#numdbfields);
+                let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(#numdbfields);
                 let pkcol = butane::db::Column::new(
                     #pklit,
                     <#pktype as butane::FieldType>::SQLTYPE);
@@ -74,7 +73,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     if values.len() > 0 {
                         conn.update(Self::TABLE,
                                     pkcol,
-                                    butane::ToSql::to_sql(self.pk()),
+                                    butane::ToSql::to_sql_ref(self.pk()),
                                     &[#save_cols], &values)?;
                     }
                 } else {
@@ -82,6 +81,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
                     #(#post_insert)*
                 }
+                #many_save
                 Ok(())
             }
             fn delete(&self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
@@ -95,11 +95,19 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 use butane::DataObject;
                 butane::ToSql::to_sql(self.pk())
             }
+            fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                use butane::DataObject;
+                butane::ToSql::to_sql_ref(self.pk())
+            }
         }
         impl butane::ToSql for &#tyname {
             fn to_sql(&self) -> butane::SqlVal {
                 use butane::DataObject;
                 butane::ToSql::to_sql(self.pk())
+            }
+            fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                use butane::DataObject;
+                butane::ToSql::to_sql_ref(self.pk())
             }
         }
         impl PartialEq<butane::ForeignKey<#tyname>> for #tyname {
@@ -129,19 +137,19 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
 
 pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let numdbfields = fields(&ast_struct).filter(|f| is_row_field(f)).count();
-    let rows = rows_for_from(&ast_struct);
+    let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
+    let rows = rows_for_from(ast_struct);
     let cols = columns(ast_struct, |_| true);
 
     let many_init: TokenStream2 =
-        fields(&ast_struct)
+        fields(ast_struct)
         .filter(|f| is_many_to_many(f))
         .map(|f| {
             let ident = f
                 .ident
                 .clone()
                 .expect("Fields must be named for butane");
-            let many_table_lit = many_table_lit(&ast_struct, f);
+            let many_table_lit = many_table_lit(ast_struct, f);
             let pksqltype = quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
             quote!(obj.#ident.ensure_init(#many_table_lit, butane::ToSql::to_sql(obj.pk()), #pksqltype);)
         }).collect();
@@ -169,12 +177,11 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident) -> TokenStream2 {
                         const COLUMNS: &'static [butane::db::Column] = &[
                                 #cols
                         ];
-                        fn from_row(mut row: butane::db::Row) -> butane::Result<Self> {
+                        fn from_row(mut row: &dyn butane::db::BackendRow) -> butane::Result<Self> {
                                 if row.len() != #numdbfields {
                                         return Err(butane::Error::BoundsError(
                                                 "Found unexpected number of columns in row for DataResult".to_string()));
                                 }
-                                let mut it = row.into_iter();
                                 #ctor
                                 #many_init
                                 Ok(obj)
@@ -189,8 +196,8 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident) -> TokenStream2 {
 
 fn make_tablelit(config: &Config, tyname: &Ident) -> LitStr {
     match &config.table_name {
-        Some(s) => make_lit(&s),
-        None => make_ident_literal_str(&tyname),
+        Some(s) => make_lit(s),
+        None => make_ident_literal_str(tyname),
     }
 }
 
@@ -284,7 +291,7 @@ fn field_ident_lit(f: &Field) -> TokenStream2 {
             )
         }
     };
-    make_ident_literal_str(&fid).into_token_stream()
+    make_ident_literal_str(fid).into_token_stream()
 }
 
 fn fields_type(tyname: &Ident) -> Ident {
@@ -292,11 +299,18 @@ fn fields_type(tyname: &Ident) -> Ident {
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
-    fields(&ast_struct)
+    let mut i: usize = 0;
+    fields(ast_struct)
         .map(|f| {
             let ident = f.ident.clone().unwrap();
             if is_row_field(f) {
-                quote!(#ident: butane::FromSql::from_sql(it.next().unwrap())?)
+                let fty = &f.ty;
+                let ret = quote!(
+                        #ident: butane::FromSql::from_sql_ref(
+                                row.get(#i, <#fty as butane::FieldType>::SQLTYPE)?)?
+                );
+                i += 1;
+                ret
             } else if is_many_to_many(f) {
                 quote!(#ident: butane::Many::new())
             } else {
@@ -310,7 +324,7 @@ fn columns<P>(ast_struct: &ItemStruct, mut predicate: P) -> TokenStream2
 where
     P: FnMut(&Field) -> bool,
 {
-    fields(&ast_struct)
+    fields(ast_struct)
         .filter(|f| is_row_field(f) && predicate(f))
         .map(|f| match f.ident.clone() {
             Some(fname) => {
@@ -344,8 +358,8 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
     for f in fields(ast_struct) {
         if is_auto(f) {
             match get_primitive_sql_type(&f.ty) {
-                Some(DeferredSqlType::Known(SqlType::Int)) => (),
-                Some(DeferredSqlType::Known(SqlType::BigInt)) => (),
+                Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int))) => (),
+                Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::BigInt))) => (),
                 _ => {
                     return Some(quote_spanned!(
                         f.span() =>
@@ -364,7 +378,7 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
 }
 
 fn add_post_insert_for_auto(pk_field: &Field, post_insert: &mut Vec<TokenStream2>) {
-    if !is_auto(&pk_field) {
+    if !is_auto(pk_field) {
         return;
     }
     let pkident = pk_field.ident.clone().unwrap();
@@ -376,23 +390,21 @@ fn push_values<P>(ast_struct: &ItemStruct, mut predicate: P) -> Vec<TokenStream2
 where
     P: FnMut(&Field) -> bool,
 {
-    fields(&ast_struct)
+    fields(ast_struct)
         .filter(|f| is_row_field(f) && predicate(f))
         .map(|f| {
             let ident = f.ident.clone().unwrap();
             if is_row_field(f) {
                 if !is_auto(f) {
-                    quote!(values.push(butane::ToSql::to_sql(&self.#ident));)
+                    quote!(values.push(butane::ToSql::to_sql_ref(&self.#ident));)
                 } else {
                     quote!()
                 }
             } else if is_many_to_many(f) {
-                quote!(
-                    self.#ident.ensure_init(Self::TABLE, self.pk().clone(), <Self as butane::DataObject>::PKType);
-                    self.#ident.save()?;
-                )
+                // No-op
+                quote!()
             } else {
-								make_compile_error!(f.span()=> "Unexpected struct field")
+                make_compile_error!(f.span()=> "Unexpected struct field")
             }
         })
         .collect()

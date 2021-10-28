@@ -29,6 +29,8 @@ mod filter;
 ///    initialized based on serial/autoincrement. Currently supported
 ///    only on the primary key and only if the primary key is an integer
 ///    type
+/// * `#[unique]` on a field indicates that the field's value must be unique
+///    (perhaps implemented as the SQL UNIQUE constraint by some backends).
 /// * `[default]` should be used on fields added by later migrations to avoid errors on existing objects.
 ///     Unnecessary if the new field is an `Option<>`
 ///

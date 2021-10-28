@@ -46,10 +46,11 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
             let col = AColumn::new(
                 name,
                 get_deferred_sql_type(&f.ty),
-                is_nullable(&f),
+                is_nullable(f),
                 f == &pk,
-                is_auto(&f),
-                get_default(&f).expect("Malformed default attribute"),
+                is_auto(f),
+                is_unique(f),
+                get_default(f).expect("Malformed default attribute"),
             );
             table.add_column(col);
         } else if is_many_to_many(f) {

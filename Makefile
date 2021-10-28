@@ -2,11 +2,11 @@
 all : build
 
 build :
-	cargo build
+	cargo check
 	# build some intermediate configuration to test different feature combinations
-	cd butane && cargo build --features pg
-	cd butane && cargo build --features pg,datetime
-	cd butane && cargo build --features sqlite
+	cd butane && cargo check --features pg
+	cd butane && cargo check --features pg,datetime
+	cd butane && cargo check --features sqlite
 	cargo build --all-features
 
 lint :

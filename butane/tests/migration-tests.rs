@@ -1,6 +1,6 @@
 use butane::migrations::{
-    adb::DeferredSqlType, adb::TypeKey, MemMigrations, Migration, MigrationMut, Migrations,
-    MigrationsMut,
+    adb::DeferredSqlType, adb::TypeIdentifier, adb::TypeKey, MemMigrations, Migration,
+    MigrationMut, Migrations, MigrationsMut,
 };
 use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
@@ -29,7 +29,7 @@ fn current_migration_basic() {
     assert!(!idcol.nullable());
     assert!(idcol.is_pk());
     assert_eq!(*idcol.default(), None);
-    assert_eq!(idcol.sqltype().unwrap(), SqlType::BigInt);
+    assert_eq!(idcol.typeid().unwrap(), TypeIdentifier::Ty(SqlType::BigInt));
     assert!(!idcol.is_auto());
 
     let barcol = table.column("bar").unwrap();
@@ -37,7 +37,7 @@ fn current_migration_basic() {
     assert!(!barcol.nullable());
     assert!(!barcol.is_pk());
     assert_eq!(*barcol.default(), None);
-    assert_eq!(barcol.sqltype().unwrap(), SqlType::Text);
+    assert_eq!(barcol.typeid().unwrap(), TypeIdentifier::Ty(SqlType::Text));
     assert!(!barcol.is_auto());
 
     assert_eq!(table.pk(), Some(idcol))
@@ -122,7 +122,7 @@ fn current_migration_nullable_col() {
     let table = db.get_table("Foo").expect("No Foo table");
     let col = table.column("bar").unwrap();
     assert!(col.nullable());
-    assert_eq!(col.sqltype().unwrap(), SqlType::Text);
+    assert_eq!(col.typeid().unwrap(), TypeIdentifier::Ty(SqlType::Text));
 }
 
 #[test]
@@ -153,13 +153,13 @@ fn current_migration_custom_type() {
     assert_eq!(
         db.types()
             .get(&TypeKey::CustomType("Frobnozzle".to_string())),
-        Some(&DeferredSqlType::Known(SqlType::Text))
+        Some(&DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Text)))
     );
     let table = db
         .get_table("HasCustomField")
         .expect("No HasCustomField table");
     let col = table.column("frob").expect("No frob field");
-    assert_eq!(col.sqltype().unwrap(), SqlType::Text);
+    assert_eq!(col.typeid().unwrap(), TypeIdentifier::Ty(SqlType::Text));
 }
 
 #[cfg(feature = "sqlite")]
@@ -208,6 +208,33 @@ fn migration_add_field_with_default_pg() {
         &mut conn,
         "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 42;",
         "ALTER TABLE Foo DROP COLUMN baz;",
+    );
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn migration_add_and_remove_field_sqlite() {
+    migration_add_and_remove_field(
+        &mut common::sqlite_connection(),
+				// The exact details of futzing a DROP COLUMN in sqlite aren't
+				// important (e.g. the temp table naming is certainly not part
+				// of the API contract), but the goal here is to ensure we're
+				// getting sane looking downgrade sql and a test failure if it
+				// changes. If the change is innocuous, this test should just
+				// be updated.
+        "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, baz FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
+        "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
+    );
+}
+
+#[cfg(feature = "pg")]
+#[test]
+fn migration_add_and_remove_field_pg() {
+    let (mut conn, _data) = common::pg_connection();
+    migration_add_and_remove_field(
+        &mut conn,
+        "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;ALTER TABLE Foo DROP COLUMN bar;",
+        "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';ALTER TABLE Foo DROP COLUMN baz;",
     );
 }
 
@@ -310,6 +337,23 @@ fn migration_add_field_with_default(conn: &mut Connection, up_sql: &str, down_sq
             id: i64,
             bar: String,
             #[default=42]
+            baz: u32,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql);
+}
+
+fn migration_add_and_remove_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: String,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
             baz: u32,
         }
     };

@@ -1,7 +1,8 @@
 use butane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
-use butane::{db, db::Connection, migrations};
+use butane::query::BoolExpr;
+use butane::{db, db::Connection, db::ConnectionMethods, migrations};
 use chrono::Utc;
 use clap::{Arg, ArgMatches};
 use serde::{Deserialize, Serialize};
@@ -44,6 +45,12 @@ fn main() {
         )
         .subcommand(clap::SubCommand::with_name("migrate").about("Apply migrations"))
         .subcommand(clap::SubCommand::with_name("list").about("List migrations"))
+				.subcommand(clap::SubCommand::with_name("collapse").about("Replace all migrations with a single migration representing the current model state.").arg(
+                    Arg::with_name("NAME")
+                        .required(true)
+                        .index(1)
+                        .help("Name to use for the new migration"),
+                ))
         .subcommand(
             clap::SubCommand::with_name("embed").about("Embed migrations in the source code"),
         )
@@ -58,12 +65,18 @@ fn main() {
                 ),
         )
         .subcommand(
+						clap::SubCommand::with_name("clear")
+								.setting(clap::AppSettings::ArgRequiredElseHelp)
+								.about("Clear data")
+								.subcommand(clap::SubCommand::with_name("data")
+														.about("Clear all data from the database. The scehma is left intact, but all instances of all models (i.e. all rows of all tables defined by the models) are deleted")))
+        .subcommand(
             clap::SubCommand::with_name("delete")
                 .about("Delete a table")
                 .setting(clap::AppSettings::ArgRequiredElseHelp)
                 .subcommand(
                     clap::SubCommand::with_name("table")
-                        .about("Delete a table")
+                        .about("Delete a table. Deleting a model in code does not currently lead to deletion of the table.")
                         .arg(
                             Arg::with_name("TABLE")
                                 .required(true)
@@ -81,6 +94,13 @@ fn main() {
         ("rollback", sub_args) => handle_error(rollback(sub_args)),
         ("embed", _) => handle_error(embed()),
         ("list", _) => handle_error(list_migrations()),
+        ("collapse", Some(sub_args)) => {
+            handle_error(collapse_migrations(sub_args.value_of("NAME")))
+        }
+        ("clear", Some(sub_args)) => match sub_args.subcommand() {
+            ("data", Some(_)) => handle_error(clear_data()),
+            (_, _) => eprintln!("Unknown clear command. Try: clear data"),
+        },
         ("delete", Some(sub_args)) => match sub_args.subcommand() {
             ("table", Some(sub_args2)) => {
                 handle_error(delete_table(sub_args2.value_of("TABLE").unwrap()))
@@ -146,13 +166,7 @@ fn make_migration(args: Option<&ArgMatches>) -> Result<()> {
         std::process::exit(1);
     }
     let spec = load_connspec()?;
-    let backend = match db::get_backend(&spec.backend_name) {
-        Some(backend) => backend,
-        None => {
-            eprintln!("Unknown backend {}", &spec.backend_name);
-            std::process::exit(1);
-        }
-    };
+    let backend = spec.get_backend()?;
     let created = ms.create_migration(&backend, &name, ms.latest().as_ref())?;
     if created {
         let cli_state = CliState::load()?;
@@ -287,10 +301,55 @@ fn list_migrations() -> Result<()> {
     Ok(())
 }
 
+fn collapse_migrations(new_initial_name: Option<&str>) -> Result<()> {
+    let name = match new_initial_name {
+        Some(name) => format!("{}_{}", default_name(), name),
+        None => default_name(),
+    };
+    let spec = load_connspec()?;
+    let backend = spec.get_backend()?;
+    let conn = db::connect(&spec)?;
+    let mut ms = get_migrations()?;
+    let latest = ms.last_applied_migration(&conn)?;
+    if latest.is_none() {
+        eprintln!("There are no migrations to collapse");
+        std::process::exit(1);
+    }
+    let latest_db = latest.unwrap().db()?;
+    ms.clear_migrations(&conn)?;
+    ms.create_migration_to(&backend, &name, None, latest_db)?;
+    let new_migration = ms.latest().unwrap();
+    new_migration.mark_applied(&conn)?;
+    let cli_state = CliState::load()?;
+    if cli_state.embedded {
+        // Update the embedding
+        embed()?;
+    }
+    println!("Collpased all changes into new single migration '{}'", name);
+    Ok(())
+}
+
 fn delete_table(name: &str) -> Result<()> {
     let mut ms = get_migrations()?;
     let current = ms.current();
     current.delete_table(name)?;
+    Ok(())
+}
+
+fn clear_data() -> Result<()> {
+    let spec = load_connspec()?;
+    let conn = db::connect(&spec)?;
+    let latest = match get_migrations()?.last_applied_migration(&conn)? {
+        Some(m) => m,
+        None => {
+            eprintln!("No migrations have been applied, so no data is recognized.");
+            std::process::exit(1);
+        }
+    };
+    for table in latest.db()?.tables() {
+        println!("Deleting data from {}", &table.name);
+        conn.delete_where(&table.name, BoolExpr::True)?;
+    }
     Ok(())
 }
 

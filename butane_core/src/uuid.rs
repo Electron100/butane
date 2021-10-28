@@ -1,6 +1,6 @@
 use crate::{
-    Error::CannotConvertSqlVal, FieldType, FromSql, IntoSql, PrimaryKeyType, Result, SqlType,
-    SqlVal, ToSql,
+    Error::CannotConvertSqlVal, FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal,
+    SqlValRef, ToSql,
 };
 use uuid::Uuid;
 
@@ -8,31 +8,32 @@ impl ToSql for Uuid {
     fn to_sql(&self) -> SqlVal {
         SqlVal::Blob(self.as_bytes().to_vec())
     }
-}
-impl IntoSql for Uuid {
-    fn into_sql(self) -> SqlVal {
-        SqlVal::Blob(self.as_bytes().to_vec())
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Blob(self.as_bytes())
     }
 }
 impl FromSql for Uuid {
-    fn from_sql(val: SqlVal) -> Result<Self> {
-        match val {
-            SqlVal::Blob(ref bytes) => {
-                if let Ok(uuid) = Uuid::from_slice(&bytes) {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+        match valref {
+            SqlValRef::Blob(bytes) => {
+                if let Ok(uuid) = Uuid::from_slice(bytes) {
                     return Ok(uuid);
                 }
             }
             // Generally we expect uuid to be a blob, but if we get a
             // string we can try to work with it.
-            SqlVal::Text(ref text) => {
-                if let Ok(uuid) = Uuid::parse_str(&text) {
+            SqlValRef::Text(text) => {
+                if let Ok(uuid) = Uuid::parse_str(text) {
                     return Ok(uuid);
                 }
             }
             _ => (),
         }
-        Err(CannotConvertSqlVal(SqlType::Blob, val))
+        Err(CannotConvertSqlVal(SqlType::Blob, valref.into()))
     }
+    // No point in implementing a `from_sql` method for greater
+    // efficiency since to construct the UUID we always end up copying
+    // the bytes.
 }
 
 impl FieldType for Uuid {

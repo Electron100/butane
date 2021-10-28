@@ -1,13 +1,15 @@
 //! For working with migrations. If using the butane CLI tool, it is
 //! not necessary to use these types directly.
-use crate::db::{Column, ConnectionMethods, Row};
-use crate::sqlval::{FromSql, SqlVal, ToSql};
+use crate::db::BackendRows;
+use crate::db::{Column, ConnectionMethods};
+use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
 
+use fallible_iterator::FallibleIterator;
 use std::path::Path;
 
 pub mod adb;
-use adb::{AColumn, ATable, DeferredSqlType, Operation, ADB};
+use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeIdentifier, ADB};
 
 mod migration;
 pub use migration::{Migration, MigrationMut};
@@ -77,18 +79,17 @@ pub trait Migrations {
         if !conn.has_table(ButaneMigration::TABLE)? {
             return Ok(None);
         }
-        let migrations: Result<Vec<ButaneMigration>> = conn
+        let migrations: Vec<ButaneMigration> = conn
             .query(
                 ButaneMigration::TABLE,
                 ButaneMigration::COLUMNS,
                 None,
                 None,
                 None,
+                None,
             )?
-            .into_iter()
-            .map(ButaneMigration::from_row)
-            .collect();
-        let migrations = migrations?;
+            .mapped(ButaneMigration::from_row)
+            .collect()?;
 
         let mut m_opt = self.latest();
         while let Some(m) = m_opt {
@@ -109,8 +110,21 @@ pub trait MigrationsMut: Migrations
 where
     Self::M: MigrationMut,
 {
+    /// Construct a new, uninitialized migration. You may want to use
+    /// `create_migration` instead, which provides higher-level
+    /// functionality.
     fn new_migration(&self, name: &str) -> Self::M;
+
+    /// Adds a migration constructed from `new_migration` into the set
+    /// of migrations. Should be called after filling in the migration
+    /// details. Unnecessary when using `create_migration`.
     fn add_migration(&mut self, m: Self::M) -> Result<()>;
+
+    /// Clears all migrations -- deleting them from this object (and
+    /// any storage backing it) and deleting the record of their
+    /// existence/application from the database. The database schema
+    /// is not modified, nor is any other data removed. Use carefully.
+    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
     /// Get a pseudo-migration representing the current state as
     /// determined by the last build of models. This does not
@@ -131,22 +145,35 @@ where
         name: &str,
         from: Option<&Self::M>,
     ) -> Result<bool> {
+        let to_db = self.current().db()?;
+        self.create_migration_to(backend, name, from, to_db)
+    }
+
+    /// Create a migration `from` -> `to_db` named `name`. From may be None, in which
+    /// case the migration is created from an empty database.
+    /// Returns true if a migration was created, false if `from` and `current` represent identical states.
+    fn create_migration_to(
+        &mut self,
+        backend: &impl db::Backend,
+        name: &str,
+        from: Option<&Self::M>,
+        to_db: ADB,
+    ) -> Result<bool> {
         let empty_db = Ok(ADB::new());
         let from_none = from.is_none();
         let from_db = from.map_or(empty_db, |m| m.db())?;
-        let to_db = self.current().db()?;
         let mut ops = adb::diff(&from_db, &to_db);
         if ops.is_empty() {
             return Ok(false);
         }
 
         if from_none {
-            // This is the first migration. Create the butane_migration table
-            ops.push(Operation::AddTable(migrations_table()));
+            // This may be the first migration. Create the butane_migration table
+            ops.push(Operation::AddTableIfNotExists(migrations_table()));
         }
 
-        let up_sql = backend.create_migration_sql(&from_db, &ops)?;
-        let down_sql = backend.create_migration_sql(&to_db, &adb::diff(&to_db, &from_db))?;
+        let up_sql = backend.create_migration_sql(&from_db, ops)?;
+        let down_sql = backend.create_migration_sql(&to_db, adb::diff(&to_db, &from_db))?;
         let mut m = self.new_migration(name);
         // Save the DB for use by other migrations from this one
         for table in to_db.tables() {
@@ -164,10 +191,11 @@ fn migrations_table() -> ATable {
     let mut table = ATable::new("butane_migrations".to_string());
     let col = AColumn::new(
         "name",
-        DeferredSqlType::Known(SqlType::Text),
+        DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Text)),
         false, // nullable
         true,  // pk
         false, // auto
+        false, // unique
         None,
     );
     table.add_column(col);
@@ -208,15 +236,14 @@ struct ButaneMigration {
 impl DataResult for ButaneMigration {
     type DBO = Self;
     const COLUMNS: &'static [Column] = &[Column::new("name", SqlType::Text)];
-    fn from_row(row: Row) -> Result<Self> {
+    fn from_row(row: &dyn db::BackendRow) -> Result<Self> {
         if row.len() != 1usize {
             return Err(Error::BoundsError(
                 "Row has the wrong number of columns for this DataResult".to_string(),
             ));
         }
-        let mut it = row.into_iter();
         Ok(ButaneMigration {
-            name: FromSql::from_sql(it.next().unwrap())?,
+            name: FromSql::from_sql_ref(row.get(0, SqlType::Text).unwrap())?,
         })
     }
     fn query() -> query::Query<Self> {
@@ -232,8 +259,8 @@ impl DataObject for ButaneMigration {
         &self.name
     }
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
-        let mut values: Vec<SqlVal> = Vec::with_capacity(2usize);
-        values.push(self.name.to_sql());
+        let mut values: Vec<SqlValRef<'_>> = Vec::with_capacity(2usize);
+        values.push(self.name.to_sql_ref());
         conn.insert_or_replace(
             Self::TABLE,
             <Self as DataResult>::COLUMNS,

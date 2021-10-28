@@ -1,9 +1,10 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::query::BoolExpr;
-use butane::{colname, filter, find, query};
+use butane::{colname, filter, find, query, Many};
 use chrono::{TimeZone, Utc};
 use paste;
+use serde_json;
 
 mod common;
 use common::blog;
@@ -30,6 +31,19 @@ fn equality_separate_dataresult(conn: Connection) {
     assert_eq!(posts[2].title, "Mount Doom");
 }
 testall!(equality_separate_dataresult);
+
+fn ordered(conn: Connection) {
+    blog::setup_blog(&conn);
+    let posts = query!(Post, published == true)
+        .order_asc(colname!(Post, title))
+        .load(&conn)
+        .unwrap();
+    assert_eq!(posts.len(), 3);
+    assert_eq!(posts[0].title, "Mount Doom");
+    assert_eq!(posts[1].title, "Sir Charles");
+    assert_eq!(posts[2].title, "The Tiger");
+}
+testall!(ordered);
 
 fn comparison(conn: Connection) {
     blog::setup_blog(&conn);
@@ -130,6 +144,19 @@ fn many_load(conn: Connection) {
 }
 testall!(many_load);
 
+fn many_serialize(conn: Connection) {
+    blog::setup_blog(&conn);
+    let post: Post = find!(Post, title == "The Tiger", &conn).unwrap();
+    let tags_json: String = serde_json::to_string(&post.tags).unwrap();
+    let tags: Many<Tag> = serde_json::from_str(&tags_json).unwrap();
+    let tags = tags.load(&conn).unwrap();
+    let mut tags: Vec<&Tag> = tags.collect();
+    tags.sort_by(|t1, t2| (*t1).tag.partial_cmp(&t2.tag).unwrap());
+    assert_eq!(tags[0].tag, "asia");
+    assert_eq!(tags[1].tag, "danger");
+}
+testall!(many_serialize);
+
 fn many_objects_with_tag(conn: Connection) {
     blog::setup_blog(&conn);
     let mut posts = query!(Post, tags.contains("danger")).load(&conn).unwrap();
@@ -176,3 +203,30 @@ fn by_timestamp(conn: Connection) {
     assert_eq!(posts[1].title, "Sir Charles");
 }
 testall!(by_timestamp);
+
+fn limit(conn: Connection) {
+    blog::setup_blog(&conn);
+    let posts = Post::query()
+        .order_asc(colname!(Post, title))
+        .limit(2)
+        .load(&conn)
+        .unwrap();
+    assert_eq!(posts.len(), 2);
+    assert_eq!(posts[0].title, "Mount Doom");
+    assert_eq!(posts[1].title, "Mt. Everest");
+}
+testall!(limit);
+
+fn offset(conn: Connection) {
+    blog::setup_blog(&conn);
+    // Now get the more posts after the two we got in the limit test above
+    let posts = Post::query()
+        .order_asc(colname!(Post, title))
+        .offset(2)
+        .load(&conn)
+        .unwrap();
+    assert_eq!(posts.len(), 2);
+    assert_eq!(posts[0].title, "Sir Charles");
+    assert_eq!(posts[1].title, "The Tiger");
+}
+testall!(offset);

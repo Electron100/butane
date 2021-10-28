@@ -1,8 +1,8 @@
-use paste;
 use butane::db::Connection;
 use butane::prelude::*;
-use butane::{model, butane_type, query};
-use butane::{FieldType, FromSql, IntoSql, ObjectState, SqlType, SqlVal, ToSql};
+use butane::{butane_type, model, query};
+use butane::{FieldType, FromSql, ObjectState, SqlType, SqlVal, SqlValRef, ToSql};
+use paste;
 
 mod common;
 
@@ -16,36 +16,31 @@ enum Frobnozzle {
 
 impl ToSql for Frobnozzle {
     fn to_sql(&self) -> SqlVal {
-        SqlVal::Text(
-            match self {
-                Frobnozzle::Foo => "Foo",
-                Frobnozzle::Bar => "Bar",
-                Frobnozzle::Baz => "Baz",
-            }
-            .to_string(),
-        )
+        self.to_sql_ref().into()
     }
-}
-impl IntoSql for Frobnozzle {
-    fn into_sql(self) -> SqlVal {
-        self.to_sql()
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Text(match self {
+            Frobnozzle::Foo => "Foo",
+            Frobnozzle::Bar => "Bar",
+            Frobnozzle::Baz => "Baz",
+        })
     }
 }
 impl FromSql for Frobnozzle {
-    fn from_sql(val: SqlVal) -> Result<Self, butane::Error> {
+    fn from_sql_ref(val: SqlValRef) -> Result<Self, butane::Error> {
         match val {
-            SqlVal::Text(ref s) => match s.as_ref() {
+            SqlValRef::Text(s) => match s {
                 "Foo" => Ok(Self::Foo),
                 "Bar" => Ok(Self::Bar),
                 "Baz" => Ok(Self::Baz),
                 _ => Err(butane::Error::CannotConvertSqlVal(
                     SqlType::Text,
-                    val.clone(),
+                    val.into(),
                 )),
             },
             _ => Err(butane::Error::CannotConvertSqlVal(
                 SqlType::Text,
-                val.clone(),
+                val.into(),
             )),
         }
     }

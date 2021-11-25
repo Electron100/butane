@@ -76,6 +76,9 @@ pub trait DataObject: DataResult<DBO = Self> {
     const PKCOL: &'static str;
     /// The name of the table.
     const TABLE: &'static str;
+    /// Whether or not this model uses an automatic primary key set on
+    /// the first save.
+    const AUTO_PK: bool;
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
     /// Find this object in the database based on primary key.
@@ -121,6 +124,8 @@ pub enum Error {
     UnknownSqlType(String),
     #[error("Value has not been loaded from the database")]
     ValueNotLoaded,
+    #[error("Cannot use value not saved to the database")]
+    ValueNotSaved,
     #[error("Not initialized")]
     NotInitialized,
     #[error("Already initialized")]

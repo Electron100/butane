@@ -11,15 +11,24 @@ struct AutoPkWithMany {
     #[auto]
     id: i64,
     tags: Many<Tag>,
+    items: Many<AutoItem>,
 }
 impl AutoPkWithMany {
     fn new() -> Self {
         AutoPkWithMany {
             id: -1,
             tags: Many::default(),
+            items: Many::default(),
             state: ObjectState::default(),
         }
     }
+}
+
+#[model]
+struct AutoItem {
+    #[auto]
+    id: i64,
+    val: String,
 }
 
 fn remove_one_from_many(conn: Connection) {
@@ -35,9 +44,9 @@ fn remove_one_from_many(conn: Connection) {
     let tag_cat = create_tag(&conn, "cat");
     let tag_european = create_tag(&conn, "european");
 
-    post.tags.add(&tag_fast);
-    post.tags.add(&tag_cat);
-    post.tags.add(&tag_european);
+    post.tags.add(&tag_fast).unwrap();
+    post.tags.add(&tag_cat).unwrap();
+    post.tags.add(&tag_european).unwrap();
     post.save(&conn).unwrap();
 
     // Wait a minute, Cheetahs aren't from Europe!
@@ -63,10 +72,10 @@ fn remove_multiple_from_many(conn: Connection) {
     let tag_european = create_tag(&conn, "european");
     let tag_striped = create_tag(&conn, "striped");
 
-    post.tags.add(&tag_fast);
-    post.tags.add(&tag_cat);
-    post.tags.add(&tag_european);
-    post.tags.add(&tag_striped);
+    post.tags.add(&tag_fast).unwrap();
+    post.tags.add(&tag_cat).unwrap();
+    post.tags.add(&tag_european).unwrap();
+    post.tags.add(&tag_striped).unwrap();
     post.save(&conn).unwrap();
 
     // Wait a minute, Cheetahs aren't from Europe and they don't have stripes!
@@ -83,8 +92,8 @@ fn can_add_to_many_before_save(conn: Connection) {
     // Verify that for an object with an auto-pk, we can add items to a Many field before we actually
     // save the original object (and thus get the actual pk);
     let mut obj = AutoPkWithMany::new();
-    obj.tags.add(&create_tag(&conn, "blue"));
-    obj.tags.add(&create_tag(&conn, "red"));
+    obj.tags.add(&create_tag(&conn, "blue")).unwrap();
+    obj.tags.add(&create_tag(&conn, "red")).unwrap();
     obj.save(&conn).unwrap();
 
     let obj = AutoPkWithMany::get(&conn, obj.id).unwrap();
@@ -92,3 +101,16 @@ fn can_add_to_many_before_save(conn: Connection) {
     assert_eq!(tags.count(), 2);
 }
 testall!(can_add_to_many_before_save);
+
+fn cant_add_unsaved_to_many(_conn: Connection) {
+    let unsaved_item = AutoItem {
+        id: -1,
+        val: "shiny".to_string(),
+        state: ObjectState::default(),
+    };
+    let mut obj = AutoPkWithMany::new();
+    obj.items
+        .add(&unsaved_item)
+        .expect_err("unexpectedly not error");
+}
+testall!(cant_add_unsaved_to_many);

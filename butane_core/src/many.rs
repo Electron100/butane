@@ -64,11 +64,26 @@ where
         self.all_values = OnceCell::new();
     }
 
-    /// Adds a value.
-    pub fn add(&mut self, new_val: &T) {
+    /// Adds a value. Returns Err(ValueNotSaved) if the
+    /// provided value uses automatic primary keys and appears
+    /// to have an uninitialized one.
+    pub fn add(&mut self, new_val: &T) -> Result<()> {
+        // Check for uninitialized pk
+        if T::AUTO_PK {
+            let ipk: i64 = match new_val.pk().to_sql() {
+                SqlVal::Int(i) => i as i64,
+                SqlVal::BigInt(i) => i,
+                _ => 1,
+            };
+            if ipk < 0 {
+                return Err(Error::ValueNotSaved);
+            }
+        }
+
         // all_values is now out of date, so clear it
         self.all_values = OnceCell::new();
-        self.new_values.push(new_val.pk().to_sql())
+        self.new_values.push(new_val.pk().to_sql());
+        Ok(())
     }
 
     /// Removes a value.

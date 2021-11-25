@@ -27,6 +27,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let pktype = &pk_field.ty;
     let pkident = pk_field.ident.clone().unwrap();
     let pklit = make_ident_literal_str(&pkident);
+    let auto_pk = is_auto(&pk_field);
 
     let insert_cols = columns(ast_struct, |f| !is_auto(f));
     let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
@@ -59,6 +60,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                         type Fields = #fields_type;
             const PKCOL: &'static str = #pklit;
             const TABLE: &'static str = #tablelit;
+            const AUTO_PK: bool = #auto_pk;
             fn pk(&self) -> &Self::PKType {
                 &self.#pkident
             }

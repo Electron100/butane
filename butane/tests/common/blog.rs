@@ -98,8 +98,8 @@ pub fn setup_blog(conn: &Connection) {
     post.published = true;
     post.pub_time = Some(Utc::now().naive_utc());
     post.likes = 4;
-    post.tags.add(&tag_danger);
-    post.tags.add(&tag_asia);
+    post.tags.add(&tag_danger).unwrap();
+    post.tags.add(&tag_asia).unwrap();
     post.save(conn).unwrap();
 
     let mut post = Post::new(
@@ -120,7 +120,7 @@ pub fn setup_blog(conn: &Connection) {
     );
     post.published = true;
     post.likes = 10;
-    post.tags.add(&tag_danger);
+    post.tags.add(&tag_danger).unwrap();
     post.save(conn).unwrap();
 
     let mut post = Post::new(
@@ -130,6 +130,6 @@ pub fn setup_blog(conn: &Connection) {
         &mountains_blog,
     );
     post.published = false;
-    post.tags.add(&tag_danger);
+    post.tags.add(&tag_danger).unwrap();
     post.save(conn).unwrap();
 }

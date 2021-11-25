@@ -255,6 +255,7 @@ impl DataObject for ButaneMigration {
     type Fields = (); // we don't need Fields as we never filter
     const PKCOL: &'static str = "name";
     const TABLE: &'static str = "butane_migrations";
+    const AUTO_PK: bool = false;
     fn pk(&self) -> &String {
         &self.name
     }

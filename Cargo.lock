@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "butane"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "butane_codegen",
  "butane_core",
@@ -137,7 +137,7 @@ dependencies = [
 
 [[package]]
 name = "butane_cli"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "butane",
@@ -150,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "butane_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "butane_core",
  "proc-macro2 1.0.26",
@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "butane_core"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "bytes",
  "cfg-if",

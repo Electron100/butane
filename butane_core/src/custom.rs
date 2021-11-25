@@ -48,7 +48,7 @@ impl fmt::Display for SqlValCustom {
                 f.write_str(&format!("<custom PG value of type {}>", ty))
             }
             #[cfg(not(feature = "pg"))]
-            _ => f.write_str(&format!("<unknown custom value>")),
+            _ => f.write_str("<unknown custom value>"),
         }
     }
 }

@@ -1,8 +1,10 @@
 use butane::db::{Backend, Connection, ConnectionSpec};
 use once_cell::sync::Lazy;
 use std::io::{BufRead, BufReader, Read, Write};
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::process::{ChildStderr, Command, Stdio};
+use std::sync::Mutex;
 use uuid_for_test::Uuid;
 
 pub fn pg_connection() -> (Connection, PgSetupData) {
@@ -93,6 +95,10 @@ fn create_tmp_server() -> PgServerState {
         }
     }
     eprintln!("createdtmp server!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    unsafe {
+        // Try to delete all the pg files when the process exits
+        libc::atexit(proc_teardown);
+    }
     PgServerState {
         dir,
         sockdir,
@@ -101,7 +107,12 @@ fn create_tmp_server() -> PgServerState {
     }
 }
 
-static TMP_SERVER: Lazy<PgServerState> = Lazy::new(|| create_tmp_server());
+extern "C" fn proc_teardown() {
+    drop(TMP_SERVER.deref().lock().unwrap().take());
+}
+
+static TMP_SERVER: Lazy<Mutex<Option<PgServerState>>> =
+    Lazy::new(|| Mutex::new(Some(create_tmp_server())));
 
 pub fn pg_setup() -> PgSetupData {
     eprintln!("pg_setup");
@@ -111,7 +122,8 @@ pub fn pg_setup() -> PgSetupData {
     let connstr = match std::env::var("BUTANE_PG_CONNSTR") {
         Ok(connstr) => connstr,
         Err(_) => {
-            let server = &TMP_SERVER;
+            let server_mguard = &TMP_SERVER.deref().lock().unwrap();
+            let server: &PgServerState = server_mguard.as_ref().unwrap();
             let host = server.sockdir.to_str().unwrap();
             format!("host={} user=postgres", host)
         }

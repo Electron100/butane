@@ -122,6 +122,7 @@ dependencies = [
  "env_logger",
  "exec_time",
  "geo-types",
+ "libc",
  "log",
  "once_cell",
  "paste",

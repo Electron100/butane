@@ -108,7 +108,7 @@ pub struct MapDeref<I, F> {
     f: F,
 }
 
-impl<'a, I, F, B> fallible_iterator::FallibleIterator for MapDeref<I, F>
+impl<I, F, B> fallible_iterator::FallibleIterator for MapDeref<I, F>
 where
     I: BackendRows,
     F: FnMut(&(dyn BackendRow)) -> Result<B>,

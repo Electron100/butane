@@ -14,11 +14,11 @@ use syn::{
 #[macro_export]
 macro_rules! make_compile_error {
     ($span:expr=> $($arg:tt)*) => ({
-        let lit = crate::codegen::make_lit(&std::fmt::format(format_args!($($arg)*)));
+        let lit = $crate::codegen::make_lit(&std::fmt::format(format_args!($($arg)*)));
         quote_spanned!($span=> compile_error!(#lit))
     });
     ($($arg:tt)*) => ({
-        let lit = crate::codegen::make_lit(&std::fmt::format(format_args!($($arg)*)));
+        let lit = $crate::codegen::make_lit(&std::fmt::format(format_args!($($arg)*)));
         quote!(compile_error!(#lit))
     })
 }
@@ -126,7 +126,7 @@ fn parse_butane_type_args(args: TokenStream2) -> std::result::Result<TypeIdentif
         return Ok(match sqltype_from_name(&tyid) {
             Some(ty) => ty,
             None => {
-                eprintln!("No SqlType value named {}", tyid.to_string());
+                eprintln!("No SqlType value named {}", tyid);
                 return Err(quote!(compile_error!("No SqlType value with the given name");));
             }
         });
@@ -526,6 +526,7 @@ fn sqltype_from_name(name: &Ident) -> Option<TypeIdentifier> {
 
 #[derive(Debug)]
 struct CompilerErrorMsg {
+    #[allow(unused)] // better compiler error reporting is an area of future improvement
     ts: TokenStream2,
 }
 impl CompilerErrorMsg {

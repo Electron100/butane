@@ -118,7 +118,7 @@ impl Default for MemMigrations {
 impl Migrations for MemMigrations {
     type M = MemMigration;
     fn get_migration(&self, name: &str) -> Option<Self::M> {
-        self.migrations.get(name).map(|m| MemMigration::clone(m))
+        self.migrations.get(name).map(MemMigration::clone)
     }
     fn latest(&self) -> Option<Self::M> {
         match &self.latest {

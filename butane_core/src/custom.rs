@@ -16,7 +16,7 @@ pub enum SqlTypeCustom {
 }
 
 /// For use with [SqlVal::Custom](crate::SqlVal)
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SqlValCustom {
     #[cfg(feature = "pg")]
     Pg {

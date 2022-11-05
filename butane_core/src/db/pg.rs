@@ -80,7 +80,7 @@ impl PgConnectionLike for PgConnection {
     }
 }
 impl BackendConnection for PgConnection {
-    fn transaction<'c>(&'c mut self) -> Result<Transaction<'c>> {
+    fn transaction(&mut self) -> Result<Transaction<'_>> {
         let trans: postgres::Transaction<'_> = self.conn.get_mut().transaction()?;
         let trans = Box::new(PgTransaction::new(trans));
         Ok(Transaction::new(trans))
@@ -487,7 +487,7 @@ fn sql_for_expr<W>(
 ) where
     W: Write,
 {
-    helper::sql_for_expr(expr, &sql_for_expr, values, pls, w)
+    helper::sql_for_expr(expr, sql_for_expr, values, pls, w)
 }
 
 fn sql_val_from_postgres<I>(row: &postgres::Row, idx: I, col: &Column) -> Result<SqlVal>

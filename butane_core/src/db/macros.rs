@@ -12,7 +12,7 @@ macro_rules! connection_method_wrapper {
                 expr: Option<BoolExpr>,
                 limit: Option<i32>,
                 offset: Option<i32>,
-                sort: Option<&[crate::query::Order]>,
+                sort: Option<&[$crate::query::Order]>,
             ) -> Result<RawQueryResult<'a>> {
                 self.wrapped_connection_methods()?
                     .query(table, columns, expr, limit, offset, sort)

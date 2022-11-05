@@ -79,7 +79,7 @@ impl SQLiteConnection {
 connection_method_wrapper!(SQLiteConnection);
 
 impl BackendConnection for SQLiteConnection {
-    fn transaction<'c>(&'c mut self) -> Result<Transaction<'c>> {
+    fn transaction(&mut self) -> Result<Transaction<'_>> {
         let trans: rusqlite::Transaction<'_> = self.conn.transaction()?;
         let trans = Box::new(SqliteTransaction::new(trans));
         Ok(Transaction::new(trans))
@@ -135,7 +135,7 @@ impl ConnectionMethods for rusqlite::Connection {
         }
 
         if let Some(offset) = offset {
-            if limit == None {
+            if limit.is_none() {
                 // Sqlite only supports offset in conjunction with
                 // limit, so add a max limit if we don't have one
                 // already.
@@ -244,7 +244,7 @@ impl ConnectionMethods for rusqlite::Connection {
     fn has_table(&self, table: &str) -> Result<bool> {
         let mut stmt =
             self.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
-        let mut rows = stmt.query(&[table])?;
+        let mut rows = stmt.query([table])?;
         Ok(rows.next()?.is_some())
     }
 }
@@ -342,7 +342,7 @@ impl<'a> QueryAdapterInner<'a> {
             //  bringing the referencing rows along with it.
             let q_ref = Pin::get_unchecked_mut(Pin::as_mut(&mut q));
             let stmt_ref: *mut rusqlite::Statement<'a> = &mut q_ref.stmt;
-            q_ref.rows = Some((&mut *stmt_ref).query(params)?)
+            q_ref.rows = Some((*stmt_ref).query(params)?)
         }
         Ok(q)
     }
@@ -403,7 +403,7 @@ fn sql_for_expr<W>(
 ) where
     W: Write,
 {
-    helper::sql_for_expr(expr, &sql_for_expr, values, pls, w)
+    helper::sql_for_expr(expr, sql_for_expr, values, pls, w)
 }
 
 fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result<SqlVal> {

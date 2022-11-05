@@ -155,7 +155,7 @@ fn init(args: Option<&ArgMatches>) -> Result<()> {
 }
 
 fn make_migration(args: Option<&ArgMatches>) -> Result<()> {
-    let name_arg = args.map(|a| a.value_of("NAME")).flatten();
+    let name_arg = args.and_then(|a| a.value_of("NAME"));
     let name = match name_arg {
         Some(name) => format!("{}_{}", default_name(), name),
         None => default_name(),
@@ -197,7 +197,7 @@ fn rollback(args: Option<&ArgMatches>) -> Result<()> {
     let spec = load_connspec()?;
     let conn = db::connect(&spec)?;
 
-    match args.map(|a| a.value_of("NAME")).flatten() {
+    match args.and_then(|a| a.value_of("NAME")) {
         Some(to) => rollback_to(conn, to),
         None => rollback_latest(conn),
     }

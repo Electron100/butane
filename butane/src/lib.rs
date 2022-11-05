@@ -72,7 +72,7 @@ pub use butane_codegen::filter;
 
 /// Constructs a filtered database query.
 ///
-/// Use as `query!(Foo, expr)`, where `Foo` is a model type. Returns `[`Query`]`<Foo>`.
+/// Use as `query!(Foo, expr)`, where `Foo` is a model type. Returns [`Query`]`<Foo>`.
 ///
 /// Shorthand for `Foo::query().filter(`[`filter`]`!(Foo, expr))`
 //

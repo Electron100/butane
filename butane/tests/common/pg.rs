@@ -128,7 +128,7 @@ pub fn pg_setup() -> PgSetupData {
             format!("host={} user=postgres", host)
         }
     };
-    let new_dbname = format!("butane_test_{}", Uuid::new_v4().to_simple());
+    let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     eprintln!("new db is `{}`", &new_dbname);
 
     let mut conn = butane::db::connect(&ConnectionSpec::new("pg", &connstr)).unwrap();

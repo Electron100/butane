@@ -391,7 +391,7 @@ impl BackendRow for rusqlite::Row<'_> {
         sql_valref_from_rusqlite(self.get_ref(idx)?, &ty)
     }
     fn len(&self) -> usize {
-        self.column_count()
+        self.as_ref().column_count()
     }
 }
 

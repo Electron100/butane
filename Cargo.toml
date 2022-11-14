@@ -8,3 +8,7 @@ members = [
         "example",
         "examples/getting_started",
         ]
+
+[workspace.dependencies]
+rusqlite = "0.28"
+uuid = "1.2"

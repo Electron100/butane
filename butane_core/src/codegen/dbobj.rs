@@ -57,7 +57,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 #dataresult
         impl butane::DataObject for #tyname {
             type PKType = #pktype;
-                        type Fields = #fields_type;
+            type Fields = #fields_type;
             const PKCOL: &'static str = #pklit;
             const TABLE: &'static str = #tablelit;
             const AUTO_PK: bool = #auto_pk;

@@ -107,6 +107,7 @@ fn basic_crud(conn: Connection) {
     // read
     let mut foo2 = Foo::get(&conn, 1).unwrap();
     assert_eq!(foo, foo2);
+    assert_eq!(Some(foo), Foo::try_get(&conn, 1).unwrap());
 
     // update
     foo2.bar = 43;
@@ -120,6 +121,7 @@ fn basic_crud(conn: Connection) {
     } else {
         panic!("Expected NoSuchObject");
     }
+    assert_eq!(None, Foo::try_get(&conn, 1).unwrap());
 }
 testall!(basic_crud);
 

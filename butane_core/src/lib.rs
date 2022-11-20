@@ -82,11 +82,20 @@ pub trait DataObject: DataResult<DBO = Self> {
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
     /// Find this object in the database based on primary key.
+    /// Returns `Error::NoSuchObject` if the primary key does not exist.
     fn get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType>) -> Result<Self>
     where
         Self: Sized,
     {
-        <Self as DataResult>::query()
+        Self::try_get(conn, id)?.ok_or(Error::NoSuchObject)
+    }
+    /// Find this object in the database based on primary key.
+    /// Returns `None` if the primary key does not exist.
+    fn try_get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType>) -> Result<Option<Self>>
+    where
+        Self: Sized,
+    {
+        Ok(<Self as DataResult>::query()
             .filter(query::BoolExpr::Eq(
                 Self::PKCOL,
                 query::Expr::Val(id.borrow().to_sql()),
@@ -94,8 +103,7 @@ pub trait DataObject: DataResult<DBO = Self> {
             .limit(1)
             .load(conn)?
             .into_iter()
-            .nth(0)
-            .ok_or(Error::NoSuchObject)
+            .nth(0))
     }
     /// Save the object to the database.
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;

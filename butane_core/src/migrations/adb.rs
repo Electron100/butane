@@ -76,7 +76,7 @@ impl<'de> Visitor<'de> for TypeKeyVisitor {
         } else if v.starts_with("CT:") {
             Ok(TypeKey::CustomType(rest))
         } else {
-            Err(E::custom("Unkown type key string".to_string()))
+            Err(E::custom("Unknown type key string".to_string()))
         }
     }
 }

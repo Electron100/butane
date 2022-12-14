@@ -1,4 +1,5 @@
 # Getting Started
+
 This guide gives a brief, high-level overview of the basic CRUD
 operations and features of Butane. The complete code can be found at
 [examples/getting_started](https://github.com/Electron100/butane/tree/master/examples/getting_started). We
@@ -16,7 +17,7 @@ In `Cargo.toml`, add a dependency on Butane:
 
 ``` toml
 [dependencies]
-butane = { version = "0.1", features=["default", "sqlite"] }
+butane = { version = "0.5", features=["default", "sqlite"] }
 ```
 
 Substitute another backend instead of "sqlite" as desired ("pg" for
@@ -28,9 +29,10 @@ to panic on failure. In a real program, you would of course handle
 your errors.
 
 ## Initialization
+
 Butane provides a CLI to help with database connection and
 migration. It's optional -- it uses only public Butane APIs -- but it
-helps with common tasks. Let's install it and initialze our
+helps with common tasks. Let's install it and initialize our
 database. It's intended to be run from the same directory as the
 Cargo package (i.e. the one containing Cargo.toml).
 
@@ -53,6 +55,7 @@ pub fn establish_connection() -> Connection {
 ```
 
 ## Models
+
 We can connect to our database, but we can't really do anything
 yet. Let's define some _models_ for our blog objects (in `src/models.rs`). We'll start with
 the Blog itself.
@@ -172,6 +175,7 @@ migrations to work, but their format is not part of Butane's public
 API.
 
 ## Initial Migration
+
 Butane has recorded our current state, but no tables have been created
 in the database yet! We need to create our first migration. It doesn't
 matter what we name it, so let's call it "init".
@@ -195,6 +199,7 @@ butane migrate
 Now that the database matches our models, let's write some more code.
 
 ## Create
+
 To create an object in the database, we just instantiate a struct as
 normal, then save it. Let's write `create_blog` and `create_post`
 methods (in `lib.rs`):
@@ -290,8 +295,9 @@ const EOF: &str = "CTRL+Z";
 Let's run this (`cargo run --bin write_post`) and author our first post.
 
 ## Read
+
 Ok, that's great, we put some data in the database, but at some point
-we're going to want to get it back to display it. The most ergonmic and typesafe way to construct Butane queries is to use the `query!` macro. To find all published posts, we'd write
+we're going to want to get it back to display it. The most ergonomic and type-safe way to construct Butane queries is to use the `query!` macro. To find all published posts, we'd write
 
 ``` rust
 query!(Post, published == true)
@@ -304,7 +310,7 @@ Post::query().filter(filter!(Post, published == true))
 ```
 
 `filter!` creates a `butane::query::BoolExpr`, but does so in a more
-ergonomic and typesafe manner. If we had a typo and wrote
+ergonomic and type-safe manner. If we had a typo and wrote
 `query!(Post, publish == true)` ("publish" instead of "published") we'd get a compiler error.
 
 
@@ -336,6 +342,7 @@ though. That's because it only prints published posts, and we haven't
 published our post yet.
 
 ## Update
+
 Let's create yet another program, `publish_post`. It needs to be given
 the id of a post to publish. To publish the post, we find it by id,
 mark it as published, and save it again.
@@ -369,6 +376,7 @@ when we run `show_posts` again, it should display our newly published
 post!
 
 ## Delete
+
 We've gotten most of the way through CRUD. For completeness, let's see
 how to delete a post. This can be done with either the `delete` method
 on `DataObject` (to delete an object we've already loaded) or (more
@@ -406,6 +414,7 @@ variable is used as the RHS for the LIKE operator.
 If you delete a post, you can run `show_posts` again to confirm that it is fact deleted.
 
 ## Migrate
+
 At some point we'll need to expand our models. Let's say we decide to
 add a feature to allow visitors to "like" posts. Now we need to add a
 likes field to `Post`. Let's go ahead and add
@@ -463,6 +472,7 @@ butane migrate
 And that's it! Now we can use our new field.
 
 ## Summary
+
 While there are lots of aspects of Butane not covered in this
 tutorial, hopefully it's conveyed an idea of how to get started. More
 details can be found in the API docs.

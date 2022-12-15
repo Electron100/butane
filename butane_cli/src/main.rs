@@ -325,7 +325,7 @@ fn collapse_migrations(new_initial_name: Option<&str>) -> Result<()> {
         // Update the embedding
         embed()?;
     }
-    println!("Collpased all changes into new single migration '{}'", name);
+    println!("Collapsed all changes into new single migration '{}'", name);
     Ok(())
 }
 

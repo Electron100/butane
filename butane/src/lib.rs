@@ -35,7 +35,7 @@ pub mod db {
 /// Filters support some operations for which Rust does not have operators and which are instead
 /// represented syntactically as function calls.
 /// * `like`: parameter is a SQL LIKE expression string, e.g. `title.like("M%").
-/// * `matches`: Parmeter is a sub-expression. Use with a
+/// * `matches`: Parameter is a sub-expression. Use with a
 ///   [`ForeignKey`] field to evaluate as true if the referent
 ///   matches. For example, to find all posts made in blogs by people
 ///   named "Pete" we might say `filter!(Post, `blog.matches(author == "Pete"))`.
@@ -61,8 +61,8 @@ pub mod db {
 ///   nationality: String
 /// }
 /// let e: BoolExpr = filter!(Contestant, nationality == "US" && rank < 42);
-/// let firstplace = 1;
-/// let e2 = filter!(Contestant, rank == { firstplace });
+/// let first_place = 1;
+/// let e2 = filter!(Contestant, rank == { first_place });
 /// let e3 = filter!(Contestant, name.like("A%"));
 ///```
 ///

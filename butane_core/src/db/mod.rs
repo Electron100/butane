@@ -8,7 +8,7 @@
 //! * `BackendConnection` is a trait representing a direct connection to a database backend. It is a superset
 //!   of `ConnectionMethods` and also includes the ability to create a transaction.
 //! * `Transaction` is a struct representing a database transaction. It implements `ConnectionMethods`.
-//! * `Connection` is a convience struct containing a boxed `BackendConnection`. It cannot do anything other than
+//! * `Connection` is a convenience struct containing a boxed `BackendConnection`. It cannot do anything other than
 //!    what a `BackendConnection` can do, but allows using a single concrete type that is not tied to a particular
 //!    database backend. It is returned by the `connect` method.
 

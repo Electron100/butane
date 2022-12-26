@@ -1,11 +1,12 @@
 #[macro_export]
 macro_rules! connection_method_wrapper {
     ($ty:path) => {
+        #[async_trait::async_trait]
         impl ConnectionMethods for $ty {
             fn execute(&self, sql: &str) -> Result<()> {
                 ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
             }
-            fn query<'a, 'b, 'c: 'a>(
+            async fn query<'a, 'b, 'c: 'a>(
                 &'c self,
                 table: &str,
                 columns: &'b [Column],
@@ -15,7 +16,7 @@ macro_rules! connection_method_wrapper {
                 sort: Option<&[$crate::query::Order]>,
             ) -> Result<RawQueryResult<'a>> {
                 self.wrapped_connection_methods()?
-                    .query(table, columns, expr, limit, offset, sort)
+                    .query(table, columns, expr, limit, offset, sort).await
             }
             fn insert_returning_pk(
                 &self,

@@ -179,20 +179,20 @@ impl<T: DataResult> Query<T> {
     }
 
     /// Executes the query against `conn` and returns the first result (if any).
-    pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        conn.query(&self.table, T::COLUMNS, self.filter, Some(1), None, None)?
+    pub async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
+        conn.query(&self.table, T::COLUMNS, self.filter, Some(1), None, None).await?
             .mapped(T::from_row)
             .nth(0)
     }
 
     /// Executes the query against `conn`.
-    pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
+    pub async fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
         let sort = if self.sort.is_empty() {
             None
         } else {
             Some(self.sort.as_slice())
         };
-        conn.query(&self.table, T::COLUMNS, self.filter, self.limit, self.offset, sort)?
+        conn.query(&self.table, T::COLUMNS, self.filter, self.limit, self.offset, sort).await?
             .mapped(T::from_row)
             .collect()
     }

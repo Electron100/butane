@@ -9,10 +9,12 @@ use crate::{Result, SqlType, SqlVal, SqlValRef};
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
-use postgres::fallible_iterator::FallibleIterator;
-use postgres::GenericClient;
+use tokio_postgres::fallible_iterator::FallibleIterator;
+use tokio_postgres::GenericClient;
+use tokio_postgres as postgres;
 use std::cell::RefCell;
 use std::fmt::Write;
+use async_trait::async_trait;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
@@ -113,6 +115,7 @@ pub trait PgConnectionLike {
     fn cell(&self) -> Result<&RefCell<Self::Client>>;
 }
 
+#[async_trait]
 impl<T> ConnectionMethods for T
 where
     T: PgConnectionLike,
@@ -125,7 +128,7 @@ where
         Ok(())
     }
 
-    fn query<'a, 'b, 'c: 'a>(
+    async fn query<'a, 'b, 'c: 'a>(
         &'c self,
         table: &str,
         columns: &'b [Column],
@@ -168,7 +171,7 @@ where
         let stmt = self
             .cell()?
             .try_borrow_mut()?
-            .prepare_typed(&sqlquery, types.as_ref())?;
+            .prepare_typed(&sqlquery, types.as_ref()).await?;
         // todo avoid intermediate vec?
         let rowvec: Vec<postgres::Row> = self
             .cell()?
@@ -323,6 +326,7 @@ impl<'c> PgConnectionLike for PgTransaction<'c> {
     }
 }
 
+#[async_trait]
 impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
@@ -330,10 +334,11 @@ impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
             Some(trans) => Ok(trans.into_inner().commit()?),
         }
     }
-    fn rollback(&mut self) -> Result<()> {
+
+    async fn rollback(&mut self) -> Result<()> {
         match self.trans.take() {
             None => Err(Self::already_consumed()),
-            Some(trans) => Ok(trans.into_inner().rollback()?),
+            Some(trans) => Ok(trans.into_inner().rollback().await?),
         }
     }
     // Workaround for https://github.com/rust-lang/rfcs/issues/2765

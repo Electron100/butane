@@ -5,14 +5,16 @@ use crate::query::{BoolExpr, Expr, Order};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
 use std::ops::{Deref, DerefMut};
 use std::vec::Vec;
+use async_trait::async_trait;
 
 /// Methods available on a database connection. Most users do not need
 /// to call these methods directly and will instead use methods on
 /// [DataObject][crate::DataObject] or the `query!` macro. This trait is
 /// implemented by both database connections and transactions.
-pub trait ConnectionMethods {
+#[async_trait]
+pub trait ConnectionMethods: Sync {
     fn execute(&self, sql: &str) -> Result<()>;
-    fn query<'a, 'b, 'c: 'a>(
+    async fn query<'a, 'b, 'c: 'a>(
         &'c self,
         table: &str,
         columns: &'b [Column],

@@ -9,7 +9,7 @@ mod custom_pg {
     use butane::{butane_type, db::Connection, model, ObjectState};
     use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
     use geo_types;
-    use postgres;
+    use tokio_postgres as postgres;
     use std::result::Result;
 
     // newtype so we can implement traits for it.

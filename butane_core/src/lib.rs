@@ -5,6 +5,7 @@ use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 use thiserror::Error as ThisError;
+use async_trait::async_trait;
 
 pub mod codegen;
 pub mod custom;
@@ -53,6 +54,7 @@ impl Eq for ObjectState {}
 /// object type. The purpose of a result type which is not also an
 /// object type is to allow a query to retrieve a subset of an
 /// object's columns.
+#[async_trait]
 pub trait DataResult: Sized {
     /// Corresponding object type.
     type DBO: DataObject;
@@ -61,13 +63,14 @@ pub trait DataResult: Sized {
     where
         Self: Sized;
     /// Create a blank query (matching all rows) for this type.
-    fn query() -> Query<Self>;
+    async fn query() -> Query<Self>;
 }
 
 /// An object in the database.
 ///
 /// Rather than implementing this type manually, use the
 /// `#[model]` attribute.
+#[async_trait]
 pub trait DataObject: DataResult<DBO = Self> {
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
@@ -82,21 +85,23 @@ pub trait DataObject: DataResult<DBO = Self> {
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
     /// Find this object in the database based on primary key.
-    fn get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType>) -> Result<Self>
+    async fn get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType>) -> Result<Self>
     where
         Self: Sized,
+        Self::PKType: Sync,
     {
-        <Self as DataResult>::query()
-            .filter(query::BoolExpr::Eq(
+        let query = <Self as DataResult>::query().await;
+        query.filter(query::BoolExpr::Eq(
                 Self::PKCOL,
                 query::Expr::Val(id.borrow().to_sql()),
             ))
             .limit(1)
-            .load(conn)?
+            .load(conn).await?
             .into_iter()
             .nth(0)
             .ok_or(Error::NoSuchObject)
     }
+
     /// Save the object to the database.
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
     /// Delete the object from the database.
@@ -162,7 +167,7 @@ pub enum Error {
     SQLiteFromSQL(rusqlite::types::FromSqlError),
     #[cfg(feature = "pg")]
     #[error("Postgres error {0}")]
-    Postgres(#[from] postgres::Error),
+    Postgres(#[from] tokio_postgres::Error),
     #[cfg(feature = "datetime")]
     #[error("Chrono error {0}")]
     Chrono(#[from] chrono::ParseError),

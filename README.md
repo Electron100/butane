@@ -1,6 +1,6 @@
 [![Latest Version](https://img.shields.io/crates/v/butane.svg)](https://crates.io/crates/butane)
 [![docs](https://docs.rs/butane/badge.svg)](https://docs.rs/butane)
-[![Build Status](https://img.shields.io/github/workflow/status/Electron100/butane/CI/master)](https://github.com/Electron100/butane/actions?query=branch%3Amaster)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Electron100/butane/workflows/ci/yml?branch=master)](https://github.com/Electron100/butane/actions?query=branch%3Amaster)
 
 # Butane
 

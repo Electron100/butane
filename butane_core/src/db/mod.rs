@@ -20,6 +20,7 @@ use std::fs;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
+use async_trait::async_trait;
 
 mod connmethods;
 mod helper;
@@ -42,6 +43,7 @@ pub use connmethods::{
 };
 
 /// Database connection.
+#[async_trait]
 pub trait BackendConnection: ConnectionMethods + Send + 'static {
     /// Begin a database transaction. The transaction object must be
     /// used in place of this connection until it is committed and aborted.
@@ -166,6 +168,7 @@ pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
         .connect(&spec.conn_str)
 }
 
+#[async_trait]
 trait BackendTransaction<'c>: ConnectionMethods {
     /// Commit the transaction Unfortunately because we use this as a
     /// trait object, we can't consume self. It should be understood
@@ -173,7 +176,7 @@ trait BackendTransaction<'c>: ConnectionMethods {
     /// not public, and that behavior is enforced by Transaction
     fn commit(&mut self) -> Result<()>;
     /// Roll back the transaction. Same comment about consuming self as above.
-    fn rollback(&mut self) -> Result<()>;
+    async fn rollback(&mut self) -> Result<()>;
 
     // Workaround for https://github.com/rust-lang/rfcs/issues/2765
     fn connection_methods(&self) -> &dyn ConnectionMethods;

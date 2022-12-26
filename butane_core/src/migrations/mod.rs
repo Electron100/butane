@@ -20,8 +20,10 @@ mod fsmigrations;
 pub use fsmigrations::{FsMigration, FsMigrations};
 mod memmigrations;
 pub use memmigrations::{MemMigration, MemMigrations};
+use async_trait::async_trait;
 
 /// A collection of migrations.
+#[async_trait]
 pub trait Migrations {
     type M: Migration;
 
@@ -66,8 +68,8 @@ pub trait Migrations {
     }
 
     /// Get migrations which have not yet been applied to the database
-    fn unapplied_migrations(&self, conn: &impl ConnectionMethods) -> Result<Vec<Self::M>> {
-        match self.last_applied_migration(conn)? {
+    async fn unapplied_migrations(&self, conn: &impl ConnectionMethods) -> Result<Vec<Self::M>> {
+        match self.last_applied_migration(conn).await? {
             None => self.all_migrations(),
             Some(m) => self.migrations_since(&m),
         }
@@ -75,7 +77,7 @@ pub trait Migrations {
 
     /// Get the last migration that has been applied to the database or None
     /// if no migrations have been applied
-    fn last_applied_migration(&self, conn: &impl ConnectionMethods) -> Result<Option<Self::M>> {
+    async fn last_applied_migration(&self, conn: &impl ConnectionMethods) -> Result<Option<Self::M>> {
         if !conn.has_table(ButaneMigration::TABLE)? {
             return Ok(None);
         }
@@ -87,7 +89,7 @@ pub trait Migrations {
                 None,
                 None,
                 None,
-            )?
+            ).await?
             .mapped(ButaneMigration::from_row)
             .collect()?;
 
@@ -233,6 +235,8 @@ pub fn copy_migration(from: &impl Migration, to: &mut impl MigrationMut) -> Resu
 struct ButaneMigration {
     name: String,
 }
+
+#[async_trait]
 impl DataResult for ButaneMigration {
     type DBO = Self;
     const COLUMNS: &'static [Column] = &[Column::new("name", SqlType::Text)];
@@ -246,10 +250,12 @@ impl DataResult for ButaneMigration {
             name: FromSql::from_sql_ref(row.get(0, SqlType::Text).unwrap())?,
         })
     }
-    fn query() -> query::Query<Self> {
+
+    async fn query() -> query::Query<Self> {
         query::Query::new("butane_migrations")
     }
 }
+
 impl DataObject for ButaneMigration {
     type PKType = String;
     type Fields = (); // we don't need Fields as we never filter

@@ -14,6 +14,7 @@ use pin_project::pin_project;
 use std::borrow::Cow;
 use std::fmt::Write;
 use std::pin::Pin;
+use async_trait::async_trait;
 
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -61,7 +62,7 @@ impl Backend for SQLiteBackend {
 
 /// SQLite database connection.
 pub struct SQLiteConnection {
-    conn: rusqlite::Connection,
+    conn: std::sync::Mutex<rusqlite::Connection>,
 }
 impl SQLiteConnection {
     fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -95,6 +96,7 @@ impl BackendConnection for SQLiteConnection {
     }
 }
 
+#[async_trait]
 impl ConnectionMethods for rusqlite::Connection {
     fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
@@ -104,7 +106,7 @@ impl ConnectionMethods for rusqlite::Connection {
         Ok(())
     }
 
-    fn query<'a, 'b, 'c: 'a>(
+    async fn query<'a, 'b, 'c: 'a>(
         &'c self,
         table: &str,
         columns: &'b [Column],
@@ -250,7 +252,7 @@ impl ConnectionMethods for rusqlite::Connection {
 }
 
 struct SqliteTransaction<'c> {
-    trans: Option<rusqlite::Transaction<'c>>,
+    trans: std::sync::Mutex<Option<rusqlite::Transaction<'c>>>,
 }
 impl<'c> SqliteTransaction<'c> {
     fn new(trans: rusqlite::Transaction<'c>) -> Self {
@@ -270,14 +272,16 @@ impl<'c> SqliteTransaction<'c> {
     }
 }
 connection_method_wrapper!(SqliteTransaction<'_>);
+
+#[async_trait]
 impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
-        match self.trans.take() {
+        match self.trans.take().take() {
             None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.commit()?),
         }
     }
-    fn rollback(&mut self) -> Result<()> {
+    async fn rollback(&mut self) -> Result<()> {
         match self.trans.take() {
             None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.rollback()?),

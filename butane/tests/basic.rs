@@ -2,6 +2,7 @@ use butane::db::Connection;
 use butane::prelude::*;
 use butane::{butane_type, find, model, query};
 use butane::{ForeignKey, ObjectState};
+use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 use paste;
 #[cfg(feature = "pg")]
 use postgres;
@@ -94,6 +95,14 @@ impl SelfReferential {
             state: ObjectState::default(),
         }
     }
+}
+
+#[model]
+#[derive(Debug, Default, PartialEq, Clone)]
+struct TimeHolder {
+    pub id: i32,
+    pub naive: NaiveDateTime,
+    pub utc: DateTime<Utc>,
 }
 
 fn basic_crud(conn: Connection) {
@@ -325,3 +334,20 @@ fn fkey_same_type(conn: Connection) {
     assert!(inner.reference.is_none());
 }
 testall!(fkey_same_type);
+
+fn basic_time(conn: Connection) {
+    let now = Utc::now();
+    let mut time = TimeHolder {
+        id: 1,
+        naive: now.naive_utc(),
+        utc: now,
+        state: ObjectState::default(),
+    };
+    time.save(&conn).unwrap();
+
+    let time2 = TimeHolder::get(&conn, 1).unwrap();
+    // Note, we don't just compare the objects directly because we
+    // lose some precision when we go to the database.
+    assert_eq!(time.naive.timestamp(), time2.naive.timestamp());
+}
+testall!(basic_time);

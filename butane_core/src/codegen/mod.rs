@@ -437,6 +437,14 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         if *ty == parse_quote!(NaiveDateTime) {
             return some_known(SqlType::Timestamp);
         }
+        // Note, the fact that we have to check specific paths because
+        // we don't really have type system information at this point
+        // is a strong argument for proc macros being the wrong time
+        // to run the full migration generation.
+        if *ty == parse_quote!(DateTime<Utc>) || *ty == parse_quote!(DateTime<chrono::offset::Utc>)
+        {
+            return some_known(SqlType::Timestamp);
+        }
     }
 
     #[cfg(feature = "uuid")]

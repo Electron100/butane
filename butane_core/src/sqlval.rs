@@ -8,7 +8,7 @@ use std::fmt;
 use crate::custom::SqlTypeCustom;
 
 #[cfg(feature = "datetime")]
-use chrono::naive::NaiveDateTime;
+use chrono::{naive::NaiveDateTime, DateTime};
 
 #[derive(Clone, Debug)]
 pub enum SqlValRef<'a> {
@@ -442,6 +442,43 @@ impl FieldType for NaiveDateTime {
 }
 #[cfg(feature = "datetime")]
 impl PrimaryKeyType for NaiveDateTime {}
+
+#[cfg(feature = "datetime")]
+impl FromSql for DateTime<chrono::offset::Utc> {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+        use chrono::Utc;
+        Ok(DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_sql_ref(valref)?,
+            Utc,
+        ))
+    }
+    fn from_sql(val: SqlVal) -> Result<Self> {
+        use chrono::Utc;
+        Ok(DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_sql(val)?,
+            Utc,
+        ))
+    }
+}
+#[cfg(feature = "datetime")]
+impl ToSql for DateTime<chrono::offset::Utc> {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Timestamp(self.naive_utc())
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Timestamp(self.naive_utc())
+    }
+    fn into_sql(self) -> SqlVal {
+        SqlVal::Timestamp(self.naive_utc())
+    }
+}
+#[cfg(feature = "datetime")]
+impl FieldType for DateTime<chrono::offset::Utc> {
+    const SQLTYPE: SqlType = SqlType::Timestamp;
+    type RefType = str;
+}
+#[cfg(feature = "datetime")]
+impl PrimaryKeyType for DateTime<chrono::offset::Utc> {}
 
 impl ToSql for &str {
     fn to_sql(&self) -> SqlVal {

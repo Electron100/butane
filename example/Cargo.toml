@@ -3,6 +3,7 @@ name = "example"
 version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
 edition = "2018"
+publish = false
 
 [dependencies]
 failure = "0.1.5"

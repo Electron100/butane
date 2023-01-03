@@ -12,6 +12,7 @@ pub mod codegen;
 pub mod custom;
 pub mod db;
 pub mod fkey;
+pub mod implementation;
 pub mod many;
 pub mod migrations;
 pub mod query;
@@ -73,7 +74,7 @@ pub trait DataResult: Sized {
 pub trait DataObject: DataResult<DBO = Self> {
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
-    type Fields: DataObjectFields<Self> + Default;
+    type Fields: implementation::DataObjectFields<Self> + Default;
     /// The name of the primary key column.
     const PKCOL: &'static str;
     /// The name of the table.
@@ -111,56 +112,11 @@ pub trait DataObject: DataResult<DBO = Self> {
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
     /// Delete the object from the database.
     fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>;
-}
-
-pub trait DataObjectFields<T: DataObject> {
-    // Since we don't have this yet
-    // https://rust-lang.github.io/impl-trait-initiative/explainer/rpit_trait.html
-    type IntoFieldsIter<'a>: IntoIterator<Item = &'a DataObjectFieldDef<T>>
-    where
-        Self: 'a,
-        T: 'a;
-    /// Allows iterating over all field definitions.
-    fn field_defs(&'_ self) -> Self::IntoFieldsIter<'_>;
-}
-
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
-pub struct DataObjectFieldDef<T: DataObject> {
-    name: &'static str,
-    sqltype: SqlType,
-    nullable: bool,
-    #[builder(default = false)]
-    pk: bool,
-    #[builder(default = false)]
-    auto: bool,
-    #[builder(default = false)]
-    unique: bool,
-    #[builder(default)]
-    default: Option<SqlVal>,
-    #[builder(default)]
-    phantom: PhantomData<T>,
-}
-impl<T: DataObject> DataObjectFieldDef<T> {
-    pub fn name(&self) -> &str {
-        self.name
-    }
-    pub fn is_nullable(&self) -> bool {
-        self.nullable
-    }
-    pub fn unique(&self) -> bool {
-        self.unique
-    }
-    pub fn is_pk(&self) -> bool {
-        self.pk
-    }
-    pub fn default(&self) -> &Option<SqlVal> {
-        &self.default
-    }
-    pub fn sqltype(&self) -> &SqlType {
-        &self.sqltype
-    }
-    pub fn is_auto(&self) -> bool {
-        self.auto
+    /// Provides access to information about fields (rows) of the data
+    /// object. Most library consumers do not need to call this
+    /// directly -- it is primarily called from macro-generated code.
+    fn fields() -> Self::Fields {
+        Self::Fields::default()
     }
 }
 

@@ -2,10 +2,9 @@
 //! not necessary to use these types directly.
 use crate::db::BackendRows;
 use crate::db::{Column, ConnectionMethods};
+use crate::implementation::{DataObjectFieldDef, DataObjectFields};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
-use crate::{
-    db, query, DataObject, DataObjectFieldDef, DataObjectFields, DataResult, Error, Result, SqlType,
-};
+use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
 
 use fallible_iterator::FallibleIterator;
 use std::path::Path;

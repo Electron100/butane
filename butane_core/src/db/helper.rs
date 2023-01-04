@@ -204,7 +204,9 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
             SqlType::Text => SqlVal::Text("".to_string()),
             SqlType::Blob => SqlVal::Blob(Vec::new()),
             #[cfg(feature = "datetime")]
-            SqlType::Timestamp => SqlVal::Timestamp(NaiveDateTime::from_timestamp(0, 0)),
+            SqlType::Timestamp => {
+                SqlVal::Timestamp(NaiveDateTime::from_timestamp_opt(0, 0).unwrap())
+            }
             SqlType::Custom(_) => return Err(Error::NoCustomDefault),
         },
         TypeIdentifier::Name(_) => return Err(Error::NoCustomDefault),

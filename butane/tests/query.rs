@@ -183,18 +183,33 @@ fn by_timestamp(conn: Connection) {
     blog::setup_blog(&conn);
     let mut post = find!(Post, title == "Sir Charles", &conn).unwrap();
     // Pretend this post was published in 1970
-    post.pub_time = Some(Utc.ymd(1970, 1, 1).and_hms(1, 1, 1).naive_utc());
+    post.pub_time = Some(
+        Utc.with_ymd_and_hms(1970, 1, 1, 1, 1, 1)
+            .single()
+            .unwrap()
+            .naive_utc(),
+    );
     post.save(&conn).unwrap();
     // And pretend another post was later in 1971
     let mut post = find!(Post, title == "The Tiger", &conn).unwrap();
-    post.pub_time = Some(Utc.ymd(1970, 5, 1).and_hms(1, 1, 1).naive_utc());
+    post.pub_time = Some(
+        Utc.with_ymd_and_hms(1970, 5, 1, 1, 1, 1)
+            .single()
+            .unwrap()
+            .naive_utc(),
+    );
     post.save(&conn).unwrap();
 
     // Now find all posts published before 1971. Assume we haven't gone
     // back in time to run these unit tests.
     let posts = query!(
         Post,
-        pub_time < { Utc.ymd(1972, 1, 1).and_hms(1, 1, 1).naive_utc() }
+        pub_time < {
+            Utc.with_ymd_and_hms(1972, 1, 1, 1, 1, 1)
+                .single()
+                .unwrap()
+                .naive_utc()
+        }
     )
     .order_desc(colname!(Post, pub_time))
     .load(&conn)

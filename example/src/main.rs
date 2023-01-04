@@ -50,7 +50,7 @@ fn query() -> Result<()> {
 }
 
 fn establish_connection() -> Result<Connection> {
-    let spec = ConnectionSpec::load(&std::env::current_dir()?)?;
+    let spec = ConnectionSpec::load(std::env::current_dir()?)?;
     let conn = butane::db::connect(&spec)?;
     Ok(conn)
 }

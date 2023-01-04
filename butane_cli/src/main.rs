@@ -275,7 +275,7 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {{
 }
 
 fn load_connspec() -> Result<db::ConnectionSpec> {
-    match db::ConnectionSpec::load(&base_dir()?) {
+    match db::ConnectionSpec::load(base_dir()?) {
         Ok(spec) => Ok(spec),
         Err(butane::Error::IO(_)) => {
             eprintln!("No Butane connection info found. Did you run butane init?");

@@ -156,7 +156,7 @@ pub fn butane_type(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 fn migrations_for_dir() -> migrations::FsMigrations {
-    migrations::from_root(&migrations_dir())
+    migrations::from_root(migrations_dir())
 }
 
 fn migrations_dir() -> PathBuf {

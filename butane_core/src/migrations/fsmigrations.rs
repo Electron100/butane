@@ -84,7 +84,7 @@ impl FsMigration {
     }
 
     fn sql_path(&self, backend: &str, direction: &str) -> PathBuf {
-        self.root.join(&format!("{}_{}.sql", backend, direction))
+        self.root.join(format!("{}_{}.sql", backend, direction))
     }
 
     fn write_contents(&self, fname: &str, contents: &[u8]) -> Result<()> {
@@ -130,7 +130,7 @@ impl MigrationMut for FsMigration {
         let fname = format!("{}.table", table);
         self.ensure_dir()?;
         let path = self.root.join(fname);
-        std::fs::remove_file(&path)?;
+        std::fs::remove_file(path)?;
         Ok(())
     }
 

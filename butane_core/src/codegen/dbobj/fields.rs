@@ -44,7 +44,8 @@ pub fn fields_type_tokens(ast_struct: &ItemStruct) -> TokenStream2 {
                 }
             }
         }
-        impl butane::implementation::DataObjectFields<#tyname> for #fields_type {
+        impl butane::implementation::DataObjectFields for #fields_type {
+            type DBO = #tyname;
             type IntoFieldsIter<'a> = &'a [butane::implementation::DataObjectFieldDef<#tyname>; #num_row_fields];
             fn field_defs(&self) -> Self::IntoFieldsIter<'_> {
                 &self.defs

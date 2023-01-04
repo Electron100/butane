@@ -74,7 +74,7 @@ pub trait DataResult: Sized {
 pub trait DataObject: DataResult<DBO = Self> {
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
-    type Fields: implementation::DataObjectFields<Self> + Default;
+    type Fields: implementation::DataObjectFields<DBO = Self> + Default;
     /// The name of the primary key column.
     const PKCOL: &'static str;
     /// The name of the table.

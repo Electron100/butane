@@ -3,13 +3,15 @@
 ///! welcome to use them, but be aware that you probably don't *need*
 ///! to.
 use super::*;
-pub trait DataObjectFields<T: DataObject> {
+pub trait DataObjectFields {
+    /// Corresponding object type.
+    type DBO: DataObject;
     // Since we don't have this yet
     // https://rust-lang.github.io/impl-trait-initiative/explainer/rpit_trait.html
-    type IntoFieldsIter<'a>: IntoIterator<Item = &'a DataObjectFieldDef<T>>
+    type IntoFieldsIter<'a>: IntoIterator<Item = &'a DataObjectFieldDef<Self::DBO>>
     where
         Self: 'a,
-        T: 'a;
+        Self::DBO: 'a;
     /// Allows iterating over all field definitions.
     fn field_defs(&'_ self) -> Self::IntoFieldsIter<'_>;
 }
@@ -37,14 +39,14 @@ impl<T: DataObject> DataObjectFieldDef<T> {
     pub fn is_nullable(&self) -> bool {
         self.nullable
     }
-    pub fn unique(&self) -> bool {
+    pub fn is_unique(&self) -> bool {
         self.unique
     }
     pub fn is_pk(&self) -> bool {
         self.pk
     }
-    pub fn default(&self) -> &Option<SqlVal> {
-        &self.default
+    pub fn default(&self) -> Option<&SqlVal> {
+        self.default.as_ref()
     }
     pub fn sqltype(&self) -> &SqlType {
         &self.sqltype

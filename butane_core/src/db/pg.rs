@@ -9,7 +9,6 @@ use crate::{Result, SqlType, SqlVal, SqlValRef};
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
-use tokio_postgres::fallible_iterator::FallibleIterator;
 use tokio_postgres::GenericClient;
 use tokio_postgres as postgres;
 use std::cell::RefCell;
@@ -55,12 +54,12 @@ impl Backend for PgBackend {
 
 /// Pg database connection.
 pub struct PgConnection {
-    conn: RefCell<postgres::Client>,
+    conn: postgres::Client,
 }
 impl PgConnection {
     fn open(params: &str) -> Result<Self> {
         Ok(PgConnection {
-            conn: RefCell::new(Self::connect(params)?),
+            conn: Self::connect(params)?,
         })
     }
     fn connect(params: &str) -> Result<postgres::Client> {
@@ -83,7 +82,7 @@ impl PgConnectionLike for PgConnection {
 }
 impl BackendConnection for PgConnection {
     fn transaction(&mut self) -> Result<Transaction<'_>> {
-        let trans: postgres::Transaction<'_> = self.conn.get_mut().transaction()?;
+        let trans: postgres::Transaction<'_> = self.conn.transaction()?;
         let trans = Box::new(PgTransaction::new(trans));
         Ok(Transaction::new(trans))
     }
@@ -94,7 +93,7 @@ impl BackendConnection for PgConnection {
         BACKEND_NAME
     }
     fn is_closed(&self) -> bool {
-        self.conn.borrow().is_closed()
+        self.conn.is_closed()
     }
 }
 
@@ -112,19 +111,19 @@ fn sqlvalref_for_pg_query<'a>(v: &'a SqlValRef<'a>) -> &'a dyn postgres::types::
 /// transaction. Implementation detail. Semver exempt.
 pub trait PgConnectionLike {
     type Client: postgres::GenericClient;
-    fn cell(&self) -> Result<&RefCell<Self::Client>>;
+    fn cell(&self) -> Result<Self::Client>;
 }
 
 #[async_trait]
 impl<T> ConnectionMethods for T
 where
-    T: PgConnectionLike,
+    T: PgConnectionLike + std::marker::Sync,
 {
     fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
             debug!("execute sql {}", sql);
         }
-        self.cell()?.try_borrow_mut()?.batch_execute(sql.as_ref())?;
+        self.cell()?.batch_execute(sql.as_ref())?;
         Ok(())
     }
 
@@ -170,12 +169,10 @@ where
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
         let stmt = self
             .cell()?
-            .try_borrow_mut()?
             .prepare_typed(&sqlquery, types.as_ref()).await?;
         // todo avoid intermediate vec?
         let rowvec: Vec<postgres::Row> = self
             .cell()?
-            .try_borrow_mut()?
             .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))?
             .map_err(Error::Postgres)
             .map(|r| {
@@ -207,7 +204,6 @@ where
         // use query instead of execute so we can get our result back
         let pk: Option<SqlVal> = self
             .cell()?
-            .try_borrow_mut()?
             .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query))?
             .map_err(Error::Postgres)
             .map(|r| sql_val_from_postgres(&r, 0, pkcol))
@@ -224,7 +220,6 @@ where
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
         self.cell()?
-            .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
@@ -239,7 +234,6 @@ where
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
         self.cell()?
-            .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
@@ -268,7 +262,6 @@ where
             debug!("update sql {}", sql);
         }
         self.cell()?
-            .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
@@ -285,7 +278,6 @@ where
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
         let cnt = self
             .cell()?
-            .try_borrow_mut()?
             .execute(sql.as_str(), params.as_slice())?;
         Ok(cnt as usize)
     }
@@ -293,7 +285,6 @@ where
         // future improvement, should be schema-aware
         let stmt = self
             .cell()?
-            .try_borrow_mut()?
             .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;")?;
         let rows = self.cell()?.try_borrow_mut()?.query(&stmt, &[&table])?;
         Ok(!rows.is_empty())
@@ -301,19 +292,16 @@ where
 }
 
 struct PgTransaction<'c> {
-    trans: Option<RefCell<postgres::Transaction<'c>>>,
+    trans: Option<postgres::Transaction<'c>>,
 }
 impl<'c> PgTransaction<'c> {
     fn new(trans: postgres::Transaction<'c>) -> Self {
         PgTransaction {
-            trans: Some(RefCell::new(trans)),
+            trans: Some(trans),
         }
     }
-    fn get(&self) -> Result<&RefCell<postgres::Transaction<'c>>> {
-        match &self.trans {
-            None => Err(Self::already_consumed()),
-            Some(trans) => Ok(trans),
-        }
+    fn get(&self) -> Result<&postgres::Transaction<'c>> {
+        &self.trans.ok_or(Self::already_consumed())
     }
     fn already_consumed() -> Error {
         Error::Internal("transaction has already been consumed".to_string())
@@ -321,7 +309,7 @@ impl<'c> PgTransaction<'c> {
 }
 impl<'c> PgConnectionLike for PgTransaction<'c> {
     type Client = postgres::Transaction<'c>;
-    fn cell(&self) -> Result<&RefCell<Self::Client>> {
+    fn cell(&self) -> Result<&Self::Client> {
         self.get()
     }
 }

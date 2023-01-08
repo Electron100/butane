@@ -100,6 +100,7 @@ pub trait DataObject: DataResult<DBO = Self> {
             .into_iter()
             .nth(0)
             .ok_or(Error::NoSuchObject)
+            .await
     }
 
     /// Save the object to the database.

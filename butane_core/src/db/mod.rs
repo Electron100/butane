@@ -27,8 +27,6 @@ mod helper;
 mod macros;
 #[cfg(feature = "pg")]
 pub mod pg;
-#[cfg(feature = "sqlite")]
-pub mod sqlite;
 
 #[cfg(feature = "r2d2")]
 mod r2;
@@ -152,8 +150,6 @@ impl Backend for Box<dyn Backend> {
 /// Find a backend by name.
 pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
-        #[cfg(feature = "sqlite")]
-        sqlite::BACKEND_NAME => Some(Box::new(sqlite::SQLiteBackend::new())),
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         _ => None,

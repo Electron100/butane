@@ -11,9 +11,9 @@ use bytes::BufMut;
 use chrono::NaiveDateTime;
 use tokio_postgres::GenericClient;
 use tokio_postgres as postgres;
-use std::cell::RefCell;
 use std::fmt::Write;
 use async_trait::async_trait;
+use tokio;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
@@ -52,17 +52,21 @@ impl Backend for PgBackend {
     }
 }
 
+// type PgConnHandle<TlsT> = tokio::task::JoinHandle<postgres::Connection<postgres::Socket, TlsT>>;
+
 /// Pg database connection.
 pub struct PgConnection {
-    conn: postgres::Client,
+    client: postgres::Client,
+    // Save the handle to the task running the connection to keep it alive
+    conn_handle: tokio::task::JoinHandle<()>,
 }
+
 impl PgConnection {
-    fn open(params: &str) -> Result<Self> {
-        Ok(PgConnection {
-            conn: Self::connect(params)?,
-        })
+    async fn open(params: &str) -> Result<Self> {
+        let (client, conn_handle) = Self::connect(params).await?;
+        Ok( Self { client, conn_handle })
     }
-    fn connect(params: &str) -> Result<postgres::Client> {
+    async fn connect(params: &str) -> Result<(postgres::Client, tokio::task::JoinHandle<()>)> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "tls")] {
                 let connector = native_tls::TlsConnector::new()?;
@@ -71,13 +75,19 @@ impl PgConnection {
                 let connector = postgres::NoTls;
             }
         }
-        Ok(postgres::Client::connect(params, connector)?)
+        let (client, conn) = postgres::connect(params, connector).await?;
+        let conn_handle = tokio::spawn(async move {
+            if let Err(e) = conn.await {
+                // TODO don't panic
+                panic!()
+            }
+        });
+        Ok((client, conn_handle))
     }
 }
 impl PgConnectionLike for PgConnection {
-    type Client = postgres::Client;
-    fn cell(&self) -> Result<&RefCell<Self::Client>> {
-        Ok(&self.conn)
+    fn cell(&self) -> Result<&postgres::Client> {
+        Ok(&self.client)
     }
 }
 impl BackendConnection for PgConnection {
@@ -301,7 +311,10 @@ impl<'c> PgTransaction<'c> {
         }
     }
     fn get(&self) -> Result<&postgres::Transaction<'c>> {
-        &self.trans.ok_or(Self::already_consumed())
+        match self.trans {
+            Some(x) => Ok(&x),
+            None => Err(Self::already_consumed()),
+        }
     }
     fn already_consumed() -> Error {
         Error::Internal("transaction has already been consumed".to_string())

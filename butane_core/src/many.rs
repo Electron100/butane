@@ -16,7 +16,7 @@ fn default_oc<T>() -> OnceCell<Vec<T>> {
 /// U::PKType. Table name is T_ManyToMany_foo where foo is the name of
 /// the Many field
 //
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Many<T>
 where
     T: DataObject,
@@ -153,6 +153,7 @@ where
         });
         vals.map(|v| v.iter())
     }
+
     pub fn columns(&self) -> [Column; 2] {
         [
             Column::new("owner", self.owner_type.clone()),

@@ -65,7 +65,7 @@ For a detailed tutorial, see the [Getting Started Guide](https://electron100.git
 ## Cargo Features
 
 Butane exposes several features to Cargo. By default, no backends are
-enabled: you will want to enabled either `sqlite` or `pg`:
+enabled: you will want to enable either `sqlite` or `pg`:
 * `default`: Turns on `datetime` and `uuid`.
 * `debug`: Used in developing Butane, not expected to be enabled by consumers.
 * `datetime`: Support for timestamps (using `chrono::NaiveDateTime`).
@@ -85,7 +85,7 @@ enabled: you will want to enabled either `sqlite` or `pg`:
   facility to infer butane models from an existing database schema.
 * API ergonomics are prioritized above performance. This does not mean
   Butane is slow, but that when given a choice between a simple,
-  straightforward API and ekeing out the smallest possible overhead,
+  straightforward API and eking out the smallest possible overhead,
   the API will win.
 
 ## Roadmap

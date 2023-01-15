@@ -3,9 +3,9 @@
 
 use crate::query::{BoolExpr, Expr, Order};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
+use async_trait::async_trait;
 use std::ops::{Deref, DerefMut};
 use std::vec::Vec;
-use async_trait::async_trait;
 
 /// Methods available on a database connection. Most users do not need
 /// to call these methods directly and will instead use methods on

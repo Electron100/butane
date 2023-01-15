@@ -1,7 +1,7 @@
-use paste;
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::{model, query};
+use paste;
 
 mod common;
 

@@ -6,14 +6,14 @@ use crate::custom::{SqlTypeCustom, SqlValRefCustom};
 use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::{debug, query};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
+use async_trait::async_trait;
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
-use tokio_postgres::GenericClient;
-use tokio_postgres as postgres;
 use std::fmt::Write;
-use async_trait::async_trait;
 use tokio;
+use tokio_postgres as postgres;
+use tokio_postgres::GenericClient;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
@@ -64,7 +64,10 @@ pub struct PgConnection {
 impl PgConnection {
     async fn open(params: &str) -> Result<Self> {
         let (client, conn_handle) = Self::connect(params).await?;
-        Ok( Self { client, conn_handle })
+        Ok(Self {
+            client,
+            conn_handle,
+        })
     }
     async fn connect(params: &str) -> Result<(postgres::Client, tokio::task::JoinHandle<()>)> {
         cfg_if::cfg_if! {
@@ -179,7 +182,8 @@ where
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
         let stmt = self
             .cell()?
-            .prepare_typed(&sqlquery, types.as_ref()).await?;
+            .prepare_typed(&sqlquery, types.as_ref())
+            .await?;
         // todo avoid intermediate vec?
         let rowvec: Vec<postgres::Row> = self
             .cell()?
@@ -229,8 +233,7 @@ where
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.cell()?
-            .execute(sql.as_str(), params.as_slice())?;
+        self.cell()?.execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
     fn insert_or_replace<'a>(
@@ -243,8 +246,7 @@ where
         let mut sql = String::new();
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.cell()?
-            .execute(sql.as_str(), params.as_slice())?;
+        self.cell()?.execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
     fn update(
@@ -271,8 +273,7 @@ where
         if cfg!(feature = "log") {
             debug!("update sql {}", sql);
         }
-        self.cell()?
-            .execute(sql.as_str(), params.as_slice())?;
+        self.cell()?.execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
     fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
@@ -286,9 +287,7 @@ where
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        let cnt = self
-            .cell()?
-            .execute(sql.as_str(), params.as_slice())?;
+        let cnt = self.cell()?.execute(sql.as_str(), params.as_slice())?;
         Ok(cnt as usize)
     }
     fn has_table(&self, table: &str) -> Result<bool> {
@@ -306,9 +305,7 @@ struct PgTransaction<'c> {
 }
 impl<'c> PgTransaction<'c> {
     fn new(trans: postgres::Transaction<'c>) -> Self {
-        PgTransaction {
-            trans: Some(trans),
-        }
+        PgTransaction { trans: Some(trans) }
     }
     fn get(&self) -> Result<&postgres::Transaction<'c>> {
         match self.trans {

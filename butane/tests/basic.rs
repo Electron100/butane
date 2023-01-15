@@ -3,10 +3,10 @@ use butane::prelude::*;
 use butane::{butane_type, find, model, query};
 use butane::{ForeignKey, ObjectState};
 use paste;
-#[cfg(feature = "pg")]
-use tokio_postgres as postgres;
 #[cfg(feature = "sqlite")]
 use rusqlite;
+#[cfg(feature = "pg")]
+use tokio_postgres as postgres;
 
 mod common;
 

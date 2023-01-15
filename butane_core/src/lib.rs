@@ -1,11 +1,11 @@
 #![allow(clippy::iter_nth_zero)]
 #![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 use thiserror::Error as ThisError;
-use async_trait::async_trait;
 
 pub mod codegen;
 pub mod custom;
@@ -91,12 +91,14 @@ pub trait DataObject: DataResult<DBO = Self> {
         Self::PKType: Sync,
     {
         let query = <Self as DataResult>::query().await;
-        query.filter(query::BoolExpr::Eq(
+        query
+            .filter(query::BoolExpr::Eq(
                 Self::PKCOL,
                 query::Expr::Val(id.borrow().to_sql()),
             ))
             .limit(1)
-            .load(conn).await?
+            .load(conn)
+            .await?
             .into_iter()
             .nth(0)
             .ok_or(Error::NoSuchObject)

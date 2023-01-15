@@ -14,19 +14,21 @@
 
 use crate::query::BoolExpr;
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fs;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use async_trait::async_trait;
 
 mod connmethods;
 mod helper;
 mod macros;
 #[cfg(feature = "pg")]
 pub mod pg;
+#[cfg(feature = "sqlite")]
+pub mod sqlite;
 
 #[cfg(feature = "r2d2")]
 mod r2;

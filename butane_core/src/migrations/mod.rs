@@ -19,8 +19,8 @@ mod fs;
 mod fsmigrations;
 pub use fsmigrations::{FsMigration, FsMigrations};
 mod memmigrations;
-pub use memmigrations::{MemMigration, MemMigrations};
 use async_trait::async_trait;
+pub use memmigrations::{MemMigration, MemMigrations};
 
 /// A collection of migrations.
 #[async_trait]
@@ -77,7 +77,10 @@ pub trait Migrations {
 
     /// Get the last migration that has been applied to the database or None
     /// if no migrations have been applied
-    async fn last_applied_migration(&self, conn: &impl ConnectionMethods) -> Result<Option<Self::M>> {
+    async fn last_applied_migration(
+        &self,
+        conn: &impl ConnectionMethods,
+    ) -> Result<Option<Self::M>> {
         if !conn.has_table(ButaneMigration::TABLE)? {
             return Ok(None);
         }
@@ -89,7 +92,8 @@ pub trait Migrations {
                 None,
                 None,
                 None,
-            ).await?
+            )
+            .await?
             .mapped(ButaneMigration::from_row)
             .collect()?;
 
@@ -251,7 +255,7 @@ impl DataResult for ButaneMigration {
         })
     }
 
-    async fn query() -> query::Query<Self> {
+    fn query() -> query::Query<Self> {
         query::Query::new("butane_migrations")
     }
 }

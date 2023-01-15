@@ -126,32 +126,45 @@ where
 
     /// Loads the values referred to by this foreign key from the
     /// database if necessary and returns a reference to them.
-    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
-        let vals: Result<&Vec<T>> = self.all_values.get_or_try_init(|| {
-            //if we don't have an owner then there are no values
-            let owner: &SqlVal = match &self.owner {
-                Some(o) => o,
-                None => return Ok(Vec::new()),
-            };
-            let mut vals = T::query()
-                .filter(BoolExpr::Subquery {
-                    col: T::PKCOL,
-                    tbl2: self.item_table.clone(),
-                    tbl2_col: "has",
-                    expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
-                })
-                .load(conn)?;
-            // Now add in the values for things not saved to the db yet
-            if !self.new_values.is_empty() {
-                vals.append(
-                    &mut T::query()
-                        .filter(BoolExpr::In(T::PKCOL, self.new_values.clone()))
-                        .load(conn)?,
-                );
+    pub async fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
+        let vals: Option<&Vec<T>> = self.all_values.get();
+        if let Some(vals) = vals {
+            // We already cached the value
+            return Ok(vals.iter());
+        }
+
+        ////////////
+        // load the value from the database
+
+        let mut vals: Vec<T> = match &self.owner {
+            None => Vec::new(), //if we don't have an owner then there are no values
+            Some(owner) => {
+                T::query()
+                    .filter(BoolExpr::Subquery {
+                        col: T::PKCOL,
+                        tbl2: self.item_table.clone(),
+                        tbl2_col: "has",
+                        expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
+                    })
+                    .load(conn)
+                    .await?
             }
-            Ok(vals)
-        });
-        vals.map(|v| v.iter())
+        };
+        // Now add in the values for things not saved to the db yet (if any)
+        if !self.new_values.is_empty() {
+            vals.append(
+                &mut T::query()
+                    .filter(BoolExpr::In(T::PKCOL, self.new_values.clone()))
+                    .load(conn)
+                    .await?,
+            );
+        }
+
+        // cache what we loaded (and added to)
+        Ok(match self.all_values.try_insert(vals) {
+            Ok(v) => v.iter(),
+            Err((existing, v)) => existing.iter(),
+        })
     }
     pub fn columns(&self) -> [Column; 2] {
         [

@@ -63,7 +63,7 @@ pub trait DataResult: Sized {
     where
         Self: Sized;
     /// Create a blank query (matching all rows) for this type.
-    async fn query() -> Query<Self>;
+    fn query() -> Query<Self>;
 }
 
 /// An object in the database.

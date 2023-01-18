@@ -1,6 +1,6 @@
 use butane::db::Connection;
-use butane::prelude::*;
 use butane::{butane_type, find, model, query};
+use butane::{colname, prelude::*};
 use butane::{ForeignKey, ObjectState};
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 use paste;
@@ -351,3 +351,50 @@ fn basic_time(conn: Connection) {
     assert_eq!(time.naive.timestamp(), time2.naive.timestamp());
 }
 testall!(basic_time);
+
+fn basic_load_first(conn: Connection) {
+    //create
+    let mut foo1 = Foo::new(1);
+    foo1.bar = 42;
+    foo1.baz = "hello world".to_string();
+    foo1.save(&conn).unwrap();
+    let mut foo2 = Foo::new(2);
+    foo2.bar = 43;
+    foo2.baz = "hello world".to_string();
+    foo2.save(&conn).unwrap();
+
+    // query finds first
+    let found = query!(Foo, baz.like("hello%")).load_first(&conn).unwrap();
+
+    assert_eq!(found, Some(foo1));
+}
+testall!(basic_load_first);
+
+fn basic_load_first_ordered(conn: Connection) {
+    //create
+    let mut foo1 = Foo::new(1);
+    foo1.bar = 42;
+    foo1.baz = "hello world".to_string();
+    foo1.save(&conn).unwrap();
+    let mut foo2 = Foo::new(2);
+    foo2.bar = 43;
+    foo2.baz = "hello world".to_string();
+    foo2.save(&conn).unwrap();
+
+    // query finds first, ascending order
+    let found_asc = query!(Foo, baz.like("hello%"))
+        .order_asc(colname!(Foo, bar))
+        .load_first(&conn)
+        .unwrap();
+
+    assert_eq!(found_asc, Some(foo1));
+
+    // query finds first, descending order
+    let found_desc = query!(Foo, baz.like("hello%"))
+        .order_desc(colname!(Foo, bar))
+        .load_first(&conn)
+        .unwrap();
+
+    assert_eq!(found_desc, Some(foo2));
+}
+testall!(basic_load_first_ordered);

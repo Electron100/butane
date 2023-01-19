@@ -178,23 +178,35 @@ impl<T: DataResult> Query<T> {
         self.order(column, OrderDirection::Descending)
     }
 
-    /// Executes the query against `conn` and returns the first result (if any).
-    pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        conn.query(&self.table, T::COLUMNS, self.filter, Some(1), None, None)?
-            .mapped(T::from_row)
-            .nth(0)
-    }
-
-    /// Executes the query against `conn`.
-    pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
+    fn fetch(
+        self,
+        conn: &impl ConnectionMethods,
+        limit: Option<i32>,
+    ) -> Result<Box<dyn BackendRows + '_>> {
         let sort = if self.sort.is_empty() {
             None
         } else {
             Some(self.sort.as_slice())
         };
-        conn.query(&self.table, T::COLUMNS, self.filter, self.limit, self.offset, sort)?
-            .mapped(T::from_row)
-            .collect()
+        conn.query(
+            &self.table,
+            T::COLUMNS,
+            self.filter,
+            limit,
+            self.offset,
+            sort,
+        )
+    }
+
+    /// Executes the query against `conn` and returns the first result (if any).
+    pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
+        self.fetch(conn, Some(1))?.mapped(T::from_row).nth(0)
+    }
+
+    /// Executes the query against `conn`.
+    pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
+        let limit = self.limit.to_owned();
+        self.fetch(conn, limit)?.mapped(T::from_row).collect()
     }
 
     /// Executes the query against `conn` and deletes all matching objects.

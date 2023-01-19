@@ -38,7 +38,7 @@ pub use r2::ConnectionManager;
 use crate::connection_method_wrapper;
 
 pub use connmethods::{
-    BackendRow, BackendRows, Column, ConnectionMethods, QueryResult, RawQueryResult,
+    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
 };
 
 /// Database connection.

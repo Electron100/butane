@@ -70,6 +70,8 @@ fn create_tmp_server() -> PgServerState {
 
     // Run postgres to actually create the server
     let mut proc = Command::new("postgres")
+        .arg("-c")
+        .arg("logging_collector=false")
         .arg("-D")
         .arg(&dir)
         .arg("-k")
@@ -94,7 +96,7 @@ fn create_tmp_server() -> PgServerState {
             panic!("postgres process died");
         }
     }
-    eprintln!("createdtmp server!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    eprintln!("created tmp server!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     unsafe {
         // Try to delete all the pg files when the process exits
         libc::atexit(proc_teardown);

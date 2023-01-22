@@ -7,3 +7,6 @@ publish = false
 
 [dependencies]
 butane = { path="../butane"}
+
+[package.metadata.release]
+release = false

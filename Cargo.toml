@@ -12,3 +12,7 @@ members = [
 [workspace.dependencies]
 rusqlite = "0.28"
 uuid = "1.2"
+
+[workspace.metadata.release]
+allow-branch = ["master"]
+push = false

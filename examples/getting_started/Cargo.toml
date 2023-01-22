@@ -22,3 +22,7 @@ doc = false
 
 [dependencies]
 butane = { path = "../../butane", features=["default", "sqlite"] }
+
+
+[package.metadata.release]
+release = false

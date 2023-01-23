@@ -27,8 +27,6 @@ mod helper;
 mod macros;
 #[cfg(feature = "pg")]
 pub mod pg;
-#[cfg(feature = "sqlite")]
-pub mod sqlite;
 
 #[cfg(feature = "r2d2")]
 mod r2;
@@ -47,7 +45,7 @@ pub use connmethods::{
 pub trait BackendConnection: ConnectionMethods + Send + 'static {
     /// Begin a database transaction. The transaction object must be
     /// used in place of this connection until it is committed and aborted.
-    fn transaction(&mut self) -> Result<Transaction>;
+    async fn transaction(&mut self) -> Result<Transaction>;
     /// Retrieve the backend backend this connection
     fn backend(&self) -> Box<dyn Backend>;
     fn backend_name(&self) -> &'static str;
@@ -62,8 +60,8 @@ pub struct Connection {
     conn: Box<dyn BackendConnection>,
 }
 impl Connection {
-    pub fn execute(&mut self, sql: impl AsRef<str>) -> Result<()> {
-        self.conn.execute(sql.as_ref())
+    pub async fn execute(&mut self, sql: impl AsRef<str>) -> Result<()> {
+        self.conn.execute(sql.as_ref()).await
     }
     // For use with connection_method_wrapper macro
     #[allow(clippy::unnecessary_wraps)]
@@ -71,9 +69,10 @@ impl Connection {
         Ok(self.conn.as_ref())
     }
 }
+#[async_trait]
 impl BackendConnection for Connection {
-    fn transaction(&mut self) -> Result<Transaction> {
-        self.conn.transaction()
+    async fn transaction(&mut self) -> Result<Transaction> {
+        self.conn.transaction().await
     }
     fn backend(&self) -> Box<dyn Backend> {
         self.conn.backend()
@@ -131,12 +130,14 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
 }
 
 /// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
-pub trait Backend {
+#[async_trait]
+pub trait Backend: Sync {
     fn name(&self) -> &'static str;
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
-    fn connect(&self, conn_str: &str) -> Result<Connection>;
+    async fn connect(&self, conn_str: &str) -> Result<Connection>;
 }
 
+#[async_trait]
 impl Backend for Box<dyn Backend> {
     fn name(&self) -> &'static str {
         self.deref().name()
@@ -144,16 +145,14 @@ impl Backend for Box<dyn Backend> {
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         self.deref().create_migration_sql(current, ops)
     }
-    fn connect(&self, conn_str: &str) -> Result<Connection> {
-        self.deref().connect(conn_str)
+    async fn connect(&self, conn_str: &str) -> Result<Connection> {
+        self.deref().connect(conn_str).await
     }
 }
 
 /// Find a backend by name.
 pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
-        #[cfg(feature = "sqlite")]
-        sqlite::BACKEND_NAME => Some(Box::new(sqlite::SQLiteBackend::new())),
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         _ => None,
@@ -162,19 +161,20 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
 
 /// Connect to a database. For non-boxed connections, see individual
 /// [Backend][crate::db::Backend] implementations.
-pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
+pub async fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
         .connect(&spec.conn_str)
+        .await
 }
 
 #[async_trait]
-trait BackendTransaction<'c>: ConnectionMethods {
+trait BackendTransaction<'c>: ConnectionMethods + Send {
     /// Commit the transaction Unfortunately because we use this as a
     /// trait object, we can't consume self. It should be understood
     /// that no methods should be called after commit. This trait is
     /// not public, and that behavior is enforced by Transaction
-    fn commit(&mut self) -> Result<()>;
+    async fn commit(&mut self) -> Result<()>;
     /// Roll back the transaction. Same comment about consuming self as above.
     async fn rollback(&mut self) -> Result<()>;
 
@@ -197,12 +197,12 @@ impl<'c> Transaction<'c> {
         Transaction { trans }
     }
     /// Commit the transaction
-    pub fn commit(mut self) -> Result<()> {
-        self.trans.deref_mut().commit()
+    pub async fn commit(mut self) -> Result<()> {
+        self.trans.commit().await
     }
     /// Roll back the transaction. Equivalent to dropping it.
-    pub fn rollback(mut self) -> Result<()> {
-        self.trans.deref_mut().rollback()
+    pub async fn rollback(mut self) -> Result<()> {
+        self.trans.deref_mut().rollback().await
     }
     // For use with connection_method_wrapper macro
     #[allow(clippy::unnecessary_wraps)]

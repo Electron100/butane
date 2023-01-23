@@ -146,12 +146,12 @@ dependencies = [
  "log",
  "once_cell",
  "paste",
- "postgres",
  "proc-macro2 1.0.47",
  "quote 1.0.21",
  "r2d2",
  "rusqlite",
  "serde_json",
+ "tokio-postgres",
  "uuid",
 ]
 
@@ -183,6 +183,7 @@ dependencies = [
 name = "butane_core"
 version = "0.5.0"
 dependencies = [
+ "async-trait",
  "bytes",
  "cfg-if",
  "chrono",
@@ -192,9 +193,7 @@ dependencies = [
  "hex",
  "log",
  "native-tls",
- "once_cell",
  "pin-project",
- "postgres",
  "postgres-native-tls",
  "proc-macro2 1.0.47",
  "quote 1.0.21",
@@ -205,6 +204,8 @@ dependencies = [
  "serde_json",
  "syn 1.0.103",
  "thiserror",
+ "tokio",
+ "tokio-postgres",
  "uuid",
 ]
 
@@ -1028,20 +1029,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ac9a59f73473f1b8d852421e59e64809f025994837ef743615c6d0c5b305160"
 
 [[package]]
-name = "postgres"
-version = "0.19.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "960c214283ef8f0027974c03e9014517ced5db12f021a9abb66185a5751fab0a"
-dependencies = [
- "bytes",
- "fallible-iterator",
- "futures-util",
- "log",
- "tokio",
- "tokio-postgres",
-]
-
-[[package]]
 name = "postgres-native-tls"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1504,9 +1491,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.21.2"
+version = "1.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9e03c497dc955702ba729190dc4aac6f2a0ce97f913e5b1b5912fc5039d9099"
+checksum = "597a12a59981d9e3c38d216785b0c37399f6e415e8d0712047620f189371b0bb"
 dependencies = [
  "autocfg",
  "bytes",
@@ -1515,7 +1502,7 @@ dependencies = [
  "mio",
  "pin-project-lite",
  "socket2",
- "winapi",
+ "windows-sys 0.42.0",
 ]
 
 [[package]]

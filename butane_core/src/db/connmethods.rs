@@ -13,7 +13,7 @@ use async_trait::async_trait;
 /// implemented by both database connections and transactions.
 #[async_trait]
 pub trait ConnectionMethods: Sync {
-    fn execute(&self, sql: &str) -> Result<()>;
+    async fn execute(&self, sql: &str) -> Result<()>;
     async fn query<'a, 'b, 'c: 'a>(
         &'c self,
         table: &str,
@@ -23,7 +23,7 @@ pub trait ConnectionMethods: Sync {
         offset: Option<i32>,
         sort: Option<&[Order]>,
     ) -> Result<RawQueryResult<'a>>;
-    fn insert_returning_pk(
+    async fn insert_returning_pk(
         &self,
         table: &str,
         columns: &[Column],
@@ -31,16 +31,16 @@ pub trait ConnectionMethods: Sync {
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal>;
     /// Like `insert_returning_pk` but with no return value
-    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()>;
+    async fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()>;
     /// Insert unless there's a conflict on the primary key column, in which case update
-    fn insert_or_replace(
+    async fn insert_or_replace(
         &self,
         table: &str,
         columns: &[Column],
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<()>;
-    fn update(
+    async fn update(
         &self,
         table: &str,
         pkcol: Column,
@@ -48,13 +48,13 @@ pub trait ConnectionMethods: Sync {
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()>;
-    fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
-        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))?;
+    async fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
+        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk))).await?;
         Ok(())
     }
-    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize>;
+    async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize>;
     /// Tests if a table exists in the database.
-    fn has_table(&self, table: &str) -> Result<bool>;
+    async fn has_table(&self, table: &str) -> Result<bool>;
 }
 
 /// Represents a database column. Most users do not need to use this

@@ -71,7 +71,7 @@ pub trait DataResult: Sized {
 /// Rather than implementing this type manually, use the
 /// `#[model]` attribute.
 #[async_trait]
-pub trait DataObject: DataResult<DBO = Self> {
+pub trait DataObject: DataResult<DBO = Self> + Sync {
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
     type Fields: Default;
@@ -85,7 +85,7 @@ pub trait DataObject: DataResult<DBO = Self> {
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
     /// Find this object in the database based on primary key.
-    async fn get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType>) -> Result<Self>
+    async fn get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType> + Send + Sync) -> Result<Self>
     where
         Self: Sized,
         Self::PKType: Sync,
@@ -103,9 +103,9 @@ pub trait DataObject: DataResult<DBO = Self> {
     }
 
     /// Save the object to the database.
-    fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
     /// Delete the object from the database.
-    fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>;
+    async fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>;
 }
 
 pub trait ModelTyped {

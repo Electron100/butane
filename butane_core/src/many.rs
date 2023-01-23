@@ -1,12 +1,13 @@
 use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
-use once_cell::unsync::OnceCell;
+use tokio::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
 fn default_oc<T>() -> OnceCell<Vec<T>> {
-    OnceCell::default()
+    // Same as impl Default for once_cell::unsync::OnceCell
+    OnceCell::new()
 }
 
 /// Used to implement a many-to-many relationship between models.
@@ -102,7 +103,7 @@ where
     }
 
     /// Used by macro-generated code. You do not need to call this directly.
-    pub fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    pub async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
         while !self.new_values.is_empty() {
             conn.insert_only(
@@ -112,13 +113,13 @@ where
                     owner.as_ref(),
                     self.new_values.pop().unwrap().as_ref().clone(),
                 ],
-            )?;
+            ).await?;
         }
         if !self.removed_values.is_empty() {
             conn.delete_where(
                 &self.item_table,
                 BoolExpr::In("has", std::mem::take(&mut self.removed_values)),
-            )?;
+            ).await?;
         }
         self.new_values.clear();
         Ok(())
@@ -126,31 +127,31 @@ where
 
     /// Loads the values referred to by this foreign key from the
     /// database if necessary and returns a reference to them.
-    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
-        let vals: Result<&Vec<T>> = self.all_values.get_or_try_init(|| {
+    pub async fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
+        let vals: Result<&Vec<T>> = self.all_values.get_or_try_init(|| async {
             //if we don't have an owner then there are no values
             let owner: &SqlVal = match &self.owner {
                 Some(o) => o,
                 None => return Ok(Vec::new()),
             };
-            let mut vals = T::query()
+            let mut vals = T::query().await
                 .filter(BoolExpr::Subquery {
                     col: T::PKCOL,
                     tbl2: self.item_table.clone(),
                     tbl2_col: "has",
                     expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
                 })
-                .load(conn)?;
+                .load(conn).await?;
             // Now add in the values for things not saved to the db yet
             if !self.new_values.is_empty() {
                 vals.append(
-                    &mut T::query()
+                    &mut T::query().await
                         .filter(BoolExpr::In(T::PKCOL, self.new_values.clone()))
-                        .load(conn)?,
+                        .load(conn).await?,
                 );
             }
             Ok(vals)
-        });
+        }).await;
         vals.map(|v| v.iter())
     }
     pub fn columns(&self) -> [Column; 2] {

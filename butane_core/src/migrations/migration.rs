@@ -13,6 +13,7 @@ use std::cmp::PartialEq;
 ///
 /// A Migration cannot be constructed directly, only retrieved from
 /// [Migrations][crate::migrations::Migrations].
+#[async_trait::async_trait]
 pub trait Migration: PartialEq {
     /// Retrieves the full abstract database state describing all tables
     fn db(&self) -> Result<ADB>;
@@ -37,46 +38,46 @@ pub trait Migration: PartialEq {
     /// Apply the migration to a database connection. The connection
     /// must be for the same type of database as this and the database
     /// must be in the state of the migration prior to this one
-    fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
+    async fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
         let backend_name = conn.backend_name();
-        let tx = conn.transaction()?;
+        let tx = conn.transaction().await?;
         let sql = self
             .up_sql(backend_name)?
             .ok_or_else(|| Error::UnknownBackend(backend_name.to_string()))?;
-        tx.execute(&sql)?;
-        self.mark_applied(&tx)?;
-        tx.commit()
+        tx.execute(&sql).await?;
+        self.mark_applied(&tx).await?;
+        tx.commit().await
     }
 
     /// Mark the migration as being applied without doing any
     /// work. Use carefully -- the caller must ensure that the
     /// database schema already matches that expected by this
     /// migration.
-    fn mark_applied(&self, conn: &impl db::ConnectionMethods) -> Result<()> {
+    async fn mark_applied(&self, conn: &impl db::ConnectionMethods) -> Result<()> {
         conn.insert_only(
             ButaneMigration::TABLE,
             ButaneMigration::COLUMNS,
             &[self.name().as_ref().to_sql_ref()],
-        )
+        ).await
     }
 
     /// Un-apply (downgrade) the migration to a database
     /// connection. The connection must be for the same type of
     /// database as this and this must be the latest migration applied
     /// to the database.
-    fn downgrade(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
+    async fn downgrade(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
         let backend_name = conn.backend_name();
-        let tx = conn.transaction()?;
+        let tx = conn.transaction().await?;
         let sql = self
             .down_sql(backend_name)?
             .ok_or_else(|| Error::UnknownBackend(backend_name.to_string()))?;
-        tx.execute(&sql)?;
+        tx.execute(&sql).await?;
         let nameval = self.name().as_ref().to_sql();
         tx.delete_where(
             ButaneMigration::TABLE,
             BoolExpr::Eq(ButaneMigration::PKCOL, Expr::Val(nameval)),
-        )?;
-        tx.commit()
+        ).await?;
+        tx.commit().await
     }
 }
 

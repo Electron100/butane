@@ -215,6 +215,8 @@ pub enum SqlType {
     #[cfg(feature = "datetime")]
     Timestamp,
     Blob,
+    #[cfg(feature = "json")]
+    Json,
     Custom(SqlTypeCustom),
 }
 impl std::fmt::Display for SqlType {
@@ -229,6 +231,8 @@ impl std::fmt::Display for SqlType {
             #[cfg(feature = "datetime")]
             Timestamp => "timestamp",
             Blob => "blob",
+            #[cfg(feature = "json")]
+            Json => "json",
             Custom(_) => "custom",
         }
         .fmt(f)

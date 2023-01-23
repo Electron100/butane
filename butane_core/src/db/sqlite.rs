@@ -314,6 +314,10 @@ fn sqlvalref_to_sqlite<'a>(valref: &SqlValRef<'a>) -> rusqlite::types::ToSqlOutp
         Real(r) => Owned(Value::Real(*r)),
         Text(t) => Borrowed(ValueRef::Text(t.as_bytes())),
         Blob(b) => Borrowed(ValueRef::Blob(b)),
+        #[cfg(feature = "json")]
+        Json(v) => serde_json::to_string(v)
+            .map(rusqlite::types::ToSqlOutput::from)
+            .unwrap(),
         #[cfg(feature = "datetime")]
         Timestamp(dt) => {
             let f = dt.format(SQLITE_DT_FORMAT);
@@ -423,6 +427,8 @@ fn sql_valref_from_rusqlite<'a>(
         SqlType::BigInt => SqlValRef::BigInt(val.as_i64()?),
         SqlType::Real => SqlValRef::Real(val.as_f64()?),
         SqlType::Text => SqlValRef::Text(val.as_str()?),
+        #[cfg(feature = "json")]
+        SqlType::Json => SqlValRef::Json(serde_json::from_str(val.as_str()?)?),
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => SqlValRef::Timestamp(NaiveDateTime::parse_from_str(
             val.as_str()?,
@@ -498,9 +504,11 @@ fn sqltype(ty: &SqlType) -> &'static str {
         SqlType::BigInt => "INTEGER",
         SqlType::Real => "REAL",
         SqlType::Text => "TEXT",
+        SqlType::Blob => "BLOB",
+        #[cfg(feature = "json")]
+        SqlType::Json => "TEXT",
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => "TEXT",
-        SqlType::Blob => "BLOB",
         SqlType::Custom(_) => panic!("Custom types not supported by sqlite backend"),
     }
 }

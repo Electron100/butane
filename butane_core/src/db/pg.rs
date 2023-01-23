@@ -379,6 +379,8 @@ impl<'a> postgres::types::ToSql for SqlValRef<'a> {
             Real(r) => r.to_sql_checked(requested_ty, out),
             Text(t) => t.to_sql_checked(requested_ty, out),
             Blob(b) => b.to_sql_checked(requested_ty, out),
+            #[cfg(feature = "json")]
+            Json(v) => v.to_sql_checked(requested_ty, out),
             #[cfg(feature = "datetime")]
             Timestamp(dt) => dt.to_sql_checked(requested_ty, out),
             Null => Ok(postgres::types::IsNull::Yes),
@@ -430,6 +432,10 @@ impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
                 ty, raw,
             )?)),
             Type::BYTEA => Ok(SqlValRef::Blob(postgres::types::FromSql::from_sql(
+                ty, raw,
+            )?)),
+            #[cfg(feature = "json")]
+            Type::JSONB => Ok(SqlValRef::Json(postgres::types::FromSql::from_sql(
                 ty, raw,
             )?)),
             #[cfg(feature = "datetime")]
@@ -573,6 +579,8 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
                     #[cfg(feature = "datetime")]
                     SqlType::Timestamp => Cow::Borrowed("TIMESTAMP"),
                     SqlType::Blob => Cow::Borrowed("BYTEA"),
+                    #[cfg(feature = "json")]
+                    SqlType::Json => Cow::Borrowed("JSONB"),
                     SqlType::Custom(c) => match c {
                         SqlTypeCustom::Pg(ref ty) => Cow::Owned(ty.name().to_string()),
                     },
@@ -687,6 +695,8 @@ fn pgtype_for_val(val: &SqlVal) -> postgres::types::Type {
         Some(SqlType::Real) => postgres::types::Type::FLOAT8,
         Some(SqlType::Text) => postgres::types::Type::TEXT,
         Some(SqlType::Blob) => postgres::types::Type::BYTEA,
+        #[cfg(feature = "json")]
+        Some(SqlType::Json) => postgres::types::Type::JSON,
         #[cfg(feature = "datetime")]
         Some(SqlType::Timestamp) => postgres::types::Type::TIMESTAMP,
         Some(SqlType::Custom(inner)) => match inner {

@@ -203,6 +203,8 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
             SqlType::Real => SqlVal::Real(0.0),
             SqlType::Text => SqlVal::Text("".to_string()),
             SqlType::Blob => SqlVal::Blob(Vec::new()),
+            #[cfg(feature = "json")]
+            SqlType::Json => SqlVal::Json(serde_json::Value::default()),
             #[cfg(feature = "datetime")]
             SqlType::Timestamp => {
                 SqlVal::Timestamp(NaiveDateTime::from_timestamp_opt(0, 0).unwrap())
@@ -255,6 +257,8 @@ pub fn sql_literal_value(val: SqlVal) -> Result<String> {
         Real(val) => Ok(val.to_string()),
         Text(val) => Ok(format!("'{val}'")),
         Blob(val) => Ok(format!("x'{}'", hex::encode_upper(val))),
+        #[cfg(feature = "json")]
+        Json(val) => Ok(format!("{val}")),
         #[cfg(feature = "datetime")]
         Timestamp(ndt) => Ok(ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string()),
         Custom(val) => Err(Error::LiteralForCustomUnsupported((*val).clone())),

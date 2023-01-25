@@ -1,12 +1,13 @@
 #![allow(dead_code)]
 use butane::db::{Connection, ConnectionSpec};
 use butane::model;
+use butane::Error;
 use butane::{find, query};
 use butane::{ForeignKey, Many};
 
 use butane::prelude::*;
 
-pub type Result<T> = std::result::Result<T, failure::Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[model]
 struct Blog {

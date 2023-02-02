@@ -30,7 +30,7 @@ pub mod pg;
 pub mod sqlite;
 
 #[cfg(feature = "r2d2")]
-mod r2;
+pub mod r2;
 #[cfg(feature = "r2d2")]
 pub use r2::ConnectionManager;
 

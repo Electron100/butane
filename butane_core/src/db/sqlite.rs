@@ -231,7 +231,7 @@ impl ConnectionMethods for rusqlite::Connection {
     fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
-        write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
+        write!(&mut sql, "DELETE FROM {table} WHERE ").unwrap();
         sql_for_expr(
             query::Expr::Condition(Box::new(expr)),
             &mut values,
@@ -304,7 +304,7 @@ impl<'a> rusqlite::ToSql for SqlValRef<'a> {
     }
 }
 
-fn sqlvalref_to_sqlite<'a, 'b>(valref: &'b SqlValRef<'a>) -> rusqlite::types::ToSqlOutput<'a> {
+fn sqlvalref_to_sqlite<'a>(valref: &SqlValRef<'a>) -> rusqlite::types::ToSqlOutput<'a> {
     use rusqlite::types::{ToSqlOutput::Borrowed, ToSqlOutput::Owned, Value, ValueRef};
     use SqlValRef::*;
     match valref {
@@ -506,7 +506,7 @@ fn sqltype(ty: &SqlType) -> &'static str {
 }
 
 fn drop_table(name: &str) -> String {
-    format!("DROP TABLE {};", name)
+    format!("DROP TABLE {name};")
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
@@ -551,7 +551,7 @@ fn copy_table(old: &ATable, new: &ATable) -> String {
 }
 
 fn tmp_table_name(name: &str) -> String {
-    format!("{}__butane_tmp", name)
+    format!("{name}__butane_tmp")
 }
 
 fn change_column(
@@ -590,11 +590,11 @@ fn change_column(
 
 pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write) {
     write!(w, "INSERT OR REPLACE ").unwrap();
-    write!(w, "INTO {} (", table).unwrap();
+    write!(w, "INTO {table} (").unwrap();
     helper::list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold("", |sep, _| {
-        write!(w, "{}?", sep).unwrap();
+        write!(w, "{sep}?").unwrap();
         ", "
     });
     write!(w, ")").unwrap();

@@ -33,7 +33,7 @@ impl Drop for PgServerState {
         self.proc.kill().ok();
         let mut buf = String::new();
         self.stderr.read_to_string(&mut buf).unwrap();
-        eprintln!("postgres stderr is {}", buf);
+        eprintln!("postgres stderr is {buf}");
         std::fs::remove_dir_all(&self.dir).unwrap();
     }
 }
@@ -92,7 +92,7 @@ fn create_tmp_server() -> PgServerState {
         if proc.try_wait().unwrap().is_some() {
             buf.clear();
             stderr.read_to_string(&mut buf).unwrap();
-            eprint!("{}", buf);
+            eprint!("{buf}");
             panic!("postgres process died");
         }
     }
@@ -127,17 +127,17 @@ pub fn pg_setup() -> PgSetupData {
             let server_mguard = &TMP_SERVER.deref().lock().unwrap();
             let server: &PgServerState = server_mguard.as_ref().unwrap();
             let host = server.sockdir.to_str().unwrap();
-            format!("host={} user=postgres", host)
+            format!("host={host} user=postgres")
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     eprintln!("new db is `{}`", &new_dbname);
 
     let mut conn = butane::db::connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
-    conn.execute(format!("CREATE DATABASE {};", new_dbname))
+    conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .unwrap();
 
-    let connstr = format!("{} dbname={}", connstr, new_dbname);
+    let connstr = format!("{connstr} dbname={new_dbname}");
     PgSetupData { connstr }
 }
 pub fn pg_teardown(_data: PgSetupData) {

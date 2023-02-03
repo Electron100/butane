@@ -23,7 +23,7 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {
 
     assert!(
         mem_migrations
-            .create_migration(&backend, &format!("init"), None)
+            .create_migration(&backend, "init", None)
             .expect("expected to create migration without error"),
         "expected to create migration"
     );
@@ -55,12 +55,12 @@ macro_rules! maketest {
             pub fn [<$fname _ $backend>]() {
 								env_logger::try_init().ok();
                 let backend = butane::db::get_backend(&stringify!($backend)).expect("Could not find backend");
-								let $dataname = crate::common::[<$backend _setup>]();
+								let $dataname = $crate::common::[<$backend _setup>]();
 								eprintln!("connecting to {}", &$connstr);
                 let mut conn = backend.connect(&$connstr).expect("Could not connect backend");
-                crate::common::setup_db(backend, &mut conn);
+                $crate::common::setup_db(backend, &mut conn);
                 $fname(conn);
-								crate::common::[<$backend _teardown>]($dataname);
+								$crate::common::[<$backend _teardown>]($dataname);
             }
         }
     };
@@ -72,7 +72,7 @@ macro_rules! maketest_pg {
         maketest!(
             $fname,
             pg,
-            &crate::common::pg_connstr(&setup_data),
+            &$crate::common::pg_connstr(&setup_data),
             setup_data
         );
     };

@@ -1,7 +1,6 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::{model, Many, ObjectState};
-use paste;
 
 mod common;
 use common::blog::{create_tag, Blog, Post, Tag};

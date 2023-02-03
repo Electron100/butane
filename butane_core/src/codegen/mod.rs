@@ -126,7 +126,7 @@ fn parse_butane_type_args(args: TokenStream2) -> std::result::Result<TypeIdentif
         return Ok(match sqltype_from_name(&tyid) {
             Some(ty) => ty,
             None => {
-                eprintln!("No SqlType value named {}", tyid);
+                eprintln!("No SqlType value named {tyid}");
                 return Err(quote!(compile_error!("No SqlType value with the given name");));
             }
         });
@@ -186,7 +186,7 @@ where
         Some(tyinfo) => match add_custom_type(ms, tyinfo.name, tyinfo.ty) {
             Ok(()) => input,
             Err(e) => {
-                eprintln!("unable to save type {}", e);
+                eprintln!("unable to save type {e}");
                 quote!(compile_error!("unable to save type");)
             }
         },
@@ -197,7 +197,7 @@ where
 }
 
 fn make_ident_literal_str(ident: &Ident) -> LitStr {
-    let as_str = format!("{}", ident);
+    let as_str = format!("{ident}");
     LitStr::new(&as_str, Span::call_site())
 }
 

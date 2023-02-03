@@ -3,11 +3,6 @@ use butane::{butane_type, find, model, query};
 use butane::{colname, prelude::*};
 use butane::{ForeignKey, ObjectState};
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
-use paste;
-#[cfg(feature = "pg")]
-use postgres;
-#[cfg(feature = "sqlite")]
-use rusqlite;
 
 mod common;
 

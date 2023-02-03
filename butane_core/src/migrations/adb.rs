@@ -34,8 +34,8 @@ pub enum TypeKey {
 impl std::fmt::Display for TypeKey {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
         match self {
-            TypeKey::PK(name) => write!(f, "PK({})", name),
-            TypeKey::CustomType(name) => write!(f, "CustomType({})", name),
+            TypeKey::PK(name) => write!(f, "PK({name})"),
+            TypeKey::CustomType(name) => write!(f, "CustomType({name})"),
         }
     }
 }
@@ -47,8 +47,8 @@ impl serde::ser::Serialize for TypeKey {
         S: Serializer,
     {
         serializer.serialize_str(&match self {
-            TypeKey::PK(s) => format!("PK:{}", s),
-            TypeKey::CustomType(s) => format!("CT:{}", s),
+            TypeKey::PK(s) => format!("PK:{s}"),
+            TypeKey::CustomType(s) => format!("CT:{s}"),
         })
     }
 }

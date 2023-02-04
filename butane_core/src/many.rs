@@ -1,12 +1,13 @@
 use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
-use once_cell::unsync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use tokio::sync::OnceCell;
 
 fn default_oc<T>() -> OnceCell<Vec<T>> {
-    OnceCell::default()
+    // Same as impl Default for once_cell::unsync::OnceCell
+    OnceCell::new()
 }
 
 /// Used to implement a many-to-many relationship between models.
@@ -102,7 +103,7 @@ where
     }
 
     /// Used by macro-generated code. You do not need to call this directly.
-    pub fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    pub async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
         while !self.new_values.is_empty() {
             conn.insert_only(
@@ -112,13 +113,15 @@ where
                     owner.as_ref(),
                     self.new_values.pop().unwrap().as_ref().clone(),
                 ],
-            )?;
+            )
+            .await?;
         }
         if !self.removed_values.is_empty() {
             conn.delete_where(
                 &self.item_table,
                 BoolExpr::In("has", std::mem::take(&mut self.removed_values)),
-            )?;
+            )
+            .await?;
         }
         self.new_values.clear();
         Ok(())

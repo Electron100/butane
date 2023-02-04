@@ -10,7 +10,6 @@ use std::fs::{File, OpenOptions};
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 const TYPES_FILENAME: &str = "types.json";
@@ -43,7 +42,7 @@ impl MigrationsState {
 
 /// A migration stored in the filesystem
 pub struct FsMigration {
-    fs: Rc<dyn Filesystem>,
+    fs: std::sync::Arc<dyn Filesystem + Send + Sync>,
     root: PathBuf,
 }
 
@@ -236,13 +235,13 @@ impl Eq for FsMigration {}
 
 /// A collection of migrations stored in the filesystem.
 pub struct FsMigrations {
-    fs: Rc<dyn Filesystem>,
+    fs: std::sync::Arc<dyn Filesystem + Send + Sync>,
     root: PathBuf,
     current: FsMigration,
 }
 impl FsMigrations {
     pub fn new(root: PathBuf) -> Self {
-        let fs = Rc::new(OsFilesystem {});
+        let fs = std::sync::Arc::new(OsFilesystem {});
         let current = FsMigration {
             fs: fs.clone(),
             root: root.join("current"),
@@ -297,6 +296,7 @@ impl Migrations for FsMigrations {
     }
 }
 
+#[async_trait::async_trait]
 impl MigrationsMut for FsMigrations {
     fn current(&mut self) -> &mut Self::M {
         &mut self.current
@@ -320,7 +320,7 @@ impl MigrationsMut for FsMigrations {
         Ok(())
     }
 
-    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    async fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         for entry in std::fs::read_dir(&self.root)? {
             let entry = entry?;
             if matches!(entry.path().file_name(), Some(name) if name == "current") {
@@ -332,7 +332,7 @@ impl MigrationsMut for FsMigrations {
                 std::fs::remove_file(entry.path())?;
             }
         }
-        conn.delete_where(super::ButaneMigration::TABLE, crate::query::BoolExpr::True)?;
+        conn.delete_where(super::ButaneMigration::TABLE, crate::query::BoolExpr::True).await?;
         Ok(())
     }
 }

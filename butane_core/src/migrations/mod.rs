@@ -112,6 +112,7 @@ pub trait Migrations {
     }
 }
 
+#[async_trait]
 pub trait MigrationsMut: Migrations
 where
     Self::M: MigrationMut,
@@ -130,7 +131,7 @@ where
     /// any storage backing it) and deleting the record of their
     /// existence/application from the database. The database schema
     /// is not modified, nor is any other data removed. Use carefully.
-    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+    async fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
     /// Get a pseudo-migration representing the current state as
     /// determined by the last build of models. This does not
@@ -260,6 +261,7 @@ impl DataResult for ButaneMigration {
     }
 }
 
+#[async_trait]
 impl DataObject for ButaneMigration {
     type PKType = String;
     type Fields = (); // we don't need Fields as we never filter
@@ -269,7 +271,7 @@ impl DataObject for ButaneMigration {
     fn pk(&self) -> &String {
         &self.name
     }
-    fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let mut values: Vec<SqlValRef<'_>> = Vec::with_capacity(2usize);
         values.push(self.name.to_sql_ref());
         conn.insert_or_replace(
@@ -278,8 +280,10 @@ impl DataObject for ButaneMigration {
             &Column::new(Self::PKCOL, SqlType::Text),
             &values,
         )
+        .await
     }
-    fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
+    async fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
         conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
+            .await
     }
 }

@@ -27,10 +27,12 @@ impl PgBackend {
     }
 }
 impl PgBackend {
-    fn connect(&self, params: &str) -> Result<PgConnection> {
-        PgConnection::open(params)
+    async fn connect(&self, params: &str) -> Result<PgConnection> {
+        PgConnection::open(params).await
     }
 }
+
+#[async_trait]
 impl Backend for PgBackend {
     fn name(&self) -> &'static str {
         BACKEND_NAME
@@ -45,9 +47,9 @@ impl Backend for PgBackend {
             .join("\n"))
     }
 
-    fn connect(&self, path: &str) -> Result<Connection> {
+    async fn connect(&self, path: &str) -> Result<Connection> {
         Ok(Connection {
-            conn: Box::new(self.connect(path)?),
+            conn: Box::new(self.connect(path).await?),
         })
     }
 }
@@ -89,13 +91,16 @@ impl PgConnection {
     }
 }
 impl PgConnectionLike for PgConnection {
-    fn cell(&self) -> Result<&postgres::Client> {
+    type Client = postgres::Client;
+    fn client(&self) -> Result<&Self::Client> {
         Ok(&self.client)
     }
 }
+
+#[async_trait]
 impl BackendConnection for PgConnection {
-    fn transaction(&mut self) -> Result<Transaction<'_>> {
-        let trans: postgres::Transaction<'_> = self.conn.transaction()?;
+    async fn transaction(&mut self) -> Result<Transaction<'_>> {
+        let trans: postgres::Transaction<'_> = self.client.transaction().await?;
         let trans = Box::new(PgTransaction::new(trans));
         Ok(Transaction::new(trans))
     }
@@ -106,7 +111,7 @@ impl BackendConnection for PgConnection {
         BACKEND_NAME
     }
     fn is_closed(&self) -> bool {
-        self.conn.is_closed()
+        self.client.is_closed()
     }
 }
 
@@ -123,8 +128,8 @@ fn sqlvalref_for_pg_query<'a>(v: &'a SqlValRef<'a>) -> &'a dyn postgres::types::
 /// Shared functionality between connection and
 /// transaction. Implementation detail. Semver exempt.
 pub trait PgConnectionLike {
-    type Client: postgres::GenericClient;
-    fn cell(&self) -> Result<Self::Client>;
+    type Client: postgres::GenericClient + Send;
+    fn client(&self) -> Result<&Self::Client>;
 }
 
 #[async_trait]
@@ -132,11 +137,11 @@ impl<T> ConnectionMethods for T
 where
     T: PgConnectionLike + std::marker::Sync,
 {
-    fn execute(&self, sql: &str) -> Result<()> {
+    async fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
             debug!("execute sql {}", sql);
         }
-        self.cell()?.batch_execute(sql.as_ref())?;
+        self.client()?.batch_execute(sql.as_ref()).await?;
         Ok(())
     }
 
@@ -181,22 +186,22 @@ where
 
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
         let stmt = self
-            .cell()?
+            .client()?
             .prepare_typed(&sqlquery, types.as_ref())
             .await?;
         // todo avoid intermediate vec?
-        let rowvec: Vec<postgres::Row> = self
-            .cell()?
-            .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))?
+        let rowvec = self
+            .client()?
+            .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))
+            .await
             .map_err(Error::Postgres)
             .map(|r| {
                 check_columns(&r, columns)?;
                 Ok(r)
-            })
-            .collect()?;
+            })??;
         Ok(Box::new(VecRows::new(rowvec)))
     }
-    fn insert_returning_pk(
+    async fn insert_returning_pk(
         &self,
         table: &str,
         columns: &[Column],
@@ -217,14 +222,20 @@ where
 
         // use query instead of execute so we can get our result back
         let pk: Option<SqlVal> = self
-            .cell()?
-            .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query))?
+            .client()?
+            .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query))
+            .await
             .map_err(Error::Postgres)
-            .map(|r| sql_val_from_postgres(&r, 0, pkcol))
+            .map(|r| sql_val_from_postgres(&r, 0, pkcol))??
             .nth(0)?;
         pk.ok_or_else(|| Error::Internal("could not get pk".to_string()))
     }
-    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
+    async fn insert_only(
+        &self,
+        table: &str,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
             table,
@@ -233,10 +244,12 @@ where
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.cell()?.execute(sql.as_str(), params.as_slice())?;
+        self.client()?
+            .execute(sql.as_str(), params.as_slice())
+            .await?;
         Ok(())
     }
-    fn insert_or_replace<'a>(
+    async fn insert_or_replace<'a>(
         &self,
         table: &str,
         columns: &[Column],
@@ -246,10 +259,12 @@ where
         let mut sql = String::new();
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.cell()?.execute(sql.as_str(), params.as_slice())?;
+        self.client()?
+            .execute(sql.as_str(), params.as_slice())
+            .await?;
         Ok(())
     }
-    fn update(
+    async fn update(
         &self,
         table: &str,
         pkcol: Column,
@@ -273,10 +288,12 @@ where
         if cfg!(feature = "log") {
             debug!("update sql {}", sql);
         }
-        self.cell()?.execute(sql.as_str(), params.as_slice())?;
+        self.client()?
+            .execute(sql.as_str(), params.as_slice())
+            .await?;
         Ok(())
     }
-    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
+    async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
         write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
@@ -287,15 +304,19 @@ where
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        let cnt = self.cell()?.execute(sql.as_str(), params.as_slice())?;
+        let cnt = self
+            .client()?
+            .execute(sql.as_str(), params.as_slice())
+            .await?;
         Ok(cnt as usize)
     }
-    fn has_table(&self, table: &str) -> Result<bool> {
+    async fn has_table(&self, table: &str) -> Result<bool> {
         // future improvement, should be schema-aware
         let stmt = self
-            .cell()?
-            .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;")?;
-        let rows = self.cell()?.try_borrow_mut()?.query(&stmt, &[&table])?;
+            .client()?
+            .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;")
+            .await?;
+        let rows = self.client()?.query(&stmt, &[&table]).await?;
         Ok(!rows.is_empty())
     }
 }
@@ -319,24 +340,24 @@ impl<'c> PgTransaction<'c> {
 }
 impl<'c> PgConnectionLike for PgTransaction<'c> {
     type Client = postgres::Transaction<'c>;
-    fn cell(&self) -> Result<&Self::Client> {
+    fn client(&self) -> Result<&Self::Client> {
         self.get()
     }
 }
 
 #[async_trait]
 impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
-    fn commit(&mut self) -> Result<()> {
+    async fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
             None => Err(Self::already_consumed()),
-            Some(trans) => Ok(trans.into_inner().commit()?),
+            Some(trans) => Ok(trans.commit().await?),
         }
     }
 
     async fn rollback(&mut self) -> Result<()> {
         match self.trans.take() {
             None => Err(Self::already_consumed()),
-            Some(trans) => Ok(trans.into_inner().rollback().await?),
+            Some(trans) => Ok(trans.rollback().await?),
         }
     }
     // Workaround for https://github.com/rust-lang/rfcs/issues/2765
@@ -461,7 +482,7 @@ impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
     }
 }
 
-fn check_columns(row: &postgres::Row, cols: &[Column]) -> Result<()> {
+fn check_columns(row: &postgres::RowStream, cols: &[Column]) -> Result<()> {
     if cols.len() != row.len() {
         Err(Error::Internal(format!(
             "postgres returns columns {} doesn't match requested columns {}",
@@ -493,7 +514,7 @@ fn sql_for_expr<W>(
     helper::sql_for_expr(expr, sql_for_expr, values, pls, w)
 }
 
-fn sql_val_from_postgres<I>(row: &postgres::Row, idx: I, col: &Column) -> Result<SqlVal>
+fn sql_val_from_postgres<I>(row: &postgres::RowStream, idx: I, col: &Column) -> Result<SqlVal>
 where
     I: postgres::row::RowIndex + std::fmt::Display,
 {

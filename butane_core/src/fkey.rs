@@ -1,6 +1,6 @@
 use crate::db::ConnectionMethods;
 use crate::*;
-use once_cell::unsync::OnceCell;
+use tokio::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
@@ -55,17 +55,6 @@ impl<T: DataObject> ForeignKey<T> {
         }
     }
 
-    /// Loads the value referred to by this foreign key from the
-    /// database if necessary and returns a reference to it.
-    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
-        self.val
-            .get_or_try_init(|| {
-                let pk = self.valpk.get().unwrap();
-                T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
-            })
-            .map(|v| v.as_ref())
-    }
-
     fn new_raw() -> Self {
         ForeignKey {
             val: OnceCell::new(),
@@ -82,6 +71,20 @@ impl<T: DataObject> ForeignKey<T> {
             },
         }
         self.valpk.get().unwrap()
+    }
+}
+
+impl<T: DataObject + Send> ForeignKey<T> {
+    /// Loads the value referred to by this foreign key from the
+    /// database if necessary and returns a reference to it.
+    pub async fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
+        self.val
+            .get_or_try_init(|| async {
+                let pk = self.valpk.get().unwrap();
+                T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?).await.map(Box::new)
+            })
+            .await
+            .map(|v| v.as_ref())
     }
 }
 

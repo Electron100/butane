@@ -12,7 +12,8 @@ repository = "https://github.com/Electron100/butane"
 documentation = "https://docs.rs/butane/"
 
 [features]
-default = ["datetime", "uuid"]
+default = ["datetime", "json", "uuid"]
+json = ["butane_core/json"]
 sqlite = ["butane_core/sqlite"]
 sqlite-bundled = ["butane_core/sqlite-bundled"]
 pg = ["butane_core/pg"]

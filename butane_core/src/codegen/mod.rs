@@ -432,6 +432,13 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         return some_known(SqlType::Blob);
     }
 
+    #[cfg(feature = "json")]
+    {
+        if *ty == parse_quote!(Value) || *ty == parse_quote!(serde::Json) {
+            return some_known(SqlType::Json);
+        }
+    }
+
     #[cfg(feature = "datetime")]
     {
         if *ty == parse_quote!(NaiveDateTime) {

@@ -33,8 +33,8 @@ where
             // No risk of SQL injection with integers and the
             // different sizes are tricky with the PG backend's binary
             // protocol
-            SqlVal::Int(i) => write!(w, "{}", i),
-            SqlVal::BigInt(i) => write!(w, "{}", i),
+            SqlVal::Int(i) => write!(w, "{i}"),
+            SqlVal::BigInt(i) => write!(w, "{i}"),
             _ => {
                 values.push(v);
                 w.write_str(&pls.next_placeholder())
@@ -44,18 +44,18 @@ where
         Condition(c) => match *c {
             True => write!(w, "TRUE"),
             Eq(col, ex) => match ex {
-                Expr::Val(SqlVal::Null) => write!(w, "{} IS NULL", col),
-                _ => write!(w, "{} = ", col).and_then(|_| Ok(f(ex, values, pls, w))),
+                Expr::Val(SqlVal::Null) => write!(w, "{col} IS NULL"),
+                _ => write!(w, "{col} = ").and_then(|_| Ok(f(ex, values, pls, w))),
             },
             Ne(col, ex) => match ex {
-                Expr::Val(SqlVal::Null) => write!(w, "{} IS NOT NULL", col),
-                _ => write!(w, "{} <> ", col).and_then(|_| Ok(f(ex, values, pls, w))),
+                Expr::Val(SqlVal::Null) => write!(w, "{col} IS NOT NULL"),
+                _ => write!(w, "{col} <> ").and_then(|_| Ok(f(ex, values, pls, w))),
             },
-            Lt(col, ex) => write!(w, "{} < ", col).and_then(|_| Ok(f(ex, values, pls, w))),
-            Gt(col, ex) => write!(w, "{} > ", col).and_then(|_| Ok(f(ex, values, pls, w))),
-            Le(col, ex) => write!(w, "{} <= ", col).and_then(|_| Ok(f(ex, values, pls, w))),
-            Ge(col, ex) => write!(w, "{} >= ", col).and_then(|_| Ok(f(ex, values, pls, w))),
-            Like(col, ex) => write!(w, "{} like ", col).and_then(|_| Ok(f(ex, values, pls, w))),
+            Lt(col, ex) => write!(w, "{col} < ").and_then(|_| Ok(f(ex, values, pls, w))),
+            Gt(col, ex) => write!(w, "{col} > ").and_then(|_| Ok(f(ex, values, pls, w))),
+            Le(col, ex) => write!(w, "{col} <= ").and_then(|_| Ok(f(ex, values, pls, w))),
+            Ge(col, ex) => write!(w, "{col} >= ").and_then(|_| Ok(f(ex, values, pls, w))),
+            Like(col, ex) => write!(w, "{col} like ").and_then(|_| Ok(f(ex, values, pls, w))),
             AllOf(conds) => {
                 let mut remaining = conds.len();
                 for cond in conds {
@@ -87,7 +87,7 @@ where
                 tbl2_col,
                 expr,
             } => {
-                write!(w, "{} IN (SELECT {} FROM {} WHERE ", col, tbl2_col, tbl2).unwrap();
+                write!(w, "{col} IN (SELECT {tbl2_col} FROM {tbl2} WHERE ").unwrap();
                 f(Expr::Condition(expr), values, pls, w);
                 write!(w, ")").unwrap();
                 Ok(())
@@ -100,9 +100,9 @@ where
                 expr,
             } => {
                 // <col> IN (SELECT <col2> FROM <tbl2> <joins> WHERE <expr>)
-                write!(w, "{} IN (SELECT ", col).unwrap();
+                write!(w, "{col} IN (SELECT ").unwrap();
                 sql_column(col2, w);
-                write!(w, " FROM {} ", tbl2).unwrap();
+                write!(w, " FROM {tbl2} ").unwrap();
                 sql_joins(joins, w);
                 write!(w, " WHERE ").unwrap();
                 f(Expr::Condition(expr), values, pls, w);
@@ -110,7 +110,7 @@ where
                 Ok(())
             }
             In(col, vals) => {
-                write!(w, "{} IN (", col).unwrap();
+                write!(w, "{col} IN (").unwrap();
                 let mut remaining = vals.len();
                 for val in vals {
                     f(Expr::Val(val), values, pls, w);
@@ -129,7 +129,7 @@ where
 pub fn sql_select(columns: &[Column], table: &str, w: &mut impl Write) {
     write!(w, "SELECT ").unwrap();
     list_columns(columns, w);
-    write!(w, " FROM {}", table).unwrap();
+    write!(w, " FROM {table}").unwrap();
 }
 
 pub fn sql_insert_with_placeholders(
@@ -138,7 +138,7 @@ pub fn sql_insert_with_placeholders(
     pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
-    write!(w, "INSERT INTO {} ", table).unwrap();
+    write!(w, "INSERT INTO {table} ").unwrap();
     if !columns.is_empty() {
         write!(w, "(").unwrap();
         list_columns(columns, w);
@@ -160,7 +160,7 @@ pub fn sql_update_with_placeholders(
     pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
-    write!(w, "UPDATE {} SET ", table).unwrap();
+    write!(w, "UPDATE {table} SET ").unwrap();
     columns.iter().fold("", |sep, c| {
         write!(w, "{}{} = {}", sep, c.name(), pls.next_placeholder()).unwrap();
         ", "
@@ -169,11 +169,11 @@ pub fn sql_update_with_placeholders(
 }
 
 pub fn sql_limit(limit: i32, w: &mut impl Write) {
-    write!(w, " LIMIT {}", limit).unwrap();
+    write!(w, " LIMIT {limit}").unwrap();
 }
 
 pub fn sql_offset(offset: i32, w: &mut impl Write) {
-    write!(w, " OFFSET {}", offset).unwrap();
+    write!(w, " OFFSET {offset}").unwrap();
 }
 
 pub fn sql_order(order: &[Order], w: &mut impl Write) {
@@ -228,7 +228,7 @@ fn sql_joins(joins: Vec<Join>, w: &mut impl Write) {
                 col2,
             } => {
                 // INNER JOIN <join_table> ON <col1> = <col2>
-                write!(w, "INNER JOIN {} ON ", join_table).unwrap();
+                write!(w, "INNER JOIN {join_table} ON ").unwrap();
                 sql_column(col1, w);
                 w.write_str(" = ").unwrap();
                 sql_column(col2, w);
@@ -253,7 +253,7 @@ pub fn sql_literal_value(val: SqlVal) -> Result<String> {
         Int(val) => Ok(val.to_string()),
         BigInt(val) => Ok(val.to_string()),
         Real(val) => Ok(val.to_string()),
-        Text(val) => Ok(format!("'{}'", val)),
+        Text(val) => Ok(format!("'{val}'")),
         Blob(val) => Ok(format!("x'{}'", hex::encode_upper(val))),
         #[cfg(feature = "datetime")]
         Timestamp(ndt) => Ok(ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string()),

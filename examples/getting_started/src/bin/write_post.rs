@@ -15,7 +15,7 @@ fn main() {
 
     println!("Enter post title");
     let title = readline();
-    println!("\nEnter text for {} ({} when finished)\n", title, EOF);
+    println!("\nEnter text for {title} ({EOF} when finished)\n");
     let mut body = String::new();
     stdin().read_to_string(&mut body).unwrap();
 

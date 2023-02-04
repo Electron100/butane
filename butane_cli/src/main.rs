@@ -107,7 +107,7 @@ fn main() {
             }
             (_, _) => eprintln!("Unknown delete command. Try: delete table"),
         },
-        (cmd, _) => eprintln!("Unknown command {}", cmd),
+        (cmd, _) => eprintln!("Unknown command {cmd}"),
     }
 }
 
@@ -142,7 +142,7 @@ fn init(args: Option<&ArgMatches>) -> Result<()> {
     let name = args.value_of("BACKEND").unwrap();
     let connstr = args.value_of("CONNECTION").unwrap();
     if db::get_backend(name).is_none() {
-        eprintln!("Unknown backend {}", name);
+        eprintln!("Unknown backend {name}");
         std::process::exit(1);
     };
 
@@ -162,7 +162,7 @@ fn make_migration(args: Option<&ArgMatches>) -> Result<()> {
     };
     let mut ms = get_migrations()?;
     if ms.all_migrations()?.iter().any(|m| m.name() == name) {
-        eprintln!("Migration {} already exists", name);
+        eprintln!("Migration {name} already exists");
         std::process::exit(1);
     }
     let spec = load_connspec()?;
@@ -174,7 +174,7 @@ fn make_migration(args: Option<&ArgMatches>) -> Result<()> {
             // Better include the new migration in the embedding
             embed()?;
         }
-        println!("Created migration {}", name);
+        println!("Created migration {name}");
     } else {
         println!("No changes to migrate");
     }
@@ -259,10 +259,9 @@ fn embed() -> Result<()> {
 use butane::migrations::MemMigrations;
 use std::result::Result;
 pub fn get_migrations() -> Result<MemMigrations, butane::Error> {{
-    let json = r#\"{}\"#;
+    let json = r#\"{json}\"#;
     MemMigrations::from_json(json)
-}}",
-        json
+}}"
     );
 
     let mut f = std::fs::File::create(path)?;
@@ -325,7 +324,7 @@ fn collapse_migrations(new_initial_name: Option<&str>) -> Result<()> {
         // Update the embedding
         embed()?;
     }
-    println!("Collapsed all changes into new single migration '{}'", name);
+    println!("Collapsed all changes into new single migration '{name}'");
     Ok(())
 }
 
@@ -370,7 +369,7 @@ fn base_dir() -> Result<PathBuf> {
 
 fn handle_error(r: Result<()>) {
     if let Err(e) = r {
-        eprintln!("Encountered unexpected error: {}", e);
+        eprintln!("Encountered unexpected error: {e}");
         std::process::exit(1);
     }
 }

@@ -162,7 +162,7 @@ where
         if cfg!(feature = "log") {
             debug!("query sql {}", sqlquery);
         }
-        eprintln!("query sql {}", sqlquery);
+        eprintln!("query sql {sqlquery}");
 
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
         let stmt = self
@@ -225,12 +225,12 @@ where
             .execute(sql.as_str(), params.as_slice())?;
         Ok(())
     }
-    fn insert_or_replace<'a>(
+    fn insert_or_replace(
         &self,
         table: &str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlValRef<'a>],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
         let mut sql = String::new();
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
@@ -272,7 +272,7 @@ where
     fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
-        write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
+        write!(&mut sql, "DELETE FROM {table} WHERE ").unwrap();
         sql_for_expr(
             query::Expr::Condition(Box::new(expr)),
             &mut values,
@@ -410,8 +410,7 @@ fn check_type_match(
         Ok(())
     } else {
         Err(Box::new(crate::Error::Internal(format!(
-            "postgres type mismatch. Wanted {} but have {}",
-            ty1, ty2
+            "postgres type mismatch. Wanted {ty1} but have {ty2}"
         ))))
     }
 }
@@ -584,7 +583,7 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
 }
 
 fn drop_table(name: &str) -> String {
-    format!("DROP TABLE {};", name)
+    format!("DROP TABLE {name};")
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
@@ -598,7 +597,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
 }
 
 fn remove_column(tbl_name: &str, name: &str) -> String {
-    format!("ALTER TABLE {} DROP COLUMN {};", tbl_name, name)
+    format!("ALTER TABLE {tbl_name} DROP COLUMN {name};")
 }
 
 fn copy_table(old: &ATable, new: &ATable) -> String {
@@ -615,7 +614,7 @@ fn copy_table(old: &ATable, new: &ATable) -> String {
 }
 
 fn tmp_table_name(name: &str) -> String {
-    format!("{}__butane_tmp", name)
+    format!("{name}__butane_tmp")
 }
 
 fn change_column(
@@ -659,12 +658,12 @@ pub fn sql_insert_or_replace_with_placeholders(
     w: &mut impl Write,
 ) {
     write!(w, "INSERT ").unwrap();
-    write!(w, "INTO {} (", table).unwrap();
+    write!(w, "INTO {table} (").unwrap();
     helper::list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold(1, |n, _| {
         let sep = if n == 1 { "" } else { ", " };
-        write!(w, "{}${}", sep, n).unwrap();
+        write!(w, "{sep}${n}").unwrap();
         n + 1
     });
     write!(w, ")").unwrap();

@@ -70,7 +70,7 @@ impl FsMigration {
     }
 
     fn write_sql(&self, name: &str, sql: &str) -> Result<()> {
-        self.write_contents(&format!("{}.sql", name), sql.as_bytes())
+        self.write_contents(&format!("{name}.sql"), sql.as_bytes())
     }
 
     fn read_sql(&self, backend: &str, direction: &str) -> Result<Option<String>> {
@@ -84,7 +84,7 @@ impl FsMigration {
     }
 
     fn sql_path(&self, backend: &str, direction: &str) -> PathBuf {
-        self.root.join(format!("{}_{}.sql", backend, direction))
+        self.root.join(format!("{backend}_{direction}.sql"))
     }
 
     fn write_contents(&self, fname: &str, contents: &[u8]) -> Result<()> {
@@ -127,7 +127,7 @@ impl MigrationMut for FsMigration {
     }
 
     fn delete_table(&mut self, table: &str) -> Result<()> {
-        let fname = format!("{}.table", table);
+        let fname = format!("{table}.table");
         self.ensure_dir()?;
         let path = self.root.join(fname);
         std::fs::remove_file(path)?;
@@ -135,8 +135,8 @@ impl MigrationMut for FsMigration {
     }
 
     fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()> {
-        self.write_sql(&format!("{}_up", backend_name), up_sql)?;
-        self.write_sql(&format!("{}_down", backend_name), down_sql)?;
+        self.write_sql(&format!("{backend_name}_up"), up_sql)?;
+        self.write_sql(&format!("{backend_name}_down"), down_sql)?;
         let mut info = self.info()?;
         info.backends.push(backend_name.to_string());
         self.write_info(&info)?;
@@ -149,7 +149,7 @@ impl MigrationMut for FsMigration {
 
         let mut types: SqlTypeMap = match self.fs.read(&typefile) {
             Ok(reader) => serde_json::from_reader(reader).map_err(|e| {
-                eprintln!("failed to read types {:?}", typefile);
+                eprintln!("failed to read types {typefile:?}");
                 e
             })?,
             Err(_) => BTreeMap::new(),

@@ -298,7 +298,7 @@ fn verify_sql(
 ) {
     let backend = conn.backend();
     let v2_migration = ms.latest().unwrap();
-    let strip = |s: String| s.replace("\n", "");
+    let strip = |s: String| s.replace('\n', "");
 
     let actual_up_sql = strip(v2_migration.up_sql(backend.name()).unwrap().unwrap());
     assert_eq!(actual_up_sql, expected_up_sql);

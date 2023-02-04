@@ -275,7 +275,7 @@ fn fieldexpr_func(
             )
         }
     };
-    let fnid = Ident::new(&format!("{}", fid), f.span());
+    let fnid = Ident::new(&format!("{fid}"), f.span());
     quote!(
         #vis fn #fnid(&self) -> #field_expr_type {
             #field_expr_ctor
@@ -297,7 +297,7 @@ fn field_ident_lit(f: &Field) -> TokenStream2 {
 }
 
 fn fields_type(tyname: &Ident) -> Ident {
-    Ident::new(&format!("{}Fields", tyname), Span::call_site())
+    Ident::new(&format!("{tyname}Fields"), Span::call_site())
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {

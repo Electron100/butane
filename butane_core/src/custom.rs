@@ -44,9 +44,7 @@ impl fmt::Display for SqlValCustom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             #[cfg(feature = "pg")]
-            SqlValCustom::Pg { ty, .. } => {
-                f.write_str(&format!("<custom PG value of type {}>", ty))
-            }
+            SqlValCustom::Pg { ty, .. } => f.write_str(&format!("<custom PG value of type {ty}>")),
             #[cfg(not(feature = "pg"))]
             _ => f.write_str("<unknown custom value>"),
         }
@@ -68,8 +66,7 @@ impl postgres::types::ToSql for SqlValCustom {
             SqlValCustom::Pg { ty, data } => {
                 if ty != wanted_ty {
                     return Err(Box::new(crate::Error::Internal(format!(
-                        "postgres type mismatch. Wanted {} but have {}",
-                        wanted_ty, ty
+                        "postgres type mismatch. Wanted {wanted_ty} but have {ty}"
                     ))));
                 }
                 out.put(data.as_ref())

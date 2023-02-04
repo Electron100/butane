@@ -7,7 +7,7 @@ publish = false
 build = "build.rs"
 
 [dependencies]
-butane = { path = "../butane", features = [ "sqlite" ] }
+butane = { path = "../butane", features = ["sqlite"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"

@@ -268,7 +268,7 @@ fn basic_dropped_transaction(mut conn: Connection) {
     match Foo::get(&conn, 1) {
         Ok(_) => panic!("object should not exist"),
         Err(butane::Error::NoSuchObject) => (),
-        Err(e) => panic!("Unexpected error {}", e),
+        Err(e) => panic!("Unexpected error {e}"),
     }
 }
 testall!(basic_dropped_transaction);
@@ -286,7 +286,7 @@ fn basic_rollback_transaction(mut conn: Connection) {
     match Foo::get(&conn, 1) {
         Ok(_) => panic!("object should not exist"),
         Err(butane::Error::NoSuchObject) => (),
-        Err(e) => panic!("Unexpected error {}", e),
+        Err(e) => panic!("Unexpected error {e}"),
     }
 }
 testall!(basic_rollback_transaction);

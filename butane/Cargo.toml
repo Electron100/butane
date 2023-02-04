@@ -2,7 +2,7 @@
 name = "butane"
 version = "0.5.1"
 authors = ["James Oakley <james@electronstudio.org>"]
-edition = "2018"
+edition.workspace = true
 description = "An ORM with a focus on simplicity and on writing Rust, not SQL."
 readme = "../README.md"
 keywords = ["database", "orm", "sql"]

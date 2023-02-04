@@ -2,7 +2,7 @@
 name = "getting_started"
 version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
-edition = "2018"
+edition.workspace = true
 publish = false
 
 [[bin]]

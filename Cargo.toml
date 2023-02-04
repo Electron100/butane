@@ -9,6 +9,9 @@ members = [
         "examples/getting_started",
         ]
 
+[workspace.package]
+edition = "2021"
+
 [workspace.dependencies]
 rusqlite = "0.28"
 uuid = "1.2"

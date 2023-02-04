@@ -349,11 +349,11 @@ fn get_foreign_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Opt
         _ => return None,
     };
     if args.len() != 1 {
-        panic!("{} should have a single type argument", tyname)
+        panic!("{tyname} should have a single type argument")
     }
     match args.last().unwrap() {
         syn::GenericArgument::Type(syn::Type::Path(typath)) => Some(&typath.path),
-        _ => panic!("{} argument should be a type.", tyname),
+        _ => panic!("{tyname} argument should be a type."),
     }
 }
 
@@ -364,7 +364,7 @@ fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<Deferred
             typath
                 .segments
                 .last()
-                .unwrap_or_else(|| panic!("{} must have an argument", tyname))
+                .unwrap_or_else(|| panic!("{tyname} must have an argument"))
                 .ident
                 .to_string(),
         ))

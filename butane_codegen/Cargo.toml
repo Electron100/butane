@@ -2,7 +2,7 @@
 name = "butane_codegen"
 version = "0.5.0"
 authors = ["James Oakley <james@electronstudio.org>"]
-edition = "2018"
+edition.workspace = true
 description = "Macros for Butane. Do not use this crate directly -- use the butane crate."
 readme = "../README.md"
 license = "MIT OR Apache-2.0"

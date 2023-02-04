@@ -6,7 +6,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-butane = { path="../butane"}
+butane = { path = "../butane" }
 
 [package.metadata.release]
 release = false

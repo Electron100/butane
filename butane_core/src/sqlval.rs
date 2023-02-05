@@ -235,9 +235,9 @@ pub trait FromSql {
 }
 
 impl From<SqlValRef<'_>> for SqlVal {
-    fn from(vref: SqlValRef) -> SqlVal {
+    fn from(valref: SqlValRef) -> SqlVal {
         use SqlValRef::*;
-        match vref {
+        match valref {
             Null => SqlVal::Null,
             Bool(v) => SqlVal::Bool(v),
             Int(v) => SqlVal::Int(v),

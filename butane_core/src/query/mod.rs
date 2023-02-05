@@ -162,7 +162,7 @@ impl<T: DataResult> Query<T> {
     /// Order the query results by the given column. Multiple calls to
     /// this method may be made, with earlier calls taking precedence.
     /// It is recommended to use the `colname!`
-    /// macro to construct the column name in a typesafe manner.
+    /// macro to construct the column name in a type-safe manner.
     pub fn order(mut self, column: &'static str, direction: OrderDirection) -> Query<T> {
         self.sort.push(Order { direction, column });
         self

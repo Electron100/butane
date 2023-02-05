@@ -14,7 +14,7 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection) {
     let mut disk_migrations = butane::migrations::from_root(&root);
     let disk_current = disk_migrations.current();
     // Create an in-memory Migrations and write only to that. This
-    // allows concurrent tetss to avoid stomping on eachother and is
+    // allows concurrent tests to avoid stomping on each other and is
     // also faster than real disk writes.
     let mut mem_migrations = MemMigrations::new();
     let mem_current = mem_migrations.current();

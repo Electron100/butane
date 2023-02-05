@@ -64,10 +64,12 @@ macro_rules! connection_method_wrapper {
                     .await
             }
             async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
-                self.wrapped_connection_methods()?.delete_where(table, expr).await
+                self.wrapped_connection_methods()?
+                    .delete_where(table, expr)
+                    .await
             }
             async fn has_table(&self, table: &str) -> Result<bool> {
-                self.wrapped_connection_methods()?.has_table(table).await
+                self.wrapped_connection_methods()?.has_table(table)
             }
         }
     };

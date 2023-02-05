@@ -24,10 +24,13 @@ cfg-if = "1.0"
 fallible-iterator = "0.2"
 fallible-streaming-iterator = "0.1"
 fs2 = "0.4" # for file locks
+futures-util = "0.3"
 hex = "0.4"
 log = { version="0.4", optional=true }
 native-tls={ version = "0.2", optional = true }
-tokio-postgres={ version = "0.7", features=["with-chrono-0_4"], optional = true}
+# Note, this is for the fix https://github.com/sfackler/rust-postgres/commit/e38e435665af8dbd55e7d803f019405653f99205
+# Once a new version beyond 0.7.7 is released, we should be able to go back to a regular dependency.
+tokio-postgres={ git = "https://github.com/sfackler/rust-postgres", features=["with-chrono-0_4"], optional = true}
 postgres-native-tls={ version = "0.5", optional = true }
 proc-macro2 = "1.0"
 pin-project = "1"

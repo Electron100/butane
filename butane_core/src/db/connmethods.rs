@@ -31,7 +31,12 @@ pub trait ConnectionMethods: Sync {
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal>;
     /// Like `insert_returning_pk` but with no return value
-    async fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()>;
+    async fn insert_only(
+        &self,
+        table: &str,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()>;
     /// Insert unless there's a conflict on the primary key column, in which case update
     async fn insert_or_replace(
         &self,
@@ -49,7 +54,8 @@ pub trait ConnectionMethods: Sync {
         values: &[SqlValRef<'_>],
     ) -> Result<()>;
     async fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
-        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk))).await?;
+        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))
+            .await?;
         Ok(())
     }
     async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize>;

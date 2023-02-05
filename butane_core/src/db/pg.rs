@@ -4,12 +4,13 @@ use super::helper;
 use super::*;
 use crate::custom::{SqlTypeCustom, SqlValRefCustom};
 use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
-use crate::{debug, query};
+use crate::{debug, query, warn};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
 use async_trait::async_trait;
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
+use futures_util::StreamExt;
 use std::fmt::Write;
 use tokio;
 use tokio_postgres as postgres;
@@ -54,8 +55,6 @@ impl Backend for PgBackend {
     }
 }
 
-// type PgConnHandle<TlsT> = tokio::task::JoinHandle<postgres::Connection<postgres::Socket, TlsT>>;
-
 /// Pg database connection.
 pub struct PgConnection {
     client: postgres::Client,
@@ -83,8 +82,7 @@ impl PgConnection {
         let (client, conn) = postgres::connect(params, connector).await?;
         let conn_handle = tokio::spawn(async move {
             if let Err(e) = conn.await {
-                // TODO don't panic
-                panic!()
+                warn!("Postgres connection error {}", e);
             }
         });
         Ok((client, conn_handle))
@@ -249,12 +247,12 @@ where
             .await?;
         Ok(())
     }
-    async fn insert_or_replace<'a>(
+    async fn insert_or_replace(
         &self,
         table: &str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlValRef<'a>],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
         let mut sql = String::new();
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);

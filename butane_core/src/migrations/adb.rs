@@ -113,6 +113,12 @@ impl TypeResolver {
         }
     }
     fn find_type(&self, key: &TypeKey) -> Option<TypeIdentifier> {
+        #[cfg(feature = "json")]
+        if let TypeKey::CustomType(ct) = key {
+            if ct.starts_with("HashMap < String,") {
+                return Some(TypeIdentifier::from(SqlType::Json));
+            }
+        }
         self.types.get(key).cloned()
     }
     fn insert(&mut self, key: TypeKey, ty: TypeIdentifier) -> bool {

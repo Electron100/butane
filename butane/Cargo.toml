@@ -44,6 +44,7 @@ once_cell = "1.5.2"
 postgres = { version = "0.19", features = ["with-geo-types-0_7"] }
 r2d2_for_test = { package = "r2d2", version = "0.8" }
 rusqlite = { workspace = true }
+serde = "1.0"
 serde_json = "1.0"
 uuid_for_test = { package = "uuid", version = "1.2", features = ["v4"] }
 

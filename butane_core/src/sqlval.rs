@@ -2,6 +2,7 @@ use crate::custom::{SqlValCustom, SqlValRefCustom};
 use crate::{DataObject, Error::CannotConvertSqlVal, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt;
 
 #[cfg(feature = "pg")]
@@ -471,6 +472,43 @@ impl FieldType for serde_json::Value {
 }
 #[cfg(feature = "json")]
 impl PrimaryKeyType for serde_json::Value {}
+
+#[cfg(feature = "json")]
+impl<T> ToSql for HashMap<String, T>
+where
+    T: Clone + PartialEq + Serialize,
+{
+    fn to_sql(&self) -> SqlVal {
+        self.to_sql_ref().into()
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Json(serde_json::to_value(self).unwrap())
+    }
+}
+
+#[cfg(feature = "json")]
+impl<T> FromSql for HashMap<String, T>
+where
+    T: Clone + PartialEq + for<'a> serde::Deserialize<'a>,
+{
+    fn from_sql_ref(val: SqlValRef) -> Result<Self> {
+        if let SqlValRef::Json(serde_json::Value::Object(m)) = val {
+            return Ok(m
+                .iter()
+                .map(|(k, v)| (k.to_owned(), T::deserialize(v).unwrap()))
+                .collect::<HashMap<String, T>>());
+        }
+        sql_conv_err!(val, Json)
+    }
+}
+#[cfg(feature = "json")]
+impl<T> FieldType for HashMap<String, T>
+where
+    T: Clone + PartialEq + for<'a> serde::Deserialize<'a> + serde::Serialize,
+{
+    type RefType = Self;
+    const SQLTYPE: SqlType = SqlType::Json;
+}
 
 #[cfg(feature = "datetime")]
 impl_basic_from_sql!(NaiveDateTime, Timestamp, Timestamp);

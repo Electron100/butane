@@ -521,9 +521,11 @@ fn sqltype_from_name(name: &Ident) -> Option<TypeIdentifier> {
         "BigInt" => return some_id(SqlType::BigInt),
         "Real" => return some_id(SqlType::Real),
         "Text" => return some_id(SqlType::Text),
+        "Blob" => return some_id(SqlType::Blob),
+        #[cfg(feature = "json")]
+        "Json" => return some_id(SqlType::Json),
         #[cfg(feature = "datetime")]
         "Timestamp" => return some_id(SqlType::Timestamp),
-        "Blob" => return some_id(SqlType::Blob),
         _ => (),
     }
     if let Some(custom_name) = Regex::new(r"^Custom\((.*)\)$").unwrap().captures(&name) {

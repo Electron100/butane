@@ -101,7 +101,7 @@ macro_rules! query {
     };
 }
 
-/// Typesafe way to refer to a column name. Use as
+/// Type-safe way to refer to a column name. Use as
 /// `colname!(MODEL_TYPE, FIELD_NAME)`. E.g. For a model type `Foo`
 /// with a field `bar`, `colname!(Foo, bar) would return `"bar"`, but
 /// `colname!(Foo, bat)` would be a compiler error (assuming `Foo`

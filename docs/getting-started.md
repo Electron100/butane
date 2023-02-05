@@ -85,7 +85,7 @@ The `#[model]` attribute does the heavy lifting here:
 1. it generates automatic impls of [`butane::DataResult`] and
    [`butane::DataObject`].
 2. It adds an additional field `state: butane::ObjectState` used to
-   store internal Butane state information. In general we can ignore
+   store internal Butane state information. In general, we can ignore
    this field, but it must be initialized when the struct is
    constructed and there may not be another field named `state`,
    although it is acceptable to manually include the `state:

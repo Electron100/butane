@@ -69,7 +69,7 @@ fn main() {
 								.setting(clap::AppSettings::ArgRequiredElseHelp)
 								.about("Clear data")
 								.subcommand(clap::SubCommand::with_name("data")
-														.about("Clear all data from the database. The scehma is left intact, but all instances of all models (i.e. all rows of all tables defined by the models) are deleted")))
+														.about("Clear all data from the database. The schema is left intact, but all instances of all models (i.e. all rows of all tables defined by the models) are deleted")))
         .subcommand(
             clap::SubCommand::with_name("delete")
                 .about("Delete a table")

@@ -20,8 +20,8 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 anyhow = "1.0"
 butane = { path = "../butane", version = "0.5", features = [
   "default",
-  "sqlite",
   "pg",
+  "sqlite",
 ] }
 chrono = "0.4"
 clap = "2.34"

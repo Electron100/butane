@@ -17,6 +17,7 @@ fn main() {
         .version(env!("CARGO_PKG_VERSION"))
         .author("James Oakley <james@electronstudio.org>")
         .about("Manages butane database migrations")
+        .max_term_width(80)
         .subcommand(
             clap::SubCommand::with_name("init")
                 .about("Initialize the database")
@@ -85,6 +86,9 @@ fn main() {
                         ),
                 ),
         )
+				.subcommand(
+						clap::SubCommand::with_name("clean")
+								.about("Clean current migration state. Deletes the current migration working state which is generated on each build. This can be used as a workaround to remove stale tables from the schema, as Butane does not currently auto-detect model removals. The next build will recreate with only tables for the extant models."))
         .setting(clap::AppSettings::ArgRequiredElseHelp);
     let args = app.get_matches();
     match args.subcommand() {
@@ -107,6 +111,7 @@ fn main() {
             }
             (_, _) => eprintln!("Unknown delete command. Try: delete table"),
         },
+        ("clean", _) => handle_error(clean()),
         (cmd, _) => eprintln!("Unknown command {cmd}"),
     }
 }
@@ -349,6 +354,11 @@ fn clear_data() -> Result<()> {
         println!("Deleting data from {}", &table.name);
         conn.delete_where(&table.name, BoolExpr::True)?;
     }
+    Ok(())
+}
+
+fn clean() -> Result<()> {
+    get_migrations()?.clear_current()?;
     Ok(())
 }
 

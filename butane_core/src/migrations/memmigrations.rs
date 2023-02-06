@@ -133,6 +133,11 @@ impl MigrationsMut for MemMigrations {
         &mut self.current
     }
 
+    fn clear_current(&mut self) -> Result<()> {
+        self.current = MemMigration::new("current".to_string());
+        Ok(())
+    }
+
     fn new_migration(&self, name: &str) -> Self::M {
         MemMigration::new(name.to_string())
     }

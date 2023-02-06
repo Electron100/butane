@@ -301,6 +301,10 @@ impl MigrationsMut for FsMigrations {
     fn current(&mut self) -> &mut Self::M {
         &mut self.current
     }
+    fn clear_current(&mut self) -> Result<()> {
+        std::fs::remove_dir_all(&self.current.root)?;
+        Ok(())
+    }
     fn new_migration(&self, name: &str) -> Self::M {
         let mut dir = self.root.clone();
         dir.push(name);

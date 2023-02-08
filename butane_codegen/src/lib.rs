@@ -167,3 +167,39 @@ fn migrations_dir() -> PathBuf {
     dir.push("migrations");
     dir
 }
+
+#[proc_macro_derive(ButaneJson)]
+pub fn derive_butane_json(input: TokenStream) -> TokenStream {
+    let ast = syn::parse_macro_input!(input as syn::DeriveInput);
+    let struct_name = &ast.ident;
+    let s = format!(
+        "impl ToSql for {struct_name}
+{{
+    fn to_sql(&self) -> SqlVal {{
+        self.to_sql_ref().into()
+    }}
+    fn to_sql_ref(&self) -> SqlValRef<'_> {{
+        SqlValRef::Json(serde_json::to_value(self).unwrap())
+    }}
+}}
+
+impl FromSql for {struct_name}
+{{
+    fn from_sql_ref(val: SqlValRef) -> Result<Self, butane::Error> {{
+        if let SqlValRef::Json(v) = val {{
+            return Ok({struct_name}::deserialize(v).unwrap());
+        }}
+        Err(butane::Error::CannotConvertSqlVal(
+            SqlType::Json,
+            val.into(),
+        ))
+    }}
+}}
+impl FieldType for {struct_name}
+{{
+    type RefType = Self;
+    const SQLTYPE: SqlType = SqlType::Json;
+}}"
+    );
+    s.parse().unwrap()
+}

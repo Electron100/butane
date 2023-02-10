@@ -101,6 +101,7 @@ dependencies = [
  "quote 1.0.23",
  "r2d2",
  "rusqlite",
+ "serde",
  "serde_json",
  "uuid",
 ]

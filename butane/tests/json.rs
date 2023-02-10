@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use butane::model;
 use butane::prelude::*;
 use butane::{db::Connection, ObjectState};
@@ -69,3 +71,87 @@ fn basic_json(conn: Connection) {
     assert_eq!(foo2, foo3);
 }
 testall!(basic_json);
+
+#[model]
+#[derive(PartialEq, Eq, Debug, Clone)]
+struct FooHH {
+    id: i64,
+    val: HashMap<String, String>,
+    bar: u32,
+}
+impl FooHH {
+    fn new(id: i64) -> Self {
+        FooHH {
+            id,
+            val: HashMap::<String, String>::default(),
+            bar: 0,
+            state: ObjectState::default(),
+        }
+    }
+}
+fn basic_hashmap(conn: Connection) {
+    //create
+    let id = 4;
+    let mut foo = FooHH::new(id);
+    let mut data = HashMap::<String, String>::new();
+    data.insert("a".to_string(), "1".to_string());
+
+    foo.val = data;
+    foo.save(&conn).unwrap();
+
+    // read
+    let mut foo2 = FooHH::get(&conn, id).unwrap();
+    assert_eq!(foo, foo2);
+
+    // update
+    foo2.bar = 43;
+    foo2.save(&conn).unwrap();
+    let foo3 = FooHH::get(&conn, id).unwrap();
+    assert_eq!(foo2, foo3);
+}
+testall!(basic_hashmap);
+
+#[derive(PartialEq, Eq, Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+struct HashedObject {
+    x: i64,
+    y: i64,
+}
+
+#[model]
+#[derive(PartialEq, Eq, Debug, Clone)]
+struct FooHHO {
+    id: i64,
+    val: HashMap<String, HashedObject>,
+    bar: u32,
+}
+impl FooHHO {
+    fn new(id: i64) -> Self {
+        FooHHO {
+            id,
+            val: HashMap::<String, HashedObject>::default(),
+            bar: 0,
+            state: ObjectState::default(),
+        }
+    }
+}
+fn hashmap_with_object_values(conn: Connection) {
+    //create
+    let id = 4;
+    let mut foo = FooHHO::new(id);
+    let mut data = HashMap::<String, HashedObject>::new();
+    data.insert("a".to_string(), HashedObject { x: 1, y: 3 });
+
+    foo.val = data;
+    foo.save(&conn).unwrap();
+
+    // read
+    let mut foo2 = FooHHO::get(&conn, id).unwrap();
+    assert_eq!(foo, foo2);
+
+    // update
+    foo2.bar = 43;
+    foo2.save(&conn).unwrap();
+    let foo3 = FooHHO::get(&conn, id).unwrap();
+    assert_eq!(foo2, foo3);
+}
+testall!(hashmap_with_object_values);

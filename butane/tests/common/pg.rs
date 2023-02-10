@@ -33,7 +33,6 @@ impl Drop for PgServerState {
         self.proc.kill().ok();
         let mut buf = String::new();
         self.stderr.read_to_string(&mut buf).unwrap();
-        eprintln!("postgres stderr is {buf}");
         std::fs::remove_dir_all(&self.dir).unwrap();
     }
 }

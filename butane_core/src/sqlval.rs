@@ -278,6 +278,7 @@ impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
 /// Type suitable for being a database column.
 pub trait FieldType: ToSql + FromSql {
     const SQLTYPE: SqlType;
+    const NULLABLE: bool = false;
     /// Reference type. Used for ergonomics with String (which has
     /// reference type str). For most, it is Self
     type RefType: ?Sized + ToSql;
@@ -625,5 +626,6 @@ where
     T: FieldType,
 {
     const SQLTYPE: SqlType = T::SQLTYPE;
+    const NULLABLE: bool = true;
     type RefType = Self;
 }

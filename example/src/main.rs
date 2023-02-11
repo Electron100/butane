@@ -13,6 +13,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 struct Blog {
     #[auto]
     id: i64,
+    #[default = "My Blog"]
     name: String,
 }
 

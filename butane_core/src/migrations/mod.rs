@@ -3,7 +3,9 @@
 use crate::db::BackendRows;
 use crate::db::{Column, ConnectionMethods};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
-use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
+use crate::{
+    db, query, DataObject, DataObjectFieldDef, DataObjectFields, DataResult, Error, Result, SqlType,
+};
 
 use fallible_iterator::FallibleIterator;
 use std::path::Path;
@@ -255,7 +257,7 @@ impl DataResult for ButaneMigration {
 }
 impl DataObject for ButaneMigration {
     type PKType = String;
-    type Fields = (); // we don't need Fields as we never filter
+    type Fields = ButaneMigrationFields;
     const PKCOL: &'static str = "name";
     const TABLE: &'static str = "butane_migrations";
     const AUTO_PK: bool = false;
@@ -274,5 +276,27 @@ impl DataObject for ButaneMigration {
     }
     fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
         conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
+    }
+}
+
+struct ButaneMigrationFields {
+    defs: [DataObjectFieldDef<ButaneMigration>; 1],
+}
+impl Default for ButaneMigrationFields {
+    fn default() -> Self {
+        let name_field = DataObjectFieldDef::<ButaneMigration>::builder()
+            .name("name")
+            .sqltype(SqlType::Text)
+            .nullable(false)
+            .pk(true)
+            .build();
+        Self { defs: [name_field] }
+    }
+}
+
+impl DataObjectFields<ButaneMigration> for ButaneMigrationFields {
+    type IntoFieldsIter<'a> = &'a [DataObjectFieldDef<ButaneMigration>; 1];
+    fn field_defs(&self) -> Self::IntoFieldsIter<'_> {
+        &self.defs
     }
 }

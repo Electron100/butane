@@ -53,7 +53,7 @@ where
     migration::write_table_to_disk(ms, &ast_struct, &config).unwrap();
 
     let impltraits = dbobj::impl_dbobject(&ast_struct, &config);
-    let fieldexprs = dbobj::add_fieldexprs(&ast_struct);
+    let fieldexprs = dbobj::fields_type_tokens(&ast_struct);
 
     let fields: Punctuated<Field, syn::token::Comma> =
         match remove_helper_field_attributes(&mut ast_struct.fields) {
@@ -321,10 +321,6 @@ fn is_many_to_many(field: &Field) -> bool {
     get_many_sql_type(field).is_some()
 }
 
-fn is_option(field: &Field) -> bool {
-    get_foreign_type_argument(&field.ty, "Option").is_some()
-}
-
 /// Check for special fields which won't correspond to rows and don't
 /// implement FieldType
 fn is_row_field(f: &Field) -> bool {
@@ -386,18 +382,24 @@ pub fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
 /// Example
 /// #[default = 42]
 fn get_default(field: &Field) -> std::result::Result<Option<SqlVal>, CompilerErrorMsg> {
+    Ok(match get_default_lit(field)? {
+        Some(lit) => Some(sqlval_from_lit(lit)?),
+        None => None,
+    })
+}
+
+fn get_default_lit(field: &Field) -> std::result::Result<Option<Lit>, CompilerErrorMsg> {
     let attr: Option<&Attribute> = field
         .attrs
         .iter()
         .find(|attr| attr.path.is_ident("default"));
-    let lit: Lit = match attr {
-        None => return Ok(None),
+    match attr {
+        None => Ok(None),
         Some(attr) => match attr.parse_meta() {
-            Ok(Meta::NameValue(meta)) => meta.lit,
-            _ => return Err(make_compile_error!("malformed default value").into()),
+            Ok(Meta::NameValue(meta)) => Ok(Some(meta.lit)),
+            _ => Err(make_compile_error!("malformed default value").into()),
         },
-    };
-    Ok(Some(sqlval_from_lit(lit)?))
+    }
 }
 
 fn some_id(ty: SqlType) -> Option<TypeIdentifier> {

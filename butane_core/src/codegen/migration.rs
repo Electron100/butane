@@ -82,3 +82,7 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
 fn is_nullable(field: &Field) -> bool {
     is_option(field)
 }
+
+fn is_option(field: &Field) -> bool {
+    get_foreign_type_argument(&field.ty, "Option").is_some()
+}

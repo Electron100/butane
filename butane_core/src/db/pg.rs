@@ -9,12 +9,12 @@ use crate::{Result, SqlType, SqlVal, SqlValRef};
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
-use tokio_postgres::fallible_iterator::FallibleIterator;
 use tokio_postgres::GenericClient;
 use tokio_postgres as postgres;
-use std::cell::RefCell;
 use std::fmt::Write;
 use async_trait::async_trait;
+use tokio;
+use futures_util::stream::StreamExt;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
@@ -28,10 +28,12 @@ impl PgBackend {
     }
 }
 impl PgBackend {
-    fn connect(&self, params: &str) -> Result<PgConnection> {
-        PgConnection::open(params)
+    async fn connect(&self, params: &str) -> Result<PgConnection> {
+        PgConnection::open(params).await
     }
 }
+
+#[async_trait]
 impl Backend for PgBackend {
     fn name(&self) -> &'static str {
         BACKEND_NAME
@@ -46,24 +48,28 @@ impl Backend for PgBackend {
             .join("\n"))
     }
 
-    fn connect(&self, path: &str) -> Result<Connection> {
+    async fn connect(&self, path: &str) -> Result<Connection> {
         Ok(Connection {
-            conn: Box::new(self.connect(path)?),
+            conn: Box::new(self.connect(path).await?),
         })
     }
 }
 
+// type PgConnHandle<TlsT> = tokio::task::JoinHandle<postgres::Connection<postgres::Socket, TlsT>>;
+
 /// Pg database connection.
 pub struct PgConnection {
-    conn: RefCell<postgres::Client>,
+    client: postgres::Client,
+    // Save the handle to the task running the connection to keep it alive
+    _conn_handle: tokio::task::JoinHandle<()>,
 }
+
 impl PgConnection {
-    fn open(params: &str) -> Result<Self> {
-        Ok(PgConnection {
-            conn: RefCell::new(Self::connect(params)?),
-        })
+    async fn open(params: &str) -> Result<Self> {
+        let (client, _conn_handle) = Self::connect(params).await?;
+        Ok( Self { client, _conn_handle })
     }
-    fn connect(params: &str) -> Result<postgres::Client> {
+    async fn connect(params: &str) -> Result<(postgres::Client, tokio::task::JoinHandle<()>)> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "tls")] {
                 let connector = native_tls::TlsConnector::new()?;
@@ -72,18 +78,27 @@ impl PgConnection {
                 let connector = postgres::NoTls;
             }
         }
-        Ok(postgres::Client::connect(params, connector)?)
+        let (client, conn) = postgres::connect(params, connector).await?;
+        let conn_handle = tokio::spawn(async move {
+            if let Err(_e) = conn.await {
+                // TODO don't panic
+                panic!()
+            }
+        });
+        Ok((client, conn_handle))
     }
 }
 impl PgConnectionLike for PgConnection {
     type Client = postgres::Client;
-    fn cell(&self) -> Result<&RefCell<Self::Client>> {
-        Ok(&self.conn)
+    fn client(&self) -> Result<&Self::Client> {
+        Ok(&self.client)
     }
 }
+
+#[async_trait]
 impl BackendConnection for PgConnection {
-    fn transaction(&mut self) -> Result<Transaction<'_>> {
-        let trans: postgres::Transaction<'_> = self.conn.get_mut().transaction()?;
+    async fn transaction(&mut self) -> Result<Transaction<'_>> {
+        let trans: postgres::Transaction<'_> = self.client.transaction().await?;
         let trans = Box::new(PgTransaction::new(trans));
         Ok(Transaction::new(trans))
     }
@@ -94,7 +109,7 @@ impl BackendConnection for PgConnection {
         BACKEND_NAME
     }
     fn is_closed(&self) -> bool {
-        self.conn.borrow().is_closed()
+        self.client.is_closed()
     }
 }
 
@@ -111,20 +126,20 @@ fn sqlvalref_for_pg_query<'a>(v: &'a SqlValRef<'a>) -> &'a dyn postgres::types::
 /// Shared functionality between connection and
 /// transaction. Implementation detail. Semver exempt.
 pub trait PgConnectionLike {
-    type Client: postgres::GenericClient;
-    fn cell(&self) -> Result<&RefCell<Self::Client>>;
+    type Client: postgres::GenericClient + Send + Sync;
+    fn client(&self) -> Result<&Self::Client>;
 }
 
 #[async_trait]
 impl<T> ConnectionMethods for T
 where
-    T: PgConnectionLike,
+    T: PgConnectionLike + std::marker::Sync,
 {
-    fn execute(&self, sql: &str) -> Result<()> {
+    async fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
             debug!("execute sql {}", sql);
         }
-        self.cell()?.try_borrow_mut()?.batch_execute(sql.as_ref())?;
+        self.client()?.batch_execute(sql.as_ref()).await?;
         Ok(())
     }
 
@@ -169,23 +184,22 @@ where
 
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
         let stmt = self
-            .cell()?
-            .try_borrow_mut()?
+            .client()?
             .prepare_typed(&sqlquery, types.as_ref()).await?;
-        // todo avoid intermediate vec?
-        let rowvec: Vec<postgres::Row> = self
-            .cell()?
-            .try_borrow_mut()?
-            .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))?
-            .map_err(Error::Postgres)
-            .map(|r| {
-                check_columns(&r, columns)?;
-                Ok(r)
-            })
-            .collect()?;
+        let mut rowvec = Vec::<postgres::Row>::new();
+        let rowstream = self
+            .client()?
+            .query_raw(&stmt, values.iter().map(sqlval_for_pg_query)).await
+            .map_err(Error::Postgres)?;
+        let mut rowstream = Box::pin(rowstream);
+        while let Some(r) = rowstream.next().await {
+            let r = r?;
+            check_columns(&r, columns)?;
+            rowvec.push(r);
+        }
         Ok(Box::new(VecRows::new(rowvec)))
     }
-    fn insert_returning_pk(
+    async fn insert_returning_pk(
         &self,
         table: &str,
         columns: &[Column],
@@ -205,16 +219,13 @@ where
         }
 
         // use query instead of execute so we can get our result back
-        let pk: Option<SqlVal> = self
-            .cell()?
-            .try_borrow_mut()?
-            .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query))?
-            .map_err(Error::Postgres)
-            .map(|r| sql_val_from_postgres(&r, 0, pkcol))
-            .nth(0)?;
-        pk.ok_or_else(|| Error::Internal("could not get pk".to_string()))
+        let pk_stream = self.client()?
+            .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query)).await
+            .map_err(Error::Postgres)?
+            .map(|r| r.map(|x| sql_val_from_postgres(&x, 0, pkcol)));
+        Box::pin(pk_stream).next().await.ok_or(Error::Internal(("could not get pk").to_string()))??
     }
-    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
+    async fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
         let mut sql = String::new();
         helper::sql_insert_with_placeholders(
             table,
@@ -223,31 +234,29 @@ where
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.cell()?
-            .try_borrow_mut()?
-            .execute(sql.as_str(), params.as_slice())?;
+        self.client()?
+            .execute(sql.as_str(), params.as_slice()).await?;
         Ok(())
     }
-    fn insert_or_replace<'a>(
+    async fn insert_or_replace(
         &self,
         table: &str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlValRef<'a>],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
         let mut sql = String::new();
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.cell()?
-            .try_borrow_mut()?
-            .execute(sql.as_str(), params.as_slice())?;
+        self.client()?
+            .execute(sql.as_str(), params.as_slice()).await?;
         Ok(())
     }
-    fn update(
+    async fn update<'a>(
         &self,
         table: &str,
         pkcol: Column,
-        pk: SqlValRef,
+        pk: SqlValRef<'a>,
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()> {
@@ -267,12 +276,10 @@ where
         if cfg!(feature = "log") {
             debug!("update sql {}", sql);
         }
-        self.cell()?
-            .try_borrow_mut()?
-            .execute(sql.as_str(), params.as_slice())?;
+        self.client()?.execute(sql.as_str(), params.as_slice()).await?;
         Ok(())
     }
-    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
+    async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
         write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
@@ -284,35 +291,33 @@ where
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
         let cnt = self
-            .cell()?
-            .try_borrow_mut()?
-            .execute(sql.as_str(), params.as_slice())?;
+            .client()?
+            .execute(sql.as_str(), params.as_slice()).await?;
         Ok(cnt as usize)
     }
-    fn has_table(&self, table: &str) -> Result<bool> {
+    async fn has_table(&self, table: &str) -> Result<bool> {
         // future improvement, should be schema-aware
         let stmt = self
-            .cell()?
-            .try_borrow_mut()?
-            .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;")?;
-        let rows = self.cell()?.try_borrow_mut()?.query(&stmt, &[&table])?;
+            .client()?
+            .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;").await?;
+        let rows = self.client()?.query(&stmt, &[&table]).await?;
         Ok(!rows.is_empty())
     }
 }
 
 struct PgTransaction<'c> {
-    trans: Option<RefCell<postgres::Transaction<'c>>>,
+    trans: Option<postgres::Transaction<'c>>,
 }
 impl<'c> PgTransaction<'c> {
     fn new(trans: postgres::Transaction<'c>) -> Self {
         PgTransaction {
-            trans: Some(RefCell::new(trans)),
+            trans: Some(trans),
         }
     }
-    fn get(&self) -> Result<&RefCell<postgres::Transaction<'c>>> {
+    fn get(&self) -> Result<&postgres::Transaction<'c>> {
         match &self.trans {
+            Some(x) => Ok(x),
             None => Err(Self::already_consumed()),
-            Some(trans) => Ok(trans),
         }
     }
     fn already_consumed() -> Error {
@@ -321,24 +326,24 @@ impl<'c> PgTransaction<'c> {
 }
 impl<'c> PgConnectionLike for PgTransaction<'c> {
     type Client = postgres::Transaction<'c>;
-    fn cell(&self) -> Result<&RefCell<Self::Client>> {
+    fn client(&self) -> Result<&Self::Client> {
         self.get()
     }
 }
 
 #[async_trait]
 impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
-    fn commit(&mut self) -> Result<()> {
+    async fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
             None => Err(Self::already_consumed()),
-            Some(trans) => Ok(trans.into_inner().commit()?),
+            Some(trans) => Ok(trans.commit().await?),
         }
     }
 
     async fn rollback(&mut self) -> Result<()> {
         match self.trans.take() {
             None => Err(Self::already_consumed()),
-            Some(trans) => Ok(trans.into_inner().rollback().await?),
+            Some(trans) => Ok(trans.rollback().await?),
         }
     }
     // Workaround for https://github.com/rust-lang/rfcs/issues/2765

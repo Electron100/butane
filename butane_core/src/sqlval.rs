@@ -269,7 +269,7 @@ pub trait FieldType: ToSql + FromSql {
 }
 
 /// Marker trait for a type suitable for being a primary key
-pub trait PrimaryKeyType: FieldType + Clone + PartialEq {}
+pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync{}
 
 /// Trait for referencing the primary key for a given model. Used to
 /// implement ForeignKey equality tests.

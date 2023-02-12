@@ -3,6 +3,8 @@
 ///! welcome to use them, but be aware that you probably don't *need*
 ///! to.
 use super::*;
+
+/// Trait which allows retrieving the definitions of all fields in a data object.
 pub trait DataObjectFields {
     /// Corresponding object type.
     type DBO: DataObject;

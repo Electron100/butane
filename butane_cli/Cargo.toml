@@ -24,7 +24,7 @@ butane = { path = "../butane", version = "0.5", features = [
   "sqlite",
 ] }
 chrono = { version = "0.4", default-features = false }
-clap = { version = "2.34", default-features = false }
+clap = { version = "4.1" }
 quote = { version = "1.0", default-features = false }
 serde = { version = "1.0", default-features = false }
 serde_json = "1.0"

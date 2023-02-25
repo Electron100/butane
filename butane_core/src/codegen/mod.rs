@@ -483,7 +483,7 @@ fn last_path_segment(ty: &syn::Type) -> Option<&syn::PathSegment> {
     {
         return segments.last();
     }
-    return None;
+    None
 }
 
 fn template_type(arguments: &syn::PathArguments) -> Option<&Ident> {
@@ -497,7 +497,7 @@ fn template_type(arguments: &syn::PathArguments) -> Option<&Ident> {
             }
         }
     }
-    return None;
+    None
 }
 
 fn has_derive_serialize(attrs: &[Attribute]) -> bool {

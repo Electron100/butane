@@ -98,6 +98,7 @@ struct TimeHolder {
     pub id: i32,
     pub naive: NaiveDateTime,
     pub utc: DateTime<Utc>,
+    pub utc2: chrono::DateTime<Utc>,
 }
 
 fn basic_crud(conn: Connection) {
@@ -336,6 +337,7 @@ fn basic_time(conn: Connection) {
         id: 1,
         naive: now.naive_utc(),
         utc: now,
+        utc2: now,
         state: ObjectState::default(),
     };
     time.save(&conn).unwrap();

@@ -441,16 +441,27 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
 
     #[cfg(feature = "datetime")]
     {
-        if *ty == parse_quote!(NaiveDateTime) {
-            return some_known(SqlType::Timestamp);
-        }
         // Note, the fact that we have to check specific paths because
         // we don't really have type system information at this point
         // is a strong argument for proc macros being the wrong time
-        // to run the full migration generation.
-        if *ty == parse_quote!(DateTime<Utc>) || *ty == parse_quote!(DateTime<chrono::offset::Utc>)
-        {
-            return some_known(SqlType::Timestamp);
+        // to run the full migration generation. We expect these types
+        // to come from chrono, but we don't really know for sure...
+        if let Some(syn::PathSegment { ident, arguments }) = last_path_segment(ty) {
+            match ident.to_string().as_str() {
+                "NaiveDateTime" => return some_known(SqlType::Timestamp),
+                "DateTime" => {
+                    // Only if the parameter is UTC, as we don't support attached
+                    // time zones
+                    if template_type(arguments)
+                        .map(|ident| ident.to_string())
+                        .unwrap_or(String::new())
+                        == "Utc"
+                    {
+                        return some_known(SqlType::Timestamp);
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
@@ -462,6 +473,31 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
     }
 
     None
+}
+
+fn last_path_segment(ty: &syn::Type) -> Option<&syn::PathSegment> {
+    if let syn::Type::Path(syn::TypePath {
+        path: syn::Path { segments, .. },
+        ..
+    }) = ty
+    {
+        return segments.last();
+    }
+    return None;
+}
+
+fn template_type(arguments: &syn::PathArguments) -> Option<&Ident> {
+    if let syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+        args, ..
+    }) = arguments
+    {
+        if let Some(syn::GenericArgument::Type(template_ty)) = args.last() {
+            if let Some(syn::PathSegment { ident, .. }) = last_path_segment(template_ty) {
+                return Some(ident);
+            }
+        }
+    }
+    return None;
 }
 
 fn has_derive_serialize(attrs: &[Attribute]) -> bool {

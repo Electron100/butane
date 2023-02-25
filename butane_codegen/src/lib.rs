@@ -9,7 +9,8 @@ use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
 use quote::quote;
 use std::path::PathBuf;
-use syn::{Expr, Ident};
+use syn::parse::{Parse, ParseStream};
+use syn::{punctuated::Punctuated, Expr, Ident, Token, Type};
 
 mod filter;
 
@@ -153,6 +154,35 @@ pub fn filter(input: TokenStream) -> TokenStream {
 pub fn butane_type(args: TokenStream, input: TokenStream) -> TokenStream {
     codegen::butane_type_with_migrations(args.into(), input.into(), &mut migrations_for_dir())
         .into()
+}
+
+struct DatabaseTypes {
+    types: Vec<Type>,
+}
+
+impl Parse for DatabaseTypes {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        let punctuated = Punctuated::<Type, Token![,]>::parse_terminated(input)?;
+        Ok(DatabaseTypes {
+            types: punctuated.into_iter().collect(),
+        })
+    }
+}
+
+#[proc_macro]
+pub fn butane_database(input: TokenStream) -> TokenStream {
+    let models = match syn::parse2::<DatabaseTypes>(input.into()) {
+        Ok(models) => models,
+        Err(_) => return make_compile_error!("Unexpected tokens in database specification").into(),
+    };
+
+    return quote!(
+        let tables = std::vec![#( butane::migrations::adb::ATable::from(#models::fields()) ),*];
+        for table in tables {
+            current_migration.write_table(&table)?;
+        }
+    )
+    .into();
 }
 
 fn migrations_for_dir() -> migrations::FsMigrations {

@@ -15,7 +15,7 @@ use std::rc::Rc;
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 const TYPES_FILENAME: &str = "types.json";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct MigrationInfo {
     /// The migration this one is based on, or None if this is the
     /// first migration in the chain
@@ -31,7 +31,7 @@ impl MigrationInfo {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct MigrationsState {
     latest: Option<String>,
 }
@@ -42,6 +42,7 @@ impl MigrationsState {
 }
 
 /// A migration stored in the filesystem
+#[derive(Debug)]
 pub struct FsMigration {
     fs: Rc<dyn Filesystem>,
     root: PathBuf,
@@ -235,6 +236,7 @@ impl PartialEq for FsMigration {
 impl Eq for FsMigration {}
 
 /// A collection of migrations stored in the filesystem.
+#[derive(Debug)]
 pub struct FsMigrations {
     fs: Rc<dyn Filesystem>,
     root: PathBuf,
@@ -341,6 +343,7 @@ impl MigrationsMut for FsMigrations {
     }
 }
 
+#[derive(Debug)]
 struct MigrationLock {
     file: File,
 }

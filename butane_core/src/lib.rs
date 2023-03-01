@@ -32,7 +32,7 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 /// in the database yet. Butane automatically creates the field
 /// `state: ObjectState` on `#[model]` structs. When initializing the
 /// state field, use `ObjectState::default()`.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ObjectState {
     pub saved: bool,
 }
@@ -202,7 +202,7 @@ impl From<rusqlite::types::FromSqlError> for Error {
 /// Enumeration of the types a database value may take.
 ///
 /// See also [`SqlVal`][crate::SqlVal].
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlType {
     Bool,
     /// 4 bytes

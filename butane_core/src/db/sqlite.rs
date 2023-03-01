@@ -22,7 +22,7 @@ const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 pub const BACKEND_NAME: &str = "sqlite";
 
 /// SQLite [Backend][crate::db::Backend] implementation.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct SQLiteBackend {}
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
@@ -60,6 +60,7 @@ impl Backend for SQLiteBackend {
 }
 
 /// SQLite database connection.
+#[derive(Debug)]
 pub struct SQLiteConnection {
     conn: rusqlite::Connection,
 }
@@ -249,6 +250,7 @@ impl ConnectionMethods for rusqlite::Connection {
     }
 }
 
+#[derive(Debug)]
 struct SqliteTransaction<'c> {
     trans: Option<rusqlite::Transaction<'c>>,
 }
@@ -329,6 +331,7 @@ fn sqlvalref_to_sqlite<'a>(valref: &SqlValRef<'a>) -> rusqlite::types::ToSqlOutp
 }
 
 #[pin_project]
+// Debug can not be derived because rusqlite::Rows doesn't implement it.
 struct QueryAdapterInner<'a> {
     stmt: rusqlite::Statement<'a>,
     // will always be Some when the constructor has finished. We use an option only to get the
@@ -363,6 +366,7 @@ impl<'a> QueryAdapterInner<'a> {
     }
 }
 
+// Debug can not be derived because QueryAdapterInner above doesn't implement it.
 struct QueryAdapter<'a> {
     inner: Pin<Box<QueryAdapterInner<'a>>>,
 }
@@ -608,6 +612,7 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write)
     write!(w, ")").unwrap();
 }
 
+#[derive(Debug)]
 struct SQLitePlaceholderSource {}
 impl SQLitePlaceholderSource {
     fn new() -> Self {

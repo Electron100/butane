@@ -57,6 +57,7 @@ pub trait ConnectionMethods {
 
 /// Represents a database column. Most users do not need to use this
 /// directly.
+#[derive(Debug)]
 pub struct Column {
     name: &'static str,
     ty: SqlType,
@@ -134,6 +135,7 @@ pub trait ConnectionMethodWrapper {
     fn wrapped_connection_methods(&self) -> Result<&Self::Wrapped>;
 }
 
+#[derive(Debug)]
 pub(crate) struct VecRows<T> {
     rows: Vec<T>,
     idx: usize,

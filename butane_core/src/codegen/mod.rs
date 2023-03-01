@@ -531,6 +531,7 @@ fn sqlval_from_lit(lit: Lit) -> std::result::Result<SqlVal, CompilerErrorMsg> {
     }
 }
 
+#[derive(Debug)]
 struct CustomTypeInfo {
     name: String,
     ty: DeferredSqlType,

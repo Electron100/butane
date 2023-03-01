@@ -9,14 +9,14 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// For use with [SqlType::Custom](crate::SqlType)
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlTypeCustom {
     #[cfg(feature = "pg")]
     Pg(#[serde(with = "pgtypeser")] postgres::types::Type),
 }
 
 /// For use with [SqlVal::Custom](crate::SqlVal)
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlValCustom {
     #[cfg(feature = "pg")]
     Pg {
@@ -151,7 +151,7 @@ mod pgtypeser {
     }
 
     //Serializable version of postgres::types::Type
-    #[derive(Serialize, Deserialize, Clone)]
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     struct SerializablePgType {
         name: String,
         oid: u32,
@@ -174,7 +174,7 @@ mod pgtypeser {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone)]
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     enum SerializablePgKind {
         Simple,
         Enum(Vec<String>),
@@ -217,7 +217,7 @@ mod pgtypeser {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone)]
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     struct SerializablePgField {
         name: String,
         ty: SerializablePgType,

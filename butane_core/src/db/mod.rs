@@ -16,6 +16,7 @@ use crate::query::BoolExpr;
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::fmt::Debug;
 use std::fs;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
@@ -42,7 +43,7 @@ pub use connmethods::{
 };
 
 /// Database connection.
-pub trait BackendConnection: ConnectionMethods + Send + 'static {
+pub trait BackendConnection: ConnectionMethods + Debug + Send + 'static {
     /// Begin a database transaction. The transaction object must be
     /// used in place of this connection until it is committed and aborted.
     fn transaction(&mut self) -> Result<Transaction>;
@@ -56,6 +57,7 @@ pub trait BackendConnection: ConnectionMethods + Send + 'static {
 
 /// Database connection. May be a connection to any type of database
 /// as it is a boxed abstraction over a specific connection.
+#[derive(Debug)]
 pub struct Connection {
     conn: Box<dyn BackendConnection>,
 }
@@ -88,7 +90,7 @@ connection_method_wrapper!(Connection);
 /// Connection specification. Contains the name of a database backend
 /// and the backend-specific connection string. See [connect][crate::db::connect]
 /// to make a [Connection][crate::db::Connection] from a `ConnectionSpec`.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ConnectionSpec {
     pub backend_name: String,
     pub conn_str: String,
@@ -166,7 +168,7 @@ pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
         .connect(&spec.conn_str)
 }
 
-trait BackendTransaction<'c>: ConnectionMethods {
+trait BackendTransaction<'c>: ConnectionMethods + Debug {
     /// Commit the transaction Unfortunately because we use this as a
     /// trait object, we can't consume self. It should be understood
     /// that no methods should be called after commit. This trait is
@@ -184,6 +186,7 @@ trait BackendTransaction<'c>: ConnectionMethods {
 ///
 /// Begin a transaction using the `BackendConnection`
 /// [`transaction`][crate::db::BackendConnection::transaction] method.
+#[derive(Debug)]
 pub struct Transaction<'c> {
     trans: Box<dyn BackendTransaction<'c> + 'c>,
 }

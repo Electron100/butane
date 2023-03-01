@@ -63,6 +63,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b88d82667eca772c4aa12f0f1348b3ae643424c8876448f3f7bd5787032e234c"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -117,6 +126,7 @@ dependencies = [
  "chrono",
  "env_logger",
  "exec_time",
+ "fake",
  "geo-types",
  "libc",
  "log",
@@ -126,6 +136,7 @@ dependencies = [
  "proc-macro2 1.0.49",
  "quote 1.0.23",
  "r2d2",
+ "rand",
  "rusqlite",
  "serde",
  "serde_json",
@@ -163,6 +174,7 @@ dependencies = [
  "bytes",
  "cfg-if",
  "chrono",
+ "fake",
  "fallible-iterator",
  "fallible-streaming-iterator",
  "fs2",
@@ -176,6 +188,7 @@ dependencies = [
  "proc-macro2 1.0.49",
  "quote 1.0.23",
  "r2d2",
+ "rand",
  "regex",
  "rusqlite",
  "serde",
@@ -339,8 +352,18 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcfbcb0c5961907597a7d1148e3af036268f2b773886b8bb3eeb1e1281d3d3d6"
 dependencies = [
- "darling_core",
- "darling_macro",
+ "darling_core 0.9.0",
+ "darling_macro 0.9.0",
+]
+
+[[package]]
+name = "darling"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a01d95850c592940db9b8194bc39f4bc0e89dee5c4265e4b1807c34a9aba453c"
+dependencies = [
+ "darling_core 0.13.4",
+ "darling_macro 0.13.4",
 ]
 
 [[package]]
@@ -358,14 +381,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling_core"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "859d65a907b6852c9361e3185c862aae7fafd2887876799fa55f5f99dc40d610"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2 1.0.49",
+ "quote 1.0.23",
+ "strsim 0.10.0",
+ "syn 1.0.107",
+]
+
+[[package]]
 name = "darling_macro"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6d8dac1c6f1d29a41c4712b4400f878cb4fcc4c7628f298dd75038e024998d1"
 dependencies = [
- "darling_core",
+ "darling_core 0.9.0",
  "quote 0.6.13",
  "syn 0.15.44",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c972679f83bdf9c42bd905396b6c3588a843a17f0f16dfcfa3e2c5d57441835"
+dependencies = [
+ "darling_core 0.13.4",
+ "quote 1.0.23",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -390,6 +438,17 @@ name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
+
+[[package]]
+name = "dummy"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5bf5ff6f74150b0bbb6e6057718a903b3d8f3fc7096c9190fc162ca99d3b2273"
+dependencies = [
+ "darling 0.13.4",
+ "quote 1.0.23",
+ "syn 1.0.107",
+]
 
 [[package]]
 name = "either"
@@ -445,10 +504,22 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c075b5e1b64429cb3e300dff4835ad163faece9e580b961f6e996f678107d477"
 dependencies = [
- "darling",
+ "darling 0.9.0",
  "proc-macro2 0.4.30",
  "quote 0.6.13",
  "syn 0.15.44",
+]
+
+[[package]]
+name = "fake"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d68f517805463f3a896a9d29c1d6ff09d3579ded64a7201b4069f8f9c0d52fd"
+dependencies = [
+ "chrono",
+ "dummy",
+ "rand",
+ "uuid",
 ]
 
 [[package]]
@@ -1363,6 +1434,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1_smol"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae1a47186c03a32177042e55dbc5fd5aee900b8e0069a8d70fba96a9375cd012"
+
+[[package]]
 name = "sha2"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1647,7 +1724,10 @@ version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "422ee0de9031b5b948b97a8fc04e3aa35230001a722ddd27943e0be31564ce4c"
 dependencies = [
+ "atomic",
  "getrandom",
+ "md-5",
+ "sha1_smol",
 ]
 
 [[package]]

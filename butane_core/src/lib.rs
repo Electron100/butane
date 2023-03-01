@@ -18,6 +18,9 @@ pub mod sqlval;
 #[cfg(feature = "uuid")]
 pub mod uuid;
 
+#[cfg(feature = "fake")]
+use fake::{Dummy, Faker};
+
 use db::{BackendRow, Column, ConnectionMethods};
 
 use custom::SqlTypeCustom;
@@ -45,6 +48,14 @@ impl PartialEq<ObjectState> for ObjectState {
     }
 }
 impl Eq for ObjectState {}
+
+#[cfg(feature = "fake")]
+/// Fake data should always have `saved` set to `false`.
+impl Dummy<Faker> for ObjectState {
+    fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
+        Self::default()
+    }
+}
 
 /// A type which may be the result of a database query.
 ///

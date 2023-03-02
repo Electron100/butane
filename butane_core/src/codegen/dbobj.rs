@@ -39,7 +39,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
     let many_save: TokenStream2 = fields(ast_struct).filter(|f| is_many_to_many(f)).map(|f| {
         let ident = f.ident.clone().expect("Fields must be named for butane");
-        let many_table_lit = many_table_lit(ast_struct, f);
+        let many_table_lit = many_table_lit(ast_struct, f, config);
         let pksqltype =
             quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
         // Save  needs to ensure_initialized
@@ -52,7 +52,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let values: Vec<TokenStream2> = push_values(ast_struct, |_| true);
     let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
 
-    let dataresult = impl_dataresult(ast_struct, tyname);
+    let dataresult = impl_dataresult(ast_struct, tyname, config);
     quote!(
                 #dataresult
         impl butane::DataObject for #tyname {
@@ -137,7 +137,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     )
 }
 
-pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident) -> TokenStream2 {
+pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
     let rows = rows_for_from(ast_struct);
@@ -151,7 +151,7 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident) -> TokenStream2 {
                 .ident
                 .clone()
                 .expect("Fields must be named for butane");
-            let many_table_lit = many_table_lit(ast_struct, f);
+            let many_table_lit = many_table_lit(ast_struct, f, config);
             let pksqltype = quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
             quote!(obj.#ident.ensure_init(#many_table_lit, butane::ToSql::to_sql(obj.pk()), #pksqltype);)
         }).collect();
@@ -203,13 +203,13 @@ fn make_tablelit(config: &Config, tyname: &Ident) -> LitStr {
     }
 }
 
-pub fn add_fieldexprs(ast_struct: &ItemStruct) -> TokenStream2 {
+pub fn add_fieldexprs(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let vis = &ast_struct.vis;
     let fieldexprs: Vec<TokenStream2> = fields(ast_struct)
         .map(|f| {
             if is_many_to_many(f) {
-                fieldexpr_func_many(f, ast_struct)
+                fieldexpr_func_many(f, ast_struct, config)
             } else {
                 fieldexpr_func_regular(f, ast_struct)
             }
@@ -247,10 +247,10 @@ fn fieldexpr_func_regular(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
     )
 }
 
-fn fieldexpr_func_many(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
+fn fieldexpr_func_many(f: &Field, ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let fty = get_foreign_type_argument(&f.ty, "Many").expect("Many field misdetected");
-    let many_table_lit = many_table_lit(ast_struct, f);
+    let many_table_lit = many_table_lit(ast_struct, f, config);
     fieldexpr_func(
         f,
         ast_struct,
@@ -342,12 +342,16 @@ where
         .collect()
 }
 
-fn many_table_lit(ast_struct: &ItemStruct, field: &Field) -> LitStr {
-    let tyname = &ast_struct.ident;
+fn many_table_lit(ast_struct: &ItemStruct, field: &Field, config: &Config) -> LitStr {
     let ident = field
         .ident
         .clone()
         .expect("Fields must be named for butane");
+    let binding = ast_struct.ident.to_string();
+    let tyname = match &config.table_name {
+        Some(s) => s,
+        None => &binding,
+    };
     make_lit(&format!("{}_{}_Many", &tyname, &ident))
 }
 

@@ -13,7 +13,7 @@ fn default_oc<T>() -> OnceCell<Vec<T>> {
 ///
 /// Creates a new table with columns "owner" and "has" If type T has a
 /// many-to-many relationship with U, owner type is T::PKType, has is
-/// U::PKType. Table name is T_ManyToMany_foo where foo is the name of
+/// U::PKType. Table name is T_foo_Many where foo is the name of
 /// the Many field
 //
 #[derive(Clone, Debug, Deserialize, Serialize)]

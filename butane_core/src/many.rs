@@ -16,7 +16,7 @@ fn default_oc<T>() -> OnceCell<Vec<T>> {
 /// U::PKType. Table name is T_ManyToMany_foo where foo is the name of
 /// the Many field
 //
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Many<T>
 where
     T: DataObject,

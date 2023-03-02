@@ -5,6 +5,7 @@ use crate::query::{BoolExpr, Expr};
 use crate::{db, sqlval::ToSql, DataObject, DataResult, Error, Result};
 use std::borrow::Cow;
 use std::cmp::PartialEq;
+use std::fmt::Debug;
 
 /// Type representing a database migration. A migration describes how
 /// to bring the database from state A to state B. In general, the
@@ -13,7 +14,7 @@ use std::cmp::PartialEq;
 ///
 /// A Migration cannot be constructed directly, only retrieved from
 /// [Migrations][crate::migrations::Migrations].
-pub trait Migration: PartialEq {
+pub trait Migration: Debug + PartialEq {
     /// Retrieves the full abstract database state describing all tables
     fn db(&self) -> Result<ADB>;
 

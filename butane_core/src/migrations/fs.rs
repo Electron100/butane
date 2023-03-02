@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -5,7 +6,7 @@ use std::path::{Path, PathBuf};
 /// allow bypassing the real filesystem during testing, but
 /// implementations that do not call through to the real filesystem
 /// are supported in production.
-pub trait Filesystem {
+pub trait Filesystem: Debug {
     /// Ensure a directory exists, recursively creating missing components
     fn ensure_dir(&self, path: &Path) -> std::io::Result<()>;
     /// List all paths in a directory
@@ -16,6 +17,7 @@ pub trait Filesystem {
     fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>>;
 }
 
+#[derive(Debug)]
 pub struct OsFilesystem {}
 
 impl Filesystem for OsFilesystem {

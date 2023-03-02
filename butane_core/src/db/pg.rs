@@ -18,7 +18,7 @@ use std::fmt::Write;
 pub const BACKEND_NAME: &str = "pg";
 
 /// Pg [Backend][crate::db::Backend] implementation.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct PgBackend {}
 impl PgBackend {
     pub fn new() -> PgBackend {
@@ -53,11 +53,15 @@ impl Backend for PgBackend {
 
 /// Pg database connection.
 pub struct PgConnection {
+    #[cfg(feature = "debug")]
+    params: Box<str>,
     conn: RefCell<postgres::Client>,
 }
 impl PgConnection {
     fn open(params: &str) -> Result<Self> {
         Ok(PgConnection {
+            #[cfg(feature = "debug")]
+            params: params.into(),
             conn: RefCell::new(Self::connect(params)?),
         })
     }
@@ -93,6 +97,16 @@ impl BackendConnection for PgConnection {
     }
     fn is_closed(&self) -> bool {
         self.conn.borrow().is_closed()
+    }
+}
+impl Debug for PgConnection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("PgConnection");
+        #[cfg(feature = "debug")]
+        d.field("params", &self.params);
+        // postgres::Client doesnt expose any internal state
+        d.field("conn", &!self.is_closed());
+        d.finish()
     }
 }
 
@@ -316,6 +330,15 @@ impl<'c> PgTransaction<'c> {
         Error::Internal("transaction has already been consumed".to_string())
     }
 }
+impl<'c> Debug for PgTransaction<'c> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PgTransaction")
+            // postgres::Transaction doesnt expose any internal state
+            .field("trans", &self.trans.is_some())
+            .finish()
+    }
+}
+
 impl<'c> PgConnectionLike for PgTransaction<'c> {
     type Client = postgres::Transaction<'c>;
     fn cell(&self) -> Result<&RefCell<Self::Client>> {
@@ -706,6 +729,7 @@ fn pgtype_for_val(val: &SqlVal) -> postgres::types::Type {
     }
 }
 
+#[derive(Debug)]
 struct PgPlaceholderSource {
     n: i8,
 }

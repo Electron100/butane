@@ -115,7 +115,7 @@ fn main() {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 struct CliState {
     embedded: bool,
 }

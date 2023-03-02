@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 /// [SqlType](crate::SqlType) and identifiers known only by name. The
 /// latter is used for custom types. `SqlType::Custom` cannot easily be used
 /// directly at compile time when the proc macro serializing type information runs.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum TypeIdentifier {
     Ty(SqlType),
     Name(String),
@@ -23,7 +23,7 @@ impl From<SqlType> for TypeIdentifier {
 }
 
 /// Key used to help resolve `DeferredSqlType`
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TypeKey {
     /// Represents a type which is the primary key for a table with the given name
     PK(String),
@@ -60,6 +60,8 @@ impl<'de> Deserialize<'de> for TypeKey {
         deserializer.deserialize_string(TypeKeyVisitor)
     }
 }
+
+#[derive(Debug)]
 struct TypeKeyVisitor;
 impl<'de> Visitor<'de> for TypeKeyVisitor {
     type Value = TypeKey;
@@ -138,7 +140,7 @@ impl TypeResolver {
 }
 
 /// Abstract representation of a database schema.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ADB {
     tables: HashMap<String, ATable>,
     extra_types: HashMap<TypeKey, DeferredSqlType>,
@@ -246,7 +248,7 @@ impl ADB {
 }
 
 /// Abstract representation of a database table schema.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ATable {
     pub name: String,
     pub columns: Vec<AColumn>,
@@ -280,7 +282,7 @@ impl ATable {
 }
 
 /// SqlType which may not yet be known.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum DeferredSqlType {
     Known(SqlType), // Kept for backwards deserialization compat, supplanted by KnownId
     KnownId(TypeIdentifier),
@@ -311,7 +313,7 @@ impl From<TypeIdentifier> for DeferredSqlType {
 }
 
 /// Abstract representation of a database column schema.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct AColumn {
     name: String,
     sqltype: DeferredSqlType,
@@ -386,7 +388,7 @@ impl AColumn {
 }
 
 /// Individual operation use to apply a migration.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Operation {
     //future improvement: support column renames
     AddTable(ATable),

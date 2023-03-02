@@ -62,7 +62,7 @@ impl SqlValRef<'_> {
 ///
 /// [`FromSql`]: crate::FromSql
 /// [`ToSql`]: crate::ToSql
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum SqlVal {
     Null,
     Bool(bool),

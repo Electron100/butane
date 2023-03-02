@@ -20,7 +20,6 @@ use std::fmt::{Debug, Formatter};
 ///   blog: ForeignKey<Blog>,
 ///   ...
 /// }
-///
 pub struct ForeignKey<T>
 where
     T: DataObject,

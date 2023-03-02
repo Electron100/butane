@@ -15,7 +15,7 @@ pub use fieldexpr::{DataOrd, FieldExpr, ManyFieldExpr};
 type TblName = Cow<'static, str>;
 
 /// Abstract representation of a database expression.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Expr {
     /// A column, referenced by name.
     Column(&'static str),
@@ -28,7 +28,7 @@ pub enum Expr {
 }
 
 /// Abstract representation of a boolean expression.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum BoolExpr {
     True,
     Eq(&'static str, Expr),
@@ -65,20 +65,20 @@ pub enum BoolExpr {
 }
 
 /// Represents the direction of a sort.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum OrderDirection {
     Ascending,
     Descending,
 }
 
 /// Represents a sorting term (ORDER BY in SQL).
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Order {
     pub direction: OrderDirection,
     pub column: &'static str,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Join {
     /// Inner join `join_table` where `col1` is equal to
     /// `col2`
@@ -89,7 +89,7 @@ pub enum Join {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Column {
     table: Option<TblName>,
     name: &'static str,
@@ -113,7 +113,7 @@ impl Column {
 }
 
 /// Representation of a database query.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Query<T: DataResult> {
     table: TblName,
     filter: Option<BoolExpr>,

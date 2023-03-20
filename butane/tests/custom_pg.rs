@@ -1,13 +1,11 @@
-mod common;
-
 // We wrap everything in an inner module just so it's easier to have the feature gate in one place
 #[cfg(feature = "pg")]
 mod custom_pg {
-    use crate::{maketest, maketest_pg};
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
     use butane::prelude::*;
     use butane::{butane_type, db::Connection, model, ObjectState};
     use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
+    use butane_test_helper::{maketest, maketest_pg};
 
     use std::result::Result;
 
@@ -73,7 +71,7 @@ mod custom_pg {
         let trip2 = Trip::get(&conn, trip.id).unwrap();
         assert_eq!(trip, trip2);
     }
-    maketest_pg!(roundtrip_custom);
+    maketest_pg!(roundtrip_custom, true);
 
     /*
         TODO point in postgres doesn't support normal equality, so need

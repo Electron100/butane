@@ -2,7 +2,7 @@ use butane::db::Connection;
 use butane::prelude::*;
 use butane::{model, query};
 
-mod common;
+use butane_test_helper::*;
 
 #[model]
 #[derive(PartialEq, Eq, Debug)]

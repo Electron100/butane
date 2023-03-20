@@ -4,6 +4,8 @@ use butane::query::BoolExpr;
 use butane::{colname, filter, find, query, Many};
 use chrono::{TimeZone, Utc};
 
+use butane_test_helper::*;
+
 mod common;
 use common::blog;
 use common::blog::{Blog, Post, PostMetadata, Tag};

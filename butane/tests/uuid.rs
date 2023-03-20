@@ -3,7 +3,7 @@ use butane::prelude::*;
 use butane::{db::Connection, ObjectState};
 use uuid_for_test::Uuid;
 
-mod common;
+use butane_test_helper::*;
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]

@@ -5,6 +5,7 @@ members = [
         "butane_codegen",
         "butane_core",
         "butane_cli",
+        "butane_test_helper",
         "example",
         "examples/getting_started",
         ]

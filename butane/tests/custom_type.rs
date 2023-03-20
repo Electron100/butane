@@ -3,7 +3,7 @@ use butane::prelude::*;
 use butane::{butane_type, model, query};
 use butane::{FieldType, FromSql, ObjectState, SqlType, SqlVal, SqlValRef, ToSql};
 
-mod common;
+use butane_test_helper::*;
 
 #[butane_type(Text)]
 #[derive(PartialEq, Eq, Debug, Clone)]

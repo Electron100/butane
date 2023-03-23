@@ -5,7 +5,7 @@ use butane::prelude::*;
 use butane::{db::Connection, ObjectState};
 use serde_json::Value;
 
-mod common;
+use butane_test_helper::*;
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]

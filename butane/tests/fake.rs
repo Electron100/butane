@@ -1,5 +1,9 @@
+#![allow(unused_imports)]
+
 use butane::db::Connection;
 use butane::{find, DataObject, ForeignKey};
+
+use butane_test_helper::*;
 
 mod common;
 #[allow(dead_code)]

@@ -89,7 +89,7 @@ impl BackendConnection for SQLiteConnection {
         Box::new(SQLiteBackend {})
     }
     fn backend_name(&self) -> &'static str {
-        "sqlite"
+        BACKEND_NAME
     }
     fn is_closed(&self) -> bool {
         false

@@ -4,15 +4,16 @@ use butane::{colname, prelude::*};
 use butane::{ForeignKey, ObjectState};
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 
-mod common;
+use butane_test_helper::*;
 
 #[butane_type]
 pub type Whatsit = String;
 
 #[model]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 struct Foo {
     id: i64,
+    bam: f64,
     #[unique]
     bar: u32,
     baz: Whatsit,
@@ -22,6 +23,7 @@ impl Foo {
     fn new(id: i64) -> Self {
         Foo {
             id,
+            bam: 0.0,
             bar: 0,
             baz: String::new(),
             blobbity: Vec::new(),
@@ -104,6 +106,7 @@ struct TimeHolder {
 fn basic_crud(conn: Connection) {
     //create
     let mut foo = Foo::new(1);
+    foo.bam = 0.1;
     foo.bar = 42;
     foo.baz = "hello world".to_string();
     foo.blobbity = [1u8, 2u8, 3u8].to_vec();
@@ -115,6 +118,7 @@ fn basic_crud(conn: Connection) {
     assert_eq!(Some(foo), Foo::try_get(&conn, 1).unwrap());
 
     // update
+    foo2.bam = 0.2;
     foo2.bar = 43;
     foo2.save(&conn).unwrap();
     let foo3 = Foo::get(&conn, 1).unwrap();

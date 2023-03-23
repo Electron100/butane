@@ -1,14 +1,15 @@
-use butane::db::{Backend, Connection, ConnectionSpec};
+use butane_core::db::{connect, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec};
+use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::process::{ChildStderr, Command, Stdio};
 use std::sync::Mutex;
-use uuid_for_test::Uuid;
+use uuid::Uuid;
 
 pub fn pg_connection() -> (Connection, PgSetupData) {
-    let backend = butane::db::get_backend("pg").unwrap();
+    let backend = get_backend(pg::BACKEND_NAME).unwrap();
     let data = pg_setup();
     (backend.connect(&pg_connstr(&data)).unwrap(), data)
 }
@@ -16,12 +17,12 @@ pub fn pg_connection() -> (Connection, PgSetupData) {
 pub fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
     let data = pg_setup();
     (
-        ConnectionSpec::new(butane::db::pg::BACKEND_NAME, pg_connstr(&data)),
+        ConnectionSpec::new(pg::BACKEND_NAME, pg_connstr(&data)),
         data,
     )
 }
 
-struct PgServerState {
+pub struct PgServerState {
     pub dir: PathBuf,
     pub sockdir: PathBuf,
     pub proc: std::process::Child,
@@ -41,7 +42,7 @@ pub struct PgSetupData {
     pub connstr: String,
 }
 
-fn create_tmp_server() -> PgServerState {
+pub fn create_tmp_server() -> PgServerState {
     eprintln!("create tmp server");
     // create a temporary directory
     let dir = std::env::current_dir()
@@ -132,7 +133,7 @@ pub fn pg_setup() -> PgSetupData {
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     eprintln!("new db is `{}`", &new_dbname);
 
-    let mut conn = butane::db::connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
+    let mut conn = connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .unwrap();
 
@@ -145,4 +146,111 @@ pub fn pg_teardown(_data: PgSetupData) {
 
 pub fn pg_connstr(data: &PgSetupData) -> String {
     data.connstr.clone()
+}
+
+pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool) {
+    let mut root = std::env::current_dir().unwrap();
+    root.push(".butane/migrations");
+    let mut disk_migrations = migrations::from_root(&root);
+    let disk_current = disk_migrations.current();
+    eprintln!("{:?}", disk_current);
+    if !migrate {
+        return;
+    }
+    // Create an in-memory Migrations and write only to that. This
+    // allows concurrent tests to avoid stomping on each other and is
+    // also faster than real disk writes.
+    let mut mem_migrations = MemMigrations::new();
+    let mem_current = mem_migrations.current();
+
+    migrations::copy_migration(disk_current, mem_current).unwrap();
+
+    assert!(
+        mem_migrations
+            .create_migration(&backend, "init", None)
+            .expect("expected to create migration without error"),
+        "expected to create migration"
+    );
+    println!("created current migration");
+    let to_apply = mem_migrations.unapplied_migrations(conn).unwrap();
+    for m in to_apply {
+        println!("Applying migration {}", m.name());
+        m.apply(conn).unwrap();
+    }
+}
+
+pub fn sqlite_connection() -> Connection {
+    let backend = get_backend(sqlite::BACKEND_NAME).unwrap();
+    backend.connect(":memory:").unwrap()
+}
+
+pub fn sqlite_connspec() -> ConnectionSpec {
+    ConnectionSpec::new(sqlite::BACKEND_NAME, ":memory:")
+}
+
+pub fn sqlite_setup() {}
+pub fn sqlite_teardown(_: ()) {}
+
+#[macro_export]
+macro_rules! maketest {
+    ($fname:ident, $backend:expr, $connstr:expr, $dataname:ident, $migrate:expr) => {
+        paste::item! {
+            #[test]
+            pub fn [<$fname _ $backend>]() {
+                env_logger::try_init().ok();
+                let backend = butane_core::db::get_backend(&stringify!($backend)).expect("Could not find backend");
+                let $dataname = butane_test_helper::[<$backend _setup>]();
+                eprintln!("connecting to {}", &$connstr);
+                let mut conn = backend.connect(&$connstr).expect("Could not connect backend");
+                butane_test_helper::setup_db(backend, &mut conn, $migrate);
+                $fname(conn);
+                butane_test_helper::[<$backend _teardown>]($dataname);
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! maketest_pg {
+    ($fname:ident, $migrate:expr) => {
+        maketest!(
+            $fname,
+            pg,
+            &butane_test_helper::pg_connstr(&setup_data),
+            setup_data,
+            $migrate
+        );
+    };
+}
+
+#[macro_export]
+macro_rules! testall {
+    ($fname:ident) => {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "sqlite")] {
+                maketest!($fname, sqlite, &format!(":memory:"), setup_data, true);
+            }
+        }
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "pg")] {
+                maketest_pg!($fname, true);
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! testall_no_migrate {
+    ($fname:ident) => {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "sqlite")] {
+                maketest!($fname, sqlite, &format!(":memory:"), setup_data, false);
+            }
+        }
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "pg")] {
+                maketest_pg!($fname, false);
+            }
+        }
+    };
 }

@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
 
 #[cfg(feature = "fake")]
-use fake::{Dummy, Faker};
+use fake::{Dummy, Faker, Fake};
 
 /// Used to implement a relationship between models.
 ///
@@ -206,9 +206,14 @@ where
 }
 
 #[cfg(feature = "fake")]
-/// Fake data support is currently limited to empty ForeignKey relationships.
-impl<T: DataObject> Dummy<Faker> for ForeignKey<T> {
-    fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
-        Self::new_raw()
+/// A dummy value for T will be created, however it also has to have the Clone
+/// trait in order for the mutable value to be obtained so that it can be saved.
+impl<T: DataObject + Dummy<Faker>> Dummy<Faker> for ForeignKey<T> {
+    fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self
+    {
+        let obj = Faker.fake::<T>();
+        let ret = Self::new_raw();
+        ret.val.set(Box::new(obj)).ok();
+        ret
     }
 }

@@ -9,6 +9,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Electron100/butane"
 documentation = "https://docs.rs/butane/"
 
+[lib]
+doc = false
+
 [[bin]]
 name = "butane"
 path = "src/main.rs"

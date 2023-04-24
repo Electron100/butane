@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use butane::model;
 use butane::prelude::*;
-use butane::{db::Connection, ObjectState};
+use butane::{butane_type, db::Connection, FieldType, ObjectState};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use butane_test_helper::*;
@@ -155,3 +156,50 @@ fn hashmap_with_object_values(conn: Connection) {
     assert_eq!(foo2, foo3);
 }
 testall!(hashmap_with_object_values);
+
+#[butane_type(Json)]
+#[derive(PartialEq, Eq, Debug, Clone, FieldType, Serialize, Deserialize)]
+struct InlineFoo {
+    foo: i64,
+    bar: u32,
+}
+impl InlineFoo {
+    fn new(foo: i64, bar: u32) -> Self {
+        InlineFoo { foo, bar }
+    }
+}
+
+#[model]
+#[derive(PartialEq, Eq, Debug, Clone)]
+struct OuterFoo {
+    #[pk]
+    id: i64,
+    bar: InlineFoo,
+}
+impl OuterFoo {
+    fn new(id: i64, bar: InlineFoo) -> Self {
+        OuterFoo {
+            id,
+            bar,
+            state: ObjectState::default(),
+        }
+    }
+}
+
+fn inline_json(conn: Connection) {
+    //create
+    let id = 4;
+    let mut foo = OuterFoo::new(id, InlineFoo::new(4, 8));
+    foo.save(&conn).unwrap();
+
+    // read
+    let mut foo2 = OuterFoo::get(&conn, id).unwrap();
+    assert_eq!(foo, foo2);
+
+    // update
+    foo2.bar = InlineFoo::new(5, 9);
+    foo2.save(&conn).unwrap();
+    let foo3 = OuterFoo::get(&conn, id).unwrap();
+    assert_eq!(foo2, foo3);
+}
+testall!(inline_json);

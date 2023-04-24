@@ -3,7 +3,12 @@
 
 extern crate proc_macro;
 
-use butane_core::*;
+use butane_core::SqlType;
+use butane_core::{
+    codegen, make_compile_error, migrations,
+    migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey},
+    migrations::{Migration, MigrationsMut},
+};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
@@ -26,7 +31,7 @@ mod filter;
 /// * `#[table = "NAME"]` used on the struct to specify the name of the table (defaults to struct name)
 /// * `#[pk]` on a field to specify that it is the primary key.
 /// * `#[auto]` on a field indicates that the field's value is
-///    initialized based on serial/autoincrement. Currently supported
+///    initialized based on serial/auto-increment. Currently supported
 ///    only on the primary key and only if the primary key is an integer
 ///    type
 /// * `#[unique]` on a field indicates that the field's value must be unique
@@ -168,38 +173,51 @@ fn migrations_dir() -> PathBuf {
     dir
 }
 
-#[proc_macro_derive(ButaneJson)]
-pub fn derive_butane_json(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(FieldType)]
+pub fn derive_field_type(input: TokenStream) -> TokenStream {
     let ast = syn::parse_macro_input!(input as syn::DeriveInput);
     let struct_name = &ast.ident;
-    let s = format!(
-        "impl ToSql for {struct_name}
-{{
-    fn to_sql(&self) -> SqlVal {{
-        self.to_sql_ref().into()
-    }}
-    fn to_sql_ref(&self) -> SqlValRef<'_> {{
-        SqlValRef::Json(serde_json::to_value(self).unwrap())
-    }}
-}}
 
-impl FromSql for {struct_name}
-{{
-    fn from_sql_ref(val: SqlValRef) -> Result<Self, butane::Error> {{
-        if let SqlValRef::Json(v) = val {{
-            return Ok({struct_name}::deserialize(v).unwrap());
-        }}
-        Err(butane::Error::CannotConvertSqlVal(
-            SqlType::Json,
-            val.into(),
-        ))
-    }}
-}}
-impl FieldType for {struct_name}
-{{
-    type RefType = Self;
-    const SQLTYPE: SqlType = SqlType::Json;
-}}"
-    );
-    s.parse().unwrap()
+    let mut migrations = migrations_for_dir();
+    let current_migrations = migrations.current();
+    let db = current_migrations.db().unwrap();
+    let types = db.types();
+    let key = TypeKey::CustomType(struct_name.to_string());
+    let sqltype = match types.get(&key) {
+        Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(ty))) => ty,
+        _ => panic!("Only custom types are supported"),
+    };
+    if *sqltype != SqlType::Json {
+        panic!("Only custom type Json supported");
+    }
+    quote!(
+        impl butane_core::ToSql for #struct_name
+        {
+            fn to_sql(&self) -> butane_core::SqlVal {
+                self.to_sql_ref().into()
+            }
+            fn to_sql_ref(&self) -> butane_core::SqlValRef<'_> {
+                butane_core::SqlValRef::Json(serde_json::to_value(self).unwrap())
+            }
+        }
+
+        impl butane_core::FromSql for #struct_name
+        {
+            fn from_sql_ref(val: butane_core::SqlValRef) -> Result<Self, butane::Error> {
+                if let butane_core::SqlValRef::Json(v) = val {
+                    return Ok(#struct_name::deserialize(v).unwrap());
+                }
+                Err(butane::Error::CannotConvertSqlVal(
+                    butane_core::SqlType::Json,
+                    val.into(),
+                ))
+            }
+        }
+        impl butane_core::FieldType for #struct_name
+        {
+            type RefType = Self;
+            const SQLTYPE: butane_core::SqlType = butane_core::SqlType::Json;
+        }
+    )
+    .into()
 }

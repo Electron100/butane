@@ -6,8 +6,7 @@ extern crate proc_macro;
 use butane_core::SqlType;
 use butane_core::{
     codegen, make_compile_error, migrations,
-    migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey},
-    migrations::{Migration, MigrationsMut},
+    migrations::adb::{DeferredSqlType, TypeIdentifier},
 };
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
@@ -179,17 +178,13 @@ pub fn derive_field_type(input: TokenStream) -> TokenStream {
     let struct_name = &ast.ident;
 
     let mut migrations = migrations_for_dir();
-    let current_migrations = migrations.current();
-    let db = current_migrations.db().unwrap();
-    let types = db.types();
-    let key = TypeKey::CustomType(struct_name.to_string());
-    let sqltype = match types.get(&key) {
-        Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(ty))) => ty,
-        _ => panic!("Only custom types are supported"),
-    };
-    if *sqltype != SqlType::Json {
-        panic!("Only custom type Json supported");
-    }
+
+    codegen::add_custom_type(
+        &mut migrations,
+        struct_name.to_string(),
+        DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Json)),
+    )
+    .unwrap();
     quote!(
         impl butane_core::ToSql for #struct_name
         {

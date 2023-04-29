@@ -157,7 +157,6 @@ fn hashmap_with_object_values(conn: Connection) {
 }
 testall!(hashmap_with_object_values);
 
-#[butane_type(Json)]
 #[derive(PartialEq, Eq, Debug, Clone, FieldType, Serialize, Deserialize)]
 struct InlineFoo {
     foo: i64,

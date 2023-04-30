@@ -538,7 +538,8 @@ struct CustomTypeInfo {
     ty: DeferredSqlType,
 }
 
-fn add_custom_type<M>(
+/// Records the SqlType of a custom named type to the current migration.
+pub fn add_custom_type<M>(
     ms: &mut impl MigrationsMut<M = M>,
     name: String,
     ty: DeferredSqlType,

@@ -15,7 +15,7 @@ build = "build.rs"
 [features]
 default = ["datetime", "json", "uuid"]
 fake = ["butane_core/fake"]
-json = ["butane_core/json"]
+json = ["butane_core/json", "butane_codegen/json"]
 sqlite = ["butane_core/sqlite"]
 sqlite-bundled = ["butane_core/sqlite-bundled"]
 pg = ["butane_core/pg"]

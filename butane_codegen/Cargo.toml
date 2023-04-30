@@ -10,6 +10,7 @@ repository = "https://github.com/Electron100/butane"
 
 [features]
 datetime = []
+json = ["butane_core/json"]
 
 [dependencies]
 butane_core = { path = "../butane_core", version = "0.5" }

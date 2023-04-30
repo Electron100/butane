@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use butane::model;
 use butane::prelude::*;
-use butane::{butane_type, db::Connection, FieldType, ObjectState};
+use butane::{db::Connection, FieldType, ObjectState};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

@@ -3,11 +3,7 @@
 
 extern crate proc_macro;
 
-use butane_core::SqlType;
-use butane_core::{
-    codegen, make_compile_error, migrations,
-    migrations::adb::{DeferredSqlType, TypeIdentifier},
-};
+use butane_core::{codegen, make_compile_error, migrations};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
@@ -175,7 +171,13 @@ fn migrations_dir() -> PathBuf {
 #[proc_macro_derive(FieldType)]
 pub fn derive_field_type(input: TokenStream) -> TokenStream {
     let ast = syn::parse_macro_input!(input as syn::DeriveInput);
-    let struct_name = &ast.ident;
+    derive_field_type_with_json(&ast.ident)
+}
+
+#[cfg(feature = "json")]
+fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream {
+    use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
+    use butane_core::SqlType;
 
     let mut migrations = migrations_for_dir();
 
@@ -215,4 +217,9 @@ pub fn derive_field_type(input: TokenStream) -> TokenStream {
         }
     )
     .into()
+}
+
+#[cfg(not(feature = "json"))]
+fn derive_field_type_with_json(_struct_name: &Ident) -> TokenStream {
+    panic!("Feature 'json' is required to derive FieldType")
 }

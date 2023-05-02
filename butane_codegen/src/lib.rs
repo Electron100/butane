@@ -188,32 +188,32 @@ fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream {
     )
     .unwrap();
     quote!(
-        impl butane_core::ToSql for #struct_name
+        impl butane::ToSql for #struct_name
         {
-            fn to_sql(&self) -> butane_core::SqlVal {
+            fn to_sql(&self) -> butane::SqlVal {
                 self.to_sql_ref().into()
             }
-            fn to_sql_ref(&self) -> butane_core::SqlValRef<'_> {
-                butane_core::SqlValRef::Json(serde_json::to_value(self).unwrap())
+            fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                butane::SqlValRef::Json(serde_json::to_value(self).unwrap())
             }
         }
 
-        impl butane_core::FromSql for #struct_name
+        impl butane::FromSql for #struct_name
         {
-            fn from_sql_ref(val: butane_core::SqlValRef) -> Result<Self, butane::Error> {
-                if let butane_core::SqlValRef::Json(v) = val {
+            fn from_sql_ref(val: butane::SqlValRef) -> Result<Self, butane::Error> {
+                if let butane::SqlValRef::Json(v) = val {
                     return Ok(#struct_name::deserialize(v).unwrap());
                 }
                 Err(butane::Error::CannotConvertSqlVal(
-                    butane_core::SqlType::Json,
+                    butane::SqlType::Json,
                     val.into(),
                 ))
             }
         }
-        impl butane_core::FieldType for #struct_name
+        impl butane::FieldType for #struct_name
         {
             type RefType = Self;
-            const SQLTYPE: butane_core::SqlType = butane_core::SqlType::Json;
+            const SQLTYPE: butane::SqlType = butane::SqlType::Json;
         }
     )
     .into()

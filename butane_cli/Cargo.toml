@@ -21,13 +21,9 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
 anyhow = "1.0"
-butane = { path = "../butane", version = "0.5", features = [
-  "default",
-  "pg",
-  "sqlite",
-] }
-chrono = { version = "0.4", default-features = false }
+butane = { features = ["default", "pg", "sqlite"], workspace = true }
+chrono = { workspace = true }
 clap = { version = "4.1" }
-quote = { version = "1.0", default-features = false }
-serde = { version = "1.0", default-features = false }
-serde_json = "1.0"
+quote = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

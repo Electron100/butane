@@ -175,16 +175,20 @@ pub fn derive_field_type(input: TokenStream) -> TokenStream {
     match derive_input.data {
         syn::Data::Struct(_) => derive_field_type_with_json(ident),
         syn::Data::Enum(data_enum) => derive_field_type_for_enum(ident, data_enum),
-        syn::Data::Union(_) => panic!("Cannot derive FieldType for a union"),
+        syn::Data::Union(_) => derive_field_type_with_json(ident),
     }
 }
 
 fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenStream {
-    data_enum.variants.iter().for_each(|variant| {
-        if variant.fields != syn::Fields::Unit {
-            panic!("Only simple enums are supported when deriving FieldType")
-        }
-    });
+    if data_enum
+        .variants
+        .iter()
+        .any(|variant| variant.fields != syn::Fields::Unit)
+    {
+        // Non-simple enum, fall back to json derive
+        return derive_field_type_with_json(ident);
+    }
+
     let match_arms_to_string: Vec<TokenStream2> = data_enum
         .variants
         .iter()

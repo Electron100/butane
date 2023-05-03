@@ -163,6 +163,8 @@ pub enum Error {
     InvalidAuto(String),
     #[error("No implicit default available for custom sql types.")]
     NoCustomDefault,
+    #[error("No enum variant named '{0}'")]
+    UnknownEnumVariant(String),
     #[error("Backend {1} is not compatible with custom SqlVal {0:?}")]
     IncompatibleCustom(custom::SqlValCustom, &'static str),
     #[error("Backend {1} is not compatible with custom SqlType {0:?}")]

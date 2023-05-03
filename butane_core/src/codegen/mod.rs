@@ -199,7 +199,7 @@ where
 
 fn make_ident_literal_str(ident: &Ident) -> LitStr {
     let as_str = format!("{ident}");
-    LitStr::new(&as_str, Span::call_site())
+    make_lit(&as_str)
 }
 
 pub fn make_lit(s: &str) -> LitStr {

@@ -4,7 +4,7 @@ use butane::{db::Connection, ForeignKey, Many, ObjectState};
 use chrono::{naive::NaiveDateTime, offset::Utc};
 
 #[cfg(feature = "fake")]
-use fake::{Dummy, Fake};
+use fake::{Dummy};
 
 #[model]
 #[derive(Debug, Eq, PartialEq)]

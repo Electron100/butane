@@ -67,7 +67,7 @@ fn debug_connection(conn: Connection) {
     if backend_name == "pg" {
         assert!(format!("{:?}", conn).contains("conn: true"));
     } else {
-        assert!(format!("{:?}", conn).contains("path: Some(\":memory:\")"));
+        assert!(format!("{:?}", conn).contains("path: Some(\"\")"));
     }
 }
 testall_no_migrate!(debug_connection);

@@ -30,7 +30,7 @@ fn debug_transaction_before_consuming(mut conn: Connection) {
     if backend_name == "pg" {
         assert!(format!("{:?}", tr).contains("{ trans: true }"));
     } else {
-        assert!(format!("{:?}", tr).contains("path: Some(\":memory:\")"));
+        assert!(format!("{:?}", tr).contains("path: Some(\"\")"));
     }
 
     assert!(tr.commit().is_ok());

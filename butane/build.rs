@@ -12,5 +12,5 @@ fn main() {
     }
     // Re-create the directory. Only tests populate it and if it is left non-existent
     // Cargo will detect it as changed and a no-op build will not in fact no-op
-    std::fs::create_dir(&dir).unwrap();
+    std::fs::create_dir(dir).unwrap();
 }

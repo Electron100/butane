@@ -169,7 +169,7 @@ dependencies = [
  "butane_core",
  "proc-macro2 1.0.56",
  "quote 1.0.26",
- "syn 1.0.107",
+ "syn 2.0.15",
  "uuid",
 ]
 
@@ -202,7 +202,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
- "syn 1.0.107",
+ "syn 2.0.15",
  "tempdir",
  "thiserror",
  "uuid",

@@ -45,11 +45,11 @@ pub trait ConnectionMethods: Sync {
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<()>;
-    async fn update(
+    async fn update<'a>(
         &self,
         table: &str,
         pkcol: Column,
-        pk: SqlValRef,
+        pk: SqlValRef<'a>,
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()>;

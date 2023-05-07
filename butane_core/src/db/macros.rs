@@ -51,11 +51,11 @@ macro_rules! connection_method_wrapper {
                     .insert_or_replace(table, columns, pkcol, values)
                     .await
             }
-            async fn update(
+            async fn update<'a>(
                 &self,
                 table: &str,
                 pkcol: Column,
-                pk: SqlValRef,
+                pk: SqlValRef<'a>,
                 columns: &[Column],
                 values: &[SqlValRef<'_>],
             ) -> Result<()> {
@@ -69,7 +69,7 @@ macro_rules! connection_method_wrapper {
                     .await
             }
             async fn has_table(&self, table: &str) -> Result<bool> {
-                self.wrapped_connection_methods()?.has_table(table)
+                self.wrapped_connection_methods()?.has_table(table).await
             }
         }
     };

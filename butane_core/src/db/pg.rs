@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
-use futures_util::StreamExt;
+use futures_util::stream::StreamExt;
 use std::fmt::Write;
 use tokio;
 use tokio_postgres as postgres;
@@ -54,6 +54,8 @@ impl Backend for PgBackend {
         })
     }
 }
+
+// type PgConnHandle<TlsT> = tokio::task::JoinHandle<postgres::Connection<postgres::Socket, TlsT>>;
 
 /// Pg database connection.
 pub struct PgConnection {
@@ -187,16 +189,18 @@ where
             .client()?
             .prepare_typed(&sqlquery, types.as_ref())
             .await?;
-        // todo avoid intermediate vec?
-        let rowvec = self
+        let mut rowvec = Vec::<postgres::Row>::new();
+        let rowstream = self
             .client()?
             .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))
             .await
-            .map_err(Error::Postgres)
-            .map(|r| {
-                check_columns(&r, columns)?;
-                Ok(r)
-            })??;
+            .map_err(Error::Postgres)?;
+        let mut rowstream = Box::pin(rowstream);
+        while let Some(r) = rowstream.next().await {
+            let r = r?;
+            check_columns(&r, columns)?;
+            rowvec.push(r);
+        }
         Ok(Box::new(VecRows::new(rowvec)))
     }
     async fn insert_returning_pk(
@@ -219,14 +223,16 @@ where
         }
 
         // use query instead of execute so we can get our result back
-        let pk: Option<SqlVal> = self
+        let pk_stream = self
             .client()?
             .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query))
             .await
-            .map_err(Error::Postgres)
-            .map(|r| sql_val_from_postgres(&r, 0, pkcol))??
-            .nth(0)?;
-        pk.ok_or_else(|| Error::Internal("could not get pk".to_string()))
+            .map_err(Error::Postgres)?
+            .map(|r| r.map(|x| sql_val_from_postgres(&x, 0, pkcol)));
+        Box::pin(pk_stream)
+            .next()
+            .await
+            .ok_or(Error::Internal(("could not get pk").to_string()))??
     }
     async fn insert_only(
         &self,
@@ -262,11 +268,11 @@ where
             .await?;
         Ok(())
     }
-    async fn update(
+    async fn update<'a>(
         &self,
         table: &str,
         pkcol: Column,
-        pk: SqlValRef,
+        pk: SqlValRef<'a>,
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()> {
@@ -327,8 +333,8 @@ impl<'c> PgTransaction<'c> {
         PgTransaction { trans: Some(trans) }
     }
     fn get(&self) -> Result<&postgres::Transaction<'c>> {
-        match self.trans {
-            Some(x) => Ok(&x),
+        match &self.trans {
+            Some(x) => Ok(x),
             None => Err(Self::already_consumed()),
         }
     }

@@ -81,7 +81,7 @@ pub trait Migrations {
         &self,
         conn: &impl ConnectionMethods,
     ) -> Result<Option<Self::M>> {
-        if !conn.has_table(ButaneMigration::TABLE)? {
+        if !conn.has_table(ButaneMigration::TABLE).await? {
             return Ok(None);
         }
         let migrations: Vec<ButaneMigration> = conn

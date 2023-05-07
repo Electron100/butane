@@ -8,7 +8,7 @@ use regex::Regex;
 use syn::parse_quote;
 use syn::{
     punctuated::Punctuated, Attribute, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta,
-    MetaNameValue, NestedMeta,
+    MetaNameValue,
 };
 
 #[macro_export]
@@ -211,18 +211,21 @@ fn filter_helper_attributes(ast_struct: &ItemStruct) -> Vec<Attribute> {
         .attrs
         .clone()
         .into_iter()
-        .filter(|a| !a.path.is_ident("table"))
+        .filter(|a| !a.path().is_ident("table"))
         .collect()
 }
 
 fn config_from_attributes(ast_struct: &ItemStruct) -> dbobj::Config {
     let mut config = dbobj::Config::default();
     for attr in &ast_struct.attrs {
-        if let Ok(Meta::NameValue(MetaNameValue {
+        // #[table = "name"]
+        if let Meta::NameValue(MetaNameValue {
             path,
-            lit: Lit::Str(s),
+            value: syn::Expr::Lit(syn::ExprLit {
+                lit: Lit::Str(s), ..
+            }),
             ..
-        })) = attr.parse_meta()
+        }) = &attr.meta
         {
             if path.is_ident("table") {
                 config.table_name = Some(s.value())
@@ -239,11 +242,11 @@ fn remove_helper_field_attributes(
         syn::Fields::Named(fields) => {
             for field in &mut fields.named {
                 field.attrs.retain(|a| {
-                    !a.path.is_ident("pk")
-                        && !a.path.is_ident("auto")
-                        && !a.path.is_ident("sqltype")
-                        && !a.path.is_ident("default")
-                        && !a.path.is_ident("unique")
+                    !a.path().is_ident("pk")
+                        && !a.path().is_ident("auto")
+                        && !a.path().is_ident("sqltype")
+                        && !a.path().is_ident("default")
+                        && !a.path().is_ident("unique")
                 });
             }
             Ok(fields)
@@ -276,7 +279,7 @@ fn remove_existing_state_field(
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
     let pk_by_attribute =
-        fields(ast_struct).find(|f| f.attrs.iter().any(|attr| attr.path.is_ident("pk")));
+        fields(ast_struct).find(|f| f.attrs.iter().any(|attr| attr.path().is_ident("pk")));
     if let Some(id_field) = pk_by_attribute {
         return Some(id_field.clone());
     }
@@ -288,11 +291,14 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
 }
 
 fn is_auto(field: &Field) -> bool {
-    field.attrs.iter().any(|attr| attr.path.is_ident("auto"))
+    field.attrs.iter().any(|attr| attr.path().is_ident("auto"))
 }
 
 fn is_unique(field: &Field) -> bool {
-    field.attrs.iter().any(|attr| attr.path.is_ident("unique"))
+    field
+        .attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("unique"))
 }
 
 fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
@@ -390,11 +396,14 @@ fn get_default(field: &Field) -> std::result::Result<Option<SqlVal>, CompilerErr
     let attr: Option<&Attribute> = field
         .attrs
         .iter()
-        .find(|attr| attr.path.is_ident("default"));
+        .find(|attr| attr.path().is_ident("default"));
     let lit: Lit = match attr {
         None => return Ok(None),
-        Some(attr) => match attr.parse_meta() {
-            Ok(Meta::NameValue(meta)) => meta.lit,
+        Some(attr) => match &attr.meta {
+            Meta::NameValue(MetaNameValue {
+                value: syn::Expr::Lit(expr_lit),
+                ..
+            }) => expr_lit.lit.clone(),
             _ => return Err(make_compile_error!("malformed default value").into()),
         },
     };
@@ -503,15 +512,18 @@ fn template_type(arguments: &syn::PathArguments) -> Option<&Ident> {
 
 fn has_derive_serialize(attrs: &[Attribute]) -> bool {
     for attr in attrs {
-        if let Ok(Meta::List(ml)) = attr.parse_meta() {
-            if ml.path.is_ident("derive")
-                && ml.nested.iter().any(|nm| match nm {
-                    NestedMeta::Meta(Meta::Path(path)) => path.is_ident("Serialize"),
-                    _ => false,
-                })
-            {
-                return true;
-            }
+        if attr.path().is_ident("derive") {
+            let mut result = false;
+            attr.parse_nested_meta(|meta| {
+                result |= meta
+                    .path
+                    .segments
+                    .iter()
+                    .any(|segment| segment.ident == "Serialize");
+                Ok(())
+            })
+            .unwrap();
+            return result;
         }
     }
     false
@@ -529,6 +541,7 @@ fn sqlval_from_lit(lit: Lit) -> std::result::Result<SqlVal, CompilerErrorMsg> {
         Lit::Verbatim(_) => {
             Err(make_compile_error!("raw verbatim literals are not supported").into())
         }
+        _ => Err(make_compile_error!("unsupported literal").into()),
     }
 }
 

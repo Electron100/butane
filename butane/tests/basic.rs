@@ -3,14 +3,16 @@ use butane::{butane_type, find, model, query};
 use butane::{colname, prelude::*};
 use butane::{ForeignKey, ObjectState};
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
+use serde::Serialize;
 
 use butane_test_helper::*;
 
 #[butane_type]
 pub type Whatsit = String;
 
+// Note, Serialize derive exists solely to exercise the logic in butane_core::codegen::has_derive_serialize
 #[model]
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Serialize)]
 struct Foo {
     id: i64,
     bam: f64,

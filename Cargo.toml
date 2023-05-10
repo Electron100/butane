@@ -14,7 +14,7 @@ members = [
 edition = "2021"
 
 [workspace.dependencies]
-butane = { path = "butane" }
+butane = { version = "0.6", path = "butane" }
 butane_core = { version = "0.6", path = "butane_core" }
 butane_codegen = { version = "0.6", path = "butane_codegen" }
 butane_test_helper = { version = "0.6", path = "butane_test_helper" }

@@ -5,6 +5,11 @@ authors = ["James Oakley <james@electronstudio.org>"]
 edition.workspace = true
 description = "A test helper for butane"
 publish = false
+keywords = ["database", "pg", "test"]
+categories = ["database"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Electron100/butane"
+documentation = "https://docs.rs/butane/"
 
 [dependencies]
 butane_core = { features = ["pg", "sqlite"], workspace = true }

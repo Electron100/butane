@@ -85,12 +85,15 @@ pub trait DataObject: DataResult<DBO = Self> + Sync {
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
     /// Find this object in the database based on primary key.
-    async fn get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType> + Send + Sync) -> Result<Self>
+    async fn get(
+        conn: &impl ConnectionMethods,
+        id: impl Borrow<Self::PKType> + Send + Sync,
+    ) -> Result<Self>
     where
         Self: Sized,
         Self::PKType: Sync,
     {
-        let query = <Self as DataResult>::query().await;
+        let query = <Self as DataResult>::query();
         query
             .filter(query::BoolExpr::Eq(
                 Self::PKCOL,
@@ -102,7 +105,6 @@ pub trait DataObject: DataResult<DBO = Self> + Sync {
             .into_iter()
             .nth(0)
             .ok_or(Error::NoSuchObject)
-            .await
     }
 
     /// Save the object to the database.

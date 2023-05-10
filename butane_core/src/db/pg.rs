@@ -141,7 +141,9 @@ where
         if cfg!(feature = "log") {
             debug!("execute sql {}", sql);
         }
-        self.client()?.batch_execute(sql.as_ref()).await?;
+        // Note, let binding exists only so that the self.client() reference is not held across the await
+        let future = self.client()?.batch_execute(sql.as_ref());
+        future.await?;
         Ok(())
     }
 
@@ -185,16 +187,13 @@ where
         eprintln!("query sql {}", sqlquery);
 
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
-        let stmt = self
-            .client()?
-            .prepare_typed(&sqlquery, types.as_ref())
-            .await?;
+        let future = self.client()?.prepare_typed(&sqlquery, types.as_ref());
+        let stmt = future.await?;
         let mut rowvec = Vec::<postgres::Row>::new();
-        let rowstream = self
+        let future = self
             .client()?
-            .query_raw(&stmt, values.iter().map(sqlval_for_pg_query))
-            .await
-            .map_err(Error::Postgres)?;
+            .query_raw(&stmt, values.iter().map(sqlval_for_pg_query));
+        let rowstream = future.await.map_err(Error::Postgres)?;
         let mut rowstream = Box::pin(rowstream);
         while let Some(r) = rowstream.next().await {
             let r = r?;
@@ -223,9 +222,10 @@ where
         }
 
         // use query instead of execute so we can get our result back
-        let pk_stream = self
+        let future = self
             .client()?
-            .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query))
+            .query_raw(sql.as_str(), values.iter().map(sqlvalref_for_pg_query));
+        let pk_stream = future
             .await
             .map_err(Error::Postgres)?
             .map(|r| r.map(|x| sql_val_from_postgres(&x, 0, pkcol)));
@@ -248,9 +248,8 @@ where
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.client()?
-            .execute(sql.as_str(), params.as_slice())
-            .await?;
+        let future = self.client()?.execute(sql.as_str(), params.as_slice());
+        future.await?;
         Ok(())
     }
     async fn insert_or_replace(
@@ -263,9 +262,8 @@ where
         let mut sql = String::new();
         sql_insert_or_replace_with_placeholders(table, columns, pkcol, &mut sql);
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        self.client()?
-            .execute(sql.as_str(), params.as_slice())
-            .await?;
+        let future = self.client()?.execute(sql.as_str(), params.as_slice());
+        future.await?;
         Ok(())
     }
     async fn update<'a>(
@@ -292,9 +290,8 @@ where
         if cfg!(feature = "log") {
             debug!("update sql {}", sql);
         }
-        self.client()?
-            .execute(sql.as_str(), params.as_slice())
-            .await?;
+        let future = self.client()?.execute(sql.as_str(), params.as_slice());
+        future.await?;
         Ok(())
     }
     async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
@@ -308,19 +305,19 @@ where
             &mut sql,
         );
         let params: Vec<&DynToSqlPg> = values.iter().map(|v| v as &DynToSqlPg).collect();
-        let cnt = self
-            .client()?
-            .execute(sql.as_str(), params.as_slice())
-            .await?;
+        let future = self.client()?.execute(sql.as_str(), params.as_slice());
+        let cnt = future.await?;
         Ok(cnt as usize)
     }
     async fn has_table(&self, table: &str) -> Result<bool> {
         // future improvement, should be schema-aware
-        let stmt = self
+        let future = self
             .client()?
-            .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;")
-            .await?;
-        let rows = self.client()?.query(&stmt, &[&table]).await?;
+            .prepare("SELECT table_name FROM information_schema.tables WHERE table_name=$1;");
+        let stmt = future.await?;
+        let tableref: &[&(dyn postgres::types::ToSql + Sync)] = &[&table];
+        let future = self.client()?.query(&stmt, tableref);
+        let rows = future.await?;
         Ok(!rows.is_empty())
     }
 }
@@ -486,7 +483,7 @@ impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
     }
 }
 
-fn check_columns(row: &postgres::RowStream, cols: &[Column]) -> Result<()> {
+fn check_columns(row: &postgres::Row, cols: &[Column]) -> Result<()> {
     if cols.len() != row.len() {
         Err(Error::Internal(format!(
             "postgres returns columns {} doesn't match requested columns {}",
@@ -518,7 +515,7 @@ fn sql_for_expr<W>(
     helper::sql_for_expr(expr, sql_for_expr, values, pls, w)
 }
 
-fn sql_val_from_postgres<I>(row: &postgres::RowStream, idx: I, col: &Column) -> Result<SqlVal>
+fn sql_val_from_postgres<I>(row: &postgres::Row, idx: I, col: &Column) -> Result<SqlVal>
 where
     I: postgres::row::RowIndex + std::fmt::Display,
 {

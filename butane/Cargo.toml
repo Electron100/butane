@@ -27,7 +27,7 @@ tls = ["butane_core/tls"]
 uuid = ["butane_codegen/uuid", "butane_core/uuid"]
 
 [dependencies]
-butane_codegen = { path = "../butane_codegen" }
+butane_codegen = { workspace = true }
 butane_core = { workspace = true }
 
 [dev-dependencies]

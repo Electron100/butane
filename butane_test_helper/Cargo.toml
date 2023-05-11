@@ -17,3 +17,6 @@ libc = "0.2"
 once_cell = { workspace = true }
 postgres = { features = ["with-geo-types-0_7"], workspace = true }
 uuid = { features = ["v4"], workspace = true }
+
+[package.metadata.release]
+release = false

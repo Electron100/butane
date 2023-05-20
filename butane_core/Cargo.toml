@@ -10,10 +10,10 @@ repository = "https://github.com/Electron100/butane"
 
 
 [features]
-datetime = ["chrono", "postgres?/with-chrono-0_4"]
+datetime = ["chrono", "tokio-postgres?/with-chrono-0_4"]
 debug = ["log"]
 fake = ["dep:fake", "rand"]
-json = ["postgres?/with-serde_json-1", "rusqlite?/serde_json"]
+json = ["tokio-postgres?/with-serde_json-1", "rusqlite?/serde_json"]
 sqlite = ["rusqlite"]
 sqlite-bundled = ["rusqlite/bundled"]
 tls = ["native-tls", "postgres-native-tls"]
@@ -35,7 +35,8 @@ log = { optional = true, workspace = true }
 native-tls = { version = "0.2", optional = true }
 once_cell = { workspace = true }
 pin-project = "1"
-postgres = { optional = true, workspace = true }
+tokio = {workspace = true, features = ["rt", "sync"]}
+tokio-postgres = { optional = true, workspace = true }
 postgres-native-tls = { version = "0.5", optional = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }

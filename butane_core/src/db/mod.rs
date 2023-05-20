@@ -17,6 +17,7 @@ use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::fmt::Debug;
 use std::fs;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
@@ -29,7 +30,7 @@ mod macros;
 pub mod pg;
 
 #[cfg(feature = "r2d2")]
-mod r2;
+pub mod r2;
 #[cfg(feature = "r2d2")]
 pub use r2::ConnectionManager;
 
@@ -37,12 +38,12 @@ pub use r2::ConnectionManager;
 use crate::connection_method_wrapper;
 
 pub use connmethods::{
-    BackendRow, BackendRows, Column, ConnectionMethods, QueryResult, RawQueryResult,
+    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
 };
 
 /// Database connection.
 #[async_trait]
-pub trait BackendConnection: ConnectionMethods + Send + 'static {
+pub trait BackendConnection: ConnectionMethods + Debug + Send + 'static {
     /// Begin a database transaction. The transaction object must be
     /// used in place of this connection until it is committed and aborted.
     async fn transaction(&mut self) -> Result<Transaction>;
@@ -56,6 +57,7 @@ pub trait BackendConnection: ConnectionMethods + Send + 'static {
 
 /// Database connection. May be a connection to any type of database
 /// as it is a boxed abstraction over a specific connection.
+#[derive(Debug)]
 pub struct Connection {
     conn: Box<dyn BackendConnection>,
 }
@@ -89,7 +91,7 @@ connection_method_wrapper!(Connection);
 /// Connection specification. Contains the name of a database backend
 /// and the backend-specific connection string. See [connect][crate::db::connect]
 /// to make a [Connection][crate::db::Connection] from a `ConnectionSpec`.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConnectionSpec {
     pub backend_name: String,
     pub conn_str: String,
@@ -169,7 +171,7 @@ pub async fn connect(spec: &ConnectionSpec) -> Result<Connection> {
 }
 
 #[async_trait]
-trait BackendTransaction<'c>: ConnectionMethods + Send {
+trait BackendTransaction<'c>: ConnectionMethods + Debug + Send {
     /// Commit the transaction Unfortunately because we use this as a
     /// trait object, we can't consume self. It should be understood
     /// that no methods should be called after commit. This trait is
@@ -187,6 +189,7 @@ trait BackendTransaction<'c>: ConnectionMethods + Send {
 ///
 /// Begin a transaction using the `BackendConnection`
 /// [`transaction`][crate::db::BackendConnection::transaction] method.
+#[derive(Debug)]
 pub struct Transaction<'c> {
     trans: Box<dyn BackendTransaction<'c> + 'c>,
 }

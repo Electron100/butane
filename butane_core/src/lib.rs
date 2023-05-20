@@ -19,6 +19,9 @@ pub mod sqlval;
 #[cfg(feature = "uuid")]
 pub mod uuid;
 
+#[cfg(feature = "fake")]
+use fake::{Dummy, Faker};
+
 use db::{BackendRow, Column, ConnectionMethods};
 
 use custom::SqlTypeCustom;
@@ -33,7 +36,7 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 /// in the database yet. Butane automatically creates the field
 /// `state: ObjectState` on `#[model]` structs. When initializing the
 /// state field, use `ObjectState::default()`.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ObjectState {
     pub saved: bool,
 }
@@ -46,6 +49,14 @@ impl PartialEq<ObjectState> for ObjectState {
     }
 }
 impl Eq for ObjectState {}
+
+#[cfg(feature = "fake")]
+/// Fake data should always have `saved` set to `false`.
+impl Dummy<Faker> for ObjectState {
+    fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
+        Self::default()
+    }
+}
 
 /// A type which may be the result of a database query.
 ///
@@ -93,8 +104,15 @@ pub trait DataObject: DataResult<DBO = Self> + Sync {
         Self: Sized,
         Self::PKType: Sync,
     {
-        let query = <Self as DataResult>::query();
-        query
+        Self::try_get(conn, id)?.ok_or(Error::NoSuchObject)
+    }
+    /// Find this object in the database based on primary key.
+    /// Returns `None` if the primary key does not exist.
+    async fn try_get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType> + Send + Sync) -> Result<Option<Self>>
+    where
+        Self: Sized,
+    {
+        Ok(<Self as DataResult>::query()
             .filter(query::BoolExpr::Eq(
                 Self::PKCOL,
                 query::Expr::Val(id.borrow().to_sql()),
@@ -103,8 +121,7 @@ pub trait DataObject: DataResult<DBO = Self> + Sync {
             .load(conn)
             .await?
             .into_iter()
-            .nth(0)
-            .ok_or(Error::NoSuchObject)
+            .nth(0))
     }
 
     /// Save the object to the database.
@@ -154,6 +171,8 @@ pub enum Error {
     InvalidAuto(String),
     #[error("No implicit default available for custom sql types.")]
     NoCustomDefault,
+    #[error("No enum variant named '{0}'")]
+    UnknownEnumVariant(String),
     #[error("Backend {1} is not compatible with custom SqlVal {0:?}")]
     IncompatibleCustom(custom::SqlValCustom, &'static str),
     #[error("Backend {1} is not compatible with custom SqlType {0:?}")]
@@ -204,7 +223,7 @@ impl From<rusqlite::types::FromSqlError> for Error {
 /// Enumeration of the types a database value may take.
 ///
 /// See also [`SqlVal`][crate::SqlVal].
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlType {
     Bool,
     /// 4 bytes
@@ -217,6 +236,8 @@ pub enum SqlType {
     #[cfg(feature = "datetime")]
     Timestamp,
     Blob,
+    #[cfg(feature = "json")]
+    Json,
     Custom(SqlTypeCustom),
 }
 impl std::fmt::Display for SqlType {
@@ -231,6 +252,8 @@ impl std::fmt::Display for SqlType {
             #[cfg(feature = "datetime")]
             Timestamp => "timestamp",
             Blob => "blob",
+            #[cfg(feature = "json")]
+            Json => "json",
             Custom(_) => "custom",
         }
         .fmt(f)

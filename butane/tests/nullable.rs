@@ -3,7 +3,7 @@ use butane::prelude::*;
 use butane::{model, query};
 use paste;
 
-mod common;
+use butane_test_helper::*;
 
 #[model]
 #[derive(PartialEq, Eq, Debug)]

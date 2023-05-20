@@ -3,8 +3,12 @@ use butane::{dataresult, model};
 use butane::{db::Connection, ForeignKey, Many, ObjectState};
 use chrono::{naive::NaiveDateTime, offset::Utc};
 
+#[cfg(feature = "fake")]
+use fake::{Dummy};
+
 #[model]
 #[derive(Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "fake", derive(Dummy))]
 pub struct Blog {
     pub id: i64,
     pub name: String,
@@ -21,6 +25,7 @@ impl Blog {
 
 #[model]
 #[derive(Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "fake", derive(Dummy))]
 pub struct Post {
     pub id: i64,
     pub title: String,
@@ -56,6 +61,7 @@ pub struct PostMetadata {
 
 #[model]
 #[derive(Debug)]
+#[cfg_attr(feature = "fake", derive(Dummy))]
 #[table = "tags"]
 pub struct Tag {
     #[pk]

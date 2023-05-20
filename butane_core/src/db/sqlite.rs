@@ -23,7 +23,7 @@ const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 pub const BACKEND_NAME: &str = "sqlite";
 
 /// SQLite [Backend][crate::db::Backend] implementation.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct SQLiteBackend {}
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
@@ -61,6 +61,7 @@ impl Backend for SQLiteBackend {
 }
 
 /// SQLite database connection.
+#[derive(Debug)]
 pub struct SQLiteConnection {
     conn: Mutex<rusqlite::Connection>,
 }
@@ -91,7 +92,7 @@ impl BackendConnection for SQLiteConnection {
         Box::new(SQLiteBackend {})
     }
     fn backend_name(&self) -> &'static str {
-        "sqlite"
+        BACKEND_NAME
     }
     fn is_closed(&self) -> bool {
         false
@@ -245,14 +246,14 @@ fn rs_conn_update(
 fn rs_conn_delete_where(conn: &rusqlite::Connection, table: &str, expr: BoolExpr) -> Result<usize> {
     let mut sql = String::new();
     let mut values: Vec<SqlVal> = Vec::new();
-    write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
+    write!(&mut sql, "DELETE FROM {table} WHERE ").unwrap();
     sql_for_expr(
         query::Expr::Condition(Box::new(expr)),
         &mut values,
         &mut SQLitePlaceholderSource::new(),
         &mut sql,
     );
-    let cnt = conn.execute(&sql, rusqlite::params_from_iter(values))?;
+    let cnt = self.execute(&sql, rusqlite::params_from_iter(values))?;
     Ok(cnt)
 }
 fn rs_conn_has_table(conn: &rusqlite::Connection, table: &str) -> Result<bool> {
@@ -325,6 +326,7 @@ impl Connectionmethods for Mutex<rusqlite::Connection> {
     }
 }
 
+#[derive(Debug)]
 struct SqliteTransaction<'c> {
     trans: Option<Mutex<rusqlite::Transaction<'c>>>,
 }
@@ -454,7 +456,7 @@ impl<'a> rusqlite::ToSql for SqlValRef<'a> {
     }
 }
 
-fn sqlvalref_to_sqlite<'a, 'b>(valref: &'b SqlValRef<'a>) -> rusqlite::types::ToSqlOutput<'a> {
+fn sqlvalref_to_sqlite<'a>(valref: &SqlValRef<'a>) -> rusqlite::types::ToSqlOutput<'a> {
     use rusqlite::types::{ToSqlOutput::Borrowed, ToSqlOutput::Owned, Value, ValueRef};
     use SqlValRef::*;
     match valref {
@@ -464,6 +466,10 @@ fn sqlvalref_to_sqlite<'a, 'b>(valref: &'b SqlValRef<'a>) -> rusqlite::types::To
         Real(r) => Owned(Value::Real(*r)),
         Text(t) => Borrowed(ValueRef::Text(t.as_bytes())),
         Blob(b) => Borrowed(ValueRef::Blob(b)),
+        #[cfg(feature = "json")]
+        Json(v) => serde_json::to_string(v)
+            .map(rusqlite::types::ToSqlOutput::from)
+            .unwrap(),
         #[cfg(feature = "datetime")]
         Timestamp(dt) => {
             let f = dt.format(SQLITE_DT_FORMAT);
@@ -475,6 +481,7 @@ fn sqlvalref_to_sqlite<'a, 'b>(valref: &'b SqlValRef<'a>) -> rusqlite::types::To
 }
 
 #[pin_project]
+// Debug can not be derived because rusqlite::Rows doesn't implement it.
 struct QueryAdapterInner<'a> {
     stmt: rusqlite::Statement<'a>,
     // will always be Some when the constructor has finished. We use an option only to get the
@@ -509,6 +516,7 @@ impl<'a> QueryAdapterInner<'a> {
     }
 }
 
+// Debug can not be derived because QueryAdapterInner above doesn't implement it.
 struct QueryAdapter<'a> {
     inner: Pin<Box<QueryAdapterInner<'a>>>,
 }
@@ -573,6 +581,8 @@ fn sql_valref_from_rusqlite<'a>(
         SqlType::BigInt => SqlValRef::BigInt(val.as_i64()?),
         SqlType::Real => SqlValRef::Real(val.as_f64()?),
         SqlType::Text => SqlValRef::Text(val.as_str()?),
+        #[cfg(feature = "json")]
+        SqlType::Json => SqlValRef::Json(serde_json::from_str(val.as_str()?)?),
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => SqlValRef::Timestamp(NaiveDateTime::parse_from_str(
             val.as_str()?,
@@ -648,15 +658,17 @@ fn sqltype(ty: &SqlType) -> &'static str {
         SqlType::BigInt => "INTEGER",
         SqlType::Real => "REAL",
         SqlType::Text => "TEXT",
+        SqlType::Blob => "BLOB",
+        #[cfg(feature = "json")]
+        SqlType::Json => "TEXT",
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => "TEXT",
-        SqlType::Blob => "BLOB",
         SqlType::Custom(_) => panic!("Custom types not supported by sqlite backend"),
     }
 }
 
 fn drop_table(name: &str) -> String {
-    format!("DROP TABLE {};", name)
+    format!("DROP TABLE {name};")
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
@@ -701,7 +713,7 @@ fn copy_table(old: &ATable, new: &ATable) -> String {
 }
 
 fn tmp_table_name(name: &str) -> String {
-    format!("{}__butane_tmp", name)
+    format!("{name}__butane_tmp")
 }
 
 fn change_column(
@@ -740,16 +752,17 @@ fn change_column(
 
 pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write) {
     write!(w, "INSERT OR REPLACE ").unwrap();
-    write!(w, "INTO {} (", table).unwrap();
+    write!(w, "INTO {table} (").unwrap();
     helper::list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold("", |sep, _| {
-        write!(w, "{}?", sep).unwrap();
+        write!(w, "{sep}?").unwrap();
         ", "
     });
     write!(w, ")").unwrap();
 }
 
+#[derive(Debug)]
 struct SQLitePlaceholderSource {}
 impl SQLitePlaceholderSource {
     fn new() -> Self {

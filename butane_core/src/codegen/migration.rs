@@ -67,13 +67,13 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .clone()
         .expect("fields must be named")
         .to_string();
-    let mut table = ATable::new(format!("{}_{}_Many", main_table_name, field_name));
+    let mut table = ATable::new(format!("{main_table_name}_{field_name}_Many"));
     let col = AColumn::new_simple("owner", get_deferred_sql_type(&pk_field.ty));
     table.add_column(col);
     let col = AColumn::new_simple(
         "has",
         get_many_sql_type(many_field)
-            .unwrap_or_else(|| panic!("Mis-identified Many field {}", field_name)),
+            .unwrap_or_else(|| panic!("Mis-identified Many field {field_name}")),
     );
     table.add_column(col);
     table

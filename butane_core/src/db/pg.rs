@@ -20,7 +20,7 @@ use tokio_postgres::GenericClient;
 pub const BACKEND_NAME: &str = "pg";
 
 /// Pg [Backend][crate::db::Backend] implementation.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct PgBackend {}
 impl PgBackend {
     pub fn new() -> PgBackend {
@@ -59,6 +59,8 @@ impl Backend for PgBackend {
 
 /// Pg database connection.
 pub struct PgConnection {
+    #[cfg(feature = "debug")]
+    params: Box<str>,
     client: postgres::Client,
     // Save the handle to the task running the connection to keep it alive
     conn_handle: tokio::task::JoinHandle<()>,
@@ -68,6 +70,8 @@ impl PgConnection {
     async fn open(params: &str) -> Result<Self> {
         let (client, conn_handle) = Self::connect(params).await?;
         Ok(Self {
+            #[cfg(feature = "debug")]
+            params: params.into(),
             client,
             conn_handle,
         })
@@ -112,6 +116,26 @@ impl BackendConnection for PgConnection {
     }
     fn is_closed(&self) -> bool {
         self.client.is_closed()
+    }
+}
+impl Debug for PgConnection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("PgConnection");
+        #[cfg(feature = "debug")]
+        d.field("params", &self.params);
+        // postgres::Client doesnt expose any internal state
+        d.field("conn", &!self.is_closed());
+        d.finish()
+    }
+}
+impl Debug for PgConnection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("PgConnection");
+        #[cfg(feature = "debug")]
+        d.field("params", &self.params);
+        // postgres::Client doesnt expose any internal state
+        d.field("conn", &!self.is_closed());
+        d.finish()
     }
 }
 
@@ -184,7 +208,7 @@ where
         if cfg!(feature = "log") {
             debug!("query sql {}", sqlquery);
         }
-        eprintln!("query sql {}", sqlquery);
+        eprintln!("query sql {sqlquery}");
 
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
         let future = self.client()?.prepare_typed(&sqlquery, types.as_ref());
@@ -297,7 +321,7 @@ where
     async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
-        write!(&mut sql, "DELETE FROM {} WHERE ", table).unwrap();
+        write!(&mut sql, "DELETE FROM {table} WHERE ").unwrap();
         sql_for_expr(
             query::Expr::Condition(Box::new(expr)),
             &mut values,
@@ -339,6 +363,15 @@ impl<'c> PgTransaction<'c> {
         Error::Internal("transaction has already been consumed".to_string())
     }
 }
+impl<'c> Debug for PgTransaction<'c> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PgTransaction")
+            // postgres::Transaction doesnt expose any internal state
+            .field("trans", &self.trans.is_some())
+            .finish()
+    }
+}
+
 impl<'c> PgConnectionLike for PgTransaction<'c> {
     type Client = postgres::Transaction<'c>;
     fn client(&self) -> Result<&Self::Client> {
@@ -404,6 +437,8 @@ impl<'a> postgres::types::ToSql for SqlValRef<'a> {
             Real(r) => r.to_sql_checked(requested_ty, out),
             Text(t) => t.to_sql_checked(requested_ty, out),
             Blob(b) => b.to_sql_checked(requested_ty, out),
+            #[cfg(feature = "json")]
+            Json(v) => v.to_sql_checked(requested_ty, out),
             #[cfg(feature = "datetime")]
             Timestamp(dt) => dt.to_sql_checked(requested_ty, out),
             Null => Ok(postgres::types::IsNull::Yes),
@@ -435,8 +470,7 @@ fn check_type_match(
         Ok(())
     } else {
         Err(Box::new(crate::Error::Internal(format!(
-            "postgres type mismatch. Wanted {} but have {}",
-            ty1, ty2
+            "postgres type mismatch. Wanted {ty1} but have {ty2}"
         ))))
     }
 }
@@ -456,6 +490,10 @@ impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
                 ty, raw,
             )?)),
             Type::BYTEA => Ok(SqlValRef::Blob(postgres::types::FromSql::from_sql(
+                ty, raw,
+            )?)),
+            #[cfg(feature = "json")]
+            Type::JSONB => Ok(SqlValRef::Json(postgres::types::FromSql::from_sql(
                 ty, raw,
             )?)),
             #[cfg(feature = "datetime")]
@@ -599,6 +637,8 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
                     #[cfg(feature = "datetime")]
                     SqlType::Timestamp => Cow::Borrowed("TIMESTAMP"),
                     SqlType::Blob => Cow::Borrowed("BYTEA"),
+                    #[cfg(feature = "json")]
+                    SqlType::Json => Cow::Borrowed("JSONB"),
                     SqlType::Custom(c) => match c {
                         SqlTypeCustom::Pg(ref ty) => Cow::Owned(ty.name().to_string()),
                     },
@@ -609,7 +649,7 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
 }
 
 fn drop_table(name: &str) -> String {
-    format!("DROP TABLE {};", name)
+    format!("DROP TABLE {name};")
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
@@ -623,7 +663,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
 }
 
 fn remove_column(tbl_name: &str, name: &str) -> String {
-    format!("ALTER TABLE {} DROP COLUMN {};", tbl_name, name)
+    format!("ALTER TABLE {tbl_name} DROP COLUMN {name};")
 }
 
 fn copy_table(old: &ATable, new: &ATable) -> String {
@@ -640,7 +680,7 @@ fn copy_table(old: &ATable, new: &ATable) -> String {
 }
 
 fn tmp_table_name(name: &str) -> String {
-    format!("{}__butane_tmp", name)
+    format!("{name}__butane_tmp")
 }
 
 fn change_column(
@@ -684,12 +724,12 @@ pub fn sql_insert_or_replace_with_placeholders(
     w: &mut impl Write,
 ) {
     write!(w, "INSERT ").unwrap();
-    write!(w, "INTO {} (", table).unwrap();
+    write!(w, "INTO {table} (").unwrap();
     helper::list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold(1, |n, _| {
         let sep = if n == 1 { "" } else { ", " };
-        write!(w, "{}${}", sep, n).unwrap();
+        write!(w, "{sep}${n}").unwrap();
         n + 1
     });
     write!(w, ")").unwrap();
@@ -713,6 +753,8 @@ fn pgtype_for_val(val: &SqlVal) -> postgres::types::Type {
         Some(SqlType::Real) => postgres::types::Type::FLOAT8,
         Some(SqlType::Text) => postgres::types::Type::TEXT,
         Some(SqlType::Blob) => postgres::types::Type::BYTEA,
+        #[cfg(feature = "json")]
+        Some(SqlType::Json) => postgres::types::Type::JSON,
         #[cfg(feature = "datetime")]
         Some(SqlType::Timestamp) => postgres::types::Type::TIMESTAMP,
         Some(SqlType::Custom(inner)) => match inner {
@@ -722,6 +764,7 @@ fn pgtype_for_val(val: &SqlVal) -> postgres::types::Type {
     }
 }
 
+#[derive(Debug)]
 struct PgPlaceholderSource {
     n: i8,
 }

@@ -8,7 +8,7 @@ use regex::Regex;
 use syn::parse_quote;
 use syn::{
     punctuated::Punctuated, Attribute, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta,
-    MetaNameValue, NestedMeta,
+    MetaNameValue,
 };
 
 #[macro_export]
@@ -53,7 +53,7 @@ where
     migration::write_table_to_disk(ms, &ast_struct, &config).unwrap();
 
     let impltraits = dbobj::impl_dbobject(&ast_struct, &config);
-    let fieldexprs = dbobj::add_fieldexprs(&ast_struct);
+    let fieldexprs = dbobj::add_fieldexprs(&ast_struct, &config);
 
     let fields: Punctuated<Field, syn::token::Comma> =
         match remove_helper_field_attributes(&mut ast_struct.fields) {
@@ -82,6 +82,7 @@ pub fn dataresult(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     let dbo: Ident = syn::parse2(args)
         .expect("Model type must be specified as argument to dataresult attribute");
     let mut ast_struct: ItemStruct = syn::parse2(input).unwrap();
+    let config: dbobj::Config = config_from_attributes(&ast_struct);
 
     // Filter out our helper attributes
     let attrs: Vec<Attribute> = filter_helper_attributes(&ast_struct);
@@ -94,7 +95,7 @@ pub fn dataresult(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 
     let vis = &ast_struct.vis;
 
-    let impltraits = dbobj::impl_dataresult(&ast_struct, &dbo);
+    let impltraits = dbobj::impl_dataresult(&ast_struct, &dbo, &config);
 
     let fields = match remove_helper_field_attributes(&mut ast_struct.fields) {
         Ok(fields) => &fields.named,
@@ -126,7 +127,7 @@ fn parse_butane_type_args(args: TokenStream2) -> std::result::Result<TypeIdentif
         return Ok(match sqltype_from_name(&tyid) {
             Some(ty) => ty,
             None => {
-                eprintln!("No SqlType value named {}", tyid);
+                eprintln!("No SqlType value named {tyid}");
                 return Err(quote!(compile_error!("No SqlType value with the given name");));
             }
         });
@@ -186,7 +187,7 @@ where
         Some(tyinfo) => match add_custom_type(ms, tyinfo.name, tyinfo.ty) {
             Ok(()) => input,
             Err(e) => {
-                eprintln!("unable to save type {}", e);
+                eprintln!("unable to save type {e}");
                 quote!(compile_error!("unable to save type");)
             }
         },
@@ -197,8 +198,8 @@ where
 }
 
 fn make_ident_literal_str(ident: &Ident) -> LitStr {
-    let as_str = format!("{}", ident);
-    LitStr::new(&as_str, Span::call_site())
+    let as_str = format!("{ident}");
+    make_lit(&as_str)
 }
 
 pub fn make_lit(s: &str) -> LitStr {
@@ -210,18 +211,21 @@ fn filter_helper_attributes(ast_struct: &ItemStruct) -> Vec<Attribute> {
         .attrs
         .clone()
         .into_iter()
-        .filter(|a| !a.path.is_ident("table"))
+        .filter(|a| !a.path().is_ident("table"))
         .collect()
 }
 
 fn config_from_attributes(ast_struct: &ItemStruct) -> dbobj::Config {
     let mut config = dbobj::Config::default();
     for attr in &ast_struct.attrs {
-        if let Ok(Meta::NameValue(MetaNameValue {
+        // #[table = "name"]
+        if let Meta::NameValue(MetaNameValue {
             path,
-            lit: Lit::Str(s),
+            value: syn::Expr::Lit(syn::ExprLit {
+                lit: Lit::Str(s), ..
+            }),
             ..
-        })) = attr.parse_meta()
+        }) = &attr.meta
         {
             if path.is_ident("table") {
                 config.table_name = Some(s.value())
@@ -238,11 +242,11 @@ fn remove_helper_field_attributes(
         syn::Fields::Named(fields) => {
             for field in &mut fields.named {
                 field.attrs.retain(|a| {
-                    !a.path.is_ident("pk")
-                        && !a.path.is_ident("auto")
-                        && !a.path.is_ident("sqltype")
-                        && !a.path.is_ident("default")
-                        && !a.path.is_ident("unique")
+                    !a.path().is_ident("pk")
+                        && !a.path().is_ident("auto")
+                        && !a.path().is_ident("sqltype")
+                        && !a.path().is_ident("default")
+                        && !a.path().is_ident("unique")
                 });
             }
             Ok(fields)
@@ -275,7 +279,7 @@ fn remove_existing_state_field(
 
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
     let pk_by_attribute =
-        fields(ast_struct).find(|f| f.attrs.iter().any(|attr| attr.path.is_ident("pk")));
+        fields(ast_struct).find(|f| f.attrs.iter().any(|attr| attr.path().is_ident("pk")));
     if let Some(id_field) = pk_by_attribute {
         return Some(id_field.clone());
     }
@@ -287,11 +291,14 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
 }
 
 fn is_auto(field: &Field) -> bool {
-    field.attrs.iter().any(|attr| attr.path.is_ident("auto"))
+    field.attrs.iter().any(|attr| attr.path().is_ident("auto"))
 }
 
 fn is_unique(field: &Field) -> bool {
-    field.attrs.iter().any(|attr| attr.path.is_ident("unique"))
+    field
+        .attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("unique"))
 }
 
 fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
@@ -349,11 +356,11 @@ fn get_foreign_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Opt
         _ => return None,
     };
     if args.len() != 1 {
-        panic!("{} should have a single type argument", tyname)
+        panic!("{tyname} should have a single type argument")
     }
     match args.last().unwrap() {
         syn::GenericArgument::Type(syn::Type::Path(typath)) => Some(&typath.path),
-        _ => panic!("{} argument should be a type.", tyname),
+        _ => panic!("{tyname} argument should be a type."),
     }
 }
 
@@ -364,7 +371,7 @@ fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<Deferred
             typath
                 .segments
                 .last()
-                .unwrap_or_else(|| panic!("{} must have an argument", tyname))
+                .unwrap_or_else(|| panic!("{tyname} must have an argument"))
                 .ident
                 .to_string(),
         ))
@@ -389,11 +396,14 @@ fn get_default(field: &Field) -> std::result::Result<Option<SqlVal>, CompilerErr
     let attr: Option<&Attribute> = field
         .attrs
         .iter()
-        .find(|attr| attr.path.is_ident("default"));
+        .find(|attr| attr.path().is_ident("default"));
     let lit: Lit = match attr {
         None => return Ok(None),
-        Some(attr) => match attr.parse_meta() {
-            Ok(Meta::NameValue(meta)) => meta.lit,
+        Some(attr) => match &attr.meta {
+            Meta::NameValue(MetaNameValue {
+                value: syn::Expr::Lit(expr_lit),
+                ..
+            }) => expr_lit.lit.clone(),
             _ => return Err(make_compile_error!("malformed default value").into()),
         },
     };
@@ -432,10 +442,36 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         return some_known(SqlType::Blob);
     }
 
+    #[cfg(feature = "json")]
+    {
+        if *ty == parse_quote!(Value) || *ty == parse_quote!(serde::Json) {
+            return some_known(SqlType::Json);
+        }
+    }
+
     #[cfg(feature = "datetime")]
     {
-        if *ty == parse_quote!(NaiveDateTime) {
-            return some_known(SqlType::Timestamp);
+        // Note, the fact that we have to check specific paths because
+        // we don't really have type system information at this point
+        // is a strong argument for proc macros being the wrong time
+        // to run the full migration generation. We expect these types
+        // to come from chrono, but we don't really know for sure...
+        if let Some(syn::PathSegment { ident, arguments }) = last_path_segment(ty) {
+            match ident.to_string().as_str() {
+                "NaiveDateTime" => return some_known(SqlType::Timestamp),
+                "DateTime" => {
+                    // Only if the parameter is UTC, as we don't support attached
+                    // time zones
+                    if template_type(arguments)
+                        .map(|ident| ident.to_string())
+                        .unwrap_or(String::new())
+                        == "Utc"
+                    {
+                        return some_known(SqlType::Timestamp);
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
@@ -449,17 +485,45 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
     None
 }
 
+fn last_path_segment(ty: &syn::Type) -> Option<&syn::PathSegment> {
+    if let syn::Type::Path(syn::TypePath {
+        path: syn::Path { segments, .. },
+        ..
+    }) = ty
+    {
+        return segments.last();
+    }
+    None
+}
+
+fn template_type(arguments: &syn::PathArguments) -> Option<&Ident> {
+    if let syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+        args, ..
+    }) = arguments
+    {
+        if let Some(syn::GenericArgument::Type(template_ty)) = args.last() {
+            if let Some(syn::PathSegment { ident, .. }) = last_path_segment(template_ty) {
+                return Some(ident);
+            }
+        }
+    }
+    None
+}
+
 fn has_derive_serialize(attrs: &[Attribute]) -> bool {
     for attr in attrs {
-        if let Ok(Meta::List(ml)) = attr.parse_meta() {
-            if ml.path.is_ident("derive")
-                && ml.nested.iter().any(|nm| match nm {
-                    NestedMeta::Meta(Meta::Path(path)) => path.is_ident("Serialize"),
-                    _ => false,
-                })
-            {
-                return true;
-            }
+        if attr.path().is_ident("derive") {
+            let mut result = false;
+            attr.parse_nested_meta(|meta| {
+                result |= meta
+                    .path
+                    .segments
+                    .iter()
+                    .any(|segment| segment.ident == "Serialize");
+                Ok(())
+            })
+            .unwrap();
+            return result;
         }
     }
     false
@@ -477,15 +541,18 @@ fn sqlval_from_lit(lit: Lit) -> std::result::Result<SqlVal, CompilerErrorMsg> {
         Lit::Verbatim(_) => {
             Err(make_compile_error!("raw verbatim literals are not supported").into())
         }
+        _ => Err(make_compile_error!("unsupported literal").into()),
     }
 }
 
+#[derive(Debug)]
 struct CustomTypeInfo {
     name: String,
     ty: DeferredSqlType,
 }
 
-fn add_custom_type<M>(
+/// Records the SqlType of a custom named type to the current migration.
+pub fn add_custom_type<M>(
     ms: &mut impl MigrationsMut<M = M>,
     name: String,
     ty: DeferredSqlType,
@@ -506,9 +573,11 @@ fn sqltype_from_name(name: &Ident) -> Option<TypeIdentifier> {
         "BigInt" => return some_id(SqlType::BigInt),
         "Real" => return some_id(SqlType::Real),
         "Text" => return some_id(SqlType::Text),
+        "Blob" => return some_id(SqlType::Blob),
+        #[cfg(feature = "json")]
+        "Json" => return some_id(SqlType::Json),
         #[cfg(feature = "datetime")]
         "Timestamp" => return some_id(SqlType::Timestamp),
-        "Blob" => return some_id(SqlType::Blob),
         _ => (),
     }
     if let Some(custom_name) = Regex::new(r"^Custom\((.*)\)$").unwrap().captures(&name) {

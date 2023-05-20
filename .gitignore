@@ -5,3 +5,4 @@ expand.rs
 butanevsc.code-workspace
 butane.code_workspace.code-workspace
 .vscode/tasks.json
+db.sqlite

@@ -1,8 +1,8 @@
 [package]
 name = "butane_core"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["James Oakley <james@electronstudio.org>"]
-edition = "2018"
+edition.workspace = true
 description = "Internals for Butane. Do not use this crate directly -- use the butane crate."
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
@@ -10,40 +10,47 @@ repository = "https://github.com/Electron100/butane"
 
 
 [features]
-datetime = ["chrono"]
+datetime = ["chrono", "postgres?/with-chrono-0_4"]
 debug = ["log"]
+fake = ["dep:fake", "rand"]
+json = ["postgres?/with-serde_json-1", "rusqlite?/serde_json"]
 sqlite = ["rusqlite"]
 sqlite-bundled = ["rusqlite/bundled"]
-tls = ["postgres-native-tls", "native-tls"]
+tls = ["native-tls", "postgres-native-tls"]
 pg = ["tokio-postgres", "bytes"]
 
 
 [dependencies]
-async-trait = "0.1"
-bytes = { version="1.0", optional=true}
-cfg-if = "1.0"
+async-trait = { workspace = true}
+bytes = { version = "1.0", optional = true }
+cfg-if = { workspace = true }
+chrono = { optional = true, workspace = true }
+fake = { workspace = true, optional = true }
 fallible-iterator = "0.2"
 fallible-streaming-iterator = "0.1"
 fs2 = "0.4" # for file locks
 futures-util = "0.3"
 hex = "0.4"
-log = { version="0.4", optional=true }
-native-tls={ version = "0.2", optional = true }
-# Note, this is for the fix https://github.com/sfackler/rust-postgres/commit/e38e435665af8dbd55e7d803f019405653f99205
-# Once a new version beyond 0.7.7 is released, we should be able to go back to a regular dependency.
-tokio-postgres={ git = "https://github.com/sfackler/rust-postgres", features=["with-chrono-0_4"], optional = true}
-postgres-native-tls={ version = "0.5", optional = true }
-proc-macro2 = "1.0"
+log = { optional = true, workspace = true }
+native-tls = { version = "0.2", optional = true }
+once_cell = { workspace = true }
 pin-project = "1"
-quote = "1.0"
-regex = "1.5"
-r2d2 = {version="0.8", optional=true}
-rusqlite = {workspace=true, optional = true}
-serde = { version = "1.0", features=["derive"] }
-serde_json = "1.0"
-syn = { version = "1.0", features = ["full", "extra-traits"] }
+postgres = { optional = true, workspace = true }
+postgres-native-tls = { version = "0.5", optional = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+r2d2 = { optional = true, workspace = true }
+rand = { optional = true, workspace = true }
+regex = { version = "1.5", features = ["std"] }
+rusqlite = { workspace = true, optional = true }
+serde = { features = ["derive"], workspace = true }
+serde_json = { workspace = true }
+syn = { workspace = true }
 thiserror = "1.0"
-chrono = { version = "0.4", features=["serde"], optional = true }
-uuid = {workspace=true, optional=true}
-tokio = { version = "1.24", features=["rt", "sync"] }
+uuid = { workspace = true, optional = true }
 
+[dev-dependencies]
+butane_test_helper = { workspace = true }
+env_logger = { workspace = true }
+paste = { workspace = true }
+tempdir = "0.3"

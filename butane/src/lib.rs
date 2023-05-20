@@ -1,4 +1,4 @@
-pub use butane_codegen::{butane_type, dataresult, model};
+pub use butane_codegen::{butane_type, dataresult, model, FieldType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
 pub use butane_core::many::Many;
@@ -101,7 +101,7 @@ macro_rules! query {
     };
 }
 
-/// Typesafe way to refer to a column name. Use as
+/// Type-safe way to refer to a column name. Use as
 /// `colname!(MODEL_TYPE, FIELD_NAME)`. E.g. For a model type `Foo`
 /// with a field `bar`, `colname!(Foo, bar) would return `"bar"`, but
 /// `colname!(Foo, bat)` would be a compiler error (assuming `Foo`

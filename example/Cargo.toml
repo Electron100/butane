@@ -2,8 +2,15 @@
 name = "example"
 version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
-edition = "2018"
+edition.workspace = true
+publish = false
+build = "build.rs"
 
 [dependencies]
-failure = "0.1.5"
-butane = { path="../butane"}
+butane = { features = ["sqlite"], workspace = true }
+
+[dev-dependencies]
+assert_cmd = "2.0"
+
+[package.metadata.release]
+release = false

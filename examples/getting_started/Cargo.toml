@@ -2,7 +2,8 @@
 name = "getting_started"
 version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
-edition = "2018"
+edition.workspace = true
+publish = false
 
 [[bin]]
 name = "show_posts"
@@ -20,4 +21,8 @@ doc = false
 doc = false
 
 [dependencies]
-butane = { path = "../../butane", features=["default", "sqlite"] }
+butane = { features = ["default", "sqlite"], workspace = true }
+
+
+[package.metadata.release]
+release = false

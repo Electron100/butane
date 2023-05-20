@@ -12,14 +12,14 @@ use std::fmt;
 use tokio_postgres as postgres;
 
 /// For use with [SqlType::Custom](crate::SqlType)
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlTypeCustom {
     #[cfg(feature = "pg")]
     Pg(#[serde(with = "pgtypeser")] tokio_postgres::types::Type),
 }
 
 /// For use with [SqlVal::Custom](crate::SqlVal)
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlValCustom {
     #[cfg(feature = "pg")]
     Pg {
@@ -47,9 +47,7 @@ impl fmt::Display for SqlValCustom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             #[cfg(feature = "pg")]
-            SqlValCustom::Pg { ty, .. } => {
-                f.write_str(&format!("<custom PG value of type {}>", ty))
-            }
+            SqlValCustom::Pg { ty, .. } => f.write_str(&format!("<custom PG value of type {ty}>")),
             #[cfg(not(feature = "pg"))]
             _ => f.write_str("<unknown custom value>"),
         }
@@ -71,8 +69,7 @@ impl postgres::types::ToSql for SqlValCustom {
             SqlValCustom::Pg { ty, data } => {
                 if ty != wanted_ty {
                     return Err(Box::new(crate::Error::Internal(format!(
-                        "postgres type mismatch. Wanted {} but have {}",
-                        wanted_ty, ty
+                        "postgres type mismatch. Wanted {wanted_ty} but have {ty}"
                     ))));
                 }
                 out.put(data.as_ref())
@@ -158,7 +155,7 @@ mod pgtypeser {
     }
 
     //Serializable version of postgres::types::Type
-    #[derive(Serialize, Deserialize, Clone)]
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     struct SerializablePgType {
         name: String,
         oid: u32,
@@ -181,7 +178,7 @@ mod pgtypeser {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone)]
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     enum SerializablePgKind {
         Simple,
         Enum(Vec<String>),
@@ -224,7 +221,7 @@ mod pgtypeser {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone)]
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     struct SerializablePgField {
         name: String,
         ty: SerializablePgType,

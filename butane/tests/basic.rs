@@ -1,22 +1,25 @@
 use butane::db::Connection;
-use butane::prelude::*;
 use butane::{butane_type, find, model, query};
+use butane::{colname, prelude::*};
 use butane::{ForeignKey, ObjectState};
-use paste;
+use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
+use serde::Serialize;
 #[cfg(feature = "sqlite")]
 use rusqlite;
 #[cfg(feature = "pg")]
 use tokio_postgres as postgres;
 
-mod common;
+use butane_test_helper::*;
 
 #[butane_type]
 pub type Whatsit = String;
 
+// Note, Serialize derive exists solely to exercise the logic in butane_core::codegen::has_derive_serialize
 #[model]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Serialize)]
 struct Foo {
     id: i64,
+    bam: f64,
     #[unique]
     bar: u32,
     baz: Whatsit,
@@ -26,6 +29,7 @@ impl Foo {
     fn new(id: i64) -> Self {
         Foo {
             id,
+            bam: 0.0,
             bar: 0,
             baz: String::new(),
             blobbity: Vec::new(),
@@ -96,9 +100,19 @@ impl SelfReferential {
     }
 }
 
+#[model]
+#[derive(Debug, Default, PartialEq, Clone)]
+struct TimeHolder {
+    pub id: i32,
+    pub naive: NaiveDateTime,
+    pub utc: DateTime<Utc>,
+    pub utc2: chrono::DateTime<Utc>,
+}
+
 fn basic_crud(conn: Connection) {
     //create
     let mut foo = Foo::new(1);
+    foo.bam = 0.1;
     foo.bar = 42;
     foo.baz = "hello world".to_string();
     foo.blobbity = [1u8, 2u8, 3u8].to_vec();
@@ -107,8 +121,10 @@ fn basic_crud(conn: Connection) {
     // read
     let mut foo2 = Foo::get(&conn, 1).unwrap();
     assert_eq!(foo, foo2);
+    assert_eq!(Some(foo), Foo::try_get(&conn, 1).unwrap());
 
     // update
+    foo2.bam = 0.2;
     foo2.bar = 43;
     foo2.save(&conn).unwrap();
     let foo3 = Foo::get(&conn, 1).unwrap();
@@ -120,6 +136,7 @@ fn basic_crud(conn: Connection) {
     } else {
         panic!("Expected NoSuchObject");
     }
+    assert_eq!(None, Foo::try_get(&conn, 1).unwrap());
 }
 testall!(basic_crud);
 
@@ -262,7 +279,7 @@ fn basic_dropped_transaction(mut conn: Connection) {
     match Foo::get(&conn, 1) {
         Ok(_) => panic!("object should not exist"),
         Err(butane::Error::NoSuchObject) => (),
-        Err(e) => panic!("Unexpected error {}", e),
+        Err(e) => panic!("Unexpected error {e}"),
     }
 }
 testall!(basic_dropped_transaction);
@@ -280,7 +297,7 @@ fn basic_rollback_transaction(mut conn: Connection) {
     match Foo::get(&conn, 1) {
         Ok(_) => panic!("object should not exist"),
         Err(butane::Error::NoSuchObject) => (),
-        Err(e) => panic!("Unexpected error {}", e),
+        Err(e) => panic!("Unexpected error {e}"),
     }
 }
 testall!(basic_rollback_transaction);
@@ -323,3 +340,68 @@ fn fkey_same_type(conn: Connection) {
     assert!(inner.reference.is_none());
 }
 testall!(fkey_same_type);
+
+fn basic_time(conn: Connection) {
+    let now = Utc::now();
+    let mut time = TimeHolder {
+        id: 1,
+        naive: now.naive_utc(),
+        utc: now,
+        utc2: now,
+        state: ObjectState::default(),
+    };
+    time.save(&conn).unwrap();
+
+    let time2 = TimeHolder::get(&conn, 1).unwrap();
+    // Note, we don't just compare the objects directly because we
+    // lose some precision when we go to the database.
+    assert_eq!(time.naive.timestamp(), time2.naive.timestamp());
+}
+testall!(basic_time);
+
+fn basic_load_first(conn: Connection) {
+    //create
+    let mut foo1 = Foo::new(1);
+    foo1.bar = 42;
+    foo1.baz = "hello world".to_string();
+    foo1.save(&conn).unwrap();
+    let mut foo2 = Foo::new(2);
+    foo2.bar = 43;
+    foo2.baz = "hello world".to_string();
+    foo2.save(&conn).unwrap();
+
+    // query finds first
+    let found = query!(Foo, baz.like("hello%")).load_first(&conn).unwrap();
+
+    assert_eq!(found, Some(foo1));
+}
+testall!(basic_load_first);
+
+fn basic_load_first_ordered(conn: Connection) {
+    //create
+    let mut foo1 = Foo::new(1);
+    foo1.bar = 42;
+    foo1.baz = "hello world".to_string();
+    foo1.save(&conn).unwrap();
+    let mut foo2 = Foo::new(2);
+    foo2.bar = 43;
+    foo2.baz = "hello world".to_string();
+    foo2.save(&conn).unwrap();
+
+    // query finds first, ascending order
+    let found_asc = query!(Foo, baz.like("hello%"))
+        .order_asc(colname!(Foo, bar))
+        .load_first(&conn)
+        .unwrap();
+
+    assert_eq!(found_asc, Some(foo1));
+
+    // query finds first, descending order
+    let found_desc = query!(Foo, baz.like("hello%"))
+        .order_desc(colname!(Foo, bar))
+        .load_first(&conn)
+        .unwrap();
+
+    assert_eq!(found_desc, Some(foo2));
+}
+testall!(basic_load_first_ordered);

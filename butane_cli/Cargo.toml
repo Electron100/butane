@@ -1,13 +1,16 @@
 [package]
 name = "butane_cli"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["James Oakley <james@electronstudio.org>"]
-edition = "2018"
+edition.workspace = true
 description = "The CLI for the Butane ORM"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Electron100/butane"
 documentation = "https://docs.rs/butane/"
+
+[lib]
+doc = false
 
 [[bin]]
 name = "butane"
@@ -18,9 +21,9 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
 anyhow = "1.0"
-butane = { path="../butane", version="0.5", features=["default", "sqlite", "pg"] }
-chrono = "0.4"
-clap = "2.33"
-quote = "1.0"
-serde = "1.0"
-serde_json = "1.0"
+butane = { features = ["default", "pg", "sqlite"], workspace = true }
+chrono = { workspace = true }
+clap = { version = "4.1" }
+quote = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

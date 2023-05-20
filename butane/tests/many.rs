@@ -1,7 +1,8 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::{model, Many, ObjectState};
-use paste;
+
+use butane_test_helper::*;
 
 mod common;
 use common::blog::{create_tag, Blog, Post, Tag};
@@ -16,6 +17,25 @@ struct AutoPkWithMany {
 impl AutoPkWithMany {
     fn new() -> Self {
         AutoPkWithMany {
+            id: -1,
+            tags: Many::default(),
+            items: Many::default(),
+            state: ObjectState::default(),
+        }
+    }
+}
+
+#[model]
+#[table = "renamed_many_table"]
+struct RenamedAutoPkWithMany {
+    #[auto]
+    id: i64,
+    tags: Many<Tag>,
+    items: Many<AutoItem>,
+}
+impl RenamedAutoPkWithMany {
+    fn new() -> Self {
+        RenamedAutoPkWithMany {
             id: -1,
             tags: Many::default(),
             items: Many::default(),
@@ -114,3 +134,15 @@ fn cant_add_unsaved_to_many(_conn: Connection) {
         .expect_err("unexpectedly not error");
 }
 testall!(cant_add_unsaved_to_many);
+
+fn can_add_to_many_with_custom_table_name(conn: Connection) {
+    let mut obj = RenamedAutoPkWithMany::new();
+    obj.tags.add(&create_tag(&conn, "blue")).unwrap();
+    obj.tags.add(&create_tag(&conn, "red")).unwrap();
+    obj.save(&conn).unwrap();
+
+    let obj = RenamedAutoPkWithMany::get(&conn, obj.id).unwrap();
+    let tags = obj.tags.load(&conn).unwrap();
+    assert_eq!(tags.count(), 2);
+}
+testall!(can_add_to_many_with_custom_table_name);

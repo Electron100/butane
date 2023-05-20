@@ -2,13 +2,14 @@ use crate::custom::{SqlValCustom, SqlValRefCustom};
 use crate::{DataObject, Error::CannotConvertSqlVal, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt;
 
 #[cfg(feature = "pg")]
 use crate::custom::SqlTypeCustom;
 
 #[cfg(feature = "datetime")]
-use chrono::naive::NaiveDateTime;
+use chrono::{naive::NaiveDateTime, DateTime};
 
 #[derive(Clone, Debug)]
 pub enum SqlValRef<'a> {
@@ -19,6 +20,8 @@ pub enum SqlValRef<'a> {
     Real(f64),
     Text(&'a str),
     Blob(&'a [u8]),
+    #[cfg(feature = "json")]
+    Json(serde_json::Value),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime), // NaiveDateTime is Copy
     Custom(SqlValRefCustom<'a>),
@@ -36,6 +39,8 @@ impl SqlValRef<'_> {
             #[cfg(feature = "datetime")]
             SqlValRef::Timestamp(_) => Some(SqlType::Timestamp),
             SqlValRef::Blob(_) => Some(SqlType::Blob),
+            #[cfg(feature = "json")]
+            SqlValRef::Json(_) => Some(SqlType::Json),
             #[cfg(feature = "pg")]
             SqlValRef::Custom(c) => match c {
                 SqlValRefCustom::PgToSql { ty, .. } => {
@@ -57,7 +62,7 @@ impl SqlValRef<'_> {
 ///
 /// [`FromSql`]: crate::FromSql
 /// [`ToSql`]: crate::ToSql
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum SqlVal {
     Null,
     Bool(bool),
@@ -66,6 +71,8 @@ pub enum SqlVal {
     Real(f64),
     Text(String),
     Blob(Vec<u8>),
+    #[cfg(feature = "json")]
+    Json(serde_json::Value),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime),
     Custom(Box<SqlValCustom>),
@@ -151,6 +158,8 @@ impl SqlVal {
             #[cfg(feature = "datetime")]
             SqlVal::Timestamp(_) => Some(SqlType::Timestamp),
             SqlVal::Blob(_) => Some(SqlType::Blob),
+            #[cfg(feature = "json")]
+            SqlVal::Json(_) => Some(SqlType::Json),
             #[cfg(feature = "pg")]
             SqlVal::Custom(c) => match c.as_ref() {
                 SqlValCustom::Pg { ty, .. } => Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone()))),
@@ -171,6 +180,8 @@ impl fmt::Display for SqlVal {
             Real(val) => val.fmt(f),
             Text(val) => val.fmt(f),
             Blob(val) => f.write_str(&hex::encode(val)),
+            #[cfg(feature = "json")]
+            Json(val) => f.write_str(val.as_str().unwrap()),
             #[cfg(feature = "datetime")]
             Timestamp(val) => val.format("%+").fmt(f),
             Custom(val) => val.fmt(f),
@@ -225,9 +236,9 @@ pub trait FromSql {
 }
 
 impl From<SqlValRef<'_>> for SqlVal {
-    fn from(vref: SqlValRef) -> SqlVal {
+    fn from(valref: SqlValRef) -> SqlVal {
         use SqlValRef::*;
-        match vref {
+        match valref {
             Null => SqlVal::Null,
             Bool(v) => SqlVal::Bool(v),
             Int(v) => SqlVal::Int(v),
@@ -235,6 +246,8 @@ impl From<SqlValRef<'_>> for SqlVal {
             Real(v) => SqlVal::Real(v),
             Text(v) => SqlVal::Text(v.to_string()),
             Blob(v) => SqlVal::Blob(v.into()),
+            #[cfg(feature = "json")]
+            Json(v) => SqlVal::Json(v),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlVal::Timestamp(v),
             Custom(v) => SqlVal::Custom(Box::new(v.into())),
@@ -253,6 +266,8 @@ impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
             Real(v) => SqlValRef::Real(*v),
             Text(v) => SqlValRef::Text(v.as_ref()),
             Blob(v) => SqlValRef::Blob(v.as_ref()),
+            #[cfg(feature = "json")]
+            Json(v) => SqlValRef::Json(v.to_owned()),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlValRef::Timestamp(*v),
             Custom(v) => SqlValRef::Custom(v.as_valref()),
@@ -421,6 +436,80 @@ impl FieldType for Vec<u8> {
 }
 impl PrimaryKeyType for Vec<u8> {}
 
+#[cfg(feature = "json")]
+impl FromSql for serde_json::Value {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+        if let SqlValRef::Json(val) = valref {
+            Ok(val)
+        } else {
+            sql_conv_err!(valref, Json)
+        }
+    }
+    fn from_sql(val: SqlVal) -> Result<Self> {
+        if let SqlVal::Json(val) = val {
+            Ok(val)
+        } else {
+            sql_conv_err!(val, Json)
+        }
+    }
+}
+#[cfg(feature = "json")]
+impl ToSql for serde_json::Value {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Json(self.clone())
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Json(self.to_owned())
+    }
+    fn into_sql(self) -> SqlVal {
+        SqlVal::Json(self)
+    }
+}
+#[cfg(feature = "json")]
+impl FieldType for serde_json::Value {
+    const SQLTYPE: SqlType = SqlType::Json;
+    type RefType = Self;
+}
+#[cfg(feature = "json")]
+impl PrimaryKeyType for serde_json::Value {}
+
+#[cfg(feature = "json")]
+impl<T> ToSql for HashMap<String, T>
+where
+    T: Clone + PartialEq + Serialize,
+{
+    fn to_sql(&self) -> SqlVal {
+        self.to_sql_ref().into()
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Json(serde_json::to_value(self).unwrap())
+    }
+}
+
+#[cfg(feature = "json")]
+impl<T> FromSql for HashMap<String, T>
+where
+    T: Clone + PartialEq + for<'a> serde::Deserialize<'a>,
+{
+    fn from_sql_ref(val: SqlValRef) -> Result<Self> {
+        if let SqlValRef::Json(serde_json::Value::Object(m)) = val {
+            return Ok(m
+                .iter()
+                .map(|(k, v)| (k.to_owned(), T::deserialize(v).unwrap()))
+                .collect::<HashMap<String, T>>());
+        }
+        sql_conv_err!(val, Json)
+    }
+}
+#[cfg(feature = "json")]
+impl<T> FieldType for HashMap<String, T>
+where
+    T: Clone + PartialEq + for<'a> serde::Deserialize<'a> + serde::Serialize,
+{
+    type RefType = Self;
+    const SQLTYPE: SqlType = SqlType::Json;
+}
+
 #[cfg(feature = "datetime")]
 impl_basic_from_sql!(NaiveDateTime, Timestamp, Timestamp);
 #[cfg(feature = "datetime")]
@@ -442,6 +531,43 @@ impl FieldType for NaiveDateTime {
 }
 #[cfg(feature = "datetime")]
 impl PrimaryKeyType for NaiveDateTime {}
+
+#[cfg(feature = "datetime")]
+impl FromSql for DateTime<chrono::offset::Utc> {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+        use chrono::Utc;
+        Ok(DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_sql_ref(valref)?,
+            Utc,
+        ))
+    }
+    fn from_sql(val: SqlVal) -> Result<Self> {
+        use chrono::Utc;
+        Ok(DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_sql(val)?,
+            Utc,
+        ))
+    }
+}
+#[cfg(feature = "datetime")]
+impl ToSql for DateTime<chrono::offset::Utc> {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Timestamp(self.naive_utc())
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Timestamp(self.naive_utc())
+    }
+    fn into_sql(self) -> SqlVal {
+        SqlVal::Timestamp(self.naive_utc())
+    }
+}
+#[cfg(feature = "datetime")]
+impl FieldType for DateTime<chrono::offset::Utc> {
+    const SQLTYPE: SqlType = SqlType::Timestamp;
+    type RefType = str;
+}
+#[cfg(feature = "datetime")]
+impl PrimaryKeyType for DateTime<chrono::offset::Utc> {}
 
 impl ToSql for &str {
     fn to_sql(&self) -> SqlVal {

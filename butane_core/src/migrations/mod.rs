@@ -143,6 +143,9 @@ where
     /// - it will never be returned by `latest`, `migrations_since`, `all_migrations` or other similar methods.
     fn current(&mut self) -> &mut Self::M;
 
+    /// Clears the current state (as would be returned by the `current` method).
+    fn clear_current(&mut self) -> Result<()>;
+
     /// Create a migration `from` -> `current` named `name`. From may be None, in which
     /// case the migration is created from an empty database.
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
@@ -236,7 +239,7 @@ pub fn copy_migration(from: &impl Migration, to: &mut impl MigrationMut) -> Resu
     Ok(())
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 struct ButaneMigration {
     name: String,
 }

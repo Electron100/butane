@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// A migration stored in memory.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MemMigration {
     name: String,
     db: ADB,
@@ -91,7 +91,7 @@ impl MigrationMut for MemMigration {
 }
 
 /// A collection of migrations stored in memory.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct MemMigrations {
     migrations: HashMap<String, MemMigration>,
     current: MemMigration,
@@ -132,6 +132,11 @@ impl Migrations for MemMigrations {
 impl MigrationsMut for MemMigrations {
     fn current(&mut self) -> &mut Self::M {
         &mut self.current
+    }
+
+    fn clear_current(&mut self) -> Result<()> {
+        self.current = MemMigration::new("current".to_string());
+        Ok(())
     }
 
     fn new_migration(&self, name: &str) -> Self::M {

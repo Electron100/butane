@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 const TYPES_FILENAME: &str = "types.json";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct MigrationInfo {
     /// The migration this one is based on, or None if this is the
     /// first migration in the chain
@@ -30,7 +30,7 @@ impl MigrationInfo {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct MigrationsState {
     latest: Option<String>,
 }
@@ -41,6 +41,7 @@ impl MigrationsState {
 }
 
 /// A migration stored in the filesystem
+#[derive(Debug)]
 pub struct FsMigration {
     fs: std::sync::Arc<dyn Filesystem + Send + Sync>,
     root: PathBuf,
@@ -69,7 +70,7 @@ impl FsMigration {
     }
 
     fn write_sql(&self, name: &str, sql: &str) -> Result<()> {
-        self.write_contents(&format!("{}.sql", name), sql.as_bytes())
+        self.write_contents(&format!("{name}.sql"), sql.as_bytes())
     }
 
     fn read_sql(&self, backend: &str, direction: &str) -> Result<Option<String>> {
@@ -83,7 +84,7 @@ impl FsMigration {
     }
 
     fn sql_path(&self, backend: &str, direction: &str) -> PathBuf {
-        self.root.join(&format!("{}_{}.sql", backend, direction))
+        self.root.join(format!("{backend}_{direction}.sql"))
     }
 
     fn write_contents(&self, fname: &str, contents: &[u8]) -> Result<()> {
@@ -126,16 +127,16 @@ impl MigrationMut for FsMigration {
     }
 
     fn delete_table(&mut self, table: &str) -> Result<()> {
-        let fname = format!("{}.table", table);
+        let fname = format!("{table}.table");
         self.ensure_dir()?;
         let path = self.root.join(fname);
-        std::fs::remove_file(&path)?;
+        std::fs::remove_file(path)?;
         Ok(())
     }
 
     fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()> {
-        self.write_sql(&format!("{}_up", backend_name), up_sql)?;
-        self.write_sql(&format!("{}_down", backend_name), down_sql)?;
+        self.write_sql(&format!("{backend_name}_up"), up_sql)?;
+        self.write_sql(&format!("{backend_name}_down"), down_sql)?;
         let mut info = self.info()?;
         info.backends.push(backend_name.to_string());
         self.write_info(&info)?;
@@ -148,7 +149,7 @@ impl MigrationMut for FsMigration {
 
         let mut types: SqlTypeMap = match self.fs.read(&typefile) {
             Ok(reader) => serde_json::from_reader(reader).map_err(|e| {
-                eprintln!("failed to read types {:?}", typefile);
+                eprintln!("failed to read types {typefile:?}");
                 e
             })?,
             Err(_) => BTreeMap::new(),
@@ -234,6 +235,7 @@ impl PartialEq for FsMigration {
 impl Eq for FsMigration {}
 
 /// A collection of migrations stored in the filesystem.
+#[derive(Debug)]
 pub struct FsMigrations {
     fs: std::sync::Arc<dyn Filesystem + Send + Sync>,
     root: PathBuf,
@@ -301,6 +303,10 @@ impl MigrationsMut for FsMigrations {
     fn current(&mut self) -> &mut Self::M {
         &mut self.current
     }
+    fn clear_current(&mut self) -> Result<()> {
+        std::fs::remove_dir_all(&self.current.root)?;
+        Ok(())
+    }
     fn new_migration(&self, name: &str) -> Self::M {
         let mut dir = self.root.clone();
         dir.push(name);
@@ -337,6 +343,7 @@ impl MigrationsMut for FsMigrations {
     }
 }
 
+#[derive(Debug)]
 struct MigrationLock {
     file: File,
 }

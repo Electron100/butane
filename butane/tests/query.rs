@@ -3,8 +3,8 @@ use butane::prelude::*;
 use butane::query::BoolExpr;
 use butane::{colname, filter, find, query, Many};
 use chrono::{TimeZone, Utc};
-use paste;
-use serde_json;
+
+use butane_test_helper::*;
 
 mod common;
 use common::blog;
@@ -138,7 +138,7 @@ fn many_load(conn: Connection) {
     let post: Post = find!(Post, title == "The Tiger", &conn).unwrap();
     let tags = post.tags.load(&conn).unwrap();
     let mut tags: Vec<&Tag> = tags.collect();
-    tags.sort_by(|t1, t2| (*t1).tag.partial_cmp(&t2.tag).unwrap());
+    tags.sort_by(|t1, t2| t1.tag.partial_cmp(&t2.tag).unwrap());
     assert_eq!(tags[0].tag, "asia");
     assert_eq!(tags[1].tag, "danger");
 }
@@ -151,7 +151,7 @@ fn many_serialize(conn: Connection) {
     let tags: Many<Tag> = serde_json::from_str(&tags_json).unwrap();
     let tags = tags.load(&conn).unwrap();
     let mut tags: Vec<&Tag> = tags.collect();
-    tags.sort_by(|t1, t2| (*t1).tag.partial_cmp(&t2.tag).unwrap());
+    tags.sort_by(|t1, t2| t1.tag.partial_cmp(&t2.tag).unwrap());
     assert_eq!(tags[0].tag, "asia");
     assert_eq!(tags[1].tag, "danger");
 }
@@ -183,18 +183,33 @@ fn by_timestamp(conn: Connection) {
     blog::setup_blog(&conn);
     let mut post = find!(Post, title == "Sir Charles", &conn).unwrap();
     // Pretend this post was published in 1970
-    post.pub_time = Some(Utc.ymd(1970, 1, 1).and_hms(1, 1, 1).naive_utc());
+    post.pub_time = Some(
+        Utc.with_ymd_and_hms(1970, 1, 1, 1, 1, 1)
+            .single()
+            .unwrap()
+            .naive_utc(),
+    );
     post.save(&conn).unwrap();
     // And pretend another post was later in 1971
     let mut post = find!(Post, title == "The Tiger", &conn).unwrap();
-    post.pub_time = Some(Utc.ymd(1970, 5, 1).and_hms(1, 1, 1).naive_utc());
+    post.pub_time = Some(
+        Utc.with_ymd_and_hms(1970, 5, 1, 1, 1, 1)
+            .single()
+            .unwrap()
+            .naive_utc(),
+    );
     post.save(&conn).unwrap();
 
     // Now find all posts published before 1971. Assume we haven't gone
     // back in time to run these unit tests.
     let posts = query!(
         Post,
-        pub_time < { Utc.ymd(1972, 1, 1).and_hms(1, 1, 1).naive_utc() }
+        pub_time < {
+            Utc.with_ymd_and_hms(1972, 1, 1, 1, 1, 1)
+                .single()
+                .unwrap()
+                .naive_utc()
+        }
     )
     .order_desc(colname!(Post, pub_time))
     .load(&conn)

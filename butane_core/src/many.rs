@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use tokio::sync::OnceCell;
 
+#[cfg(feature = "fake")]
+use fake::{Dummy, Faker};
+
 fn default_oc<T>() -> OnceCell<Vec<T>> {
     // Same as impl Default for once_cell::unsync::OnceCell
     OnceCell::new()
@@ -14,10 +17,10 @@ fn default_oc<T>() -> OnceCell<Vec<T>> {
 ///
 /// Creates a new table with columns "owner" and "has" If type T has a
 /// many-to-many relationship with U, owner type is T::PKType, has is
-/// U::PKType. Table name is T_ManyToMany_foo where foo is the name of
+/// U::PKType. Table name is T_foo_Many where foo is the name of
 /// the Many field
 //
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Many<T>
 where
     T: DataObject,
@@ -161,6 +164,7 @@ where
             .await;
         vals.map(|v| v.iter())
     }
+
     pub fn columns(&self) -> [Column; 2] {
         [
             Column::new("owner", self.owner_type.clone()),
@@ -176,6 +180,14 @@ impl<T: DataObject> PartialEq<Many<T>> for Many<T> {
 impl<T: DataObject> Eq for Many<T> {}
 impl<T: DataObject> Default for Many<T> {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "fake")]
+/// Fake data support is currently limited to empty Many relationships.
+impl<T: DataObject> Dummy<Faker> for Many<T> {
+    fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
         Self::new()
     }
 }

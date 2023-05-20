@@ -37,6 +37,7 @@ impl<T> DataOrd<T> for Option<T> where T: PartialOrd<T> + FieldType {}
 impl<T> DataOrd<T> for T where T: PartialOrd<T> + FieldType {}
 
 /// Used to implement the `query!` and `filter!` macros.
+#[derive(Debug)]
 pub struct FieldExpr<T>
 where
     T: Into<SqlVal>,
@@ -94,6 +95,7 @@ impl<F: DataObject> FieldExpr<ForeignKey<F>> {
     }
 }
 
+#[derive(Debug)]
 pub struct ManyFieldExpr<O, T>
 where
     O: DataObject, // owner

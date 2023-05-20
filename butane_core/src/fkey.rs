@@ -5,6 +5,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
 
+#[cfg(feature = "fake")]
+use fake::{Dummy, Faker};
+
 /// Used to implement a relationship between models.
 ///
 /// Initialize using `From` or `from_pk`
@@ -20,7 +23,6 @@ use std::fmt::{Debug, Formatter};
 ///   blog: ForeignKey<Blog>,
 ///   ...
 /// }
-///
 pub struct ForeignKey<T>
 where
     T: DataObject,
@@ -103,7 +105,7 @@ impl<T: DataObject> From<&T> for ForeignKey<T> {
 impl<T: DataObject> Clone for ForeignKey<T> {
     fn clone(&self) -> Self {
         // Once specialization lands, it would be nice to clone val if
-        // it's cloneable. Then we wouldn't have to ensure the pk
+        // it's clone-able. Then we wouldn't have to ensure the pk
         self.ensure_valpk();
         ForeignKey {
             val: OnceCell::new(),
@@ -200,5 +202,13 @@ where
         D: Deserializer<'de>,
     {
         Ok(Self::from_pk(T::PKType::deserialize(deserializer)?))
+    }
+}
+
+#[cfg(feature = "fake")]
+/// Fake data support is currently limited to empty ForeignKey relationships.
+impl<T: DataObject> Dummy<Faker> for ForeignKey<T> {
+    fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
+        Self::new_raw()
     }
 }

@@ -15,7 +15,7 @@ pub use fieldexpr::{DataOrd, FieldExpr, ManyFieldExpr};
 type TblName = Cow<'static, str>;
 
 /// Abstract representation of a database expression.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Expr {
     /// A column, referenced by name.
     Column(&'static str),
@@ -28,7 +28,7 @@ pub enum Expr {
 }
 
 /// Abstract representation of a boolean expression.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum BoolExpr {
     True,
     Eq(&'static str, Expr),
@@ -65,20 +65,20 @@ pub enum BoolExpr {
 }
 
 /// Represents the direction of a sort.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum OrderDirection {
     Ascending,
     Descending,
 }
 
 /// Represents a sorting term (ORDER BY in SQL).
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Order {
     pub direction: OrderDirection,
     pub column: &'static str,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Join {
     /// Inner join `join_table` where `col1` is equal to
     /// `col2`
@@ -89,7 +89,7 @@ pub enum Join {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Column {
     table: Option<TblName>,
     name: &'static str,
@@ -113,7 +113,7 @@ impl Column {
 }
 
 /// Representation of a database query.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Query<T: DataResult> {
     table: TblName,
     filter: Option<BoolExpr>,
@@ -162,7 +162,7 @@ impl<T: DataResult> Query<T> {
     /// Order the query results by the given column. Multiple calls to
     /// this method may be made, with earlier calls taking precedence.
     /// It is recommended to use the `colname!`
-    /// macro to construct the column name in a typesafe manner.
+    /// macro to construct the column name in a type-safe manner.
     pub fn order(mut self, column: &'static str, direction: OrderDirection) -> Query<T> {
         self.sort.push(Order { direction, column });
         self
@@ -178,16 +178,11 @@ impl<T: DataResult> Query<T> {
         self.order(column, OrderDirection::Descending)
     }
 
-    /// Executes the query against `conn` and returns the first result (if any).
-    pub async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        conn.query(&self.table, T::COLUMNS, self.filter, Some(1), None, None)
-            .await?
-            .mapped(T::from_row)
-            .nth(0)
-    }
-
-    /// Executes the query against `conn`.
-    pub async fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
+    fn fetch(
+        self,
+        conn: &impl ConnectionMethods,
+        limit: Option<i32>,
+    ) -> Result<Box<dyn BackendRows + '_>> {
         let sort = if self.sort.is_empty() {
             None
         } else {
@@ -197,13 +192,21 @@ impl<T: DataResult> Query<T> {
             &self.table,
             T::COLUMNS,
             self.filter,
-            self.limit,
+            limit,
             self.offset,
             sort,
         )
-        .await?
-        .mapped(T::from_row)
-        .collect()
+    }
+
+    /// Executes the query against `conn` and returns the first result (if any).
+    pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
+        self.fetch(conn, Some(1))?.mapped(T::from_row).nth(0)
+    }
+
+    /// Executes the query against `conn`.
+    pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
+        let limit = self.limit.to_owned();
+        self.fetch(conn, limit)?.mapped(T::from_row).collect()
     }
 
     /// Executes the query against `conn` and deletes all matching objects.

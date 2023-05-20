@@ -1,8 +1,10 @@
 use super::connmethods::ConnectionMethodWrapper;
 use super::*;
 use crate::Result;
+pub use r2d2::ManageConnection;
 
 /// R2D2 support for Butane. Implements [`r2d2::ManageConnection`].
+#[derive(Debug)]
 pub struct ConnectionManager {
     spec: ConnectionSpec,
 }
@@ -12,7 +14,7 @@ impl ConnectionManager {
     }
 }
 
-impl r2d2::ManageConnection for ConnectionManager {
+impl ManageConnection for ConnectionManager {
     type Connection = Connection;
     type Error = crate::Error;
 

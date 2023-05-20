@@ -3,7 +3,7 @@
 
 extern crate proc_macro;
 
-use butane_core::*;
+use butane_core::{codegen, make_compile_error, migrations};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
@@ -26,7 +26,7 @@ mod filter;
 /// * `#[table = "NAME"]` used on the struct to specify the name of the table (defaults to struct name)
 /// * `#[pk]` on a field to specify that it is the primary key.
 /// * `#[auto]` on a field indicates that the field's value is
-///    initialized based on serial/autoincrement. Currently supported
+///    initialized based on serial/auto-increment. Currently supported
 ///    only on the primary key and only if the primary key is an integer
 ///    type
 /// * `#[unique]` on a field indicates that the field's value must be unique
@@ -156,7 +156,7 @@ pub fn butane_type(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 fn migrations_for_dir() -> migrations::FsMigrations {
-    migrations::from_root(&migrations_dir())
+    migrations::from_root(migrations_dir())
 }
 
 fn migrations_dir() -> PathBuf {
@@ -166,4 +166,138 @@ fn migrations_dir() -> PathBuf {
     dir.push(".butane");
     dir.push("migrations");
     dir
+}
+
+#[proc_macro_derive(FieldType)]
+pub fn derive_field_type(input: TokenStream) -> TokenStream {
+    let derive_input = syn::parse_macro_input!(input as syn::DeriveInput);
+    let ident = &derive_input.ident;
+    match derive_input.data {
+        syn::Data::Struct(_) => derive_field_type_with_json(ident),
+        syn::Data::Enum(data_enum) => derive_field_type_for_enum(ident, data_enum),
+        syn::Data::Union(_) => derive_field_type_with_json(ident),
+    }
+}
+
+fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenStream {
+    if data_enum
+        .variants
+        .iter()
+        .any(|variant| variant.fields != syn::Fields::Unit)
+    {
+        // Non-simple enum, fall back to json derive
+        return derive_field_type_with_json(ident);
+    }
+
+    let match_arms_to_string: Vec<TokenStream2> = data_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            let v_ident = &variant.ident;
+            let ident_literal = codegen::make_lit(&v_ident.to_string());
+            quote!(Self::#v_ident => #ident_literal,)
+        })
+        .collect();
+    let match_arms_from_string: Vec<TokenStream2> = data_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            let v_ident = &variant.ident;
+            let ident_literal = codegen::make_lit(&v_ident.to_string());
+            quote!(#ident_literal => Ok(Self::#v_ident),)
+        })
+        .collect();
+    quote!(
+        impl #ident {
+            fn to_string_for_butane(&self) -> &'static str {
+                match self {
+                    #(#match_arms_to_string)*
+                }
+            }
+            fn from_string_for_butane(s: &str) -> std::result::Result<Self, butane::Error> {
+                match s {
+                    #(#match_arms_from_string)*
+                    _ => Err(butane::Error::UnknownEnumVariant(s.to_string()))
+                }
+            }
+        }
+        impl butane::ToSql for #ident
+        {
+            fn to_sql(&self) -> butane::SqlVal {
+                butane::SqlVal::Text(self.to_string_for_butane().to_string())
+            }
+            fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                butane::SqlValRef::Text(self.to_string_for_butane())
+            }
+        }
+
+        impl butane::FromSql for #ident
+        {
+            fn from_sql_ref(val: butane::SqlValRef) -> std::result::Result<Self, butane::Error> {
+                if let butane::SqlValRef::Text(v) = val {
+                    return Self::from_string_for_butane(v);
+                }
+                Err(butane::Error::CannotConvertSqlVal(
+                    butane::SqlType::Text,
+                    val.into(),
+                ))
+            }
+        }
+        impl butane::FieldType for #ident
+        {
+            type RefType = Self;
+            const SQLTYPE: butane::SqlType = butane::SqlType::Text;
+        }
+    )
+    .into()
+}
+
+#[cfg(feature = "json")]
+fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream {
+    use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
+    use butane_core::SqlType;
+
+    let mut migrations = migrations_for_dir();
+
+    codegen::add_custom_type(
+        &mut migrations,
+        struct_name.to_string(),
+        DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Json)),
+    )
+    .unwrap();
+    quote!(
+        impl butane::ToSql for #struct_name
+        {
+            fn to_sql(&self) -> butane::SqlVal {
+                self.to_sql_ref().into()
+            }
+            fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                butane::SqlValRef::Json(serde_json::to_value(self).unwrap())
+            }
+        }
+
+        impl butane::FromSql for #struct_name
+        {
+            fn from_sql_ref(val: butane::SqlValRef) -> std::result::Result<Self, butane::Error> {
+                if let butane::SqlValRef::Json(v) = val {
+                    return Ok(#struct_name::deserialize(v).unwrap());
+                }
+                Err(butane::Error::CannotConvertSqlVal(
+                    butane::SqlType::Json,
+                    val.into(),
+                ))
+            }
+        }
+        impl butane::FieldType for #struct_name
+        {
+            type RefType = Self;
+            const SQLTYPE: butane::SqlType = butane::SqlType::Json;
+        }
+    )
+    .into()
+}
+
+#[cfg(not(feature = "json"))]
+fn derive_field_type_with_json(_struct_name: &Ident) -> TokenStream {
+    panic!("Feature 'json' is required to derive FieldType")
 }

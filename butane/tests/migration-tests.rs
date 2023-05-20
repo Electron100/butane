@@ -7,7 +7,7 @@ use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-mod common;
+use butane_test_helper::*;
 
 #[test]
 fn current_migration_basic() {
@@ -15,6 +15,7 @@ fn current_migration_basic() {
         struct Foo {
             id: i64,
             bar: String,
+            baz: f64,
         }
     };
 
@@ -39,6 +40,14 @@ fn current_migration_basic() {
     assert_eq!(*barcol.default(), None);
     assert_eq!(barcol.typeid().unwrap(), TypeIdentifier::Ty(SqlType::Text));
     assert!(!barcol.is_auto());
+
+    let baz_col = table.column("baz").unwrap();
+    assert_eq!(baz_col.name(), "baz");
+    assert!(!baz_col.nullable());
+    assert!(!baz_col.is_pk());
+    assert_eq!(*baz_col.default(), None);
+    assert_eq!(baz_col.typeid().unwrap(), TypeIdentifier::Ty(SqlType::Real));
+    assert!(!baz_col.is_auto());
 
     assert_eq!(table.pk(), Some(idcol))
 }
@@ -166,7 +175,7 @@ fn current_migration_custom_type() {
 #[test]
 fn migration_add_field_sqlite() {
     migration_add_field(
-        &mut common::sqlite_connection(),
+        &mut sqlite_connection(),
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;",
 				// The exact details of futzing a DROP COLUMN in sqlite aren't
 				// important (e.g. the temp table naming is certainly not part
@@ -181,7 +190,7 @@ fn migration_add_field_sqlite() {
 #[cfg(feature = "pg")]
 #[test]
 fn migration_add_field_pg() {
-    let (mut conn, _data) = common::pg_connection();
+    let (mut conn, _data) = pg_connection();
     migration_add_field(
         &mut conn,
         "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;",
@@ -193,7 +202,7 @@ fn migration_add_field_pg() {
 #[test]
 fn migration_add_field_with_default_sqlite() {
     migration_add_field_with_default(
-        &mut common::sqlite_connection(),
+        &mut sqlite_connection(),
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 42;",
 				// See comments on migration_add_field_sqlite
 				"CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"
@@ -203,7 +212,7 @@ fn migration_add_field_with_default_sqlite() {
 #[cfg(feature = "pg")]
 #[test]
 fn migration_add_field_with_default_pg() {
-    let (mut conn, _data) = common::pg_connection();
+    let (mut conn, _data) = pg_connection();
     migration_add_field_with_default(
         &mut conn,
         "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 42;",
@@ -215,7 +224,7 @@ fn migration_add_field_with_default_pg() {
 #[test]
 fn migration_add_and_remove_field_sqlite() {
     migration_add_and_remove_field(
-        &mut common::sqlite_connection(),
+        &mut sqlite_connection(),
 				// The exact details of futzing a DROP COLUMN in sqlite aren't
 				// important (e.g. the temp table naming is certainly not part
 				// of the API contract), but the goal here is to ensure we're
@@ -230,7 +239,7 @@ fn migration_add_and_remove_field_sqlite() {
 #[cfg(feature = "pg")]
 #[test]
 fn migration_add_and_remove_field_pg() {
-    let (mut conn, _data) = common::pg_connection();
+    let (mut conn, _data) = pg_connection();
     migration_add_and_remove_field(
         &mut conn,
         "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;ALTER TABLE Foo DROP COLUMN bar;",
@@ -242,7 +251,7 @@ fn migration_add_and_remove_field_pg() {
 #[test]
 fn migration_delete_table_sqlite() {
     migration_delete_table(
-        &mut common::sqlite_connection(),
+        &mut sqlite_connection(),
         "DROP TABLE Foo;",
         "CREATE TABLE Foo (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
     );
@@ -251,7 +260,7 @@ fn migration_delete_table_sqlite() {
 #[cfg(feature = "pg")]
 #[test]
 fn migration_delete_table_pg() {
-    let (mut conn, _data) = common::pg_connection();
+    let (mut conn, _data) = pg_connection();
     migration_delete_table(
         &mut conn,
         "DROP TABLE Foo;",
@@ -298,7 +307,7 @@ fn verify_sql(
 ) {
     let backend = conn.backend();
     let v2_migration = ms.latest().unwrap();
-    let strip = |s: String| s.replace("\n", "");
+    let strip = |s: String| s.replace('\n', "");
 
     let actual_up_sql = strip(v2_migration.up_sql(backend.name()).unwrap().unwrap());
     assert_eq!(actual_up_sql, expected_up_sql);

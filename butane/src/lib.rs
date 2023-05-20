@@ -169,3 +169,11 @@ pub mod prelude {
     pub use crate::DataResult;
     pub use butane_core::db::BackendConnection;
 }
+
+pub mod internal {
+    //! Internals which will we be used in macro-generated code.
+    //!
+    //! Do not use directly.
+
+    pub use async_trait::async_trait;
+}

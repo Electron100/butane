@@ -63,6 +63,9 @@ macro_rules! connection_method_wrapper {
                     .update(table, pkcol, pk, columns, values)
                     .await
             }
+            async fn delete(&self, table: &str, expr: BoolExpr) -> Result<usize> {
+                self.wrapped_connection_methods()?.delete(table, expr).await
+            }
             async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
                 self.wrapped_connection_methods()?
                     .delete_where(table, expr)

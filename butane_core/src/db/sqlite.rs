@@ -262,7 +262,7 @@ fn rs_conn_has_table(conn: &rusqlite::Connection, table: &str) -> Result<bool> {
 }
 
 #[async_trait]
-impl ConnectionMethods for Mutex<rusqlite::Connection> {
+impl Connectionmethods for Mutex<rusqlite::Connection> {
     fn execute(&self, sql: &str) -> Result<()> {
         rs_conn_execute(self.lock()?.deref(), sql)
     }

@@ -24,6 +24,7 @@ tls = ["butane_core/tls"]
 uuid = ["butane_core/uuid", "butane_codegen/uuid"]
 
 [dependencies]
+async-trait = "0.1"
 butane_codegen = { path = "../butane_codegen", version = "0.5" }
 butane_core = { path = "../butane_core", version = "0.5" }
 

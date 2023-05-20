@@ -54,7 +54,9 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
 
     let dataresult = impl_dataresult(ast_struct, tyname);
     quote!(
-                #dataresult
+        #dataresult
+
+        #[butane::internal::async_trait]
         impl butane::DataObject for #tyname {
             type PKType = #pktype;
                         type Fields = #fields_type;
@@ -64,7 +66,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             fn pk(&self) -> &Self::PKType {
                 &self.#pkident
             }
-            fn save(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
+            async fn save(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
                 //future perf improvement use an array on the stack
                 let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(#numdbfields);
                 let pkcol = butane::db::Column::new(
@@ -86,7 +88,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 #many_save
                 Ok(())
             }
-            fn delete(&self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
+            async fn delete(&self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
                 use butane::ToSql;
                 use butane::prelude::DataObject;
                 conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())

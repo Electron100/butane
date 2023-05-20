@@ -4,6 +4,7 @@ use super::helper;
 use super::*;
 use crate::custom::{SqlTypeCustom, SqlValRefCustom};
 use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
+use crate::query::Expr;
 use crate::{debug, query, warn};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
 use async_trait::async_trait;
@@ -316,6 +317,11 @@ where
         }
         let future = self.client()?.execute(sql.as_str(), params.as_slice());
         future.await?;
+        Ok(())
+    }
+    async fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
+        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))
+            .await?;
         Ok(())
     }
     async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {

@@ -153,6 +153,7 @@ macro_rules! find {
         butane::query!($dbobj, $filter)
             .limit(1)
             .load($conn)
+            .await
             .and_then(|mut results| results.pop().ok_or(butane::Error::NoSuchObject))
     };
 }

@@ -28,6 +28,8 @@ mod helper;
 mod macros;
 #[cfg(feature = "pg")]
 pub mod pg;
+//#[cfg(feature = "sqlite")]
+//pub mod sqlite;
 
 #[cfg(feature = "r2d2")]
 pub mod r2;

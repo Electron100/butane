@@ -2,11 +2,13 @@ use butane::query;
 use getting_started::models::*;
 use getting_started::*;
 
-fn main() {
-    let conn = establish_connection();
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    let conn = establish_connection().await;
     let results = query!(Post, published == true)
         .limit(5)
         .load(&conn)
+        .await
         .expect("Error loading posts");
     println!("Displaying {} posts", results.len());
     for post in results {

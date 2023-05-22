@@ -1,15 +1,16 @@
 use getting_started::*;
 use std::io::{stdin, Read};
 
-fn main() {
-    let conn = establish_connection();
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    let conn = establish_connection().await;
 
-    let blog = match existing_blog(&conn) {
+    let blog = match existing_blog(&conn).await {
         Some(blog) => blog,
         None => {
             println!("Enter blog name");
             let name = readline();
-            create_blog(&conn, name)
+            create_blog(&conn, name).await
         }
     };
 
@@ -19,7 +20,7 @@ fn main() {
     let mut body = String::new();
     stdin().read_to_string(&mut body).unwrap();
 
-    let post = create_post(&conn, &blog, title, body);
+    let post = create_post(&conn, &blog, title, body).await;
     println!(
         "\nSaved unpublished post {} with id {}",
         post.title, post.id

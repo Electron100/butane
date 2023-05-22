@@ -44,14 +44,14 @@ pub fn default_name() -> String {
     Utc::now().format("%Y%m%d_%H%M%S%3f").to_string()
 }
 
-pub fn init(name: &str, connstr: &str) -> Result<()> {
+pub async fn init(name: &str, connstr: &str) -> Result<()> {
     if db::get_backend(name).is_none() {
         eprintln!("Unknown backend {name}");
         std::process::exit(1);
     };
 
     let spec = db::ConnectionSpec::new(name, connstr);
-    db::connect(&spec)?; // ensure we can
+    db::connect(&spec).await?; // ensure we can
     std::fs::create_dir_all(base_dir()?)?;
     spec.save(&base_dir()?)?;
 
@@ -84,19 +84,19 @@ pub fn make_migration(name: Option<&String>) -> Result<()> {
     Ok(())
 }
 
-pub fn migrate() -> Result<()> {
+pub async fn migrate() -> Result<()> {
     let spec = load_connspec()?;
-    let mut conn = db::connect(&spec)?;
-    let to_apply = get_migrations()?.unapplied_migrations(&conn)?;
+    let mut conn = db::connect(&spec).await?;
+    let to_apply = get_migrations()?.unapplied_migrations(&conn).await?;
     println!("{} migrations to apply", to_apply.len());
     for m in to_apply {
         println!("Applying migration {}", m.name());
-        m.apply(&mut conn)?;
+        m.apply(&mut conn).await?;
     }
     Ok(())
 }
 
-pub fn rollback_to(mut conn: Connection, to: &str) -> Result<()> {
+pub async fn rollback_to(mut conn: Connection, to: &str) -> Result<()> {
     let ms = get_migrations()?;
     let to_migration = match ms.get_migration(to) {
         Some(m) => m,
@@ -112,16 +112,16 @@ pub fn rollback_to(mut conn: Connection, to: &str) -> Result<()> {
     }
     for m in to_unapply.into_iter().rev() {
         println!("Rolling back migration  {}", m.name());
-        m.downgrade(&mut conn)?;
+        m.downgrade(&mut conn).await?;
     }
     Ok(())
 }
 
-pub fn rollback_latest(mut conn: Connection) -> Result<()> {
+pub async fn rollback_latest(mut conn: Connection) -> Result<()> {
     match get_migrations()?.latest() {
         Some(m) => {
             println!("Rolling back migration  {}", m.name());
-            m.downgrade(&mut conn)?;
+            m.downgrade(&mut conn).await?;
         }
         None => {
             eprintln!("No migrations applied!");
@@ -177,11 +177,11 @@ pub fn load_connspec() -> Result<db::ConnectionSpec> {
     }
 }
 
-pub fn list_migrations() -> Result<()> {
+pub async fn list_migrations() -> Result<()> {
     let spec = load_connspec()?;
-    let conn = db::connect(&spec)?;
+    let conn = db::connect(&spec).await?;
     let ms = get_migrations()?;
-    let unapplied = ms.unapplied_migrations(&conn)?;
+    let unapplied = ms.unapplied_migrations(&conn).await?;
     let all = ms.all_migrations()?;
     for m in all {
         let m_state = match unapplied.contains(&m) {
@@ -193,25 +193,25 @@ pub fn list_migrations() -> Result<()> {
     Ok(())
 }
 
-pub fn collapse_migrations(new_initial_name: Option<&String>) -> Result<()> {
+pub async fn collapse_migrations(new_initial_name: Option<&String>) -> Result<()> {
     let name = match new_initial_name {
         Some(name) => format!("{}_{}", default_name(), name),
         None => default_name(),
     };
     let spec = load_connspec()?;
     let backend = spec.get_backend()?;
-    let conn = db::connect(&spec)?;
+    let conn = db::connect(&spec).await?;
     let mut ms = get_migrations()?;
-    let latest = ms.last_applied_migration(&conn)?;
+    let latest = ms.last_applied_migration(&conn).await?;
     if latest.is_none() {
         eprintln!("There are no migrations to collapse");
         std::process::exit(1);
     }
     let latest_db = latest.unwrap().db()?;
-    ms.clear_migrations(&conn)?;
+    ms.clear_migrations(&conn).await?;
     ms.create_migration_to(&backend, &name, None, latest_db)?;
     let new_migration = ms.latest().unwrap();
-    new_migration.mark_applied(&conn)?;
+    new_migration.mark_applied(&conn).await?;
     let cli_state = CliState::load()?;
     if cli_state.embedded {
         // Update the embedding
@@ -228,10 +228,10 @@ pub fn delete_table(name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn clear_data() -> Result<()> {
+pub async fn clear_data() -> Result<()> {
     let spec = load_connspec()?;
-    let conn = db::connect(&spec)?;
-    let latest = match get_migrations()?.last_applied_migration(&conn)? {
+    let conn = db::connect(&spec).await?;
+    let latest = match get_migrations()?.last_applied_migration(&conn).await? {
         Some(m) => m,
         None => {
             eprintln!("No migrations have been applied, so no data is recognized.");
@@ -240,7 +240,7 @@ pub fn clear_data() -> Result<()> {
     };
     for table in latest.db()?.tables() {
         println!("Deleting data from {}", &table.name);
-        conn.delete_where(&table.name, BoolExpr::True)?;
+        conn.delete_where(&table.name, BoolExpr::True).await?;
     }
     Ok(())
 }

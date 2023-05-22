@@ -104,11 +104,14 @@ pub trait DataObject: DataResult<DBO = Self> + Sync {
         Self: Sized,
         Self::PKType: Sync,
     {
-        Self::try_get(conn, id)?.ok_or(Error::NoSuchObject)
+        Self::try_get(conn, id).await?.ok_or(Error::NoSuchObject)
     }
     /// Find this object in the database based on primary key.
     /// Returns `None` if the primary key does not exist.
-    async fn try_get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType> + Send + Sync) -> Result<Option<Self>>
+    async fn try_get(
+        conn: &impl ConnectionMethods,
+        id: impl Borrow<Self::PKType> + Send + Sync,
+    ) -> Result<Option<Self>>
     where
         Self: Sized,
     {

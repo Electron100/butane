@@ -4,17 +4,20 @@ use butane::prelude::*;
 use getting_started::*;
 use std::env::args;
 
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
     let id = args()
         .nth(1)
         .expect("publish_post requires a post id")
         .parse::<i32>()
         .expect("Invalid ID");
-    let conn = establish_connection();
+    let conn = establish_connection().await;
 
-    let mut post = Post::get(&conn, id).expect(&format!("Unable to find post {id}"));
+    let mut post = Post::get(&conn, id)
+        .await
+        .expect(&format!("Unable to find post {id}"));
     // Just a normal Rust assignment, no fancy set methods
     post.published = true;
-    post.save(&conn).unwrap();
+    post.save(&conn).await.unwrap();
     println!("Published post {}", post.title);
 }

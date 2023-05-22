@@ -1,4 +1,6 @@
-use butane_core::db::{connect, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec};
+use butane_core::db::{connect, get_backend, pg, Backend, Connection, ConnectionSpec};
+//todo
+//use butane_core::db::sqlite;
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -8,14 +10,14 @@ use std::process::{ChildStderr, Command, Stdio};
 use std::sync::Mutex;
 use uuid::Uuid;
 
-pub fn pg_connection() -> (Connection, PgSetupData) {
+pub async fn pg_connection() -> (Connection, PgSetupData) {
     let backend = get_backend(pg::BACKEND_NAME).unwrap();
-    let data = pg_setup();
-    (backend.connect(&pg_connstr(&data)).unwrap(), data)
+    let data = pg_setup().await;
+    (backend.connect(&pg_connstr(&data)).await.unwrap(), data)
 }
 
-pub fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
-    let data = pg_setup();
+pub async fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
+    let data = pg_setup().await;
     (
         ConnectionSpec::new(pg::BACKEND_NAME, pg_connstr(&data)),
         data,
@@ -116,7 +118,7 @@ extern "C" fn proc_teardown() {
 static TMP_SERVER: Lazy<Mutex<Option<PgServerState>>> =
     Lazy::new(|| Mutex::new(Some(create_tmp_server())));
 
-pub fn pg_setup() -> PgSetupData {
+pub async fn pg_setup() -> PgSetupData {
     eprintln!("pg_setup");
     // By default we set up a temporary, local postgres server just
     // for this test. This can be overridden by the environment
@@ -133,8 +135,9 @@ pub fn pg_setup() -> PgSetupData {
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     eprintln!("new db is `{}`", &new_dbname);
 
-    let mut conn = connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
+    let mut conn = connect(&ConnectionSpec::new("pg", &connstr)).await.unwrap();
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
+        .await
         .unwrap();
 
     let connstr = format!("{connstr} dbname={new_dbname}");
@@ -148,7 +151,7 @@ pub fn pg_connstr(data: &PgSetupData) -> String {
     data.connstr.clone()
 }
 
-pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool) {
+pub async fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool) {
     let mut root = std::env::current_dir().unwrap();
     root.push(".butane/migrations");
     let mut disk_migrations = migrations::from_root(&root);
@@ -172,14 +175,15 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
         "expected to create migration"
     );
     println!("created current migration");
-    let to_apply = mem_migrations.unapplied_migrations(conn).unwrap();
+    let to_apply = mem_migrations.unapplied_migrations(conn).await.unwrap();
     for m in to_apply {
         println!("Applying migration {}", m.name());
-        m.apply(conn).unwrap();
+        m.apply(conn).await.unwrap();
     }
 }
 
-pub fn sqlite_connection() -> Connection {
+// todo
+/*pub fn sqlite_connection() -> Connection {
     let backend = get_backend(sqlite::BACKEND_NAME).unwrap();
     backend.connect(":memory:").unwrap()
 }
@@ -190,6 +194,7 @@ pub fn sqlite_connspec() -> ConnectionSpec {
 
 pub fn sqlite_setup() {}
 pub fn sqlite_teardown(_: ()) {}
+*/
 
 #[macro_export]
 macro_rules! maketest {

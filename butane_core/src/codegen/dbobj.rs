@@ -45,7 +45,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         // Save  needs to ensure_initialized
         quote!(
             self.#ident.ensure_init(#many_table_lit, butane::ToSql::to_sql(self.pk()), #pksqltype);
-            self.#ident.save(conn)?;
+            self.#ident.save(conn).await?;
         )
     }).collect();
 
@@ -78,11 +78,11 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                         conn.update(Self::TABLE,
                                     pkcol,
                                     butane::ToSql::to_sql_ref(self.pk()),
-                                    &[#save_cols], &values)?;
+                                    &[#save_cols], &values).await?;
                     }
                 } else {
                     #(#values)*
-                    let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
+                    let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values).await?;
                     #(#post_insert)*
                 }
                 #many_save
@@ -91,7 +91,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             async fn delete(&self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
                 use butane::ToSql;
                 use butane::prelude::DataObject;
-                conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
+                conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql()).await
             }
         }
         impl butane::ToSql for #tyname {

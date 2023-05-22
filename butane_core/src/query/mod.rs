@@ -178,7 +178,7 @@ impl<T: DataResult> Query<T> {
         self.order(column, OrderDirection::Descending)
     }
 
-    fn fetch(
+    async fn fetch(
         self,
         conn: &impl ConnectionMethods,
         limit: Option<i32>,
@@ -196,21 +196,23 @@ impl<T: DataResult> Query<T> {
             self.offset,
             sort,
         )
+        .await
     }
 
     /// Executes the query against `conn` and returns the first result (if any).
-    pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        self.fetch(conn, Some(1))?.mapped(T::from_row).nth(0)
+    pub async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
+        self.fetch(conn, Some(1)).await?.mapped(T::from_row).nth(0)
     }
 
     /// Executes the query against `conn`.
-    pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
+    pub async fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
         let limit = self.limit.to_owned();
-        self.fetch(conn, limit)?.mapped(T::from_row).collect()
+        self.fetch(conn, limit).await?.mapped(T::from_row).collect()
     }
 
     /// Executes the query against `conn` and deletes all matching objects.
     pub async fn delete(self, conn: &impl ConnectionMethods) -> Result<usize> {
-        conn.delete_where(&self.table, self.filter.unwrap_or(BoolExpr::True)).await
+        conn.delete_where(&self.table, self.filter.unwrap_or(BoolExpr::True))
+            .await
     }
 }

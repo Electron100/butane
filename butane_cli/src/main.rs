@@ -5,7 +5,8 @@ use butane_cli::{
     migrate, Result,
 };
 
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
     let app = clap::Command::new("butane")
         .version(env!("CARGO_PKG_VERSION"))
         .author("James Oakley <james@electronstudio.org>")
@@ -85,15 +86,17 @@ fn main() {
                                 .arg_required_else_help(true);
     let args = app.get_matches();
     match args.subcommand() {
-        Some(("init", sub_args)) => handle_error(init(Some(sub_args))),
+        Some(("init", sub_args)) => handle_error(init(Some(sub_args)).await),
         Some(("makemigration", sub_args)) => handle_error(make_migration(Some(sub_args))),
-        Some(("migrate", _)) => handle_error(migrate()),
-        Some(("rollback", sub_args)) => handle_error(rollback(Some(sub_args))),
+        Some(("migrate", _)) => handle_error(migrate().await),
+        Some(("rollback", sub_args)) => handle_error(rollback(Some(sub_args)).await),
         Some(("embed", _)) => handle_error(embed()),
-        Some(("list", _)) => handle_error(list_migrations()),
-        Some(("collapse", sub_args)) => handle_error(collapse_migrations(sub_args.get_one("NAME"))),
+        Some(("list", _)) => handle_error(list_migrations().await),
+        Some(("collapse", sub_args)) => {
+            handle_error(collapse_migrations(sub_args.get_one("NAME")).await)
+        }
         Some(("clear", sub_args)) => match sub_args.subcommand() {
-            Some(("data", _)) => handle_error(clear_data()),
+            Some(("data", _)) => handle_error(clear_data().await),
             _ => eprintln!("Unknown clear command. Try: clear data"),
         },
         Some(("delete", sub_args)) => match sub_args.subcommand() {
@@ -108,11 +111,11 @@ fn main() {
     }
 }
 
-fn init(args: Option<&ArgMatches>) -> Result<()> {
+async fn init(args: Option<&ArgMatches>) -> Result<()> {
     let args = args.unwrap();
     let name: &String = args.get_one("BACKEND").unwrap();
     let connstr: &String = args.get_one("CONNECTION").unwrap();
-    butane_cli::init(name, connstr)
+    butane_cli::init(name, connstr).await
 }
 
 fn make_migration(args: Option<&ArgMatches>) -> Result<()> {
@@ -120,12 +123,12 @@ fn make_migration(args: Option<&ArgMatches>) -> Result<()> {
     butane_cli::make_migration(name_arg)
 }
 
-fn rollback(args: Option<&ArgMatches>) -> Result<()> {
+async fn rollback(args: Option<&ArgMatches>) -> Result<()> {
     let spec = butane_cli::load_connspec()?;
-    let conn = butane::db::connect(&spec)?;
+    let conn = butane::db::connect(&spec).await?;
 
     match args.and_then(|a| a.get_one::<String>("NAME")) {
-        Some(to) => butane_cli::rollback_to(conn, to),
-        None => butane_cli::rollback_latest(conn),
+        Some(to) => butane_cli::rollback_to(conn, to).await,
+        None => butane_cli::rollback_latest(conn).await,
     }
 }

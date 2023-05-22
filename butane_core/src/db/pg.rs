@@ -129,16 +129,6 @@ impl Debug for PgConnection {
         d.finish()
     }
 }
-impl Debug for PgConnection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut d = f.debug_struct("PgConnection");
-        #[cfg(feature = "debug")]
-        d.field("params", &self.params);
-        // postgres::Client doesnt expose any internal state
-        d.field("conn", &!self.is_closed());
-        d.finish()
-    }
-}
 
 type DynToSqlPg<'a> = (dyn postgres::types::ToSql + Sync + 'a);
 

@@ -8,6 +8,7 @@ build = "build.rs"
 
 [dependencies]
 butane = { features = ["sqlite"], workspace = true }
+tokio = { workspace = true, features = ["macros"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"

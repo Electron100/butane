@@ -22,6 +22,7 @@ doc = false
 
 [dependencies]
 butane = { features = ["default", "sqlite"], workspace = true }
+tokio = { workspace = true, features = ["macros"] }
 
 
 [package.metadata.release]

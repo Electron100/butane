@@ -217,6 +217,7 @@ dependencies = [
  "quote 1.0.27",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -535,6 +536,7 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "butane",
+ "tokio",
 ]
 
 [[package]]
@@ -746,6 +748,7 @@ name = "getting_started"
 version = "0.1.0"
 dependencies = [
  "butane",
+ "tokio",
 ]
 
 [[package]]
@@ -1688,7 +1691,19 @@ dependencies = [
  "mio",
  "pin-project-lite",
  "socket2 0.4.9",
+ "tokio-macros",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "630bdcf245f78637c13ec01ffae6187cca34625e8c63150d424b59e55af2675e"
+dependencies = [
+ "proc-macro2 1.0.58",
+ "quote 1.0.27",
+ "syn 2.0.16",
 ]
 
 [[package]]

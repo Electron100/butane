@@ -34,7 +34,7 @@ Butane provides a CLI to help with database connection and
 migration. It's optional -- it uses only public Butane APIs -- but it
 helps with common tasks. Let's install it and initialize our
 database. It's intended to be run from the same directory as the
-Cargo package (i.e. the one containing Cargo.toml).
+Cargo package (i.e. the one containing `Cargo.toml`).
 
 ``` shell
 cargo install butane_cli
@@ -82,7 +82,8 @@ impl Blog {
 ```
 
 The `#[model]` attribute does the heavy lifting here:
-1. it generates automatic impls of [`butane::DataResult`] and
+
+1. It generates automatic `impl`s of [`butane::DataResult`] and
    [`butane::DataObject`].
 2. It adds an additional field `state: butane::ObjectState` used to
    store internal Butane state information. In general, we can ignore
@@ -93,7 +94,7 @@ The `#[model]` attribute does the heavy lifting here:
    more obvious (and rust-analyzer happier).
 3. It tells Butane that instances of this struct should be represented in the
    database, recording migration info (more on this later).
-   
+
 The `id` field is special -- it's the primary key. All models must
 have a primary key. If we didn't want to name ours `id`, we could have
 added a `#[pk]` attribute to denote the primary key field. The
@@ -118,7 +119,7 @@ pub struct Post {
     pub blog: ForeignKey<Blog>,
     pub tags: Many<Tag>,
     pub byline: Option<String>,
-	// listed for clarity, generated automatically if omitted
+    // listed for clarity, generated automatically if omitted
     state: butane::ObjectState,
 }
 impl Post {
@@ -190,7 +191,7 @@ The migration is created using our supplied name and the current date. If we now
 butane list
 ```
 
-It prints our migration and tell us that it's "(not applied"). So let's go ahead and apply it!
+It prints our migration and tell us that it's "(not applied)". So let's go ahead and apply it!
 
 ``` shell
 butane migrate
@@ -226,7 +227,6 @@ scope. If you'd prefer to avoid star-imports, you can import the
 necessary traits explicitly (in this case `use butane::{DataObject,
 DataResult};`)
 
-
 We don't need to create a new blog every time, if we have an existing
 one we want to reuse it (for simplicity we'll only add one blog in
 this example), so let's add a method to find that existing blog.
@@ -240,7 +240,7 @@ pub fn existing_blog(conn: &Connection) -> Option<Blog> {
 At this point we have everything we need to create a short program to
 write a post. Let's add a `write_post` binary to `Cargo.toml`:
 
-``` rust
+``` toml
 [[bin]]
 name = "write_post"
 doc = false
@@ -297,7 +297,9 @@ Let's run this (`cargo run --bin write_post`) and author our first post.
 ## Read
 
 Ok, that's great, we put some data in the database, but at some point
-we're going to want to get it back to display it. The most ergonomic and type-safe way to construct Butane queries is to use the `query!` macro. To find all published posts, we'd write
+we're going to want to get it back to display it. The most ergonomic and
+type-safe way to construct Butane queries is to use the `query!` macro.
+To find all published posts, we'd write:
 
 ``` rust
 query!(Post, published == true)
@@ -313,8 +315,7 @@ Post::query().filter(filter!(Post, published == true))
 ergonomic and type-safe manner. If we had a typo and wrote
 `query!(Post, publish == true)` ("publish" instead of "published") we'd get a compiler error.
 
-
-Let's add another binary to Cargo.toml, this one called `show_posts`, and write its code (in `src/bin/show_posts.rs`).
+Let's add another binary to `Cargo.toml`, this one called `show_posts`, and write its code (in `src/bin/show_posts.rs`).
 
 ``` rust
 use butane::query;
@@ -347,7 +348,7 @@ Let's create yet another program, `publish_post`. It needs to be given
 the id of a post to publish. To publish the post, we find it by id,
 mark it as published, and save it again.
 
-Add `publish_post` binary to Cargo.toml, and write its code (in `src/bin/publish_post.rs`).
+Add `publish_post` binary to `Cargo.toml`, and write its code (in `src/bin/publish_post.rs`).
 
 ``` rust
 use self::models::Post;
@@ -380,7 +381,8 @@ post!
 We've gotten most of the way through CRUD. For completeness, let's see
 how to delete a post. This can be done with either the `delete` method
 on `DataObject` (to delete an object we've already loaded) or (more
-commonly) with the `delete` method on `Query` to delete directly. Here's our `delete_post` program (in `src/bin/delete_post.rs`):
+commonly) with the `delete` method on `Query` to delete directly.
+Here's our `delete_post` program (in `src/bin/delete_post.rs`):
 
 ``` rust
 use self::models::Post;
@@ -404,12 +406,12 @@ We're showing off another feature of the `query!`/`filter!` macro here
 too. We look for the post(s) to be deleted based on title pattern. The
 `like` method-like invocation on `title` transforms into the SQL LIKE
 operator. So if we named our first post "First post" we could match it
-with e.g. "First%".
+with e.g. `First%`.
 
 But what about the braces in `{ pattern }`? Normally names within the
 macro refer to database columns/operators. The braces escape us back
 to referring names in Rust code, so the value of the `pattern`
-variable is used as the RHS for the LIKE operator.
+variable is used as the right-hand side for the `LIKE` operator.
 
 If you delete a post, you can run `show_posts` again to confirm that it is fact deleted.
 
@@ -417,7 +419,7 @@ If you delete a post, you can run `show_posts` again to confirm that it is fact 
 
 At some point we'll need to expand our models. Let's say we decide to
 add a feature to allow visitors to "like" posts. Now we need to add a
-likes field to `Post`. Let's go ahead and add
+`likes` field to `Post`. Let's go ahead and add
 
 ``` rust
 pub likes: i32,
@@ -476,7 +478,6 @@ And that's it! Now we can use our new field.
 While there are lots of aspects of Butane not covered in this
 tutorial, hopefully it's conveyed an idea of how to get started. More
 details can be found in the API docs.
-
 
 [`butane::DataResult`]: https://docs.rs/butane/0.1.0/butane/trait.DataResult.html
 [`butane::DataObject`]: https://docs.rs/butane/0.1.0/butane/trait.DataObject.html

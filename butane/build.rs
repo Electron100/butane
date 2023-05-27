@@ -8,9 +8,13 @@ fn main() {
     let dir = ".butane/";
     println!("cargo:rerun-if-changed={dir}");
     if std::path::Path::new(&dir).exists() {
-        std::fs::remove_dir_all(dir).unwrap();
+        match std::fs::remove_dir_all(dir) {
+            Ok(_) => {
+                // Re-create the directory. Only tests populate it and if it is left non-existent
+                // Cargo will detect it as changed and a no-op build will not in fact no-op
+                std::fs::create_dir(dir).unwrap();
+            }
+            Err(_) => eprintln!("Cannot delete .butane dir"),
+        }
     }
-    // Re-create the directory. Only tests populate it and if it is left non-existent
-    // Cargo will detect it as changed and a no-op build will not in fact no-op
-    std::fs::create_dir(dir).unwrap();
 }

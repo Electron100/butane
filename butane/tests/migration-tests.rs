@@ -188,14 +188,15 @@ fn migration_add_field_sqlite() {
 }
 
 #[cfg(feature = "pg")]
-#[test]
-fn migration_add_field_pg() {
-    let (mut conn, _data) = pg_connection();
+#[tokio::test]
+async fn migration_add_field_pg() {
+    let (mut conn, _data) = pg_connection().await;
     migration_add_field(
         &mut conn,
         "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;",
         "ALTER TABLE Foo DROP COLUMN baz;",
-    );
+    )
+    .await;
 }
 
 #[cfg(feature = "sqlite")]
@@ -210,14 +211,15 @@ fn migration_add_field_with_default_sqlite() {
 }
 
 #[cfg(feature = "pg")]
-#[test]
-fn migration_add_field_with_default_pg() {
-    let (mut conn, _data) = pg_connection();
+#[tokio::test]
+async fn migration_add_field_with_default_pg() {
+    let (mut conn, _data) = pg_connection().await;
     migration_add_field_with_default(
         &mut conn,
         "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 42;",
         "ALTER TABLE Foo DROP COLUMN baz;",
-    );
+    )
+    .await;
 }
 
 #[cfg(feature = "sqlite")]
@@ -237,14 +239,15 @@ fn migration_add_and_remove_field_sqlite() {
 }
 
 #[cfg(feature = "pg")]
-#[test]
-fn migration_add_and_remove_field_pg() {
-    let (mut conn, _data) = pg_connection();
+#[tokio::test]
+async fn migration_add_and_remove_field_pg() {
+    let (mut conn, _data) = pg_connection().await;
     migration_add_and_remove_field(
         &mut conn,
         "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;ALTER TABLE Foo DROP COLUMN bar;",
         "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';ALTER TABLE Foo DROP COLUMN baz;",
-    );
+    )
+    .await;
 }
 
 #[cfg(feature = "sqlite")]
@@ -258,17 +261,18 @@ fn migration_delete_table_sqlite() {
 }
 
 #[cfg(feature = "pg")]
-#[test]
-fn migration_delete_table_pg() {
-    let (mut conn, _data) = pg_connection();
+#[tokio::test]
+async fn migration_delete_table_pg() {
+    let (mut conn, _data) = pg_connection().await;
     migration_delete_table(
         &mut conn,
         "DROP TABLE Foo;",
         "CREATE TABLE Foo (id BIGINT NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
-    );
+    )
+    .await;
 }
 
-fn test_migrate(
+async fn test_migrate(
     conn: &mut Connection,
     init_tokens: TokenStream,
     v2_tokens: TokenStream,
@@ -285,17 +289,17 @@ fn test_migrate(
         .create_migration(&backend, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let mut to_apply = ms.unapplied_migrations(conn).unwrap();
+    let mut to_apply = ms.unapplied_migrations(conn).await.unwrap();
     assert_eq!(to_apply.len(), 2);
     for m in &to_apply {
-        m.apply(conn).unwrap();
+        m.apply(conn).await.unwrap();
     }
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
     to_apply.reverse();
     for m in to_apply {
-        m.downgrade(conn).unwrap();
+        m.downgrade(conn).await.unwrap();
     }
 }
 
@@ -315,7 +319,7 @@ fn verify_sql(
     assert_eq!(actual_down_sql, expected_down_sql);
 }
 
-fn migration_add_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+async fn migration_add_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
     let init = quote! {
         struct Foo {
             id: i64,
@@ -330,10 +334,10 @@ fn migration_add_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
             baz: u32,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(conn, init, v2, up_sql, down_sql).await;
 }
 
-fn migration_add_field_with_default(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+async fn migration_add_field_with_default(conn: &mut Connection, up_sql: &str, down_sql: &str) {
     let init = quote! {
         struct Foo {
             id: i64,
@@ -349,10 +353,10 @@ fn migration_add_field_with_default(conn: &mut Connection, up_sql: &str, down_sq
             baz: u32,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(conn, init, v2, up_sql, down_sql).await;
 }
 
-fn migration_add_and_remove_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+async fn migration_add_and_remove_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
     let init = quote! {
         struct Foo {
             id: i64,
@@ -366,10 +370,14 @@ fn migration_add_and_remove_field(conn: &mut Connection, up_sql: &str, down_sql:
             baz: u32,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(conn, init, v2, up_sql, down_sql).await;
 }
 
-fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected_down_sql: &str) {
+async fn migration_delete_table(
+    conn: &mut Connection,
+    expected_up_sql: &str,
+    expected_down_sql: &str,
+) {
     let init_tokens = quote! {
         struct Foo {
             id: i64,
@@ -387,16 +395,16 @@ fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected
         .create_migration(&backend, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let mut to_apply = ms.unapplied_migrations(conn).unwrap();
+    let mut to_apply = ms.unapplied_migrations(conn).await.unwrap();
     assert_eq!(to_apply.len(), 2);
     for m in &to_apply {
-        m.apply(conn).unwrap();
+        m.apply(conn).await.unwrap();
     }
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
     to_apply.reverse();
     for m in to_apply {
-        m.downgrade(conn).unwrap();
+        m.downgrade(conn).await.unwrap();
     }
 }

@@ -21,7 +21,8 @@ doc = false
 doc = false
 
 [dependencies]
-butane = { features = ["default", "sqlite"], workspace = true }
+# todo re-enable sqlite
+butane = { features = ["default", "pg"], workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 
 

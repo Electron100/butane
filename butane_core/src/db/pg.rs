@@ -88,6 +88,7 @@ impl PgConnection {
         }
         let (client, conn) = postgres::connect(params, connector).await?;
         let conn_handle = tokio::spawn(async move {
+            #[allow(unused_variables)] // used only when logging is enabled
             if let Err(e) = conn.await {
                 warn!("Postgres connection error {}", e);
             }

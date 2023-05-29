@@ -3,9 +3,9 @@ use butane::{butane_type, find, model, query};
 use butane::{colname, prelude::*};
 use butane::{ForeignKey, ObjectState};
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
-use serde::Serialize;
 #[cfg(feature = "sqlite")]
 use rusqlite;
+use serde::Serialize;
 #[cfg(feature = "pg")]
 use tokio_postgres as postgres;
 
@@ -109,47 +109,47 @@ struct TimeHolder {
     pub utc2: chrono::DateTime<Utc>,
 }
 
-fn basic_crud(conn: Connection) {
+async fn basic_crud(conn: Connection) {
     //create
     let mut foo = Foo::new(1);
     foo.bam = 0.1;
     foo.bar = 42;
     foo.baz = "hello world".to_string();
     foo.blobbity = [1u8, 2u8, 3u8].to_vec();
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = Foo::get(&conn, 1).unwrap();
+    let mut foo2 = Foo::get(&conn, 1).await.unwrap();
     assert_eq!(foo, foo2);
-    assert_eq!(Some(foo), Foo::try_get(&conn, 1).unwrap());
+    assert_eq!(Some(foo), Foo::try_get(&conn, 1).await.unwrap());
 
     // update
     foo2.bam = 0.2;
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = Foo::get(&conn, 1).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = Foo::get(&conn, 1).await.unwrap();
     assert_eq!(foo2, foo3);
 
     // delete
-    assert!(foo3.delete(&conn).is_ok());
-    if let Some(butane::Error::NoSuchObject) = Foo::get(&conn, 1).err() {
+    assert!(foo3.delete(&conn).await.is_ok());
+    if let Some(butane::Error::NoSuchObject) = Foo::get(&conn, 1).await.err() {
     } else {
         panic!("Expected NoSuchObject");
     }
-    assert_eq!(None, Foo::try_get(&conn, 1).unwrap());
+    assert_eq!(None, Foo::try_get(&conn, 1).await.unwrap());
 }
 testall!(basic_crud);
 
-fn basic_find(conn: Connection) {
+async fn basic_find(conn: Connection) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
     foo1.baz = "hello world".to_string();
-    foo1.save(&conn).unwrap();
+    foo1.save(&conn).await.unwrap();
     let mut foo2 = Foo::new(2);
     foo2.bar = 43;
     foo2.baz = "hello world".to_string();
-    foo2.save(&conn).unwrap();
+    foo2.save(&conn).await.unwrap();
 
     // find
     let found: Foo = find!(Foo, bar == 43, &conn).unwrap();
@@ -157,72 +157,75 @@ fn basic_find(conn: Connection) {
 }
 testall!(basic_find);
 
-fn basic_query(conn: Connection) {
+async fn basic_query(conn: Connection) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
     foo1.baz = "hello world".to_string();
-    foo1.save(&conn).unwrap();
+    foo1.save(&conn).await.unwrap();
     let mut foo2 = Foo::new(2);
     foo2.bar = 43;
     foo2.baz = "hello world".to_string();
-    foo2.save(&conn).unwrap();
+    foo2.save(&conn).await.unwrap();
 
     // query finds 1
-    let mut found = query!(Foo, bar == 42).load(&conn).unwrap();
+    let mut found = query!(Foo, bar == 42).load(&conn).await.unwrap();
     assert_eq!(found.len(), 1);
     assert_eq!(found.pop().unwrap(), foo1);
 
     // query finds both
-    let found = query!(Foo, bar < 44).load(&conn).unwrap();
+    let found = query!(Foo, bar < 44).load(&conn).await.unwrap();
     assert_eq!(found.len(), 2);
 }
 testall!(basic_query);
 
-fn basic_query_delete(conn: Connection) {
+async fn basic_query_delete(conn: Connection) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
     foo1.baz = "hello world".to_string();
-    foo1.save(&conn).unwrap();
+    foo1.save(&conn).await.unwrap();
     let mut foo2 = Foo::new(2);
     foo2.bar = 43;
     foo2.baz = "hello world".to_string();
-    foo2.save(&conn).unwrap();
+    foo2.save(&conn).await.unwrap();
     let mut foo3 = Foo::new(3);
     foo3.bar = 44;
     foo3.baz = "goodbye world".to_string();
-    foo3.save(&conn).unwrap();
+    foo3.save(&conn).await.unwrap();
 
     // delete just the last one
-    let cnt = query!(Foo, baz == "goodbye world").delete(&conn).unwrap();
+    let cnt = query!(Foo, baz == "goodbye world")
+        .delete(&conn)
+        .await
+        .unwrap();
     assert_eq!(cnt, 1);
 
     // delete the other two
-    let cnt = query!(Foo, baz.like("hello%")).delete(&conn).unwrap();
+    let cnt = query!(Foo, baz.like("hello%")).delete(&conn).await.unwrap();
     assert_eq!(cnt, 2);
 }
 testall!(basic_query_delete);
 
-fn string_pk(conn: Connection) {
+async fn string_pk(conn: Connection) {
     let mut foo = Foo::new(1);
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
     let mut bar = Bar::new("tarzan", foo);
-    bar.save(&conn).unwrap();
+    bar.save(&conn).await.unwrap();
 
-    let bar2 = Bar::get(&conn, "tarzan".to_string()).unwrap();
+    let bar2 = Bar::get(&conn, "tarzan".to_string()).await.unwrap();
     assert_eq!(bar, bar2);
 }
 testall!(string_pk);
 
-fn foreign_key(conn: Connection) {
+async fn foreign_key(conn: Connection) {
     let mut foo = Foo::new(1);
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
     let mut bar = Bar::new("tarzan", foo.clone());
-    bar.save(&conn).unwrap();
-    let bar2 = Bar::get(&conn, "tarzan".to_string()).unwrap();
+    bar.save(&conn).await.unwrap();
+    let bar2 = Bar::get(&conn, "tarzan".to_string()).await.unwrap();
 
-    let foo2: &Foo = bar2.foo.load(&conn).unwrap();
+    let foo2: &Foo = bar2.foo.load(&conn).await.unwrap();
     assert_eq!(&foo, foo2);
 
     let foo3: &Foo = bar2.foo.get().unwrap();
@@ -230,53 +233,53 @@ fn foreign_key(conn: Connection) {
 }
 testall!(foreign_key);
 
-fn auto_pk(conn: Connection) {
+async fn auto_pk(conn: Connection) {
     let mut baz1 = Baz::new("baz1");
-    baz1.save(&conn).unwrap();
+    baz1.save(&conn).await.unwrap();
     let mut baz2 = Baz::new("baz2");
-    baz2.save(&conn).unwrap();
+    baz2.save(&conn).await.unwrap();
     let mut baz3 = Baz::new("baz3");
-    baz3.save(&conn).unwrap();
+    baz3.save(&conn).await.unwrap();
     assert!(baz1.id < baz2.id);
     assert!(baz2.id < baz3.id);
 }
 testall!(auto_pk);
 
-fn only_pk(conn: Connection) {
+async fn only_pk(conn: Connection) {
     let mut obj = HasOnlyPk::new(1);
-    obj.save(&conn).unwrap();
+    obj.save(&conn).await.unwrap();
     // verify we can still save the object even though it has no
     // fields to modify
-    obj.save(&conn).unwrap();
+    obj.save(&conn).await.unwrap();
 }
 testall!(only_pk);
 
-fn basic_committed_transaction(mut conn: Connection) {
-    let tr = conn.transaction().unwrap();
+async fn basic_committed_transaction(mut conn: Connection) {
+    let tr = conn.transaction().await.unwrap();
 
     // Create an object with a transaction and commit it
     let mut foo = Foo::new(1);
     foo.bar = 42;
-    foo.save(&tr).unwrap();
-    tr.commit().unwrap();
+    foo.save(&tr).await.unwrap();
+    tr.commit().await.unwrap();
 
     // Find the object
-    let foo2 = Foo::get(&conn, 1).unwrap();
+    let foo2 = Foo::get(&conn, 1).await.unwrap();
     assert_eq!(foo, foo2);
 }
 testall!(basic_committed_transaction);
 
-fn basic_dropped_transaction(mut conn: Connection) {
+async fn basic_dropped_transaction(mut conn: Connection) {
     // Create an object with a transaction but never commit it
     {
-        let tr = conn.transaction().unwrap();
+        let tr = conn.transaction().await.unwrap();
         let mut foo = Foo::new(1);
         foo.bar = 42;
-        foo.save(&tr).unwrap();
+        foo.save(&tr).await.unwrap();
     }
 
     // Find the object
-    match Foo::get(&conn, 1) {
+    match Foo::get(&conn, 1).await {
         Ok(_) => panic!("object should not exist"),
         Err(butane::Error::NoSuchObject) => (),
         Err(e) => panic!("Unexpected error {e}"),
@@ -284,17 +287,17 @@ fn basic_dropped_transaction(mut conn: Connection) {
 }
 testall!(basic_dropped_transaction);
 
-fn basic_rollback_transaction(mut conn: Connection) {
-    let tr = conn.transaction().unwrap();
+async fn basic_rollback_transaction(mut conn: Connection) {
+    let tr = conn.transaction().await.unwrap();
 
     // Create an object with a transaction but then roll back the transaction
     let mut foo = Foo::new(1);
     foo.bar = 42;
-    foo.save(&tr).unwrap();
-    tr.rollback().unwrap();
+    foo.save(&tr).await.unwrap();
+    tr.rollback().await.unwrap();
 
     // Find the object
-    match Foo::get(&conn, 1) {
+    match Foo::get(&conn, 1).await {
         Ok(_) => panic!("object should not exist"),
         Err(butane::Error::NoSuchObject) => (),
         Err(e) => panic!("Unexpected error {e}"),
@@ -302,14 +305,14 @@ fn basic_rollback_transaction(mut conn: Connection) {
 }
 testall!(basic_rollback_transaction);
 
-fn basic_unique_field_error_on_non_unique(conn: Connection) {
+async fn basic_unique_field_error_on_non_unique(conn: Connection) {
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
-    foo1.save(&conn).unwrap();
+    foo1.save(&conn).await.unwrap();
 
     let mut foo2 = Foo::new(2);
     foo2.bar = foo1.bar;
-    let e = foo2.save(&conn).unwrap_err();
+    let e = foo2.save(&conn).await.unwrap_err();
     // Make sure the error is one we expect
     assert!(match e {
         #[cfg(feature = "sqlite")]
@@ -326,22 +329,22 @@ fn basic_unique_field_error_on_non_unique(conn: Connection) {
 }
 testall!(basic_unique_field_error_on_non_unique);
 
-fn fkey_same_type(conn: Connection) {
+async fn fkey_same_type(conn: Connection) {
     let mut o1 = SelfReferential::new(1);
     let mut o2 = SelfReferential::new(2);
-    o2.save(&conn).unwrap();
+    o2.save(&conn).await.unwrap();
     o1.reference = Some(ForeignKey::from_pk(o2.id));
-    o1.save(&conn).unwrap();
+    o1.save(&conn).await.unwrap();
 
-    let o1 = SelfReferential::get(&conn, 1).unwrap();
+    let o1 = SelfReferential::get(&conn, 1).await.unwrap();
     assert!(o1.reference.is_some());
-    let inner: SelfReferential = o1.reference.unwrap().load(&conn).unwrap().clone();
+    let inner: SelfReferential = o1.reference.unwrap().load(&conn).await.unwrap().clone();
     assert_eq!(inner, o2);
     assert!(inner.reference.is_none());
 }
 testall!(fkey_same_type);
 
-fn basic_time(conn: Connection) {
+async fn basic_time(conn: Connection) {
     let now = Utc::now();
     let mut time = TimeHolder {
         id: 1,
@@ -350,48 +353,52 @@ fn basic_time(conn: Connection) {
         utc2: now,
         state: ObjectState::default(),
     };
-    time.save(&conn).unwrap();
+    time.save(&conn).await.unwrap();
 
-    let time2 = TimeHolder::get(&conn, 1).unwrap();
+    let time2 = TimeHolder::get(&conn, 1).await.unwrap();
     // Note, we don't just compare the objects directly because we
     // lose some precision when we go to the database.
     assert_eq!(time.naive.timestamp(), time2.naive.timestamp());
 }
 testall!(basic_time);
 
-fn basic_load_first(conn: Connection) {
+async fn basic_load_first(conn: Connection) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
     foo1.baz = "hello world".to_string();
-    foo1.save(&conn).unwrap();
+    foo1.save(&conn).await.unwrap();
     let mut foo2 = Foo::new(2);
     foo2.bar = 43;
     foo2.baz = "hello world".to_string();
-    foo2.save(&conn).unwrap();
+    foo2.save(&conn).await.unwrap();
 
     // query finds first
-    let found = query!(Foo, baz.like("hello%")).load_first(&conn).unwrap();
+    let found = query!(Foo, baz.like("hello%"))
+        .load_first(&conn)
+        .await
+        .unwrap();
 
     assert_eq!(found, Some(foo1));
 }
 testall!(basic_load_first);
 
-fn basic_load_first_ordered(conn: Connection) {
+async fn basic_load_first_ordered(conn: Connection) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
     foo1.baz = "hello world".to_string();
-    foo1.save(&conn).unwrap();
+    foo1.save(&conn).await.unwrap();
     let mut foo2 = Foo::new(2);
     foo2.bar = 43;
     foo2.baz = "hello world".to_string();
-    foo2.save(&conn).unwrap();
+    foo2.save(&conn).await.unwrap();
 
     // query finds first, ascending order
     let found_asc = query!(Foo, baz.like("hello%"))
         .order_asc(colname!(Foo, bar))
         .load_first(&conn)
+        .await
         .unwrap();
 
     assert_eq!(found_asc, Some(foo1));
@@ -400,6 +407,7 @@ fn basic_load_first_ordered(conn: Connection) {
     let found_desc = query!(Foo, baz.like("hello%"))
         .order_desc(colname!(Foo, bar))
         .load_first(&conn)
+        .await
         .unwrap();
 
     assert_eq!(found_desc, Some(foo2));

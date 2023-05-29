@@ -21,21 +21,21 @@ impl FooUU {
     }
 }
 
-fn basic_uuid(conn: Connection) {
+async fn basic_uuid(conn: Connection) {
     //create
     let id = Uuid::new_v4();
     let mut foo = FooUU::new(id);
     foo.bar = 42;
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooUU::get(&conn, id).unwrap();
+    let mut foo2 = FooUU::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooUU::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooUU::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
 testall!(basic_uuid);

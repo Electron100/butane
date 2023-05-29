@@ -60,16 +60,16 @@ mod custom_pg {
         pt_to: Point,
     }
 
-    fn roundtrip_custom(conn: Connection) {
+    async fn roundtrip_custom(conn: Connection) {
         let mut trip = Trip {
             id: -1,
             pt_from: Point::new(0.0, 0.0),
             pt_to: Point::new(8.0, 9.0),
             state: ObjectState::default(),
         };
-        trip.save(&conn).unwrap();
+        trip.save(&conn).await.unwrap();
 
-        let trip2 = Trip::get(&conn, trip.id).unwrap();
+        let trip2 = Trip::get(&conn, trip.id).await.unwrap();
         assert_eq!(trip, trip2);
     }
     maketest_pg!(roundtrip_custom, true);

@@ -29,27 +29,28 @@ impl HasCustomField2 {
     }
 }
 
-fn roundtrip_custom_type(conn: Connection) {
+async fn roundtrip_custom_type(conn: Connection) {
     //create
     let mut obj = HasCustomField2::new(1, Whatsit::Foo);
-    obj.save(&conn).unwrap();
+    obj.save(&conn).await.unwrap();
 
     // read
-    let obj2 = HasCustomField2::get(&conn, 1).unwrap();
+    let obj2 = HasCustomField2::get(&conn, 1).await.unwrap();
     assert_eq!(obj, obj2);
 }
 testall!(roundtrip_custom_type);
 
-fn query_custom_type(conn: Connection) {
+async fn query_custom_type(conn: Connection) {
     //create
     let mut obj_foo = HasCustomField2::new(1, Whatsit::Foo);
-    obj_foo.save(&conn).unwrap();
+    obj_foo.save(&conn).await.unwrap();
     let mut obj_bar = HasCustomField2::new(2, Whatsit::Bar);
-    obj_bar.save(&conn).unwrap();
+    obj_bar.save(&conn).await.unwrap();
 
     // query
     let results = query!(HasCustomField2, frob == { Whatsit::Bar })
         .load(&conn)
+        .await
         .unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], obj_bar)

@@ -14,8 +14,9 @@ datetime = ["chrono", "tokio-postgres?/with-chrono-0_4"]
 debug = ["log"]
 fake = ["dep:fake", "rand"]
 json = ["tokio-postgres?/with-serde_json-1", "rusqlite?/serde_json"]
-sqlite = ["rusqlite"]
-sqlite-bundled = ["rusqlite/bundled"]
+# todo re-enable sqlite
+#sqlite = ["rusqlite"]
+#sqlite-bundled = ["rusqlite/bundled"]
 tls = ["native-tls", "postgres-native-tls"]
 pg = ["tokio-postgres", "bytes"]
 
@@ -40,7 +41,8 @@ tokio-postgres = { optional = true, workspace = true }
 postgres-native-tls = { version = "0.5", optional = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
-r2d2 = { optional = true, workspace = true }
+# todo re-enable r2d2
+#r2d2 = { optional = true, workspace = true }
 rand = { optional = true, workspace = true }
 regex = { version = "1.5", features = ["std"] }
 rusqlite = { workspace = true, optional = true }

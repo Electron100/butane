@@ -26,25 +26,25 @@ impl FooJJ {
     }
 }
 
-fn json_null(conn: Connection) {
+async fn json_null(conn: Connection) {
     //create
     let id = 4;
     let mut foo = FooJJ::new(id);
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooJJ::get(&conn, id).unwrap();
+    let mut foo2 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooJJ::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
 testall!(json_null);
 
-fn basic_json(conn: Connection) {
+async fn basic_json(conn: Connection) {
     //create
     let id = 4;
     let mut foo = FooJJ::new(id);
@@ -59,16 +59,16 @@ fn basic_json(conn: Connection) {
         }"#;
 
     foo.val = serde_json::from_str(data).unwrap();
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooJJ::get(&conn, id).unwrap();
+    let mut foo2 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooJJ::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
 testall!(basic_json);
@@ -90,7 +90,7 @@ impl FooHH {
         }
     }
 }
-fn basic_hashmap(conn: Connection) {
+async fn basic_hashmap(conn: Connection) {
     //create
     let id = 4;
     let mut foo = FooHH::new(id);
@@ -98,16 +98,16 @@ fn basic_hashmap(conn: Connection) {
     data.insert("a".to_string(), "1".to_string());
 
     foo.val = data;
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooHH::get(&conn, id).unwrap();
+    let mut foo2 = FooHH::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooHH::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooHH::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
 testall!(basic_hashmap);
@@ -135,7 +135,7 @@ impl FooHHO {
         }
     }
 }
-fn hashmap_with_object_values(conn: Connection) {
+async fn hashmap_with_object_values(conn: Connection) {
     //create
     let id = 4;
     let mut foo = FooHHO::new(id);
@@ -143,16 +143,16 @@ fn hashmap_with_object_values(conn: Connection) {
     data.insert("a".to_string(), HashedObject { x: 1, y: 3 });
 
     foo.val = data;
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooHHO::get(&conn, id).unwrap();
+    let mut foo2 = FooHHO::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooHHO::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooHHO::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
 testall!(hashmap_with_object_values);
@@ -185,20 +185,20 @@ impl OuterFoo {
     }
 }
 
-fn inline_json(conn: Connection) {
+async fn inline_json(conn: Connection) {
     //create
     let id = 4;
     let mut foo = OuterFoo::new(id, InlineFoo::new(4, 8));
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = OuterFoo::get(&conn, id).unwrap();
+    let mut foo2 = OuterFoo::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = InlineFoo::new(5, 9);
-    foo2.save(&conn).unwrap();
-    let foo3 = OuterFoo::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = OuterFoo::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
 testall!(inline_json);

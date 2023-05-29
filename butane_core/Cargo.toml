@@ -1,6 +1,6 @@
 [package]
 name = "butane_core"
-version = "0.6.0"
+version.workspace = true
 authors = ["James Oakley <james@electronstudio.org>"]
 edition.workspace = true
 description = "Internals for Butane. Do not use this crate directly -- use the butane crate."

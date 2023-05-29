@@ -3,7 +3,8 @@
 
 extern crate proc_macro;
 
-use butane_core::{codegen, make_compile_error, migrations};
+use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
+use butane_core::{codegen, make_compile_error,SqlType, migrations};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
@@ -189,6 +190,15 @@ fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenS
         return derive_field_type_with_json(ident);
     }
 
+    let mut migrations = migrations_for_dir();
+
+    codegen::add_custom_type(
+        &mut migrations,
+        ident.to_string(),
+        DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Text)),
+    )
+    .unwrap();
+
     let match_arms_to_string: Vec<TokenStream2> = data_enum
         .variants
         .iter()
@@ -254,9 +264,6 @@ fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenS
 
 #[cfg(feature = "json")]
 fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream {
-    use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
-    use butane_core::SqlType;
-
     let mut migrations = migrations_for_dir();
 
     codegen::add_custom_type(

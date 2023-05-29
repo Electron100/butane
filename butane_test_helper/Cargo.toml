@@ -1,6 +1,6 @@
 [package]
 name = "butane_test_helper"
-version = "0.6.0"
+version.workspace = true
 authors = ["James Oakley <james@electronstudio.org>"]
 edition.workspace = true
 description = "A test helper for butane"

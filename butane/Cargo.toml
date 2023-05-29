@@ -1,6 +1,6 @@
 [package]
 name = "butane"
-version = "0.6.0"
+version.workspace = true
 authors = ["James Oakley <james@electronstudio.org>"]
 edition.workspace = true
 description = "An ORM with a focus on simplicity and on writing Rust, not SQL."

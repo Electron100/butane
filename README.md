@@ -13,7 +13,7 @@ implementation detail to the API consumer.
 
 ## Features
 
-* Relational queries using Rust-like syntax (via proc-macros)
+* Relational queries using Rust-like syntax (via `proc-macro`s)
 * Automatic migrations without writing SQL (although the generated SQL
   may be hand-tuned if necessary)
 * Ability to embed migrations in Rust code (so that a library may easily bundle its migrations)
@@ -57,15 +57,18 @@ post.save(conn)?;
 ```
 
 Queries are performed ergonomically with the `query!` macro.
+
 ``` rust
 let posts = query!(Post, published == true).limit(5).load(&conn)?;
 ```
 
 For a detailed tutorial, see the [Getting Started Guide](https://electron100.github.io/butane/getting-started).
+
 ## Cargo Features
 
 Butane exposes several features to Cargo. By default, no backends are
 enabled: you will want to enable either `sqlite` or `pg`:
+
 * `default`: Turns on `datetime` and `uuid`.
 * `debug`: Used in developing Butane, not expected to be enabled by consumers.
 * `datetime`: Support for timestamps (using `chrono::NaiveDateTime`).
@@ -91,9 +94,10 @@ enabled: you will want to enable either `sqlite` or `pg`:
 ## Roadmap
 
 Butane is young. The following features are currently missing, but planned
+
 * Foreign key constraints
 * Incremental object save
-* Backreferences for `ForeignKey` and `Many`.
+* Back-references for `ForeignKey` and `Many`.
 * Field/column rename support in migrations
 * Prepared/reusable queries
 * Benchmarking and performance tuning
@@ -111,23 +115,23 @@ doesn't aim to be better than Diesel, but makes some _different_ decisions, incl
 3. Rust code is the source of truth. The schema is understood from the
    definition of Models in Rust code, rather than inferred from the
    database.
-4. Queries are constructed using a DSL inside a proc-macro invocation
-   rather than by importing dsl methods/names to use into the current
+4. Queries are constructed using a DSL inside a `proc-macro` invocation
+   rather than by importing DSL methods/names to use into the current
    scope. For Diesel, you might write
-   
+
    ```rust
    use diesel_demo::schema::posts::dsl::*;
    let posts = posts.filter(published.eq(true))
         .limit(5)
         .load::<Post>(&conn)?
    ```
-   
+
    whereas for Butane, you would instead write
-   
+
    ```rust
    let posts = query!(Post, published == true).limit(5).load(&conn)?;
    ```
-   
+
    Which form is preferable is primarily an aesthetic
    judgement.
 5. Differences between database backends are largely hidden.

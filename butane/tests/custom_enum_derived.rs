@@ -1,12 +1,11 @@
 // Tests deriving FieldType for an enum
 use butane::db::Connection;
 use butane::prelude::*;
-use butane::{butane_type, model, query};
+use butane::{model, query};
 use butane::{FieldType, FromSql, ObjectState, SqlVal, ToSql};
 
 use butane_test_helper::*;
 
-#[butane_type(Text)]
 #[derive(PartialEq, Eq, Debug, Clone, FieldType)]
 enum Whatsit {
     Foo,

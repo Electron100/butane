@@ -1,0 +1,93 @@
+# yamllint disable rule:truthy
+# yamllint disable rule:empty-lines
+---
+name: Code Coverage
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# this allows a subsequently queued workflow run to interrupt previous runs in pull_requests only
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+jobs:
+  deepsource:
+    name: Test and submit
+    runs-on: ubuntu-22.04
+    steps:
+      # The checkout must be the PR 'head' sha for deepsource to work
+      - name: Checkout PR
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Checkout PUSH
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/checkout@v3
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ~/.cargo/advisory-dbs/
+          key: ${{ runner.os }}-coverage-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-coverage
+
+      # coverage needs a nightly toolchain
+      - name: Run test suite
+        run: |
+          rustup toolchain install nightly --allow-downgrade
+          cargo +nightly test --all-features --no-fail-fast ||:
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=unwind"
+          RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=unwind"
+
+      - name: Install grcov
+        run: |
+          cargo +stable install grcov || true
+
+      - name: Run coverage
+        id: coverage
+        uses: actions-rs/grcov@v0.1
+        with:
+          config: .grcov.yaml
+
+      # DeepSource limits the size of the coverage data file to 50 MB
+      - name: Move coverage file
+        run: |
+          mv ${{ steps.coverage.outputs.report }} ./coverage.xml
+          ls -al ./coverage.xml
+
+      - name: Install deepsource cli
+        run: |
+          RELEASE_ID=$(curl -fsSL https://api.github.com/repos/deepsourcelabs/cli/releases/latest | jq -r '.tag_name')
+          curl -fsSL -o ./deepsource_"${RELEASE_ID//v}"_linux_x86_64.tar.gz \
+            https://github.com/deepsourcelabs/cli/releases/download/"${RELEASE_ID}"/deepsource_"${RELEASE_ID//v}"_linux_x86_64.tar.gz
+          curl -fsSL -o ./ds_checksums.txt \
+            https://github.com/deepsourcelabs/cli/releases/download/"${RELEASE_ID}"/checksums.txt
+          cat ds_checksums.txt | grep deepsource_"${RELEASE_ID//v}"_linux_x86_64.tar.gz > ds-sha256chk.txt
+          sha256sum -c --strict ds-sha256chk.txt
+          tar -xvf deepsource_"${RELEASE_ID//v}"_linux_x86_64.tar.gz deepsource
+          chmod 755 deepsource
+
+      - name: Report test-coverage to DeepSource
+        if: ${{ !env.ACT }}
+        env:
+          DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
+        run: |
+          ./deepsource report --analyzer test-coverage --key rust --value-file coverage.xml

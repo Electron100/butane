@@ -1,6 +1,8 @@
 version = 1
 test_patterns = [
-  "butane/tests/**",
+  "butane/tests/**", 
+  "butane_core/tests/**", 
+  "example/tests/**",
 ]
 
 [[analyzers]]
@@ -9,3 +11,6 @@ name = "rust"
   [analyzers.meta]
   msrv = "stable"
 
+[[analyzers]]
+enabled = true
+name = "test-coverage"

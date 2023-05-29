@@ -12,7 +12,7 @@ use butane_test_helper::*;
 #[derive(PartialEq, Eq, Debug, Clone)]
 struct FooJJ {
     id: i64,
-    val: Value,
+    val: serde_json::Value,
     bar: u32,
 }
 impl FooJJ {

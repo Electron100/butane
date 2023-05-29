@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use clap::{value_parser, Arg, ArgMatches};
 
 use butane_cli::{
-    clean, clear_data, collapse_migrations, delete_table, embed, handle_error, list_migrations,
-    migrate, working_dir_path, Result,
+    base_dir, clean, clear_data, collapse_migrations, delete_table, embed, handle_error,
+    list_migrations, migrate, Result,
 };
 
 fn main() {
     lazy_static::lazy_static! {
-        static ref WORKING_DIR_PATH: PathBuf = working_dir_path();
+        static ref WORKING_DIR_PATH: PathBuf = base_dir();
     }
     let app = clap::Command::new("butane")
         .version(env!("CARGO_PKG_VERSION"))

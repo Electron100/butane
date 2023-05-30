@@ -289,7 +289,7 @@ where
         write!(
             &mut sql,
             "DELETE FROM {} WHERE ",
-            helper::quote_reserved_word(table.into())
+            helper::quote_reserved_word(table)
         )
         .unwrap();
         sql_for_expr(
@@ -565,7 +565,7 @@ fn create_table(table: &ATable, allow_exists: bool) -> Result<String> {
     Ok(format!(
         "CREATE TABLE {}{} (\n{}\n);",
         modifier,
-        helper::quote_reserved_word(table.name.clone()),
+        helper::quote_reserved_word(&table.name),
         coldefs
     ))
 }
@@ -583,7 +583,7 @@ fn define_column(col: &AColumn) -> Result<String> {
     }
     Ok(format!(
         "{} {} {}",
-        helper::quote_reserved_word(col.name().into()),
+        helper::quote_reserved_word(col.name()),
         col_sqltype(col)?,
         constraints.join(" ")
     ))
@@ -621,14 +621,14 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
 }
 
 fn drop_table(name: &str) -> String {
-    format!("DROP TABLE {};", helper::quote_reserved_word(name.into()))
+    format!("DROP TABLE {};", helper::quote_reserved_word(name))
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     let default: SqlVal = helper::column_default(col)?;
     Ok(format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
-        helper::quote_reserved_word(tbl_name.into()),
+        helper::quote_reserved_word(tbl_name),
         define_column(col)?,
         helper::sql_literal_value(default)?
     ))
@@ -637,8 +637,8 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
 fn remove_column(tbl_name: &str, name: &str) -> String {
     format!(
         "ALTER TABLE {} DROP COLUMN {};",
-        helper::quote_reserved_word(tbl_name.into()),
-        helper::quote_reserved_word(name.into())
+        helper::quote_reserved_word(tbl_name),
+        helper::quote_reserved_word(name)
     )
 }
 
@@ -646,14 +646,14 @@ fn copy_table(old: &ATable, new: &ATable) -> String {
     let column_names = new
         .columns
         .iter()
-        .map(|col| helper::quote_reserved_word(col.name().into()))
-        .collect::<Vec<String>>()
+        .map(|col| helper::quote_reserved_word(col.name()))
+        .collect::<Vec<Cow<str>>>()
         .join(", ");
     format!(
         "INSERT INTO {} SELECT {} FROM {};",
-        helper::quote_reserved_word(new.name.clone()),
+        helper::quote_reserved_word(&new.name),
         column_names,
-        helper::quote_reserved_word(old.name.clone())
+        helper::quote_reserved_word(&old.name)
     )
 }
 
@@ -689,8 +689,8 @@ fn change_column(
         &drop_table(&old_table.name),
         &format!(
             "ALTER TABLE {} RENAME TO {};",
-            helper::quote_reserved_word(new_table.name),
-            helper::quote_reserved_word(tbl_name.into())
+            helper::quote_reserved_word(&new_table.name),
+            helper::quote_reserved_word(tbl_name)
         ),
     ];
     let result = stmts.join("\n");
@@ -706,7 +706,7 @@ pub fn sql_insert_or_replace_with_placeholders(
     w: &mut impl Write,
 ) {
     write!(w, "INSERT ").unwrap();
-    write!(w, "INTO {} (", helper::quote_reserved_word(table.into())).unwrap();
+    write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();
     helper::list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold(1, |n, _| {

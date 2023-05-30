@@ -20,11 +20,11 @@ pub trait PlaceholderSource {
 }
 
 /// Quotes the `word` if it is a reserved word.
-pub fn quote_reserved_word(word: String) -> String {
+pub fn quote_reserved_word(word: &str) -> Cow<str> {
     if sqlparser::keywords::ALL_KEYWORDS.contains(&word.to_uppercase().as_str()) {
-        format!("\"{word}\"")
+        format!("\"{}\"", word).into()
     } else {
-        word
+        word.into()
     }
 }
 
@@ -37,7 +37,7 @@ where
     W: Write,
 {
     match expr {
-        Expr::Column(name) => w.write_str(&quote_reserved_word(name.into())),
+        Expr::Column(name) => w.write_str(&quote_reserved_word(name)),
         Val(v) => match v {
             // No risk of SQL injection with integers and the
             // different sizes are tricky with the PG backend's binary
@@ -99,9 +99,9 @@ where
                 write!(
                     w,
                     "{} IN (SELECT {} FROM {} WHERE ",
-                    quote_reserved_word(col.into()),
-                    quote_reserved_word(tbl2_col.into()),
-                    quote_reserved_word(tbl2.into()),
+                    quote_reserved_word(col),
+                    quote_reserved_word(tbl2_col),
+                    quote_reserved_word(&tbl2),
                 )
                 .unwrap();
                 f(Expr::Condition(expr), values, pls, w);
@@ -116,9 +116,9 @@ where
                 expr,
             } => {
                 // <col> IN (SELECT <col2> FROM <tbl2> <joins> WHERE <expr>)
-                write!(w, "{} IN (SELECT ", quote_reserved_word(col.into())).unwrap();
+                write!(w, "{} IN (SELECT ", quote_reserved_word(col)).unwrap();
                 sql_column(col2, w);
-                write!(w, " FROM {} ", quote_reserved_word(tbl2.into())).unwrap();
+                write!(w, " FROM {} ", quote_reserved_word(&tbl2)).unwrap();
                 sql_joins(joins, w);
                 write!(w, " WHERE ").unwrap();
                 f(Expr::Condition(expr), values, pls, w);
@@ -126,7 +126,7 @@ where
                 Ok(())
             }
             In(col, vals) => {
-                write!(w, "{} IN (", quote_reserved_word(col.into())).unwrap();
+                write!(w, "{} IN (", quote_reserved_word(col)).unwrap();
                 let mut remaining = vals.len();
                 for val in vals {
                     f(Expr::Val(val), values, pls, w);
@@ -154,7 +154,7 @@ pub fn sql_insert_with_placeholders(
     pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
-    write!(w, "INSERT INTO {} ", quote_reserved_word(table.into())).unwrap();
+    write!(w, "INSERT INTO {} ", quote_reserved_word(table)).unwrap();
     if !columns.is_empty() {
         write!(w, "(").unwrap();
         list_columns(columns, w);
@@ -178,13 +178,13 @@ pub fn sql_update_with_placeholders(
     pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
-    write!(w, "UPDATE {} SET ", quote_reserved_word(table.into())).unwrap();
+    write!(w, "UPDATE {} SET ", quote_reserved_word(table)).unwrap();
     columns.iter().fold("", |sep, c| {
         write!(
             w,
             "{}{} = {}",
             sep,
-            quote_reserved_word(c.name().into()),
+            quote_reserved_word(c.name()),
             pls.next_placeholder()
         )
         .unwrap();
@@ -193,7 +193,7 @@ pub fn sql_update_with_placeholders(
     write!(
         w,
         " WHERE {} = {}",
-        quote_reserved_word(pkcol.name().into()),
+        quote_reserved_word(pkcol.name()),
         pls.next_placeholder()
     )
     .unwrap();
@@ -215,14 +215,7 @@ pub fn sql_order(order: &[Order], w: &mut impl Write) {
             OrderDirection::Ascending => "ASC",
             OrderDirection::Descending => "DESC",
         };
-        write!(
-            w,
-            "{}{} {}",
-            sep,
-            quote_reserved_word(o.column.into()),
-            sql_dir
-        )
-        .unwrap();
+        write!(w, "{}{} {}", sep, quote_reserved_word(o.column), sql_dir).unwrap();
         ", "
     });
 }
@@ -263,8 +256,8 @@ pub fn list_columns(columns: &[Column], w: &mut impl Write) {
         "{}",
         colnames
             .iter()
-            .map(|x| quote_reserved_word((*x).into()))
-            .collect::<Vec<String>>()
+            .map(|x| quote_reserved_word(x))
+            .collect::<Vec<Cow<str>>>()
             .join(", ")
     )
     .unwrap();
@@ -279,12 +272,7 @@ fn sql_joins(joins: Vec<Join>, w: &mut impl Write) {
                 col2,
             } => {
                 // INNER JOIN <join_table> ON <col1> = <col2>
-                write!(
-                    w,
-                    "INNER JOIN {} ON ",
-                    quote_reserved_word(join_table.into())
-                )
-                .unwrap();
+                write!(w, "INNER JOIN {} ON ", quote_reserved_word(join_table)).unwrap();
                 sql_column(col1, w);
                 w.write_str(" = ").unwrap();
                 sql_column(col2, w);
@@ -298,8 +286,8 @@ fn sql_column(col: query::Column, w: &mut impl Write) {
         Some(table) => write!(
             w,
             "{}.{}",
-            quote_reserved_word(table.into()),
-            quote_reserved_word(col.name().into())
+            quote_reserved_word(table),
+            quote_reserved_word(col.name())
         ),
         None => w.write_str(col.name()),
     }

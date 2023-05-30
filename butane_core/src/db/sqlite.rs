@@ -235,7 +235,7 @@ impl ConnectionMethods for rusqlite::Connection {
         write!(
             &mut sql,
             "DELETE FROM {} WHERE ",
-            helper::quote_reserved_word(table.into())
+            helper::quote_reserved_word(table)
         )
         .unwrap();
         sql_for_expr(
@@ -488,10 +488,10 @@ fn define_column(col: &AColumn) -> String {
     if col.unique() {
         constraints.push("UNIQUE".to_string());
     }
-    eprintln!("{}", helper::quote_reserved_word(col.name().into()));
+    eprintln!("{}", helper::quote_reserved_word(col.name()));
     format!(
         "{} {} {}",
-        helper::quote_reserved_word(col.name().into()),
+        helper::quote_reserved_word(col.name()),
         col_sqltype(col),
         constraints.join(" ")
     )
@@ -524,14 +524,14 @@ fn sqltype(ty: &SqlType) -> &'static str {
 }
 
 fn drop_table(name: &str) -> String {
-    format!("DROP TABLE {};", helper::quote_reserved_word(name.into()))
+    format!("DROP TABLE {};", helper::quote_reserved_word(name))
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     let default: SqlVal = helper::column_default(col)?;
     Ok(format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
-        helper::quote_reserved_word(tbl_name.into()),
+        helper::quote_reserved_word(tbl_name),
         define_column(col),
         helper::sql_literal_value(default)?
     ))
@@ -559,14 +559,14 @@ fn copy_table(old: &ATable, new: &ATable) -> String {
     let column_names = new
         .columns
         .iter()
-        .map(|col| helper::quote_reserved_word(col.name().into()))
-        .collect::<Vec<String>>()
+        .map(|col| helper::quote_reserved_word(col.name()))
+        .collect::<Vec<Cow<str>>>()
         .join(", ");
     format!(
         "INSERT INTO {} SELECT {} FROM {};",
-        helper::quote_reserved_word(new.name.clone()),
+        helper::quote_reserved_word(&new.name),
         column_names,
-        helper::quote_reserved_word(old.name.clone())
+        helper::quote_reserved_word(&old.name)
     )
 }
 
@@ -602,8 +602,8 @@ fn change_column(
         &drop_table(&old_table.name),
         &format!(
             "ALTER TABLE {} RENAME TO {};",
-            helper::quote_reserved_word(new_table.name),
-            helper::quote_reserved_word(tbl_name.into())
+            helper::quote_reserved_word(&new_table.name),
+            helper::quote_reserved_word(tbl_name)
         ),
     ];
     let result = stmts.join("\n");
@@ -614,7 +614,7 @@ fn change_column(
 
 pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write) {
     write!(w, "INSERT OR REPLACE ").unwrap();
-    write!(w, "INTO {} (", helper::quote_reserved_word(table.into())).unwrap();
+    write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();
     helper::list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold("", |sep, _| {

@@ -4,7 +4,7 @@
 extern crate proc_macro;
 
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
-use butane_core::{codegen, make_compile_error,SqlType, migrations};
+use butane_core::{codegen, make_compile_error, migrations, SqlType};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;

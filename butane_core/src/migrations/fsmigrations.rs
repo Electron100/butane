@@ -271,6 +271,17 @@ impl FsMigrations {
         f.write_all(serde_json::to_string(state)?.as_bytes())
             .map_err(|e| e.into())
     }
+    pub fn detach_latest_migration(&mut self) -> Result<()> {
+        let latest = self.latest().expect("There are no migrations");
+        let from_name = latest
+            .migration_from()?
+            .map(|s| s.to_string())
+            .expect("There is no previous migration");
+        let mut state = self.get_state()?;
+        state.latest = Some(from_name);
+        self.save_state(&state)?;
+        Ok(())
+    }
 }
 
 impl Migrations for FsMigrations {

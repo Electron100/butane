@@ -89,6 +89,32 @@ pub fn make_migration(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
     Ok(())
 }
 
+pub fn detach_migration(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
+    let mut ms = get_migrations(base_dir)?;
+    let all_migrations = ms.all_migrations()?;
+    let initial_migration = all_migrations.first().expect("There are no migrations");
+    let top_migration = ms.latest().expect("There are no migrations");
+    if initial_migration == &top_migration {
+        eprintln!("Can not detach initial migration");
+        std::process::exit(1);
+    }
+    // TODO: check the top migration hasnt been applied.
+    let previous_migration = &all_migrations[all_migrations.len() - 2];
+    if let Some(name) = name {
+        if top_migration.name() != name.as_str() {
+            eprintln!("Migration {name} is not the top migration");
+            std::process::exit(1);
+        }
+    }
+    println!(
+        "Detaching {} from {}",
+        top_migration.name(),
+        previous_migration.name()
+    );
+    ms.detach_latest_migration()?;
+    Ok(())
+}
+
 pub fn migrate(base_dir: &PathBuf) -> Result<()> {
     let spec = load_connspec(base_dir)?;
     let mut conn = db::connect(&spec)?;

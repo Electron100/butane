@@ -49,6 +49,16 @@ fn main() {
                         .help("Name to use for the migration"),
                 ),
         )
+        .subcommand(
+            clap::Command::new("detachmigration")
+                .about("Detach the top migration")
+                .arg(
+                    Arg::new("NAME")
+                        .required(true)
+                        .index(1)
+                        .help("Name to use for the migration"),
+                ),
+        )
         .subcommand(clap::Command::new("migrate").about("Apply migrations"))
         .subcommand(clap::Command::new("list").about("List migrations"))
         .subcommand(clap::Command::new("collapse").about("Replace all migrations with a single migration representing the current model state.").arg(
@@ -103,6 +113,7 @@ fn main() {
         Some(("makemigration", sub_args)) => {
             handle_error(make_migration(&base_dir, Some(sub_args)))
         }
+        Some(("detachmigration", sub_args)) => handle_error(detach_migration(&base_dir, Some(sub_args))),
         Some(("migrate", _)) => handle_error(migrate(&base_dir)),
         Some(("rollback", sub_args)) => handle_error(rollback(&base_dir, Some(sub_args))),
         Some(("embed", _)) => handle_error(embed(&base_dir)),
@@ -136,6 +147,11 @@ fn init(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
 fn make_migration(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
     let name_arg = args.and_then(|a| a.get_one::<String>("NAME"));
     butane_cli::make_migration(base_dir, name_arg)
+}
+
+fn detach_migration(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
+    let name_arg = args.and_then(|a| a.get_one::<String>("NAME"));
+    butane_cli::detach_migration(base_dir, name_arg)
 }
 
 fn rollback(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {

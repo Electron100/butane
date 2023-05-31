@@ -444,7 +444,7 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
 
     #[cfg(feature = "json")]
     {
-        if *ty == parse_quote!(Value) || *ty == parse_quote!(serde::Json) {
+        if *ty == parse_quote!(serde_json::Value) || *ty == parse_quote!(Value) {
             return some_known(SqlType::Json);
         }
     }

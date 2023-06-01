@@ -11,13 +11,13 @@ fn test_migrate_and_query() {
 
     // This ensures the binary exists if `example` is the first project tested
     Command::new("cargo")
-        .args(&["build", "--workspace", "--bin=butane"])
+        .args(["build", "--workspace", "--bin=butane"])
         .assert()
         .success();
 
     Command::cargo_bin("butane")
         .unwrap()
-        .args(&["init", "sqlite", db])
+        .args(["init", "sqlite", db])
         .assert()
         .success();
 
@@ -27,7 +27,7 @@ fn test_migrate_and_query() {
 
     let result = Command::cargo_bin("butane")
         .unwrap()
-        .args(&["makemigration", "initial"])
+        .args(["makemigration", "initial"])
         .assert()
         .success();
 
@@ -43,7 +43,7 @@ fn test_migrate_and_query() {
 
     Command::cargo_bin("butane")
         .unwrap()
-        .args(&["migrate"])
+        .args(["migrate"])
         .assert()
         .success();
 

@@ -19,6 +19,15 @@ pub trait PlaceholderSource {
     fn next_placeholder(&mut self) -> Cow<str>;
 }
 
+/// Quotes the `word` if it is a reserved word.
+pub fn quote_reserved_word(word: &str) -> Cow<str> {
+    if sqlparser::keywords::ALL_KEYWORDS.contains(&word.to_uppercase().as_str()) {
+        format!("\"{}\"", word).into()
+    } else {
+        word.into()
+    }
+}
+
 /// Writes to `w` the SQL to express the expression given in `expr`. Values contained in `expr` are rendered
 /// as placeholders in the SQL string and the actual values are added to `values`.
 pub fn sql_for_expr<F, P, W>(expr: Expr, f: F, values: &mut Vec<SqlVal>, pls: &mut P, w: &mut W)
@@ -28,7 +37,7 @@ where
     W: Write,
 {
     match expr {
-        Expr::Column(name) => w.write_str(name),
+        Expr::Column(name) => w.write_str(&quote_reserved_word(name)),
         Val(v) => match v {
             // No risk of SQL injection with integers and the
             // different sizes are tricky with the PG backend's binary
@@ -87,7 +96,14 @@ where
                 tbl2_col,
                 expr,
             } => {
-                write!(w, "{col} IN (SELECT {tbl2_col} FROM {tbl2} WHERE ").unwrap();
+                write!(
+                    w,
+                    "{} IN (SELECT {} FROM {} WHERE ",
+                    quote_reserved_word(col),
+                    quote_reserved_word(tbl2_col),
+                    quote_reserved_word(&tbl2),
+                )
+                .unwrap();
                 f(Expr::Condition(expr), values, pls, w);
                 write!(w, ")").unwrap();
                 Ok(())
@@ -100,9 +116,9 @@ where
                 expr,
             } => {
                 // <col> IN (SELECT <col2> FROM <tbl2> <joins> WHERE <expr>)
-                write!(w, "{col} IN (SELECT ").unwrap();
+                write!(w, "{} IN (SELECT ", quote_reserved_word(col)).unwrap();
                 sql_column(col2, w);
-                write!(w, " FROM {tbl2} ").unwrap();
+                write!(w, " FROM {} ", quote_reserved_word(&tbl2)).unwrap();
                 sql_joins(joins, w);
                 write!(w, " WHERE ").unwrap();
                 f(Expr::Condition(expr), values, pls, w);
@@ -110,7 +126,7 @@ where
                 Ok(())
             }
             In(col, vals) => {
-                write!(w, "{col} IN (").unwrap();
+                write!(w, "{} IN (", quote_reserved_word(col)).unwrap();
                 let mut remaining = vals.len();
                 for val in vals {
                     f(Expr::Val(val), values, pls, w);
@@ -138,7 +154,7 @@ pub fn sql_insert_with_placeholders(
     pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
-    write!(w, "INSERT INTO {table} ").unwrap();
+    write!(w, "INSERT INTO {} ", quote_reserved_word(table)).unwrap();
     if !columns.is_empty() {
         write!(w, "(").unwrap();
         list_columns(columns, w);
@@ -153,6 +169,8 @@ pub fn sql_insert_with_placeholders(
     }
 }
 
+/// Writes to `w` the SQL of an UPDATE to `table` of `columns` using values in `pls`,
+/// for the row uniquely identified by `pkcol`.
 pub fn sql_update_with_placeholders(
     table: &str,
     pkcol: Column,
@@ -160,12 +178,25 @@ pub fn sql_update_with_placeholders(
     pls: &mut impl PlaceholderSource,
     w: &mut impl Write,
 ) {
-    write!(w, "UPDATE {table} SET ").unwrap();
+    write!(w, "UPDATE {} SET ", quote_reserved_word(table)).unwrap();
     columns.iter().fold("", |sep, c| {
-        write!(w, "{}{} = {}", sep, c.name(), pls.next_placeholder()).unwrap();
+        write!(
+            w,
+            "{}{} = {}",
+            sep,
+            quote_reserved_word(c.name()),
+            pls.next_placeholder()
+        )
+        .unwrap();
         ", "
     });
-    write!(w, " WHERE {} = {}", pkcol.name(), pls.next_placeholder()).unwrap();
+    write!(
+        w,
+        " WHERE {} = {}",
+        quote_reserved_word(pkcol.name()),
+        pls.next_placeholder()
+    )
+    .unwrap();
 }
 
 pub fn sql_limit(limit: i32, w: &mut impl Write) {
@@ -176,6 +207,7 @@ pub fn sql_offset(offset: i32, w: &mut impl Write) {
     write!(w, " OFFSET {offset}").unwrap();
 }
 
+/// Writes to `w` the SQL of the list of column `order`.
 pub fn sql_order(order: &[Order], w: &mut impl Write) {
     write!(w, " ORDER BY ").unwrap();
     order.iter().fold("", |sep, o| {
@@ -183,7 +215,7 @@ pub fn sql_order(order: &[Order], w: &mut impl Write) {
             OrderDirection::Ascending => "ASC",
             OrderDirection::Descending => "DESC",
         };
-        write!(w, "{}{} {}", sep, o.column, sql_dir).unwrap();
+        write!(w, "{}{} {}", sep, quote_reserved_word(o.column), sql_dir).unwrap();
         ", "
     });
 }
@@ -215,10 +247,20 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
     })
 }
 
+/// Writes to `w` the SQL of the list of `columns`.
 pub fn list_columns(columns: &[Column], w: &mut impl Write) {
     let mut colnames: Vec<&'static str> = Vec::new();
     columns.iter().for_each(|c| colnames.push(c.name()));
-    write!(w, "{}", colnames.as_slice().join(",")).unwrap();
+    write!(
+        w,
+        "{}",
+        colnames
+            .iter()
+            .map(|x| quote_reserved_word(x))
+            .collect::<Vec<Cow<str>>>()
+            .join(", ")
+    )
+    .unwrap();
 }
 
 fn sql_joins(joins: Vec<Join>, w: &mut impl Write) {
@@ -230,7 +272,7 @@ fn sql_joins(joins: Vec<Join>, w: &mut impl Write) {
                 col2,
             } => {
                 // INNER JOIN <join_table> ON <col1> = <col2>
-                write!(w, "INNER JOIN {join_table} ON ").unwrap();
+                write!(w, "INNER JOIN {} ON ", quote_reserved_word(join_table)).unwrap();
                 sql_column(col1, w);
                 w.write_str(" = ").unwrap();
                 sql_column(col2, w);
@@ -241,7 +283,12 @@ fn sql_joins(joins: Vec<Join>, w: &mut impl Write) {
 
 fn sql_column(col: query::Column, w: &mut impl Write) {
     match col.table() {
-        Some(table) => write!(w, "{}.{}", table, col.name()),
+        Some(table) => write!(
+            w,
+            "{}.{}",
+            quote_reserved_word(table),
+            quote_reserved_word(col.name())
+        ),
         None => w.write_str(col.name()),
     }
     .unwrap()

@@ -82,7 +82,7 @@ fn wont_load_connection_spec_from_missing_path() {
     assert!(!path.exists());
 
     // try to load a spec from the non-existent path
-    let result = ConnectionSpec::load(&path);
+    let result = ConnectionSpec::load(path);
     assert!(result.is_err());
     assert!(matches!(result, Err(butane_core::Error::IO(_))));
 }
@@ -98,11 +98,11 @@ fn saves_invalid_connection_spec_to_missing_path() {
 
     // writes the json to that path
     let spec = ConnectionSpec::new("unknown_name", "foo://bar");
-    let result = spec.save(&path);
+    let result = spec.save(path);
     assert!(result.is_ok());
     let f = std::fs::File::open(path).unwrap();
     assert!(f.metadata().unwrap().is_file());
 
-    let loaded_spec = ConnectionSpec::load(&path).unwrap();
+    let loaded_spec = ConnectionSpec::load(path).unwrap();
     assert_eq!(spec, loaded_spec);
 }

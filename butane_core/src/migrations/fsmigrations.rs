@@ -42,7 +42,7 @@ impl MigrationsState {
 }
 
 /// A migration stored in the filesystem
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FsMigration {
     fs: Rc<dyn Filesystem>,
     root: PathBuf,

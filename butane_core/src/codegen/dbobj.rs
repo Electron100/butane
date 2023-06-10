@@ -7,7 +7,7 @@ use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Field, ItemStruct};
 
 // Configuration that can be specified with attributes to override default behavior
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Config {
     pub table_name: Option<String>,
 }

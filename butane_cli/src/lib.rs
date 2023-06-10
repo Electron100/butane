@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 pub type Result<T> = std::result::Result<T, anyhow::Error>;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CliState {
     embedded: bool,
 }

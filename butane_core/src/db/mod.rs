@@ -90,7 +90,7 @@ connection_method_wrapper!(Connection);
 /// Connection specification. Contains the name of a database backend
 /// and the backend-specific connection string. See [connect][crate::db::connect]
 /// to make a [Connection][crate::db::Connection] from a `ConnectionSpec`.
-#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectionSpec {
     pub backend_name: String,
     pub conn_str: String,

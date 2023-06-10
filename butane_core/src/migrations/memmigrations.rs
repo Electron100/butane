@@ -91,7 +91,7 @@ impl MigrationMut for MemMigration {
 }
 
 /// A collection of migrations stored in memory.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MemMigrations {
     migrations: HashMap<String, MemMigration>,
     current: MemMigration,

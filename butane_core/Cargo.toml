@@ -49,6 +49,7 @@ thiserror = "1.0"
 uuid = { workspace = true, optional = true }
 
 [dev-dependencies]
+assert_matches = "1.5"
 butane_test_helper = { workspace = true }
 env_logger = { workspace = true }
 paste = { workspace = true }

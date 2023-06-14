@@ -488,7 +488,6 @@ fn define_column(col: &AColumn) -> String {
     if col.unique() {
         constraints.push("UNIQUE".to_string());
     }
-    eprintln!("{}", helper::quote_reserved_word(col.name()));
     format!(
         "{} {} {}",
         helper::quote_reserved_word(col.name()),

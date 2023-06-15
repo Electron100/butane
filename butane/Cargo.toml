@@ -49,6 +49,7 @@ r2d2_for_test = { package = "r2d2", version = "0.8" }
 rusqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sqlparser = { workspace = true }
 uuid_for_test = { package = "uuid", version = "1.2", features = ["v4"] }
 
 [package.metadata.docs.rs]

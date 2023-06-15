@@ -6,6 +6,8 @@ use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
 use proc_macro2::TokenStream;
 use quote::quote;
+use sqlparser::dialect::GenericDialect;
+use sqlparser::parser::Parser as SqlParser;
 
 use butane_test_helper::*;
 
@@ -148,11 +150,11 @@ fn current_migration_custom_type() {
     butane_type_with_migrations(quote! {Text}, tokens, &mut ms);
 
     let tokens = quote! {
-            #[derive(PartialEq, Eq, Debug, Clone)]
-            struct HasCustomField {
-                    id: i64,
-                    frob: Frobnozzle,
-            }
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        struct HasCustomField {
+            id: i64,
+            frob: Frobnozzle,
+        }
     };
     model_with_migrations(tokens, &mut ms);
 
@@ -177,12 +179,12 @@ fn migration_add_field_sqlite() {
     migration_add_field(
         &mut sqlite_connection(),
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;",
-				// The exact details of futzing a DROP COLUMN in sqlite aren't
-				// important (e.g. the temp table naming is certainly not part
-				// of the API contract), but the goal here is to ensure we're
-				// getting sane looking downgrade sql and a test failure if it
-				// changes. If the change is innocuous, this test should just
-				// be updated.
+        // The exact details of futzing a DROP COLUMN in sqlite aren't
+        // important (e.g. the temp table naming is certainly not part
+        // of the API contract), but the goal here is to ensure we're
+        // getting sane looking downgrade sql and a test failure if it
+        // changes. If the change is innocuous, this test should just
+        // be updated.
         "CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
     );
 }
@@ -204,8 +206,10 @@ fn migration_add_field_with_default_sqlite() {
     migration_add_field_with_default(
         &mut sqlite_connection(),
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 42;",
-				// See comments on migration_add_field_sqlite
-				"CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"
+        // See comments on migration_add_field_sqlite
+        r#"CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
+           INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;
+           DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
     );
 }
 
@@ -225,14 +229,20 @@ fn migration_add_field_with_default_pg() {
 fn migration_add_and_remove_field_sqlite() {
     migration_add_and_remove_field(
         &mut sqlite_connection(),
-				// The exact details of futzing a DROP COLUMN in sqlite aren't
-				// important (e.g. the temp table naming is certainly not part
-				// of the API contract), but the goal here is to ensure we're
-				// getting sane looking downgrade sql and a test failure if it
-				// changes. If the change is innocuous, this test should just
-				// be updated.
-        "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, baz FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
-        "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
+        // The exact details of futzing a DROP COLUMN in sqlite aren't
+        // important (e.g. the temp table naming is certainly not part
+        // of the API contract), but the goal here is to ensure we're
+        // getting sane looking downgrade sql and a test failure if it
+        // changes. If the change is innocuous, this test should just
+        // be updated.
+        r#"ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;
+           CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL);
+           INSERT INTO Foo__butane_tmp SELECT id, baz FROM Foo;
+           DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
+        r#"ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';
+           CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
+           INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;
+           ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
     );
 }
 
@@ -305,14 +315,19 @@ fn verify_sql(
     expected_up_sql: &str,
     expected_down_sql: &str,
 ) {
+    let dialect = GenericDialect {};
+    let expected_up_ast = SqlParser::parse_sql(&dialect, expected_up_sql).unwrap();
+    let expected_down_ast = SqlParser::parse_sql(&dialect, expected_down_sql).unwrap();
+
     let backend = conn.backend();
     let v2_migration = ms.latest().unwrap();
-    let strip = |s: String| s.replace('\n', "");
 
-    let actual_up_sql = strip(v2_migration.up_sql(backend.name()).unwrap().unwrap());
-    assert_eq!(actual_up_sql, expected_up_sql);
-    let actual_down_sql = strip(v2_migration.down_sql(backend.name()).unwrap().unwrap());
-    assert_eq!(actual_down_sql, expected_down_sql);
+    let actual_up_sql = v2_migration.up_sql(backend.name()).unwrap().unwrap();
+    let actual_up_ast = sqlparser::parser::Parser::parse_sql(&dialect, &actual_up_sql).unwrap();
+    assert_eq!(actual_up_ast, expected_up_ast);
+    let actual_down_sql = v2_migration.down_sql(backend.name()).unwrap().unwrap();
+    let actual_down_ast = sqlparser::parser::Parser::parse_sql(&dialect, &actual_down_sql).unwrap();
+    assert_eq!(actual_down_ast, expected_down_ast);
 }
 
 fn migration_add_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {

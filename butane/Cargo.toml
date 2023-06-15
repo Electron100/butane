@@ -13,6 +13,7 @@ documentation = "https://docs.rs/butane/"
 build = "build.rs"
 
 [features]
+auto-save-related = ["butane_core/auto-save-related"]
 default = ["datetime", "json", "uuid"]
 fake = ["butane_core/fake"]
 json = ["butane_codegen/json", "butane_core/json"]

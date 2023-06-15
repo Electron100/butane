@@ -2,7 +2,7 @@ use butane::prelude::*;
 use butane::{model, ForeignKey, Many, ObjectState};
 
 #[model]
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Blog {
     #[auto]
     pub id: i64,
@@ -18,6 +18,7 @@ impl Blog {
 }
 
 #[model]
+#[derive(Clone, Debug)]
 pub struct Post {
     #[auto]
     pub id: i32,
@@ -47,7 +48,7 @@ impl Post {
 }
 
 #[model]
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Tag {
     #[pk]
     pub tag: String,

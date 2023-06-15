@@ -24,13 +24,13 @@ fn default_oc<T>() -> OnceCell<Vec<T>> {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Many<T>
 where
-    T: DataObject,
+    T: DataObject + Clone,
 {
     item_table: Cow<'static, str>,
     owner: Option<SqlVal>,
     owner_type: SqlType,
     #[serde(skip)]
-    new_values: Vec<SqlVal>,
+    new_values: Vec<T>,
     #[serde(skip)]
     removed_values: Vec<SqlVal>,
     #[serde(skip)]
@@ -39,7 +39,7 @@ where
 }
 impl<T> Many<T>
 where
-    T: DataObject,
+    T: DataObject + Clone,
 {
     /// Constructs a new Many. `init` must be called before it can be
     /// loaded or saved (or those methods will return
@@ -74,6 +74,7 @@ where
     /// to have an uninitialized one.
     pub fn add(&mut self, new_val: &T) -> Result<()> {
         // Check for uninitialized pk
+        #[cfg(not(feature = "auto-save-related"))]
         match new_val.is_saved() {
             Ok(true) => (), // hooray
             Ok(false) => return Err(Error::ValueNotSaved),
@@ -83,7 +84,10 @@ where
 
         // all_values is now out of date, so clear it
         self.all_values = OnceCell::new();
-        self.new_values.push(new_val.pk().to_sql());
+        let stored_value = new_val.clone();
+        // TODO: Allow the following to avoid duplicate inserts
+        // stored_value.state.saved = new_val.state.saved;
+        self.new_values.push(stored_value);
         Ok(())
     }
 
@@ -106,13 +110,14 @@ where
     pub fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
         while !self.new_values.is_empty() {
+            let mut new_value = self.new_values.pop().unwrap();
+            eprintln!("saving item in {:?}", self.item_table);
+            // ignore failures, as they will be unique constraints
+            let _ = new_value.save(conn);
             conn.insert_only(
                 &self.item_table,
                 &self.columns(),
-                &[
-                    owner.as_ref(),
-                    self.new_values.pop().unwrap().as_ref().clone(),
-                ],
+                &[owner.as_ref(), new_value.pk().to_sql().as_ref()],
             )?;
         }
         if !self.removed_values.is_empty() {
@@ -166,7 +171,10 @@ where
             if !self.new_values.is_empty() {
                 vals.append(
                     &mut T::query()
-                        .filter(BoolExpr::In(T::PKCOL, self.new_values.clone()))
+                        .filter(BoolExpr::In(
+                            T::PKCOL,
+                            self.new_values.iter().map(|x| x.pk().to_sql()).collect(),
+                        ))
                         .load(conn)?,
                 );
             }
@@ -202,13 +210,13 @@ where
         ]
     }
 }
-impl<T: DataObject> PartialEq<Many<T>> for Many<T> {
+impl<T: DataObject + Clone> PartialEq<Many<T>> for Many<T> {
     fn eq(&self, other: &Many<T>) -> bool {
         (self.owner == other.owner) && (self.item_table == other.item_table)
     }
 }
-impl<T: DataObject> Eq for Many<T> {}
-impl<T: DataObject> Default for Many<T> {
+impl<T: DataObject + Clone> Eq for Many<T> {}
+impl<T: DataObject + Clone> Default for Many<T> {
     fn default() -> Self {
         Self::new()
     }
@@ -216,7 +224,7 @@ impl<T: DataObject> Default for Many<T> {
 
 #[cfg(feature = "fake")]
 /// Fake data support is currently limited to empty Many relationships.
-impl<T: DataObject> Dummy<Faker> for Many<T> {
+impl<T: DataObject + Clone> Dummy<Faker> for Many<T> {
     fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
         Self::new()
     }

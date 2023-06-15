@@ -185,6 +185,7 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
         println!("Applying migration {}", m.name());
         m.apply(conn).unwrap();
     }
+    println!("database setup completed");
 }
 
 pub fn sqlite_connection() -> Connection {

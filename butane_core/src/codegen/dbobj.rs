@@ -91,6 +91,10 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 use butane::prelude::DataObject;
                 conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
             }
+
+            fn is_saved(&self) -> butane::Result<bool> {
+                Ok(self.state.saved)
+            }
         }
         impl butane::ToSql for #tyname {
             fn to_sql(&self) -> butane::SqlVal {

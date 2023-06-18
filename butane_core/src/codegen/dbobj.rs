@@ -71,6 +71,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     #pklit,
                     <#pktype as butane::FieldType>::SQLTYPE);
                 if self.state.saved {
+                    // Already exists in db, do an update
                     #(#values_no_pk)*
                     if values.len() > 0 {
                         conn.update(Self::TABLE,
@@ -78,10 +79,17 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                                     butane::ToSql::to_sql_ref(self.pk()),
                                     &[#save_cols], &values)?;
                     }
-                } else {
+                } else if #auto_pk {
+                    // Since we expect our pk field to be invalid and to be created by the insert,
+                    // we do a pure insert, no upsert allowed.
                     #(#values)*
                     let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
                     #(#post_insert)*
+                } else {
+                    // Do an upsert
+                    #(#values)*
+                    conn.insert_or_replace(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
+                    self.state.saved = true
                 }
                 #many_save
                 Ok(())

@@ -198,11 +198,11 @@ impl ConnectionMethods for rusqlite::Connection {
         &self,
         table: &str,
         columns: &[Column],
-        _pkcol: &Column,
+        pkcol: &Column,
         values: &[SqlValRef],
     ) -> Result<()> {
         let mut sql = String::new();
-        sql_insert_or_update(table, columns, &mut sql);
+        sql_insert_or_update(table, columns, pkcol, &mut sql);
         self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(())
     }
@@ -611,8 +611,8 @@ fn change_column(
     result
 }
 
-pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write) {
-    write!(w, "INSERT OR REPLACE ").unwrap();
+pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: &mut impl Write) {
+    write!(w, "INSERT ").unwrap();
     write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();
     helper::list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
@@ -621,6 +621,26 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write)
         ", "
     });
     write!(w, ")").unwrap();
+    write!(w, " ON CONFLICT ({}) DO ", pkcol.name()).unwrap();
+    if columns.len() > 1 {
+        write!(w, "UPDATE SET (").unwrap();
+        helper::list_columns(columns, w);
+        write!(w, ") = (").unwrap();
+        columns.iter().fold("", |sep, c| {
+            write!(
+                w,
+                "{}excluded.{}",
+                sep,
+                helper::quote_reserved_word(c.name())
+            )
+            .unwrap();
+            ", "
+        });
+        write!(w, ")").unwrap();
+    } else {
+        // If the pk is the only column and it already exists, then there's nothing to update.
+        write!(w, "NOTHING").unwrap();
+    }
 }
 
 #[derive(Debug)]

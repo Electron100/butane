@@ -715,14 +715,20 @@ pub fn sql_insert_or_replace_with_placeholders(
         n + 1
     });
     write!(w, ")").unwrap();
-    write!(w, " ON CONFLICT ({}) DO UPDATE SET (", pkcol.name()).unwrap();
-    helper::list_columns(columns, w);
-    write!(w, ") = (").unwrap();
-    columns.iter().fold("", |sep, c| {
-        write!(w, "{}excluded.{}", sep, c.name()).unwrap();
-        ", "
-    });
-    write!(w, ")").unwrap();
+    write!(w, " ON CONFLICT ({}) DO ", pkcol.name()).unwrap();
+    if columns.len() > 1 {
+        write!(w, "UPDATE SET (").unwrap();
+        helper::list_columns(columns, w);
+        write!(w, ") = (").unwrap();
+        columns.iter().fold("", |sep, c| {
+            write!(w, "{}excluded.{}", sep, c.name()).unwrap();
+            ", "
+        });
+        write!(w, ")").unwrap();
+    } else {
+        // If the pk is the only column and it already exists, then there's nothing to update.
+        write!(w, "NOTHING").unwrap();
+    }
 }
 
 fn pgtype_for_val(val: &SqlVal) -> postgres::types::Type {

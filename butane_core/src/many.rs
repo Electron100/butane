@@ -72,15 +72,11 @@ where
     /// to have an uninitialized one.
     pub fn add(&mut self, new_val: &T) -> Result<()> {
         // Check for uninitialized pk
-        if T::AUTO_PK {
-            let ipk: i64 = match new_val.pk().to_sql() {
-                SqlVal::Int(i) => i as i64,
-                SqlVal::BigInt(i) => i,
-                _ => 1,
-            };
-            if ipk < 0 {
-                return Err(Error::ValueNotSaved);
-            }
+        match new_val.is_saved() {
+            Ok(true) => (), // hooray
+            Ok(false) => return Err(Error::ValueNotSaved),
+            Err(Error::SaveDeterminationNotSupported) => (), // we don't know, so assume it's OK
+            Err(e) => return Err(e),                         // unexpected error
         }
 
         // all_values is now out of date, so clear it

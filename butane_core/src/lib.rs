@@ -120,6 +120,9 @@ pub trait DataObject: DataResult<DBO = Self> {
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
     /// Delete the object from the database.
     fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>;
+
+    /// Test if this object has been saved to the database at least once
+    fn is_saved(&self) -> Result<bool>;
 }
 
 pub trait ModelTyped {
@@ -171,6 +174,8 @@ pub enum Error {
     IncompatibleCustomT(custom::SqlTypeCustom, &'static str),
     #[error("Literal values for custom types are currently unsupported.")]
     LiteralForCustomUnsupported(custom::SqlValCustom),
+    #[error("This DataObject doesn't support determining whether it has been saved.")]
+    SaveDeterminationNotSupported,
     #[error("(De)serialization error {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("IO error {0}")]

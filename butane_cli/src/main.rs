@@ -39,12 +39,12 @@ fn main() {
         )
         .subcommand(clap::Command::new("migrate").about("Apply migrations"))
         .subcommand(clap::Command::new("list").about("List migrations"))
-				.subcommand(clap::Command::new("collapse").about("Replace all migrations with a single migration representing the current model state.").arg(
-                    Arg::new("NAME")
-                        .required(true)
-                        .index(1)
-                        .help("Name to use for the new migration"),
-                ))
+        .subcommand(clap::Command::new("collapse").about("Replace all migrations with a single migration representing the current model state.").arg(
+            Arg::new("NAME")
+                .required(true)
+                .index(1)
+                .help("Name to use for the new migration"),
+        ))
         .subcommand(
             clap::Command::new("embed").about("Embed migrations in the source code"),
         )
@@ -59,11 +59,11 @@ fn main() {
                 ),
         )
         .subcommand(
-						clap::Command::new("clear")
-								.arg_required_else_help(true)
-								.about("Clear data")
-								.subcommand(clap::Command::new("data")
-														.about("Clear all data from the database. The schema is left intact, but all instances of all models (i.e. all rows of all tables defined by the models) are deleted")))
+            clap::Command::new("clear")
+                .arg_required_else_help(true)
+                .about("Clear data")
+                .subcommand(clap::Command::new("data")
+                    .about("Clear all data from the database. The schema is left intact, but all instances of all models (i.e. all rows of all tables defined by the models) are deleted")))
         .subcommand(
             clap::Command::new("delete")
                 .about("Delete a table")
@@ -79,10 +79,10 @@ fn main() {
                         ),
                 ),
         )
-				.subcommand(
-						clap::Command::new("clean")
-								.about("Clean current migration state. Deletes the current migration working state which is generated on each build. This can be used as a workaround to remove stale tables from the schema, as Butane does not currently auto-detect model removals. The next build will recreate with only tables for the extant models."))
-                                .arg_required_else_help(true);
+        .subcommand(
+            clap::Command::new("clean")
+                .about("Clean current migration state. Deletes the current migration working state which is generated on each build. This can be used as a workaround to remove stale tables from the schema, as Butane does not currently auto-detect model removals. The next build will recreate with only tables for the extant models."))
+                .arg_required_else_help(true);
     let args = app.get_matches();
     match args.subcommand() {
         Some(("init", sub_args)) => handle_error(init(Some(sub_args))),

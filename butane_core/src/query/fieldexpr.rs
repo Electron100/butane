@@ -75,7 +75,7 @@ where
         BoolExpr::Like(self.name, Expr::Val(val.to_sql()))
     }
 }
-impl<F: DataObject> FieldExpr<ForeignKey<F>> {
+impl<F: DataObject + Clone> FieldExpr<ForeignKey<F>> {
     pub fn subfilter(&self, q: BoolExpr) -> BoolExpr {
         BoolExpr::Subquery {
             col: self.name,

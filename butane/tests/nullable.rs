@@ -5,7 +5,7 @@ use butane::{model, query};
 use butane_test_helper::*;
 
 #[model]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct WithNullable {
     id: i64,
     foo: Option<i32>,

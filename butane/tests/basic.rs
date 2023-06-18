@@ -35,7 +35,7 @@ impl Foo {
 }
 
 #[model]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Bar {
     #[pk]
     name: String,
@@ -52,6 +52,7 @@ impl Bar {
 }
 
 #[model]
+#[derive(Clone)]
 struct Baz {
     #[auto]
     id: i64,
@@ -68,6 +69,7 @@ impl Baz {
 }
 
 #[model]
+#[derive(Clone)]
 struct HasOnlyPk {
     id: i64,
 }
@@ -80,12 +82,14 @@ impl HasOnlyPk {
     }
 }
 
+#[cfg(not(feature = "auto-save-related"))]
 #[model]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct SelfReferential {
     pub id: i32,
     pub reference: Option<ForeignKey<SelfReferential>>,
 }
+#[cfg(not(feature = "auto-save-related"))]
 impl SelfReferential {
     fn new(id: i32) -> Self {
         SelfReferential {
@@ -322,6 +326,7 @@ fn basic_unique_field_error_on_non_unique(conn: Connection) {
 }
 testall!(basic_unique_field_error_on_non_unique);
 
+#[cfg(not(feature = "auto-save-related"))]
 fn fkey_same_type(conn: Connection) {
     let mut o1 = SelfReferential::new(1);
     let mut o2 = SelfReferential::new(2);
@@ -335,6 +340,7 @@ fn fkey_same_type(conn: Connection) {
     assert_eq!(inner, o2);
     assert!(inner.reference.is_none());
 }
+#[cfg(not(feature = "auto-save-related"))]
 testall!(fkey_same_type);
 
 fn basic_time(conn: Connection) {

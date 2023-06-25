@@ -6,14 +6,13 @@ use butane::{find, DataObject, ForeignKey};
 use butane_test_helper::*;
 
 mod common;
-#[allow(dead_code)]
-use common::blog::{Blog, Post, Tag};
-
-#[cfg(feature = "fake")]
-use fake::{Fake, Faker};
 
 #[cfg(feature = "fake")]
 fn fake_blog_post(conn: Connection) {
+    use fake::{Fake, Faker};
+
+    use common::blog::{Blog, Post, Tag};
+
     let mut fake_blog: Blog = Faker.fake();
     fake_blog.save(&conn).unwrap();
 

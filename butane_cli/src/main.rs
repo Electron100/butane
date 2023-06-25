@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use clap::{Arg, ArgMatches};
 
 use butane_cli::{
-    clean, clear_data, collapse_migrations, delete_table, embed, handle_error, list_migrations,
-    migrate, Result,
+    base_dir, clean, clear_data, collapse_migrations, delete_table, embed, handle_error,
+    list_migrations, migrate, Result,
 };
 
 fn main() {
@@ -84,48 +86,54 @@ fn main() {
                 .about("Clean current migration state. Deletes the current migration working state which is generated on each build. This can be used as a workaround to remove stale tables from the schema, as Butane does not currently auto-detect model removals. The next build will recreate with only tables for the extant models."))
                 .arg_required_else_help(true);
     let args = app.get_matches();
+    let base_dir = base_dir().expect("Unable to find base directory");
     match args.subcommand() {
-        Some(("init", sub_args)) => handle_error(init(Some(sub_args))),
-        Some(("makemigration", sub_args)) => handle_error(make_migration(Some(sub_args))),
-        Some(("migrate", _)) => handle_error(migrate()),
-        Some(("rollback", sub_args)) => handle_error(rollback(Some(sub_args))),
-        Some(("embed", _)) => handle_error(embed()),
-        Some(("list", _)) => handle_error(list_migrations()),
-        Some(("collapse", sub_args)) => handle_error(collapse_migrations(sub_args.get_one("NAME"))),
+        Some(("init", sub_args)) => handle_error(init(&base_dir, Some(sub_args))),
+        Some(("makemigration", sub_args)) => {
+            handle_error(make_migration(&base_dir, Some(sub_args)))
+        }
+        Some(("migrate", _)) => handle_error(migrate(&base_dir)),
+        Some(("rollback", sub_args)) => handle_error(rollback(&base_dir, Some(sub_args))),
+        Some(("embed", _)) => handle_error(embed(&base_dir)),
+        Some(("list", _)) => handle_error(list_migrations(&base_dir)),
+        Some(("collapse", sub_args)) => {
+            handle_error(collapse_migrations(&base_dir, sub_args.get_one("NAME")))
+        }
         Some(("clear", sub_args)) => match sub_args.subcommand() {
-            Some(("data", _)) => handle_error(clear_data()),
+            Some(("data", _)) => handle_error(clear_data(&base_dir)),
             _ => eprintln!("Unknown clear command. Try: clear data"),
         },
         Some(("delete", sub_args)) => match sub_args.subcommand() {
-            Some(("table", sub_args2)) => {
-                handle_error(delete_table(sub_args2.get_one::<&str>("TABLE").unwrap()))
-            }
+            Some(("table", sub_args2)) => handle_error(delete_table(
+                &base_dir,
+                sub_args2.get_one::<&str>("TABLE").unwrap(),
+            )),
             _ => eprintln!("Unknown delete command. Try: delete table"),
         },
-        Some(("clean", _)) => handle_error(clean()),
+        Some(("clean", _)) => handle_error(clean(&base_dir)),
         Some((cmd, _)) => eprintln!("Unknown command {cmd}"),
         None => eprintln!("Unknown command"),
     }
 }
 
-fn init(args: Option<&ArgMatches>) -> Result<()> {
+fn init(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
     let args = args.unwrap();
     let name: &String = args.get_one("BACKEND").unwrap();
     let connstr: &String = args.get_one("CONNECTION").unwrap();
-    butane_cli::init(name, connstr)
+    butane_cli::init(base_dir, name, connstr)
 }
 
-fn make_migration(args: Option<&ArgMatches>) -> Result<()> {
+fn make_migration(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
     let name_arg = args.and_then(|a| a.get_one::<String>("NAME"));
-    butane_cli::make_migration(name_arg)
+    butane_cli::make_migration(base_dir, name_arg)
 }
 
-fn rollback(args: Option<&ArgMatches>) -> Result<()> {
-    let spec = butane_cli::load_connspec()?;
+fn rollback(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
+    let spec = butane_cli::load_connspec(base_dir)?;
     let conn = butane::db::connect(&spec)?;
 
     match args.and_then(|a| a.get_one::<String>("NAME")) {
-        Some(to) => butane_cli::rollback_to(conn, to),
-        None => butane_cli::rollback_latest(conn),
+        Some(to) => butane_cli::rollback_to(base_dir, conn, to),
+        None => butane_cli::rollback_latest(base_dir, conn),
     }
 }

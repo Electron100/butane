@@ -1,4 +1,7 @@
 //! SQLite database backend
+#[cfg(feature = "log")]
+use std::sync::Once;
+
 use super::helper;
 use super::*;
 use crate::db::connmethods::BackendRows;
@@ -20,6 +23,24 @@ const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 /// The name of the sqlite backend.
 pub const BACKEND_NAME: &str = "sqlite";
+
+#[cfg(feature = "log")]
+fn log_callback(error_code: std::ffi::c_int, message: &str) {
+    match error_code {
+        rusqlite::ffi::SQLITE_NOTICE => {
+            #[cfg(feature = "debug")]
+            log::trace!("{}", message)
+        }
+        rusqlite::ffi::SQLITE_OK
+        | rusqlite::ffi::SQLITE_DONE
+        | rusqlite::ffi::SQLITE_NOTICE_RECOVER_WAL
+        | rusqlite::ffi::SQLITE_NOTICE_RECOVER_ROLLBACK => log::info!("{}", message),
+        rusqlite::ffi::SQLITE_WARNING | rusqlite::ffi::SQLITE_WARNING_AUTOINDEX => {
+            log::warn!("{}", message)
+        }
+        _ => log::error!("{error_code} {}", message),
+    }
+}
 
 /// SQLite [Backend][crate::db::Backend] implementation.
 #[derive(Debug, Default)]
@@ -66,6 +87,14 @@ pub struct SQLiteConnection {
 }
 impl SQLiteConnection {
     fn open(path: impl AsRef<Path>) -> Result<Self> {
+        #[cfg(feature = "log")]
+        static INIT_SQLITE_LOGGING: Once = Once::new();
+
+        #[cfg(feature = "log")]
+        INIT_SQLITE_LOGGING.call_once(|| {
+            _ = unsafe { rusqlite::trace::config_log(Some(log_callback)) };
+        });
+
         rusqlite::Connection::open(path)
             .map(|conn| SQLiteConnection { conn })
             .map_err(|e| e.into())
@@ -146,6 +175,8 @@ impl ConnectionMethods for rusqlite::Connection {
         }
 
         debug!("query sql {}", sqlquery);
+        #[cfg(feature = "debug")]
+        debug!("values {:?}", values);
 
         let stmt = self.prepare(&sqlquery)?;
         let adapter = QueryAdapter::new(stmt, rusqlite::params_from_iter(values))?;
@@ -167,6 +198,8 @@ impl ConnectionMethods for rusqlite::Connection {
         );
         if cfg!(feature = "log") {
             debug!("insert sql {}", sql);
+            #[cfg(feature = "debug")]
+            debug!("values {:?}", values);
         }
         self.execute(&sql, rusqlite::params_from_iter(values))?;
         let pk: SqlVal = self.query_row_and_then(
@@ -190,6 +223,8 @@ impl ConnectionMethods for rusqlite::Connection {
         );
         if cfg!(feature = "log") {
             debug!("insert sql {}", sql);
+            #[cfg(feature = "debug")]
+            debug!("values {:?}", values);
         }
         self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(())
@@ -225,6 +260,8 @@ impl ConnectionMethods for rusqlite::Connection {
         let placeholder_values = [values, &[pk]].concat();
         if cfg!(feature = "log") {
             debug!("update sql {}", sql);
+            #[cfg(feature = "debug")]
+            debug!("placeholders {:?}", placeholder_values);
         }
         self.execute(&sql, rusqlite::params_from_iter(placeholder_values))?;
         Ok(())
@@ -244,6 +281,11 @@ impl ConnectionMethods for rusqlite::Connection {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
+        if cfg!(feature = "log") {
+            debug!("delete where sql {}", sql);
+            #[cfg(feature = "debug")]
+            debug!("placeholders {:?}", values);
+        }
         let cnt = self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(cnt)
     }

@@ -37,7 +37,7 @@ pub struct Post {
     pub blog: ForeignKey<Blog>,
 }
 impl Post {
-    pub fn new(id: i64, title: &str, body: &str, blog: &Blog) -> Self {
+    pub fn new(id: i64, title: &str, body: &str, blog: Blog) -> Self {
         Post {
             id,
             title: title.to_string(),
@@ -105,7 +105,7 @@ pub fn setup_blog(conn: &Connection) {
         1,
         "The Tiger",
         "The tiger is a cat which would very much like to eat you.",
-        &cats_blog,
+        cats_blog.clone(),
     );
     post.published = true;
     post.pub_time = Some(Utc::now().naive_utc());
@@ -118,7 +118,7 @@ pub fn setup_blog(conn: &Connection) {
         2,
         "Sir Charles",
         "Sir Charles (the Very Second) is a handsome orange gentleman",
-        &cats_blog,
+        cats_blog,
     );
     post.published = true;
     post.likes = 20;
@@ -128,7 +128,7 @@ pub fn setup_blog(conn: &Connection) {
         3,
         "Mount Doom",
         "You must throw the ring into Mount Doom. Then you get to ride on a cool eagle.",
-        &mountains_blog,
+        mountains_blog.clone(),
     );
     post.published = true;
     post.likes = 10;
@@ -139,7 +139,7 @@ pub fn setup_blog(conn: &Connection) {
         4,
         "Mt. Everest",
         "Everest has very little air, and lately it has very many people. This post is unfinished.",
-        &mountains_blog,
+        mountains_blog,
     );
     post.published = false;
     post.tags.add(&tag_danger).unwrap();

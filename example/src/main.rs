@@ -32,7 +32,7 @@ struct Post {
     byline: Option<String>,
 }
 impl Post {
-    pub fn new(blog: &Blog, title: String, body: String) -> Self {
+    pub fn new(blog: Blog, title: String, body: String) -> Self {
         Post {
             id: -1,
             title,
@@ -68,7 +68,7 @@ fn query() -> Result<()> {
     };
     tag.save(&conn).unwrap();
 
-    let mut post = Post::new(&blog, "Grizzly".into(), "lorem ipsum".into());
+    let mut post = Post::new(blog, "Grizzly".into(), "lorem ipsum".into());
     post.published = true;
     post.tags.add(&tag)?;
     post.save(&conn).unwrap();

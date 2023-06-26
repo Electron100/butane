@@ -32,7 +32,7 @@ pub struct Post {
     state: butane::ObjectState,
 }
 impl Post {
-    pub fn new(blog: &Blog, title: String, body: String) -> Self {
+    pub fn new(blog: Blog, title: String, body: String) -> Self {
         Post {
             id: -1,
             title,

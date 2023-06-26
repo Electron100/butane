@@ -14,7 +14,7 @@ pub fn create_blog(conn: &Connection, name: impl Into<String>) -> Blog {
     blog
 }
 
-pub fn create_post(conn: &Connection, blog: &Blog, title: String, body: String) -> Post {
+pub fn create_post(conn: &Connection, blog: Blog, title: String, body: String) -> Post {
     let mut new_post = Post::new(blog, title, body);
     new_post.save(conn).unwrap();
     new_post

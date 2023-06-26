@@ -98,6 +98,7 @@ impl<T: DataObject + Clone> From<T> for ForeignKey<T> {
         ret
     }
 }
+#[cfg(not(feature = "auto-save-related"))]
 impl<T: DataObject + Clone> From<&T> for ForeignKey<T> {
     fn from(obj: &T) -> Self {
         let ret = Self::new_raw();

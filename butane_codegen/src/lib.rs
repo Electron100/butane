@@ -102,7 +102,7 @@ pub fn filter(input: TokenStream) -> TokenStream {
         }
     };
 
-    if let TokenTree::Punct(_) = args[1] {
+    if matches!(args[1], TokenTree::Punct(_)) {
     } else {
         return make_compile_error!("Expected filter!(Type, expression)").into();
     }

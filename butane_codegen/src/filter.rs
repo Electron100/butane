@@ -75,33 +75,27 @@ fn handle_call(fields: &impl ToTokens, mcall: &ExprMethodCall) -> TokenStream2 {
 
 fn handle_in(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStream2 {
     let fex = fieldexpr(fields, receiver);
-    match expr {
-        Expr::Lit(lit) => {
-            // treat this as matching the primary key
-            quote!(#fex.subfilterpk(#lit))
-        }
-        _ => {
-            // Arbitrary expression
-            let q = handle_expr(&quote!(#fex.fields()), expr);
-            let span = receiver.span();
-            quote_spanned!(span=> #fex.subfilter(#q))
-        }
+    if let Expr::Lit(lit) = expr {
+        // treat this as matching the primary key
+        quote!(#fex.subfilterpk(#lit))
+    } else {
+        // Arbitrary expression
+        let q = handle_expr(&quote!(#fex.fields()), expr);
+        let span = receiver.span();
+        quote_spanned!(span=> #fex.subfilter(#q))
     }
 }
 
 fn handle_contains(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStream2 {
     let fex = fieldexpr(fields, receiver);
-    match expr {
-        Expr::Lit(lit) => {
-            // treat this as matching the primary key
-            quote!(#fex.containspk(#lit))
-        }
-        _ => {
-            // Arbitrary expression
-            let q = handle_expr(&quote!(#fex.fields()), expr);
-            let span = receiver.span();
-            quote_spanned!(span=> #fex.contains(#q))
-        }
+    if let Expr::Lit(lit) = expr {
+        // treat this as matching the primary key
+        quote!(#fex.containspk(#lit))
+    } else {
+        // Arbitrary expression
+        let q = handle_expr(&quote!(#fex.fields()), expr);
+        let span = receiver.span();
+        quote_spanned!(span=> #fex.contains(#q))
     }
 }
 

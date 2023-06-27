@@ -128,7 +128,7 @@ fn basic_crud(conn: Connection) {
 
     // delete
     assert!(foo3.delete(&conn).is_ok());
-    if let Some(butane::Error::NoSuchObject) = Foo::get(&conn, 1).err() {
+    if matches!(Foo::get(&conn, 1).err(), Some(butane::Error::NoSuchObject)) {
     } else {
         panic!("Expected NoSuchObject");
     }

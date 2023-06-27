@@ -694,7 +694,7 @@ fn change_column(
         ),
     ];
     let result = stmts.join("\n");
-    new_table.name = old_table.name.clone();
+    new_table.name.clone_from(&old_table.name);
     current.replace_table(new_table);
     Ok(result)
 }

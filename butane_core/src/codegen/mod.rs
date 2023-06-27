@@ -464,7 +464,7 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
                     // time zones
                     if template_type(arguments)
                         .map(|ident| ident.to_string())
-                        .unwrap_or(String::new())
+                        .unwrap_or_else(String::new)
                         == "Utc"
                     {
                         return some_known(SqlType::Timestamp);

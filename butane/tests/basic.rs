@@ -401,3 +401,21 @@ fn basic_load_first_ordered(conn: Connection) {
     assert_eq!(found_desc, Some(foo2));
 }
 testall!(basic_load_first_ordered);
+
+fn save_upserts_by_default(conn: Connection) {
+    let mut foo = Foo::new(1);
+    foo.bar = 42;
+    foo.save(&conn).unwrap();
+
+    // Create another foo object with the same primary key,
+    // but a different bar value.
+    let mut foo = Foo::new(1);
+    foo.bar = 43;
+    // Save should do an upsert, so it will update the bar value
+    // rather than throwing a conflict
+    foo.save(&conn).unwrap();
+
+    let retrieved = Foo::get(&conn, 1).unwrap();
+    assert_eq!(retrieved.bar, 43);
+}
+testall!(save_upserts_by_default);

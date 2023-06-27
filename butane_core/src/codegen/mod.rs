@@ -11,6 +11,10 @@ use syn::{
     MetaNameValue,
 };
 
+const OPTION_TYNAMES: [&str; 2] = ["Option", "std::option::Option"];
+const MANY_TYNAMES: [&str; 2] = ["Many", "butane::Many"];
+const FKEY_TYNAMES: [&str; 2] = ["ForeignKey", "butane::ForeignKey"];
+
 #[macro_export]
 macro_rules! make_compile_error {
     ($span:expr=> $($arg:tt)*) => ({
@@ -309,7 +313,7 @@ fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
 }
 
 fn get_option_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    get_foreign_type_argument(ty, "Option").map(|path| {
+    get_foreign_type_argument(ty, &OPTION_TYNAMES).map(|path| {
         let inner_ty: syn::Type = syn::TypePath {
             qself: None,
             path: path.clone(),
@@ -321,7 +325,7 @@ fn get_option_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
 }
 
 fn get_many_sql_type(field: &Field) -> Option<DeferredSqlType> {
-    get_foreign_sql_type(&field.ty, "Many")
+    get_foreign_sql_type(&field.ty, &MANY_TYNAMES)
 }
 
 fn is_many_to_many(field: &Field) -> bool {
@@ -329,7 +333,7 @@ fn is_many_to_many(field: &Field) -> bool {
 }
 
 fn is_option(field: &Field) -> bool {
-    get_foreign_type_argument(&field.ty, "Option").is_some()
+    get_foreign_type_argument(&field.ty, &OPTION_TYNAMES).is_some()
 }
 
 /// Check for special fields which won't correspond to rows and don't
@@ -338,40 +342,59 @@ fn is_row_field(f: &Field) -> bool {
     !is_many_to_many(f)
 }
 
-fn get_foreign_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Option<&'a syn::Path> {
+/// Test if the ident of each segment in two paths is the same without
+/// looking at the argments
+fn is_same_path_ident(path1: &syn::Path, path2: &syn::Path) -> bool {
+    if path1.segments.len() != path2.segments.len() {
+        return false;
+    }
+    path1
+        .segments
+        .iter()
+        .zip(path2.segments.iter())
+        .all(|(a, b)| a.ident == b.ident)
+}
+
+fn get_foreign_type_argument<'a>(
+    ty: &'a syn::Type,
+    tynames: &[&'static str],
+) -> Option<&'a syn::Path> {
     let path = match ty {
         syn::Type::Path(path) => &path.path,
         _ => return None,
     };
-    let seg = if path.segments.len() == 2 && path.segments.first().unwrap().ident == "butane" {
-        path.segments.last()
-    } else {
-        path.segments.first()
-    }?;
-    if seg.ident != tyname {
+    if !tynames
+        .iter()
+        .any(|tyname| match syn::parse_str::<syn::Path>(tyname) {
+            Ok(ty_path) => is_same_path_ident(path, &ty_path),
+            // Should only happen if there's a bug in butane
+            Err(_) => panic!("Cannot parse {tyname} as syn::Path"),
+        })
+    {
         return None;
     }
+    let seg = path.segments.last().unwrap();
     let args = match &seg.arguments {
         syn::PathArguments::AngleBracketed(args) => &args.args,
         _ => return None,
     };
     if args.len() != 1 {
-        panic!("{tyname} should have a single type argument")
+        panic!("{} should have a single type argument", tynames[0])
     }
     match args.last().unwrap() {
         syn::GenericArgument::Type(syn::Type::Path(typath)) => Some(&typath.path),
-        _ => panic!("{tyname} argument should be a type."),
+        _ => panic!("{} argument should be a type.", tynames[0]),
     }
 }
 
-fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<DeferredSqlType> {
-    let typath = get_foreign_type_argument(ty, tyname);
+fn get_foreign_sql_type(ty: &syn::Type, tynames: &[&'static str]) -> Option<DeferredSqlType> {
+    let typath = get_foreign_type_argument(ty, tynames);
     typath.map(|typath| {
         DeferredSqlType::Deferred(TypeKey::PK(
             typath
                 .segments
                 .last()
-                .unwrap_or_else(|| panic!("{tyname} must have an argument"))
+                .unwrap_or_else(|| panic!("{} must have an argument", tynames[0]))
                 .ident
                 .to_string(),
         ))
@@ -381,7 +404,7 @@ fn get_foreign_sql_type(ty: &syn::Type, tyname: &'static str) -> Option<Deferred
 pub fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
     get_primitive_sql_type(ty)
         .or_else(|| get_option_sql_type(ty))
-        .or_else(|| get_foreign_sql_type(ty, "ForeignKey"))
+        .or_else(|| get_foreign_sql_type(ty, &FKEY_TYNAMES))
         .unwrap_or_else(|| {
             DeferredSqlType::Deferred(TypeKey::CustomType(
                 ty.clone().into_token_stream().to_string(),

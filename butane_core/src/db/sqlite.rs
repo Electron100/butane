@@ -469,7 +469,7 @@ fn sql_valref_from_rusqlite<'a>(
     val: rusqlite::types::ValueRef<'a>,
     ty: &SqlType,
 ) -> Result<SqlValRef<'a>> {
-    if let rusqlite::types::ValueRef::Null = val {
+    if matches!(val, rusqlite::types::ValueRef::Null) {
         return Ok(SqlValRef::Null);
     }
     Ok(match ty {
@@ -648,7 +648,7 @@ fn change_column(
         ),
     ];
     let result = stmts.join("\n");
-    new_table.name = old_table.name.clone();
+    new_table.name.clone_from(&old_table.name);
     current.replace_table(new_table);
     result
 }

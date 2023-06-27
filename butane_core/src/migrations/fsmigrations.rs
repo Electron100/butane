@@ -290,12 +290,10 @@ impl Migrations for FsMigrations {
     }
 
     fn latest(&self) -> Option<Self::M> {
-        self.get_state()
-            .map(|state| match state.latest {
-                None => None,
-                Some(name) => self.get_migration(&name),
-            })
-            .unwrap_or(None)
+        self.get_state().map_or(None, |state| match state.latest {
+            None => None,
+            Some(name) => self.get_migration(&name),
+        })
     }
 }
 

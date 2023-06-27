@@ -12,7 +12,7 @@ fn main() {
         .expect("Invalid ID");
     let conn = establish_connection();
 
-    let mut post = Post::get(&conn, id).expect(&format!("Unable to find post {id}"));
+    let mut post = Post::get(&conn, id).unwrap_or_else(|_| panic!("Unable to find post {id}"));
     // Just a normal Rust assignment, no fancy set methods
     post.published = true;
     post.save(&conn).unwrap();

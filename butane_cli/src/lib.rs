@@ -188,9 +188,10 @@ pub fn list_migrations(base_dir: &PathBuf) -> Result<()> {
     let unapplied = ms.unapplied_migrations(&conn)?;
     let all = ms.all_migrations()?;
     for m in all {
-        let m_state = match unapplied.contains(&m) {
-            true => "not applied",
-            false => "applied",
+        let m_state = if unapplied.contains(&m) {
+            "not applied"
+        } else {
+            "applied"
         };
         println!("Migration '{}' ({})", m.name(), m_state);
     }

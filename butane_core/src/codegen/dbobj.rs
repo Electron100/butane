@@ -261,7 +261,7 @@ fn fieldexpr_func_regular(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
 
 fn fieldexpr_func_many(f: &Field, ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let fty = get_foreign_type_argument(&f.ty, "Many").expect("Many field misdetected");
+    let fty = get_foreign_type_argument(&f.ty, &MANY_TYNAMES).expect("Many field misdetected");
     let many_table_lit = many_table_lit(ast_struct, f, config);
     fieldexpr_func(
         f,

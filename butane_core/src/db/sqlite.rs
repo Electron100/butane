@@ -1,4 +1,7 @@
 //! SQLite database backend
+#[cfg(feature = "log")]
+use std::sync::Once;
+
 use super::helper;
 use super::*;
 use crate::db::connmethods::BackendRows;
@@ -21,6 +24,24 @@ const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 /// The name of the sqlite backend.
 pub const BACKEND_NAME: &str = "sqlite";
+
+#[cfg(feature = "log")]
+fn log_callback(error_code: std::ffi::c_int, message: &str) {
+    match error_code {
+        rusqlite::ffi::SQLITE_NOTICE => {
+            #[cfg(feature = "debug")]
+            log::trace!("{}", message)
+        }
+        rusqlite::ffi::SQLITE_OK
+        | rusqlite::ffi::SQLITE_DONE
+        | rusqlite::ffi::SQLITE_NOTICE_RECOVER_WAL
+        | rusqlite::ffi::SQLITE_NOTICE_RECOVER_ROLLBACK => log::info!("{}", message),
+        rusqlite::ffi::SQLITE_WARNING | rusqlite::ffi::SQLITE_WARNING_AUTOINDEX => {
+            log::warn!("{}", message)
+        }
+        _ => log::error!("{error_code} {}", message),
+    }
+}
 
 /// SQLite [Backend][crate::db::Backend] implementation.
 #[derive(Debug, Default)]
@@ -67,6 +88,14 @@ pub struct SQLiteConnection {
 }
 impl SQLiteConnection {
     fn open(path: impl AsRef<Path>) -> Result<Self> {
+        #[cfg(feature = "log")]
+        static INIT_SQLITE_LOGGING: Once = Once::new();
+
+        #[cfg(feature = "log")]
+        INIT_SQLITE_LOGGING.call_once(|| {
+            _ = unsafe { rusqlite::trace::config_log(Some(log_callback)) };
+        });
+
         rusqlite::Connection::open(path)
             .map(|conn| SQLiteConnection {
                 conn: Mutex::new(conn),
@@ -572,7 +601,7 @@ fn sql_valref_from_rusqlite<'a>(
     val: rusqlite::types::ValueRef<'a>,
     ty: &SqlType,
 ) -> Result<SqlValRef<'a>> {
-    if let rusqlite::types::ValueRef::Null = val {
+    if matches!(val, rusqlite::types::ValueRef::Null) {
         return Ok(SqlValRef::Null);
     }
     Ok(match ty {
@@ -635,7 +664,7 @@ fn define_column(col: &AColumn) -> String {
     }
     format!(
         "{} {} {}",
-        &col.name(),
+        helper::quote_reserved_word(col.name()),
         col_sqltype(col),
         constraints.join(" ")
     )
@@ -668,14 +697,14 @@ fn sqltype(ty: &SqlType) -> &'static str {
 }
 
 fn drop_table(name: &str) -> String {
-    format!("DROP TABLE {name};")
+    format!("DROP TABLE {};", helper::quote_reserved_word(name))
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     let default: SqlVal = helper::column_default(col)?;
     Ok(format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
-        tbl_name,
+        helper::quote_reserved_word(tbl_name),
         define_column(col),
         helper::sql_literal_value(default)?
     ))
@@ -703,12 +732,14 @@ fn copy_table(old: &ATable, new: &ATable) -> String {
     let column_names = new
         .columns
         .iter()
-        .map(|col| col.name())
-        .collect::<Vec<&str>>()
+        .map(|col| helper::quote_reserved_word(col.name()))
+        .collect::<Vec<Cow<str>>>()
         .join(", ");
     format!(
         "INSERT INTO {} SELECT {} FROM {};",
-        &new.name, column_names, &old.name
+        helper::quote_reserved_word(&new.name),
+        column_names,
+        helper::quote_reserved_word(&old.name)
     )
 }
 
@@ -742,17 +773,21 @@ fn change_column(
         &create_table(&new_table, false),
         &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
-        &format!("ALTER TABLE {} RENAME TO {};", &new_table.name, tbl_name),
+        &format!(
+            "ALTER TABLE {} RENAME TO {};",
+            helper::quote_reserved_word(&new_table.name),
+            helper::quote_reserved_word(tbl_name)
+        ),
     ];
     let result = stmts.join("\n");
-    new_table.name = old_table.name.clone();
+    new_table.name.clone_from(&old_table.name);
     current.replace_table(new_table);
     result
 }
 
-pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write) {
-    write!(w, "INSERT OR REPLACE ").unwrap();
-    write!(w, "INTO {table} (").unwrap();
+pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: &mut impl Write) {
+    write!(w, "INSERT ").unwrap();
+    write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();
     helper::list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold("", |sep, _| {
@@ -760,6 +795,26 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], w: &mut impl Write)
         ", "
     });
     write!(w, ")").unwrap();
+    write!(w, " ON CONFLICT ({}) DO ", pkcol.name()).unwrap();
+    if columns.len() > 1 {
+        write!(w, "UPDATE SET (").unwrap();
+        helper::list_columns(columns, w);
+        write!(w, ") = (").unwrap();
+        columns.iter().fold("", |sep, c| {
+            write!(
+                w,
+                "{}excluded.{}",
+                sep,
+                helper::quote_reserved_word(c.name())
+            )
+            .unwrap();
+            ", "
+        });
+        write!(w, ")").unwrap();
+    } else {
+        // If the pk is the only column and it already exists, then there's nothing to update.
+        write!(w, "NOTHING").unwrap();
+    }
 }
 
 #[derive(Debug)]

@@ -106,7 +106,7 @@ struct TimeHolder {
     pub id: i32,
     pub naive: NaiveDateTime,
     pub utc: DateTime<Utc>,
-    pub utc2: chrono::DateTime<Utc>,
+    pub when: chrono::DateTime<Utc>,
 }
 
 async fn basic_crud(conn: Connection) {
@@ -132,7 +132,10 @@ async fn basic_crud(conn: Connection) {
 
     // delete
     assert!(foo3.delete(&conn).await.is_ok());
-    if let Some(butane::Error::NoSuchObject) = Foo::get(&conn, 1).await.err() {
+    if matches!(
+        Foo::get(&conn, 1).await.err(),
+        Some(butane::Error::NoSuchObject)
+    ) {
     } else {
         panic!("Expected NoSuchObject");
     }
@@ -350,7 +353,7 @@ async fn basic_time(conn: Connection) {
         id: 1,
         naive: now.naive_utc(),
         utc: now,
-        utc2: now,
+        when: now,
         state: ObjectState::default(),
     };
     time.save(&conn).await.unwrap();
@@ -413,3 +416,21 @@ async fn basic_load_first_ordered(conn: Connection) {
     assert_eq!(found_desc, Some(foo2));
 }
 testall!(basic_load_first_ordered);
+
+async fn save_upserts_by_default(conn: Connection) {
+    let mut foo = Foo::new(1);
+    foo.bar = 42;
+    foo.save(&conn).await.unwrap();
+
+    // Create another foo object with the same primary key,
+    // but a different bar value.
+    let mut foo = Foo::new(1);
+    foo.bar = 43;
+    // Save should do an upsert, so it will update the bar value
+    // rather than throwing a conflict
+    foo.save(&conn).await.unwrap();
+
+    let retrieved = Foo::get(&conn, 1).await.unwrap();
+    assert_eq!(retrieved.bar, 43);
+}
+testall!(save_upserts_by_default);

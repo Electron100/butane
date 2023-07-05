@@ -318,7 +318,12 @@ where
     async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
         let mut sql = String::new();
         let mut values: Vec<SqlVal> = Vec::new();
-        write!(&mut sql, "DELETE FROM {table} WHERE ").unwrap();
+        write!(
+            &mut sql,
+            "DELETE FROM {} WHERE ",
+            helper::quote_reserved_word(table)
+        )
+        .unwrap();
         sql_for_expr(
             query::Expr::Condition(Box::new(expr)),
             &mut values,
@@ -591,7 +596,9 @@ fn create_table(table: &ATable, allow_exists: bool) -> Result<String> {
     let modifier = if allow_exists { "IF NOT EXISTS " } else { "" };
     Ok(format!(
         "CREATE TABLE {}{} (\n{}\n);",
-        modifier, table.name, coldefs
+        modifier,
+        helper::quote_reserved_word(&table.name),
+        coldefs
     ))
 }
 
@@ -608,7 +615,7 @@ fn define_column(col: &AColumn) -> Result<String> {
     }
     Ok(format!(
         "{} {} {}",
-        &col.name(),
+        helper::quote_reserved_word(col.name()),
         col_sqltype(col)?,
         constraints.join(" ")
     ))
@@ -646,33 +653,39 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
 }
 
 fn drop_table(name: &str) -> String {
-    format!("DROP TABLE {name};")
+    format!("DROP TABLE {};", helper::quote_reserved_word(name))
 }
 
 fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     let default: SqlVal = helper::column_default(col)?;
     Ok(format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
-        tbl_name,
+        helper::quote_reserved_word(tbl_name),
         define_column(col)?,
         helper::sql_literal_value(default)?
     ))
 }
 
 fn remove_column(tbl_name: &str, name: &str) -> String {
-    format!("ALTER TABLE {tbl_name} DROP COLUMN {name};")
+    format!(
+        "ALTER TABLE {} DROP COLUMN {};",
+        helper::quote_reserved_word(tbl_name),
+        helper::quote_reserved_word(name)
+    )
 }
 
 fn copy_table(old: &ATable, new: &ATable) -> String {
     let column_names = new
         .columns
         .iter()
-        .map(|col| col.name())
-        .collect::<Vec<&str>>()
+        .map(|col| helper::quote_reserved_word(col.name()))
+        .collect::<Vec<Cow<str>>>()
         .join(", ");
     format!(
         "INSERT INTO {} SELECT {} FROM {};",
-        &new.name, column_names, &old.name
+        helper::quote_reserved_word(&new.name),
+        column_names,
+        helper::quote_reserved_word(&old.name)
     )
 }
 
@@ -706,10 +719,14 @@ fn change_column(
         &create_table(&new_table, false)?,
         &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
-        &format!("ALTER TABLE {} RENAME TO {};", &new_table.name, tbl_name),
+        &format!(
+            "ALTER TABLE {} RENAME TO {};",
+            helper::quote_reserved_word(&new_table.name),
+            helper::quote_reserved_word(tbl_name)
+        ),
     ];
     let result = stmts.join("\n");
-    new_table.name = old_table.name.clone();
+    new_table.name.clone_from(&old_table.name);
     current.replace_table(new_table);
     Ok(result)
 }
@@ -721,7 +738,7 @@ pub fn sql_insert_or_replace_with_placeholders(
     w: &mut impl Write,
 ) {
     write!(w, "INSERT ").unwrap();
-    write!(w, "INTO {table} (").unwrap();
+    write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();
     helper::list_columns(columns, w);
     write!(w, ") VALUES (").unwrap();
     columns.iter().fold(1, |n, _| {
@@ -730,14 +747,20 @@ pub fn sql_insert_or_replace_with_placeholders(
         n + 1
     });
     write!(w, ")").unwrap();
-    write!(w, " ON CONFLICT ({}) DO UPDATE SET (", pkcol.name()).unwrap();
-    helper::list_columns(columns, w);
-    write!(w, ") = (").unwrap();
-    columns.iter().fold("", |sep, c| {
-        write!(w, "{}excluded.{}", sep, c.name()).unwrap();
-        ", "
-    });
-    write!(w, ")").unwrap();
+    write!(w, " ON CONFLICT ({}) DO ", pkcol.name()).unwrap();
+    if columns.len() > 1 {
+        write!(w, "UPDATE SET (").unwrap();
+        helper::list_columns(columns, w);
+        write!(w, ") = (").unwrap();
+        columns.iter().fold("", |sep, c| {
+            write!(w, "{}excluded.{}", sep, c.name()).unwrap();
+            ", "
+        });
+        write!(w, ")").unwrap();
+    } else {
+        // If the pk is the only column and it already exists, then there's nothing to update.
+        write!(w, "NOTHING").unwrap();
+    }
 }
 
 fn pgtype_for_val(val: &SqlVal) -> postgres::types::Type {

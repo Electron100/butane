@@ -7,7 +7,7 @@ use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Field, ItemStruct};
 
 // Configuration that can be specified with attributes to override default behavior
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Config {
     pub table_name: Option<String>,
 }
@@ -73,6 +73,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     #pklit,
                     <#pktype as butane::FieldType>::SQLTYPE);
                 if self.state.saved {
+                    // Already exists in db, do an update
                     #(#values_no_pk)*
                     if values.len() > 0 {
                         conn.update(Self::TABLE,
@@ -80,10 +81,17 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                                     butane::ToSql::to_sql_ref(self.pk()),
                                     &[#save_cols], &values).await?;
                     }
-                } else {
+                } else if #auto_pk {
+                    // Since we expect our pk field to be invalid and to be created by the insert,
+                    // we do a pure insert, no upsert allowed.
                     #(#values)*
                     let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values).await?;
                     #(#post_insert)*
+                } else {
+                    // Do an upsert
+                    #(#values)*
+                    conn.insert_or_replace(Self::TABLE, &[#insert_cols], &pkcol, &values).await?;
+                    self.state.saved = true
                 }
                 #many_save
                 Ok(())
@@ -92,6 +100,10 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 use butane::ToSql;
                 use butane::prelude::DataObject;
                 conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql()).await
+            }
+
+            fn is_saved(&self) -> butane::Result<bool> {
+                Ok(self.state.saved)
             }
         }
         impl butane::ToSql for #tyname {
@@ -251,7 +263,7 @@ fn fieldexpr_func_regular(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
 
 fn fieldexpr_func_many(f: &Field, ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let fty = get_foreign_type_argument(&f.ty, "Many").expect("Many field misdetected");
+    let fty = get_foreign_type_argument(&f.ty, &MANY_TYNAMES).expect("Many field misdetected");
     let many_table_lit = many_table_lit(ast_struct, f, config);
     fieldexpr_func(
         f,

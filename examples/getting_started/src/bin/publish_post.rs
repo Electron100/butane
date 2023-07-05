@@ -15,7 +15,7 @@ async fn main() {
 
     let mut post = Post::get(&conn, id)
         .await
-        .expect(&format!("Unable to find post {id}"));
+        .unwrap_or_else(|_| panic!("Unable to find post {id}"));
     // Just a normal Rust assignment, no fancy set methods
     post.published = true;
     post.save(&conn).await.unwrap();

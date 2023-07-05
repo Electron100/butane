@@ -24,11 +24,16 @@ pub async fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
     )
 }
 
+/// Server state for a test PostgreSQL server
+#[derive(Debug)]
 pub struct PgServerState {
+    /// Temporary directory containing the test server
     pub dir: PathBuf,
+    /// Directory for the socket
     pub sockdir: PathBuf,
+    /// Process of the test server
     pub proc: std::process::Child,
-    // stderr from the child process
+    /// stderr from the test server
     pub stderr: BufReader<ChildStderr>,
 }
 impl Drop for PgServerState {
@@ -40,7 +45,10 @@ impl Drop for PgServerState {
     }
 }
 
+/// Connection spec for a test server
+#[derive(Clone, Debug)]
 pub struct PgSetupData {
+    /// Connection string
     pub connstr: String,
 }
 

@@ -289,4 +289,9 @@ impl DataObject for ButaneMigration {
         conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
             .await
     }
+    fn is_saved(&self) -> Result<bool> {
+        // In practice we don't expect this to be called as
+        // ButaneMigration is not exposed outside the library
+        Err(Error::SaveDeterminationNotSupported)
+    }
 }

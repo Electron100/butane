@@ -31,7 +31,7 @@ pub struct Post {
     pub title: String,
     pub body: String,
     pub published: bool,
-    pub pub_time: Option<NaiveDateTime>,
+    pub pub_time: std::option::Option<NaiveDateTime>,
     pub likes: i32,
     pub tags: Many<Tag>,
     pub blog: ForeignKey<Blog>,

@@ -4,7 +4,7 @@ use crate::Result;
 pub use r2d2::ManageConnection;
 
 /// R2D2 support for Butane. Implements [`r2d2::ManageConnection`].
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConnectionManager {
     spec: ConnectionSpec,
 }

@@ -14,11 +14,12 @@ datetime = ["chrono", "tokio-postgres?/with-chrono-0_4"]
 debug = ["log"]
 fake = ["dep:fake", "rand"]
 json = ["tokio-postgres?/with-serde_json-1", "rusqlite?/serde_json"]
+log = ["dep:log", "rusqlite?/trace"]
+pg = ["bytes", "tokio-postgres"]
 # todo re-enable sqlite
-#sqlite = ["rusqlite"]
-#sqlite-bundled = ["rusqlite/bundled"]
+# sqlite = ["rusqlite"]
+# sqlite-bundled = ["rusqlite/bundled"]
 tls = ["native-tls", "postgres-native-tls"]
-pg = ["tokio-postgres", "bytes"]
 
 
 [dependencies]
@@ -48,11 +49,13 @@ regex = { version = "1.5", features = ["std"] }
 rusqlite = { workspace = true, optional = true }
 serde = { features = ["derive"], workspace = true }
 serde_json = { workspace = true }
+sqlparser = { workspace = true }
 syn = { workspace = true }
 thiserror = "1.0"
 uuid = { workspace = true, optional = true }
 
 [dev-dependencies]
+assert_matches = "1.5"
 butane_test_helper = { workspace = true }
 env_logger = { workspace = true }
 paste = { workspace = true }

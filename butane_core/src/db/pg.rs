@@ -63,21 +63,18 @@ pub struct PgConnection {
     #[cfg(feature = "debug")]
     params: Box<str>,
     client: postgres::Client,
-    // Save the handle to the task running the connection to keep it alive
-    conn_handle: tokio::task::JoinHandle<()>,
 }
 
 impl PgConnection {
     async fn open(params: &str) -> Result<Self> {
-        let (client, conn_handle) = Self::connect(params).await?;
+        let client = Self::connect(params).await?;
         Ok(Self {
             #[cfg(feature = "debug")]
             params: params.into(),
             client,
-            conn_handle,
         })
     }
-    async fn connect(params: &str) -> Result<(postgres::Client, tokio::task::JoinHandle<()>)> {
+    async fn connect(params: &str) -> Result<postgres::Client> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "tls")] {
                 let connector = native_tls::TlsConnector::new()?;
@@ -87,13 +84,13 @@ impl PgConnection {
             }
         }
         let (client, conn) = postgres::connect(params, connector).await?;
-        let conn_handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             #[allow(unused_variables)] // used only when logging is enabled
             if let Err(e) = conn.await {
                 warn!("Postgres connection error {}", e);
             }
         });
-        Ok((client, conn_handle))
+        Ok(client)
     }
 }
 impl PgConnectionLike for PgConnection {

@@ -1,4 +1,4 @@
-use crate::db::{Column, ConnectionMethods};
+use crate::db::Column;
 use crate::query::{BoolExpr, Expr};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use serde::{Deserialize, Serialize};
@@ -101,8 +101,9 @@ where
             .map(|v| v.iter())
     }
 
+    // todo support save and load for sync too
     /// Used by macro-generated code. You do not need to call this directly.
-    pub async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    pub async fn save(&mut self, conn: &impl crate::ConnectionMethods) -> Result<()> {
         let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
         while !self.new_values.is_empty() {
             conn.insert_only(
@@ -128,7 +129,10 @@ where
 
     /// Loads the values referred to by this foreign key from the
     /// database if necessary and returns a reference to them.
-    pub async fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
+    pub async fn load(
+        &self,
+        conn: &impl crate::ConnectionMethods,
+    ) -> Result<impl Iterator<Item = &T>> {
         let vals: Result<&Vec<T>> = self
             .all_values
             .get_or_try_init(|| async {

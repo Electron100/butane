@@ -41,9 +41,9 @@ pub mod pg;
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
 
-pub use connmethods::{
-    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
-};
+pub use connmethods::{BackendRow, BackendRows, Column, MapDeref, QueryResult, RawQueryResult};
+
+pub use connmethods::ConnectionMethods;
 
 /// Database connection.
 #[async_trait]

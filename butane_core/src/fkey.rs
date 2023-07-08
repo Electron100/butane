@@ -1,9 +1,8 @@
-use crate::db::ConnectionMethods;
 use crate::*;
-use tokio::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
+use tokio::sync::OnceCell;
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
@@ -76,14 +75,17 @@ impl<T: DataObject> ForeignKey<T> {
     }
 }
 
+//todo support sync load with ForeignKey too
 impl<T: DataObject + Send> ForeignKey<T> {
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to it.
-    pub async fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
+    pub async fn load(&self, conn: &impl crate::ConnectionMethods) -> Result<&T> {
         self.val
             .get_or_try_init(|| async {
                 let pk = self.valpk.get().unwrap();
-                T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?).await.map(Box::new)
+                T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?)
+                    .await
+                    .map(Box::new)
             })
             .await
             .map(|v| v.as_ref())

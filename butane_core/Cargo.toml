@@ -34,6 +34,7 @@ fs2 = "0.4" # for file locks
 futures-util = "0.3"
 hex = "0.4"
 log = { optional = true, workspace = true }
+maybe-async-cfg = { workspace = true }
 native-tls = { version = "0.2", optional = true }
 once_cell = { workspace = true }
 pin-project = "1"

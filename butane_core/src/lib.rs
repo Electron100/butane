@@ -23,6 +23,9 @@ pub mod uuid;
 use fake::{Dummy, Faker};
 
 use db::{BackendRow, Column, ConnectionMethods};
+mod sync {
+    pub use crate::db::sync::ConnectionMethods;
+}
 
 use custom::SqlTypeCustom;
 pub use query::Query;

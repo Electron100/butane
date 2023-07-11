@@ -72,7 +72,7 @@ pub trait ConnectionMethodWrapper {
     fn wrapped_connection_methods(&self) -> Result<&Self::Wrapped>;
 }
 
-mod sync {
+pub mod sync {
     use super::*;
     pub use internal::ConnectionMethodsSync as ConnectionMethods;
 }

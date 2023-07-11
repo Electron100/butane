@@ -1,6 +1,11 @@
 #[macro_export]
 macro_rules! connection_method_wrapper {
     ($ty:path) => {
+        #[maybe_async_cfg::maybe(
+            idents(ConnectionMethods(sync = "ConnectionMethodsSync", async)),
+            sync(),
+            async()
+        )]
         #[async_trait::async_trait]
         impl ConnectionMethods for $ty {
             async fn execute(&self, sql: &str) -> Result<()> {

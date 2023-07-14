@@ -55,3 +55,7 @@ butane_test_helper = { workspace = true }
 env_logger = { workspace = true }
 paste = { workspace = true }
 tempdir = "0.3"
+
+[[test]]
+name = "uuid"
+required-features = ["uuid"]

@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 use butane::db::Connection;
 use butane::{find, DataObject, ForeignKey};
 
@@ -7,7 +5,6 @@ use butane_test_helper::*;
 
 mod common;
 
-#[cfg(feature = "fake")]
 fn fake_blog_post(conn: Connection) {
     use fake::{Fake, Faker};
 
@@ -35,5 +32,4 @@ fn fake_blog_post(conn: Connection) {
     assert_eq!(post_from_db.title, post.title);
     assert_eq!(post_from_db.tags.load(&conn).unwrap().count(), 3);
 }
-#[cfg(feature = "fake")]
 testall!(fake_blog_post);

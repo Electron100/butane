@@ -1,12 +1,9 @@
-#[cfg(feature = "r2d2")]
 use butane_test_helper::{pg_connspec, setup_db, sqlite_connspec};
 
-#[cfg(feature = "r2d2")]
 use butane::db;
-#[cfg(feature = "r2d2")]
 use r2d2_for_test as r2d2;
 
-#[cfg(all(feature = "sqlite", feature = "r2d2"))]
+#[cfg(feature = "sqlite")]
 #[test]
 fn r2d2_sqlite() {
     let manager = db::ConnectionManager::new(sqlite_connspec());
@@ -28,7 +25,7 @@ fn r2d2_sqlite() {
     assert_eq!(pool.state().idle_connections, 3);
 }
 
-#[cfg(all(feature = "pg", feature = "r2d2"))]
+#[cfg(feature = "pg")]
 #[test]
 fn r2d2_pq() {
     let (connspec, _data) = pg_connspec();

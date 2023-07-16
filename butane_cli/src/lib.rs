@@ -136,7 +136,7 @@ pub fn rollback_latest(base_dir: &Path, mut conn: Connection) -> Result<()> {
 }
 
 pub fn embed(base_dir: &Path) -> Result<()> {
-    let srcdir = base_dir.join("src");
+    let srcdir = base_dir.join("../src");
     if !srcdir.exists() {
         eprintln!("src directory not found");
         std::process::exit(1);
@@ -144,7 +144,9 @@ pub fn embed(base_dir: &Path) -> Result<()> {
     let path = srcdir.join("butane_migrations.rs");
 
     let mut mem_ms = MemMigrations::new();
-    for m in get_migrations(base_dir)?.all_migrations()? {
+    let migrations = get_migrations(base_dir)?;
+    let migration_list = migrations.all_migrations()?;
+    for m in migration_list {
         let mut new_m = mem_ms.new_migration(&m.name());
         copy_migration(&m, &mut new_m)?;
         mem_ms.add_migration(new_m)?;

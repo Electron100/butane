@@ -115,7 +115,7 @@ pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()
         eprintln!("That is the latest migration, not rolling back to anything. If you expected something to happen, try specifying the migration to rollback to.");
     }
     for m in to_unapply.into_iter().rev() {
-        println!("Rolling back migration  {}", m.name());
+        println!("Rolling back migration {}", m.name());
         m.downgrade(&mut conn)?;
     }
     Ok(())
@@ -124,7 +124,7 @@ pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()
 pub fn rollback_latest(base_dir: &Path, mut conn: Connection) -> Result<()> {
     match get_migrations(base_dir)?.latest() {
         Some(m) => {
-            println!("Rolling back migration  {}", m.name());
+            println!("Rolling back migration {}", m.name());
             m.downgrade(&mut conn)?;
         }
         None => {

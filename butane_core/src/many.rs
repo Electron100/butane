@@ -1,7 +1,7 @@
 //! Implementation of many-to-many relationships between models.
 #![deny(missing_docs)]
 use crate::db::{Column, ConnectionMethods};
-use crate::query::{BoolExpr, Expr};
+use crate::query::{BoolExpr, Expr, Query};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use once_cell::unsync::OnceCell;
 use serde::{Deserialize, Serialize};
@@ -125,23 +125,31 @@ where
         Ok(())
     }
 
+    /// Query the values referred to by this many relationship from the
+    /// database if necessary and returns a reference to them.
+    pub fn query(&self) -> Result<Query<T>> {
+        let owner: &SqlVal = match &self.owner {
+            Some(o) => o,
+            None => return Err(Error::NotInitialized),
+        };
+        Ok(T::query().filter(BoolExpr::Subquery {
+            col: T::PKCOL,
+            tbl2: self.item_table.clone(),
+            tbl2_col: "has",
+            expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
+        }))
+    }
+
     /// Loads the values referred to by this many relationship from the
     /// database if necessary and returns a reference to them.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
         let vals: Result<&Vec<T>> = self.all_values.get_or_try_init(|| {
-            //if we don't have an owner then there are no values
-            let owner: &SqlVal = match &self.owner {
-                Some(o) => o,
-                None => return Ok(Vec::new()),
-            };
-            let mut vals = T::query()
-                .filter(BoolExpr::Subquery {
-                    col: T::PKCOL,
-                    tbl2: self.item_table.clone(),
-                    tbl2_col: "has",
-                    expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
-                })
-                .load(conn)?;
+            let query = self.query();
+            // If not initialised then there are no values
+            if query.is_err() {
+                return Ok(Vec::new());
+            }
+            let mut vals = query.unwrap().load(conn)?;
             // Now add in the values for things not saved to the db yet
             if !self.new_values.is_empty() {
                 vals.append(

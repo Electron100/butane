@@ -266,10 +266,11 @@ pub fn get_migrations(base_dir: &Path) -> Result<FsMigrations> {
     Ok(migrations::from_root(root))
 }
 
-pub fn base_dir() -> Result<PathBuf> {
-    std::env::current_dir()
-        .map(|d| d.join(".butane"))
-        .map_err(|e| e.into())
+pub fn working_dir_path() -> PathBuf {
+    match std::env::current_dir() {
+        Ok(path) => path,
+        Err(_) => PathBuf::from("."),
+    }
 }
 
 pub fn handle_error(r: Result<()>) {

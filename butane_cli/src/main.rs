@@ -1,18 +1,26 @@
 use std::path::PathBuf;
 
-use clap::{Arg, ArgMatches};
+use clap::{value_parser, Arg, ArgMatches};
 
 use butane_cli::{
-    base_dir, clean, clear_data, collapse_migrations, delete_table, embed, handle_error,
-    list_migrations, migrate, Result,
+    clean, clear_data, collapse_migrations, delete_table, embed, handle_error, list_migrations,
+    migrate, working_dir_path, Result,
 };
 
 fn main() {
+    lazy_static::lazy_static! {
+        static ref WORKING_DIR_PATH: PathBuf = working_dir_path();
+    }
     let app = clap::Command::new("butane")
         .version(env!("CARGO_PKG_VERSION"))
         .author("James Oakley <james@electronstudio.org>")
         .about("Manages butane database migrations")
         .max_term_width(80)
+        .arg(
+            Arg::new("path").short('p').long("path")
+            .default_value(WORKING_DIR_PATH.as_os_str())
+            .value_parser(value_parser!(PathBuf))
+        )
         .subcommand(
             clap::Command::new("init")
                 .about("Initialize the database")
@@ -86,7 +94,8 @@ fn main() {
                 .about("Clean current migration state. Deletes the current migration working state which is generated on each build. This can be used as a workaround to remove stale tables from the schema, as Butane does not currently auto-detect model removals. The next build will recreate with only tables for the extant models."))
                 .arg_required_else_help(true);
     let args = app.get_matches();
-    let base_dir = base_dir().expect("Unable to find base directory");
+    let mut base_dir = args.get_one::<PathBuf>("path").unwrap().clone();
+    base_dir.push(".butane");
     match args.subcommand() {
         Some(("init", sub_args)) => handle_error(init(&base_dir, Some(sub_args))),
         Some(("makemigration", sub_args)) => {

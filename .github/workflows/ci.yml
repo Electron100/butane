@@ -37,6 +37,8 @@ jobs:
       run: cd butane_core && cargo test --all-features
     - name: Test Codegen
       run: cd butane_codegen && cargo test --all-features
+    - name: Test CLI
+      run: cd butane_cli && cargo test --all-features
     - name: Run example cli tests
       run: cd example && cargo test --all-features
     - name: Test

@@ -20,6 +20,7 @@ fn main() {
             Arg::new("path").short('p').long("path")
             .default_value(WORKING_DIR_PATH.as_os_str())
             .value_parser(value_parser!(PathBuf))
+            .help("Select directory to locate butane state")
         )
         .subcommand(
             clap::Command::new("init")

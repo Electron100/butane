@@ -24,6 +24,7 @@ anyhow = "1.0"
 butane = { features = ["default", "pg", "sqlite"], workspace = true }
 chrono = { workspace = true }
 clap = { version = "4.1" }
+lazy_static = "1.4"
 quote = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

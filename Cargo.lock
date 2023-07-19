@@ -164,6 +164,7 @@ dependencies = [
  "butane",
  "chrono",
  "clap",
+ "lazy_static",
  "quote 1.0.26",
  "serde",
  "serde_json",

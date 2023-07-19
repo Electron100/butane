@@ -1,7 +1,7 @@
 #[test]
-fn base_dir() {
-    let path = butane_cli::base_dir().unwrap();
-    assert!(path.ends_with(&"butane_cli/.butane"));
+fn working_dir_path() {
+    let path = butane_cli::working_dir_path();
+    assert!(path.ends_with(&"butane_cli/"));
 }
 
 #[test]

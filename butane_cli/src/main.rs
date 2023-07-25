@@ -15,6 +15,7 @@ fn main() {
         .version(env!("CARGO_PKG_VERSION"))
         .author("James Oakley <james@electronstudio.org>")
         .about("Manages butane database migrations")
+        .subcommand_required(true)
         .max_term_width(80)
         .arg(
             Arg::new("path").short('p').long("path")
@@ -121,8 +122,7 @@ fn main() {
             _ => eprintln!("Unknown delete command. Try: delete table"),
         },
         Some(("clean", _)) => handle_error(clean(&base_dir)),
-        Some((cmd, _)) => eprintln!("Unknown command {cmd}"),
-        None => eprintln!("Unknown command"),
+        Some((_, _)) | None => panic!("Unreachable as clap handles this automatically"),
     }
 }
 

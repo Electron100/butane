@@ -1,3 +1,5 @@
+//! Implementation of many-to-many relationships between models.
+#![deny(missing_docs)]
 use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
@@ -123,7 +125,7 @@ where
         Ok(())
     }
 
-    /// Loads the values referred to by this foreign key from the
+    /// Loads the values referred to by this many relationship from the
     /// database if necessary and returns a reference to them.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
         let vals: Result<&Vec<T>> = self.all_values.get_or_try_init(|| {
@@ -153,6 +155,7 @@ where
         vals.map(|v| v.iter())
     }
 
+    /// Describes the columns of the Many table
     pub fn columns(&self) -> [Column; 2] {
         [
             Column::new("owner", self.owner_type.clone()),

@@ -1,3 +1,10 @@
+//! An experimental ORM for Rust with a focus on simplicity and on writing Rust, not SQL
+
+//! Butane takes an object-oriented approach to database operations.
+//! It may be thought of as much as an object-persistence system as an ORM.
+//! The fact that it is backed by a SQL database is mostly an implementation detail to the API consumer.
+
+#![deny(missing_docs)]
 pub use butane_codegen::{butane_type, dataresult, model, FieldType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
@@ -10,6 +17,7 @@ pub use butane_core::{
 };
 
 pub mod db {
+    //! Database helpers
     pub use butane_core::db::*;
 }
 

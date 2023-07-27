@@ -133,9 +133,11 @@ pub fn dataresult(args: TokenStream, input: TokenStream) -> TokenStream {
 /// let first_place = 1;
 /// let e2 = filter!(Contestant, rank == { first_place });
 /// let e3 = filter!(Contestant, name.like("A%"));
-///```
+/// ```
 ///
 /// [`BoolExpr`]: butane_core::query::BoolExpr
+/// [`ForeignKey`]: butane_core::fkey::ForeignKey
+/// [`Many`]: butane_core::many::Many
 /// [`Query`]: butane_core::query::Query
 #[proc_macro]
 pub fn filter(input: TokenStream) -> TokenStream {

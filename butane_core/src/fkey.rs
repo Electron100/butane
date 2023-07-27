@@ -1,3 +1,5 @@
+//! Implementation of foreign key relationships between models.
+#![deny(missing_docs)]
 use crate::db::ConnectionMethods;
 use crate::*;
 use once_cell::unsync::OnceCell;
@@ -33,6 +35,7 @@ where
     valpk: OnceCell<SqlVal>,
 }
 impl<T: DataObject> ForeignKey<T> {
+    /// Create a value from a reference to the primary key of the value
     pub fn from_pk(pk: T::PKType) -> Self {
         let ret = Self::new_raw();
         ret.valpk.set(pk.into_sql()).unwrap();

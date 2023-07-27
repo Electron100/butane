@@ -1,3 +1,5 @@
+//! Code-generation backend
+
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::{SqlType, SqlVal};

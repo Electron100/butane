@@ -140,16 +140,15 @@ where
         }))
     }
 
-    /// Loads the values referred to by this many relationship from the
-    /// database if necessary and returns a reference to them.
-    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
+    /// Loads the values referred to by this many relationship from a
+    /// database query if necessary and returns a reference to them.
+    pub fn load_query(
+        &self,
+        conn: &impl ConnectionMethods,
+        query: Query<T>,
+    ) -> Result<impl Iterator<Item = &T>> {
         let vals: Result<&Vec<T>> = self.all_values.get_or_try_init(|| {
-            let query = self.query();
-            // If not initialised then there are no values
-            if query.is_err() {
-                return Ok(Vec::new());
-            }
-            let mut vals = query.unwrap().load(conn)?;
+            let mut vals = query.load(conn)?;
             // Now add in the values for things not saved to the db yet
             if !self.new_values.is_empty() {
                 vals.append(
@@ -161,6 +160,19 @@ where
             Ok(vals)
         });
         vals.map(|v| v.iter())
+    }
+
+    /// Loads the values referred to by this many relationship from the
+    /// database if necessary and returns a reference to them.
+    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
+        let query = self.query();
+        // If not initialised then there are no values
+        let vals: Result<Vec<&T>> = if query.is_err() {
+            Ok(Vec::new())
+        } else {
+            Ok(self.load_query(conn, query.unwrap())?.collect())
+        };
+        vals.map(|v| v.into_iter())
     }
 
     /// Describes the columns of the Many table

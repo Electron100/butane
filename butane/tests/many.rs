@@ -1,6 +1,6 @@
 use butane::db::Connection;
 use butane::prelude::*;
-use butane::{model, Many, ObjectState};
+use butane::{model, query::OrderDirection, Many, ObjectState};
 
 use butane_test_helper::*;
 
@@ -50,6 +50,44 @@ struct AutoItem {
     id: i64,
     val: String,
 }
+
+fn load_sorted_from_many(conn: Connection) {
+    let mut cats_blog = Blog::new(1, "Cats");
+    cats_blog.save(&conn).unwrap();
+    let mut post = Post::new(
+        1,
+        "The Cheetah",
+        "This post is about a fast cat.",
+        &cats_blog,
+    );
+    let tag_fast = create_tag(&conn, "fast");
+    let tag_cat = create_tag(&conn, "cat");
+    let tag_european = create_tag(&conn, "european");
+
+    post.tags.add(&tag_fast).unwrap();
+    post.tags.add(&tag_cat).unwrap();
+    post.tags.add(&tag_european).unwrap();
+    post.save(&conn).unwrap();
+
+    let post2 = Post::get(&conn, post.id).unwrap();
+    let mut tag_iter = post2
+        .tags
+        .load_ordered(&conn, OrderDirection::Ascending)
+        .unwrap();
+    assert_eq!(tag_iter.next().unwrap().tag, "cat");
+    assert_eq!(tag_iter.next().unwrap().tag, "european");
+    assert_eq!(tag_iter.next().unwrap().tag, "fast");
+
+    let post3 = Post::get(&conn, post.id).unwrap();
+    let mut tag_iter = post3
+        .tags
+        .load_ordered(&conn, OrderDirection::Descending)
+        .unwrap();
+    assert_eq!(tag_iter.next().unwrap().tag, "fast");
+    assert_eq!(tag_iter.next().unwrap().tag, "european");
+    assert_eq!(tag_iter.next().unwrap().tag, "cat");
+}
+testall!(load_sorted_from_many);
 
 fn remove_one_from_many(conn: Connection) {
     let mut cats_blog = Blog::new(1, "Cats");

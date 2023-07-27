@@ -1,7 +1,7 @@
 //! Implementation of many-to-many relationships between models.
 #![deny(missing_docs)]
 use crate::db::{Column, ConnectionMethods};
-use crate::query::{BoolExpr, Expr, Query};
+use crate::query::{BoolExpr, Expr, Query, OrderDirection};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use once_cell::unsync::OnceCell;
 use serde::{Deserialize, Serialize};
@@ -160,6 +160,23 @@ where
             Ok(vals)
         });
         vals.map(|v| v.iter())
+    }
+
+    /// Loads and orders the values referred to by this many relationship from a
+    /// database if necessary and returns a reference to them.
+    pub fn load_ordered(
+        &self,
+        conn: &impl ConnectionMethods,
+        order: OrderDirection,
+    ) -> Result<impl Iterator<Item = &T>> {
+        let query = self.query();
+        // If not initialised then there are no values
+        let vals: Result<Vec<&T>> = if query.is_err() {
+            Ok(Vec::new())
+        } else {
+            Ok(self.load_query(conn, query.unwrap().order(T::PKCOL, order))?.collect())
+        };
+        vals.map(|v| v.into_iter())
     }
 
     /// Loads the values referred to by this many relationship from the

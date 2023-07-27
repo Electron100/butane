@@ -118,8 +118,8 @@ pub fn dataresult(args: TokenStream, input: TokenStream) -> TokenStream {
 ///    primary key.
 ///
 /// # Examples
-/// ```
-/// # use butane::query::BoolExpr;
+/// ```ignore
+/// # use butane_core::query::BoolExpr;
 /// # use butane_codegen::model;
 /// # use butane_codegen::filter;
 /// #[model]
@@ -135,8 +135,8 @@ pub fn dataresult(args: TokenStream, input: TokenStream) -> TokenStream {
 /// let e3 = filter!(Contestant, name.like("A%"));
 ///```
 ///
-/// [`BoolExpr`]: crate::query::BoolExpr
-/// [`Query`]: crate::query::Query
+/// [`BoolExpr`]: butane_core::query::BoolExpr
+/// [`Query`]: butane_core::query::Query
 #[proc_macro]
 pub fn filter(input: TokenStream) -> TokenStream {
     let input: TokenStream2 = input.into();

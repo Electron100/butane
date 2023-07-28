@@ -1,7 +1,7 @@
 //! Implementation of many-to-many relationships between models.
 #![deny(missing_docs)]
 use crate::db::{Column, ConnectionMethods};
-use crate::query::{BoolExpr, Expr, Query, OrderDirection};
+use crate::query::{BoolExpr, Expr, OrderDirection, Query};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use once_cell::unsync::OnceCell;
 use serde::{Deserialize, Serialize};
@@ -187,7 +187,9 @@ where
         let vals: Result<Vec<&T>> = if query.is_err() {
             Ok(Vec::new())
         } else {
-            Ok(self.load_query(conn, query.unwrap().order(T::PKCOL, order))?.collect())
+            Ok(self
+                .load_query(conn, query.unwrap().order(T::PKCOL, order))?
+                .collect())
         };
         vals.map(|v| v.into_iter())
     }

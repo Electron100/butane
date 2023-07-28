@@ -125,6 +125,19 @@ where
         Ok(())
     }
 
+    /// Loads the values referred to by this many relationship from the
+    /// database if necessary and returns a reference to them.
+    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
+        let query = self.query();
+        // If not initialised then there are no values
+        let vals: Result<Vec<&T>> = if query.is_err() {
+            Ok(Vec::new())
+        } else {
+            Ok(self.load_query(conn, query.unwrap())?.collect())
+        };
+        vals.map(|v| v.into_iter())
+    }
+
     /// Query the values referred to by this many relationship from the
     /// database if necessary and returns a reference to them.
     fn query(&self) -> Result<Query<T>> {
@@ -175,19 +188,6 @@ where
             Ok(Vec::new())
         } else {
             Ok(self.load_query(conn, query.unwrap().order(T::PKCOL, order))?.collect())
-        };
-        vals.map(|v| v.into_iter())
-    }
-
-    /// Loads the values referred to by this many relationship from the
-    /// database if necessary and returns a reference to them.
-    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
-        let query = self.query();
-        // If not initialised then there are no values
-        let vals: Result<Vec<&T>> = if query.is_err() {
-            Ok(Vec::new())
-        } else {
-            Ok(self.load_query(conn, query.unwrap())?.collect())
         };
         vals.map(|v| v.into_iter())
     }

@@ -16,9 +16,8 @@ build = "build.rs"
 default = ["datetime", "json", "uuid"]
 fake = ["butane_core/fake"]
 json = ["butane_codegen/json", "butane_core/json"]
-# todo re-enable sqlite
-#sqlite = ["butane_core/sqlite"]
-#sqlite-bundled = ["butane_core/sqlite-bundled"]
+sqlite = ["butane_core/sqlite"]
+sqlite-bundled = ["butane_core/sqlite-bundled"]
 pg = ["butane_core/pg"]
 datetime = ["butane_codegen/datetime", "butane_core/datetime"]
 debug = ["butane_core/debug"]

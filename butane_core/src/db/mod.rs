@@ -15,6 +15,7 @@
 use crate::query::BoolExpr;
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 use async_trait::async_trait;
+use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -23,14 +24,17 @@ use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
+#[cfg(feature = "async-adapter")]
+mod adapter;
+
 mod connmethods;
 mod helper;
 mod macros;
 #[cfg(feature = "pg")]
 pub mod pg;
-// TODO re-enable
-//#[cfg(feature = "sqlite")]
-//pub mod sqlite;
+
+#[cfg(feature = "sqlite")]
+pub mod sqlite;
 
 // TODO re-enable
 //#[cfg(feature = "r2d2")]
@@ -49,17 +53,32 @@ mod internal {
     use super::*;
     use connmethods::sync::ConnectionMethods as ConnectionMethodsSync;
 
+    #[maybe_async_cfg::maybe(sync())]
+    pub trait AsyncRequiresSend {}
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSend), sync())]
+    impl<T> AsyncRequiresSend for T {}
+
+    #[maybe_async_cfg::maybe(async())]
+    pub trait AsyncRequiresSend: Send {}
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSend), async())]
+    impl<T: Send> AsyncRequiresSend for T {}
+
     /// Database connection.
     #[maybe_async_cfg::maybe(
-        idents(ConnectionMethods(sync = "ConnectionMethodsSync", async)),
+        idents(
+            AsyncRequiresSend,
+            Backend,
+            ConnectionMethods(sync = "ConnectionMethodsSync", async),
+            Transaction(sync = "TransactionSync", async),
+        ),
         sync(),
         async()
     )]
-    #[async_trait]
-    pub trait BackendConnection: ConnectionMethods + Debug + Send + 'static {
+    #[async_trait(?Send)]
+    pub trait BackendConnection: ConnectionMethods + Debug + AsyncRequiresSend {
         /// Begin a database transaction. The transaction object must be
-        /// used in place of this connection until it is committed and aborted.
-        async fn transaction(&mut self) -> Result<Transaction>;
+        /// used in place of this connection until it is committed or aborted.
+        async fn transaction(&mut self) -> Result<Transaction<'_>>;
         /// Retrieve the backend backend this connection
         fn backend(&self) -> Box<dyn Backend>;
         fn backend_name(&self) -> &'static str;
@@ -70,27 +89,13 @@ mod internal {
 
     /// Database connection. May be a connection to any type of database
     /// as it is a boxed abstraction over a specific connection.
-    #[maybe_async_cfg::maybe(
-        idents(BackendConnection(
-            sync = "BackendConnectionSync",
-            async = "BackendConnectionAsync"
-        )),
-        sync(),
-        async()
-    )]
+    #[maybe_async_cfg::maybe(idents(BackendConnection), sync(), async())]
     #[derive(Debug)]
     pub struct Connection {
         pub(super) conn: Box<dyn BackendConnection>,
     }
 
-    #[maybe_async_cfg::maybe(
-        idents(BackendConnection(
-            sync = "BackendConnectionSync",
-            async = "BackendConnectionAsync"
-        )),
-        sync(),
-        async()
-    )]
+    #[maybe_async_cfg::maybe(idents(BackendConnection), sync(), async())]
     impl Connection {
         pub async fn execute(&mut self, sql: impl AsRef<str>) -> Result<()> {
             self.conn.execute(sql.as_ref()).await
@@ -103,14 +108,11 @@ mod internal {
     }
 
     #[maybe_async_cfg::maybe(
-        idents(
-            BackendConnection(sync = "BackendConnectionSync", async = "BackendConnectionAsync"),
-            Connection(sync = "ConnectionSync", async = "ConnectionAsync")
-        ),
+        idents(Backend, BackendConnection, Connection, Transaction),
         sync(),
         async()
     )]
-    #[async_trait]
+    #[async_trait(?Send)]
     impl BackendConnection for Connection {
         async fn transaction(&mut self) -> Result<Transaction> {
             self.conn.transaction().await
@@ -128,12 +130,15 @@ mod internal {
     connection_method_wrapper!(Connection);
 
     #[maybe_async_cfg::maybe(
-        idents(ConnectionMethods(sync = "ConnectionMethodsSync", async)),
+        idents(
+            ConnectionMethods(sync = "ConnectionMethodsSync", async),
+            AsyncRequiresSend
+        ),
         sync(),
         async()
     )]
-    #[async_trait]
-    pub trait BackendTransaction<'c>: ConnectionMethods + Debug + Send {
+    #[async_trait(?Send)]
+    pub trait BackendTransaction<'c>: ConnectionMethods + AsyncRequiresSend + Debug {
         /// Commit the transaction Unfortunately because we use this as a
         /// trait object, we can't consume self. It should be understood
         /// that no methods should be called after commit. This trait is
@@ -161,7 +166,7 @@ mod internal {
     )]
     #[derive(Debug)]
     pub struct Transaction<'c> {
-        trans: Box<dyn BackendTransaction<'c> + 'c>,
+        pub(super) trans: Box<dyn BackendTransaction<'c> + 'c>,
     }
 
     #[maybe_async_cfg::maybe(
@@ -195,21 +200,70 @@ mod internal {
     }
 
     connection_method_wrapper!(Transaction<'_>);
+
+    #[maybe_async_cfg::maybe(
+        idents(
+            BackendTransaction,
+            ConnectionMethods(sync = "ConnectionMethodsSync", async)
+        ),
+        sync(),
+        async()
+    )]
+    #[async_trait(?Send)]
+    impl<'c> BackendTransaction<'c> for Transaction<'c> {
+        async fn commit(&mut self) -> Result<()> {
+            self.trans.commit().await
+        }
+        async fn rollback(&mut self) -> Result<()> {
+            self.trans.deref_mut().rollback().await
+        }
+        fn connection_methods(&self) -> &dyn ConnectionMethods {
+            self
+        }
+        fn connection_methods_mut(&mut self) -> &mut dyn ConnectionMethods {
+            self
+        }
+    }
+
+    #[maybe_async_cfg::maybe(idents(Connection(sync = "ConnectionSync", async)), sync(), async())]
+    /// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
+    #[async_trait]
+    pub trait Backend: Send + Sync + DynClone {
+        fn name(&self) -> &'static str;
+        fn create_migration_sql(
+            &self,
+            current: &adb::ADB,
+            ops: Vec<adb::Operation>,
+        ) -> Result<String>;
+        async fn connect(&self, conn_str: &str) -> Result<Connection>;
+    }
+
+    dyn_clone::clone_trait_object!(BackendAsync);
+    dyn_clone::clone_trait_object!(BackendSync);
 }
 
+pub use internal::BackendAsync as Backend;
 pub use internal::BackendConnectionAsync as BackendConnection;
-use internal::BackendTransactionAsync as BackendTransaction;
 pub use internal::ConnectionAsync as Connection;
 pub use internal::TransactionAsync as Transaction;
+
+// unused may occur dependending on backends being compiled
+// todo include by feature instead
+#[allow(unused)]
+use internal::BackendTransactionAsync as BackendTransaction;
 
 pub mod sync {
     //! Synchronous (non-async versions of traits)
 
     pub use super::connmethods::sync::ConnectionMethods;
     pub use super::internal::BackendConnectionSync as BackendConnection;
-    use super::internal::BackendTransactionSync as BackendTransaction;
+    pub use super::internal::BackendSync as Backend;
     pub use super::internal::ConnectionSync as Connection;
     pub use super::internal::TransactionSync as Transaction;
+
+    // unused may occur dependending on backends being compiled
+    #[allow(unused)]
+    pub(crate) use super::internal::BackendTransactionSync as BackendTransaction;
 }
 
 /// Connection specification. Contains the name of a database backend
@@ -255,14 +309,6 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
     }
 }
 
-/// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
-#[async_trait]
-pub trait Backend: Sync {
-    fn name(&self) -> &'static str;
-    fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
-    async fn connect(&self, conn_str: &str) -> Result<Connection>;
-}
-
 #[async_trait]
 impl Backend for Box<dyn Backend> {
     fn name(&self) -> &'static str {
@@ -276,11 +322,36 @@ impl Backend for Box<dyn Backend> {
     }
 }
 
+impl sync::Backend for Box<dyn sync::Backend> {
+    fn name(&self) -> &'static str {
+        self.deref().name()
+    }
+    fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
+        self.deref().create_migration_sql(current, ops)
+    }
+    fn connect(&self, conn_str: &str) -> Result<sync::Connection> {
+        self.deref().connect(conn_str)
+    }
+}
+
 /// Find a backend by name.
 pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
+        #[cfg(feature = "sqlite")]
+        sqlite::BACKEND_NAME => Some(Box::new(adapter::BackendAdapter::new(
+            sqlite::SQLiteBackend::new(),
+        ))),
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
+        _ => None,
+    }
+}
+
+pub fn get_backend_sync(name: &str) -> Option<Box<dyn sync::Backend>> {
+    match name {
+        #[cfg(feature = "sqlite")]
+        sqlite::BACKEND_NAME => Some(Box::new(sqlite::SQLiteBackend::new())),
+        // todo wrap PG
         _ => None,
     }
 }

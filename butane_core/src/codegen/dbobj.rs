@@ -56,7 +56,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     quote!(
         #dataresult
 
-        #[butane::internal::async_trait]
+        #[butane::internal::async_trait(?Send)]
         impl butane::DataObject for #tyname {
             type PKType = #pktype;
             type Fields = #fields_type;

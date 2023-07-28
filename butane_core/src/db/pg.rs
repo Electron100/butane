@@ -21,7 +21,7 @@ use tokio_postgres::GenericClient;
 pub const BACKEND_NAME: &str = "pg";
 
 /// Pg [Backend][crate::db::Backend] implementation.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct PgBackend {}
 impl PgBackend {
     pub fn new() -> PgBackend {
@@ -100,7 +100,7 @@ impl PgConnectionLike for PgConnection {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl BackendConnection for PgConnection {
     async fn transaction(&mut self) -> Result<Transaction<'_>> {
         let trans: postgres::Transaction<'_> = self.client.transaction().await?;
@@ -145,7 +145,7 @@ pub trait PgConnectionLike {
     fn client(&self) -> Result<&Self::Client>;
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<T> ConnectionMethods for T
 where
     T: PgConnectionLike + std::marker::Sync,
@@ -160,15 +160,15 @@ where
         Ok(())
     }
 
-    async fn query<'a, 'b, 'c: 'a>(
+    async fn query<'c>(
         &'c self,
         table: &str,
-        columns: &'b [Column],
+        columns: &[Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
         offset: Option<i32>,
         order: Option<&[query::Order]>,
-    ) -> Result<RawQueryResult<'a>> {
+    ) -> Result<RawQueryResult<'c>> {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
         let mut values: Vec<SqlVal> = Vec::new();
@@ -279,11 +279,11 @@ where
         future.await?;
         Ok(())
     }
-    async fn update<'a>(
+    async fn update(
         &self,
         table: &str,
         pkcol: Column,
-        pk: SqlValRef<'a>,
+        pk: SqlValRef<'_>,
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()> {
@@ -378,7 +378,7 @@ impl<'c> PgConnectionLike for PgTransaction<'c> {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
     async fn commit(&mut self) -> Result<()> {
         match self.trans.take() {

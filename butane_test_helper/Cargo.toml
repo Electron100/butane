@@ -13,7 +13,7 @@ documentation = "https://docs.rs/butane/"
 
 [dependencies]
 # todo re-enable sqlite
-butane_core = { features = ["pg"], workspace = true }
+butane_core = { features = ["pg", "sqlite"], workspace = true }
 libc = "0.2"
 once_cell = { workspace = true }
 tokio-postgres = { features = ["with-geo-types-0_7"], workspace = true }

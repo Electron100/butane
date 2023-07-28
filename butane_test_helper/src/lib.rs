@@ -1,6 +1,4 @@
 use butane_core::db::{connect, get_backend, pg, Backend, Connection, ConnectionSpec};
-//todo
-//use butane_core::db::sqlite;
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -9,6 +7,8 @@ use std::path::PathBuf;
 use std::process::{ChildStderr, Command, Stdio};
 use std::sync::Mutex;
 use uuid::Uuid;
+
+use butane_core::db::sqlite;
 
 pub async fn pg_connection() -> (Connection, PgSetupData) {
     let backend = get_backend(pg::BACKEND_NAME).unwrap();
@@ -190,10 +190,9 @@ pub async fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate:
     }
 }
 
-// todo
-/*pub fn sqlite_connection() -> Connection {
+pub async fn sqlite_connection() -> Connection {
     let backend = get_backend(sqlite::BACKEND_NAME).unwrap();
-    backend.connect(":memory:").unwrap()
+    backend.connect(":memory:").await.unwrap()
 }
 
 pub fn sqlite_connspec() -> ConnectionSpec {
@@ -202,7 +201,6 @@ pub fn sqlite_connspec() -> ConnectionSpec {
 
 pub fn sqlite_setup() {}
 pub fn sqlite_teardown(_: ()) {}
-*/
 
 #[macro_export]
 macro_rules! maketest {

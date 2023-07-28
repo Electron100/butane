@@ -296,7 +296,7 @@ impl Migrations for FsMigrations {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl MigrationsMut for FsMigrations {
     fn current(&mut self) -> &mut Self::M {
         &mut self.current
@@ -336,7 +336,8 @@ impl MigrationsMut for FsMigrations {
                 std::fs::remove_file(entry.path())?;
             }
         }
-        conn.delete_where(super::ButaneMigration::TABLE, crate::query::BoolExpr::True).await?;
+        conn.delete_where(super::ButaneMigration::TABLE, crate::query::BoolExpr::True)
+            .await?;
         Ok(())
     }
 }

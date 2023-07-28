@@ -14,7 +14,7 @@ use std::fmt::Debug;
 ///
 /// A Migration cannot be constructed directly, only retrieved from
 /// [Migrations][crate::migrations::Migrations].
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 pub trait Migration: Debug + PartialEq {
     /// Retrieves the full abstract database state describing all tables
     fn db(&self) -> Result<ADB>;
@@ -59,7 +59,8 @@ pub trait Migration: Debug + PartialEq {
             ButaneMigration::TABLE,
             ButaneMigration::COLUMNS,
             &[self.name().as_ref().to_sql_ref()],
-        ).await
+        )
+        .await
     }
 
     /// Un-apply (downgrade) the migration to a database
@@ -77,7 +78,8 @@ pub trait Migration: Debug + PartialEq {
         tx.delete_where(
             ButaneMigration::TABLE,
             BoolExpr::Eq(ButaneMigration::PKCOL, Expr::Val(nameval)),
-        ).await?;
+        )
+        .await?;
         tx.commit().await
     }
 }

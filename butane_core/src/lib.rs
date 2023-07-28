@@ -84,7 +84,7 @@ pub trait DataResult: Sized {
 ///
 /// Rather than implementing this type manually, use the
 /// `#[model]` attribute.
-#[async_trait]
+#[async_trait(?Send)]
 pub trait DataObject: DataResult<DBO = Self> + Sync {
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
@@ -213,6 +213,12 @@ pub enum Error {
     TLS(#[from] native_tls::Error),
     #[error("Generic error {0}")]
     Generic(#[from] Box<dyn std::error::Error + Sync + Send>),
+    #[error("Tokio join error {0}")]
+    TokioJoin(#[from] tokio::task::JoinError),
+    #[error("Tokio recv error {0}")]
+    TokioRecv(#[from] tokio::sync::oneshot::error::RecvError),
+    #[error("Crossbeam cannot send/recv, channel disconnected")]
+    CrossbeamChannel,
 }
 
 #[cfg(feature = "sqlite")]
@@ -228,6 +234,18 @@ impl From<rusqlite::types::FromSqlError> for Error {
             FromSqlError::Other(_) => Error::SQLiteFromSQL(e),
             _ => Error::SQLiteFromSQL(e),
         }
+    }
+}
+
+impl<T> From<crossbeam_channel::SendError<T>> for Error {
+    fn from(_e: crossbeam_channel::SendError<T>) -> Self {
+        Self::CrossbeamChannel
+    }
+}
+
+impl From<crossbeam_channel::RecvError> for Error {
+    fn from(_e: crossbeam_channel::RecvError) -> Self {
+        Self::CrossbeamChannel
     }
 }
 

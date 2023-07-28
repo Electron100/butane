@@ -128,7 +128,7 @@ impl Migrations for MemMigrations {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl MigrationsMut for MemMigrations {
     fn current(&mut self) -> &mut Self::M {
         &mut self.current
@@ -161,7 +161,8 @@ impl MigrationsMut for MemMigrations {
     async fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         self.migrations.clear();
         self.latest = None;
-        conn.delete_where(ButaneMigration::TABLE, BoolExpr::True).await?;
+        conn.delete_where(ButaneMigration::TABLE, BoolExpr::True)
+            .await?;
         Ok(())
     }
 }

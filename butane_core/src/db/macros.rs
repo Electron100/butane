@@ -6,20 +6,20 @@ macro_rules! connection_method_wrapper {
             sync(),
             async()
         )]
-        #[async_trait::async_trait]
+        #[async_trait::async_trait(?Send)]
         impl ConnectionMethods for $ty {
             async fn execute(&self, sql: &str) -> Result<()> {
                 ConnectionMethods::execute(self.wrapped_connection_methods()?, sql).await
             }
-            async fn query<'a, 'b, 'c: 'a>(
+            async fn query<'c>(
                 &'c self,
                 table: &str,
-                columns: &'b [Column],
+                columns: &[Column],
                 expr: Option<BoolExpr>,
                 limit: Option<i32>,
                 offset: Option<i32>,
                 sort: Option<&[$crate::query::Order]>,
-            ) -> Result<RawQueryResult<'a>> {
+            ) -> Result<RawQueryResult<'c>> {
                 self.wrapped_connection_methods()?
                     .query(table, columns, expr, limit, offset, sort)
                     .await
@@ -56,11 +56,11 @@ macro_rules! connection_method_wrapper {
                     .insert_or_replace(table, columns, pkcol, values)
                     .await
             }
-            async fn update<'a>(
+            async fn update(
                 &self,
                 table: &str,
                 pkcol: Column,
-                pk: SqlValRef<'a>,
+                pk: SqlValRef<'_>,
                 columns: &[Column],
                 values: &[SqlValRef<'_>],
             ) -> Result<()> {

@@ -174,10 +174,10 @@ fn current_migration_custom_type() {
 }
 
 #[cfg(feature = "sqlite")]
-#[test]
-fn migration_add_field_sqlite() {
+#[tokio::test]
+async fn migration_add_field_sqlite() {
     migration_add_field(
-        &mut sqlite_connection(),
+        &mut butane_test_helper::sqlite_connection().await,
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;",
         // The exact details of futzing a DROP COLUMN in sqlite aren't
         // important (e.g. the temp table naming is certainly not part
@@ -186,7 +186,7 @@ fn migration_add_field_sqlite() {
         // changes. If the change is innocuous, this test should just
         // be updated.
         "CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
-    );
+    ).await;
 }
 
 #[cfg(feature = "pg")]
@@ -202,16 +202,17 @@ async fn migration_add_field_pg() {
 }
 
 #[cfg(feature = "sqlite")]
-#[test]
-fn migration_add_field_with_default_sqlite() {
+#[tokio::test]
+async fn migration_add_field_with_default_sqlite() {
     migration_add_field_with_default(
-        &mut sqlite_connection(),
+        &mut sqlite_connection().await,
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 42;",
         // See comments on migration_add_field_sqlite
         r#"CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
            INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;
            DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
-    );
+    )
+    .await;
 }
 
 #[cfg(feature = "pg")]
@@ -227,10 +228,10 @@ async fn migration_add_field_with_default_pg() {
 }
 
 #[cfg(feature = "sqlite")]
-#[test]
-fn migration_add_and_remove_field_sqlite() {
+#[tokio::test]
+async fn migration_add_and_remove_field_sqlite() {
     migration_add_and_remove_field(
-        &mut sqlite_connection(),
+        &mut sqlite_connection().await,
         // The exact details of futzing a DROP COLUMN in sqlite aren't
         // important (e.g. the temp table naming is certainly not part
         // of the API contract), but the goal here is to ensure we're
@@ -245,7 +246,8 @@ fn migration_add_and_remove_field_sqlite() {
            CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
            INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;
            ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
-    );
+    )
+    .await;
 }
 
 #[cfg(feature = "pg")]
@@ -261,13 +263,14 @@ async fn migration_add_and_remove_field_pg() {
 }
 
 #[cfg(feature = "sqlite")]
-#[test]
-fn migration_delete_table_sqlite() {
+#[tokio::test]
+async fn migration_delete_table_sqlite() {
     migration_delete_table(
-        &mut sqlite_connection(),
+        &mut sqlite_connection().await,
         "DROP TABLE Foo;",
         "CREATE TABLE Foo (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
-    );
+    )
+    .await;
 }
 
 #[cfg(feature = "pg")]

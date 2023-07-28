@@ -2,22 +2,23 @@
 #[cfg(feature = "log")]
 use std::sync::Once;
 
-use super::helper;
-use super::*;
+use super::sync::{
+    Backend, BackendConnection, BackendTransaction, Connection, ConnectionMethods, Transaction,
+};
+use super::{helper, BackendRow, Column, RawQueryResult};
 use crate::db::connmethods::BackendRows;
-use crate::debug;
 use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
-use crate::query;
-use crate::query::Order;
-use crate::{Result, SqlType, SqlVal, SqlValRef};
+use crate::query::{BoolExpr, Order};
+use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use pin_project::pin_project;
 use std::borrow::Cow;
 use std::fmt::Write;
+use std::ops::Deref;
+use std::path::Path;
 use std::pin::Pin;
-use std::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -44,7 +45,7 @@ fn log_callback(error_code: std::ffi::c_int, message: &str) {
 }
 
 /// SQLite [Backend][crate::db::Backend] implementation.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SQLiteBackend {}
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
@@ -84,7 +85,7 @@ impl Backend for SQLiteBackend {
 /// SQLite database connection.
 #[derive(Debug)]
 pub struct SQLiteConnection {
-    conn: Mutex<rusqlite::Connection>,
+    conn: rusqlite::Connection,
 }
 impl SQLiteConnection {
     fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -97,23 +98,81 @@ impl SQLiteConnection {
         });
 
         rusqlite::Connection::open(path)
-            .map(|conn| SQLiteConnection {
-                conn: Mutex::new(conn),
-            })
+            .map(|conn| SQLiteConnection { conn })
             .map_err(|e| e.into())
     }
 
     // For use with connection_method_wrapper macro
     #[allow(clippy::unnecessary_wraps)]
-    fn wrapped_connection_methods(&self) -> Result<&Mutex<rusqlite::Connection>> {
+    fn wrapped_connection_methods(&self) -> Result<&rusqlite::Connection> {
         Ok(&self.conn)
     }
 }
-connection_method_wrapper!(SQLiteConnection);
+impl ConnectionMethods for SQLiteConnection {
+    fn execute(&self, sql: &str) -> Result<()> {
+        ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
+    }
+    fn query<'a, 'b, 'c>(
+        &'c self,
+        table: &str,
+        columns: &'b [Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+        offset: Option<i32>,
+        sort: Option<&[crate::query::Order]>,
+    ) -> Result<RawQueryResult<'c>> {
+        self.wrapped_connection_methods()?
+            .query(table, columns, expr, limit, offset, sort)
+    }
+    fn insert_returning_pk(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<SqlVal> {
+        self.wrapped_connection_methods()?
+            .insert_returning_pk(table, columns, pkcol, values)
+    }
+    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
+        self.wrapped_connection_methods()?
+            .insert_only(table, columns, values)
+    }
+    fn insert_or_replace(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.wrapped_connection_methods()?
+            .insert_or_replace(table, columns, pkcol, values)
+    }
+    fn update<'a>(
+        &self,
+        table: &str,
+        pkcol: Column,
+        pk: SqlValRef<'a>,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.wrapped_connection_methods()?
+            .update(table, pkcol, pk, columns, values)
+    }
+    fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
+        self.wrapped_connection_methods()?.delete(table, pkcol, pk)
+    }
+    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
+        self.wrapped_connection_methods()?.delete_where(table, expr)
+    }
+    fn has_table(&self, table: &str) -> Result<bool> {
+        self.wrapped_connection_methods()?.has_table(table)
+    }
+}
 
 impl BackendConnection for SQLiteConnection {
     fn transaction(&mut self) -> Result<Transaction<'_>> {
-        let trans: rusqlite::Transaction<'_> = self.conn.lock()?.transaction()?;
+        let trans: rusqlite::Transaction<'_> = self.conn.transaction()?;
         let trans = Box::new(SqliteTransaction::new(trans));
         Ok(Transaction::new(trans))
     }
@@ -128,176 +187,16 @@ impl BackendConnection for SQLiteConnection {
     }
 }
 
-fn rs_conn_execute(conn: &rusqlite::Connection, sql: &str) -> Result<()> {
-    if cfg!(feature = "log") {
-        debug!("execute sql {}", sql);
-    }
-    conn.execute_batch(sql.as_ref())?;
-    Ok(())
-}
-
-fn rs_conn_query<'a, 'b, 'c: 'a>(
-    conn: &'c rusqlite::Connection,
-    table: &str,
-    columns: &'b [Column],
-    expr: Option<BoolExpr>,
-    limit: Option<i32>,
-    offset: Option<i32>,
-    order: Option<&[Order]>,
-) -> Result<RawQueryResult<'a>> {
-    let mut sqlquery = String::new();
-    helper::sql_select(columns, table, &mut sqlquery);
-    let mut values: Vec<SqlVal> = Vec::new();
-    if let Some(expr) = expr {
-        sqlquery.write_str(" WHERE ").unwrap();
-        sql_for_expr(
-            query::Expr::Condition(Box::new(expr)),
-            &mut values,
-            &mut SQLitePlaceholderSource::new(),
-            &mut sqlquery,
-        );
-    }
-
-    if let Some(order) = order {
-        helper::sql_order(order, &mut sqlquery)
-    }
-
-    if let Some(limit) = limit {
-        helper::sql_limit(limit, &mut sqlquery)
-    }
-
-    if let Some(offset) = offset {
-        if limit.is_none() {
-            // Sqlite only supports offset in conjunction with
-            // limit, so add a max limit if we don't have one
-            // already.
-            helper::sql_limit(i32::MAX, &mut sqlquery)
-        }
-        helper::sql_offset(offset, &mut sqlquery)
-    }
-
-    debug!("query sql {}", sqlquery);
-    let stmt = conn.prepare(&sqlquery)?;
-    // TODO
-    /*let rows = stmt.query().mapped(|row| {
-            for col in columns {
-
-            }
-
-    }*/
-    let adapter = QueryAdapter::new(stmt, rusqlite::params_from_iter(values))?;
-    Ok(Box::new(adapter))
-}
-
-fn rs_conn_insert_returning_pk(
-    conn: &rusqlite::Connection,
-    table: &str,
-    columns: &[Column],
-    pkcol: &Column,
-    values: &[SqlValRef<'_>],
-) -> Result<SqlVal> {
-    let mut sql = String::new();
-    helper::sql_insert_with_placeholders(
-        table,
-        columns,
-        &mut SQLitePlaceholderSource::new(),
-        &mut sql,
-    );
-    if cfg!(feature = "log") {
-        debug!("insert sql {}", sql);
-    }
-    conn.execute(&sql, rusqlite::params_from_iter(values))?;
-    let pk: SqlVal = conn.query_row_and_then(
-        &format!(
-            "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
-            pkcol.name(),
-            table
-        ),
-        [],
-        |row| sql_val_from_rusqlite(row.get_ref_unwrap(0), pkcol),
-    )?;
-    Ok(pk)
-}
-fn rs_conn_insert_only(
-    conn: &rusqlite::Connection,
-    table: &str,
-    columns: &[Column],
-    values: &[SqlValRef<'_>],
-) -> Result<()> {
-    let mut sql = String::new();
-    helper::sql_insert_with_placeholders(
-        table,
-        columns,
-        &mut SQLitePlaceholderSource::new(),
-        &mut sql,
-    );
-    if cfg!(feature = "log") {
-        debug!("insert sql {}", sql);
-    }
-    conn.execute(&sql, rusqlite::params_from_iter(values))?;
-    Ok(())
-}
-fn rs_conn_insert_or_replace(
-    conn: &rusqlite::Connection,
-    table: &str,
-    columns: &[Column],
-    _pkcol: &Column,
-    values: &[SqlValRef],
-) -> Result<()> {
-    let mut sql = String::new();
-    sql_insert_or_update(table, columns, &mut sql);
-    conn.execute(&sql, rusqlite::params_from_iter(values))?;
-    Ok(())
-}
-fn rs_conn_update(
-    conn: &rusqlite::Connection,
-    table: &str,
-    pkcol: Column,
-    pk: SqlValRef,
-    columns: &[Column],
-    values: &[SqlValRef<'_>],
-) -> Result<()> {
-    let mut sql = String::new();
-    helper::sql_update_with_placeholders(
-        table,
-        pkcol,
-        columns,
-        &mut SQLitePlaceholderSource::new(),
-        &mut sql,
-    );
-    let placeholder_values = [values, &[pk]].concat();
-    if cfg!(feature = "log") {
-        debug!("update sql {}", sql);
-    }
-    conn.execute(&sql, rusqlite::params_from_iter(placeholder_values))?;
-    Ok(())
-}
-fn rs_conn_delete_where(conn: &rusqlite::Connection, table: &str, expr: BoolExpr) -> Result<usize> {
-    let mut sql = String::new();
-    let mut values: Vec<SqlVal> = Vec::new();
-    write!(&mut sql, "DELETE FROM {table} WHERE ").unwrap();
-    sql_for_expr(
-        query::Expr::Condition(Box::new(expr)),
-        &mut values,
-        &mut SQLitePlaceholderSource::new(),
-        &mut sql,
-    );
-    let cnt = self.execute(&sql, rusqlite::params_from_iter(values))?;
-    Ok(cnt)
-}
-fn rs_conn_has_table(conn: &rusqlite::Connection, table: &str) -> Result<bool> {
-    let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
-    let mut rows = stmt.query([table])?;
-    Ok(rows.next()?.is_some())
-}
-
-#[async_trait]
-impl ConnectionMethods for Mutex<rusqlite::Connection> {
+impl ConnectionMethods for rusqlite::Connection {
     fn execute(&self, sql: &str) -> Result<()> {
-        rs_conn_execute(self.lock()?.deref(), sql)
+        if cfg!(feature = "log") {
+            debug!("execute sql {}", sql);
+        }
+        self.execute_batch(sql.as_ref())?;
+        Ok(())
     }
 
-    async fn query<'a, 'b, 'c: 'a>(
+    fn query<'b, 'c>(
         &'c self,
         table: &str,
         columns: &'b [Column],
@@ -305,16 +204,45 @@ impl ConnectionMethods for Mutex<rusqlite::Connection> {
         limit: Option<i32>,
         offset: Option<i32>,
         order: Option<&[Order]>,
-    ) -> Result<RawQueryResult<'a>> {
-        rs_conn_query(
-            self.lock()?.deref(),
-            table,
-            columns,
-            expr,
-            limit,
-            offset,
-            order,
-        )
+    ) -> Result<RawQueryResult<'c>> {
+        let mut sqlquery = String::new();
+        helper::sql_select(columns, table, &mut sqlquery);
+        let mut values: Vec<SqlVal> = Vec::new();
+        if let Some(expr) = expr {
+            sqlquery.write_str(" WHERE ").unwrap();
+            sql_for_expr(
+                query::Expr::Condition(Box::new(expr)),
+                &mut values,
+                &mut SQLitePlaceholderSource::new(),
+                &mut sqlquery,
+            );
+        }
+
+        if let Some(order) = order {
+            helper::sql_order(order, &mut sqlquery)
+        }
+
+        if let Some(limit) = limit {
+            helper::sql_limit(limit, &mut sqlquery)
+        }
+
+        if let Some(offset) = offset {
+            if limit.is_none() {
+                // Sqlite only supports offset in conjunction with
+                // limit, so add a max limit if we don't have one
+                // already.
+                helper::sql_limit(i32::MAX, &mut sqlquery)
+            }
+            helper::sql_offset(offset, &mut sqlquery)
+        }
+
+        debug!("query sql {}", sqlquery);
+        #[cfg(feature = "debug")]
+        debug!("values {:?}", values);
+
+        let stmt = self.prepare(&sqlquery)?;
+        let adapter = QueryAdapter::new(stmt, rusqlite::params_from_iter(values))?;
+        Ok(Box::new(adapter))
     }
     fn insert_returning_pk(
         &self,
@@ -323,10 +251,45 @@ impl ConnectionMethods for Mutex<rusqlite::Connection> {
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
-        rs_conn_insert_returning_pk(self.lock()?.deref(), table, columns, pkcol, values)
+        let mut sql = String::new();
+        helper::sql_insert_with_placeholders(
+            table,
+            columns,
+            &mut SQLitePlaceholderSource::new(),
+            &mut sql,
+        );
+        if cfg!(feature = "log") {
+            debug!("insert sql {}", sql);
+            #[cfg(feature = "debug")]
+            debug!("values {:?}", values);
+        }
+        self.execute(&sql, rusqlite::params_from_iter(values))?;
+        let pk: SqlVal = self.query_row_and_then(
+            &format!(
+                "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
+                pkcol.name(),
+                table
+            ),
+            [],
+            |row| sql_val_from_rusqlite(row.get_ref_unwrap(0), pkcol),
+        )?;
+        Ok(pk)
     }
     fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
-        rs_conn_insert_only(self.lock()?.deref(), table, columns, values)
+        let mut sql = String::new();
+        helper::sql_insert_with_placeholders(
+            table,
+            columns,
+            &mut SQLitePlaceholderSource::new(),
+            &mut sql,
+        );
+        if cfg!(feature = "log") {
+            debug!("insert sql {}", sql);
+            #[cfg(feature = "debug")]
+            debug!("values {:?}", values);
+        }
+        self.execute(&sql, rusqlite::params_from_iter(values))?;
+        Ok(())
     }
     fn insert_or_replace(
         &self,
@@ -335,7 +298,10 @@ impl ConnectionMethods for Mutex<rusqlite::Connection> {
         pkcol: &Column,
         values: &[SqlValRef],
     ) -> Result<()> {
-        rs_conn_insert_or_replace(self.lock()?.deref(), table, columns, pkcol, values)
+        let mut sql = String::new();
+        sql_insert_or_update(table, columns, pkcol, &mut sql);
+        self.execute(&sql, rusqlite::params_from_iter(values))?;
+        Ok(())
     }
     fn update(
         &self,
@@ -345,64 +311,90 @@ impl ConnectionMethods for Mutex<rusqlite::Connection> {
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()> {
-        rs_conn_update(self.lock()?.deref(), table, pkcol, pk, columns, values)
+        let mut sql = String::new();
+        helper::sql_update_with_placeholders(
+            table,
+            pkcol,
+            columns,
+            &mut SQLitePlaceholderSource::new(),
+            &mut sql,
+        );
+        let placeholder_values = [values, &[pk]].concat();
+        if cfg!(feature = "log") {
+            debug!("update sql {}", sql);
+            #[cfg(feature = "debug")]
+            debug!("placeholders {:?}", placeholder_values);
+        }
+        self.execute(&sql, rusqlite::params_from_iter(placeholder_values))?;
+        Ok(())
     }
     fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
-        rs_conn_delete_where(self.lock()?.deref(), table, expr)
+        let mut sql = String::new();
+        let mut values: Vec<SqlVal> = Vec::new();
+        write!(
+            &mut sql,
+            "DELETE FROM {} WHERE ",
+            helper::quote_reserved_word(table)
+        )
+        .unwrap();
+        sql_for_expr(
+            query::Expr::Condition(Box::new(expr)),
+            &mut values,
+            &mut SQLitePlaceholderSource::new(),
+            &mut sql,
+        );
+        if cfg!(feature = "log") {
+            debug!("delete where sql {}", sql);
+            #[cfg(feature = "debug")]
+            debug!("placeholders {:?}", values);
+        }
+        let cnt = self.execute(&sql, rusqlite::params_from_iter(values))?;
+        Ok(cnt)
     }
     fn has_table(&self, table: &str) -> Result<bool> {
-        rs_conn_has_table(&self.lock()?.deref(), table)
+        let mut stmt =
+            self.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
+        let mut rows = stmt.query([table])?;
+        Ok(rows.next()?.is_some())
     }
 }
 
 #[derive(Debug)]
 struct SqliteTransaction<'c> {
-    trans: Option<Mutex<rusqlite::Transaction<'c>>>,
+    trans: Option<rusqlite::Transaction<'c>>,
 }
 impl<'c> SqliteTransaction<'c> {
     fn new(trans: rusqlite::Transaction<'c>) -> Self {
-        SqliteTransaction {
-            trans: Some(Mutex::new(trans)),
-        }
+        SqliteTransaction { trans: Some(trans) }
     }
-    fn get(&self) -> Result<&Mutex<rusqlite::Transaction<'c>>> {
+    fn get(&self) -> Result<&rusqlite::Transaction<'c>> {
         match &self.trans {
             None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans),
         }
     }
-    fn wrapped_connection_methods(&self) -> Result<&Mutex<rusqlite::Transaction<'_>>> {
-        Ok(self.get()?)
+    fn wrapped_connection_methods(&self) -> Result<&rusqlite::Connection> {
+        Ok(self.get()?.deref())
     }
     fn already_consumed() -> Error {
         Error::Internal("transaction has already been consumed".to_string())
     }
 }
-
-#[async_trait]
 impl ConnectionMethods for SqliteTransaction<'_> {
     fn execute(&self, sql: &str) -> Result<()> {
-        rs_conn_execute(self.get()?.lock()?.deref(), sql)
+        ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
     }
-
-    async fn query<'a, 'b, 'c: 'a>(
+    fn query<'b, 'c>(
         &'c self,
         table: &str,
         columns: &'b [Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
         offset: Option<i32>,
-        order: Option<&[Order]>,
-    ) -> Result<RawQueryResult<'a>> {
-        rs_conn_query(
-            self.get()?.lock()?.deref(),
-            table,
-            columns,
-            expr,
-            limit,
-            offset,
-            order,
-        )
+        sort: Option<&[crate::query::Order]>,
+    ) -> Result<RawQueryResult<'c>> {
+        self.wrapped_connection_methods()?
+            .query(table, columns, expr, limit, offset, sort)
     }
     fn insert_returning_pk(
         &self,
@@ -411,46 +403,45 @@ impl ConnectionMethods for SqliteTransaction<'_> {
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
-        rs_conn_insert_returning_pk(self.get()?.lock()?.deref(), table, columns, pkcol, values)
+        self.wrapped_connection_methods()?
+            .insert_returning_pk(table, columns, pkcol, values)
     }
     fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
-        rs_conn_insert_only(self.get()?.lock()?.deref(), table, columns, values)
+        self.wrapped_connection_methods()?
+            .insert_only(table, columns, values)
     }
     fn insert_or_replace(
         &self,
         table: &str,
         columns: &[Column],
         pkcol: &Column,
-        values: &[SqlValRef],
+        values: &[SqlValRef<'_>],
     ) -> Result<()> {
-        rs_conn_insert_or_replace(self.get()?.lock()?.deref(), table, columns, pkcol, values)
+        self.wrapped_connection_methods()?
+            .insert_or_replace(table, columns, pkcol, values)
     }
-    fn update(
+    fn update<'a>(
         &self,
         table: &str,
         pkcol: Column,
-        pk: SqlValRef,
+        pk: SqlValRef<'a>,
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()> {
-        rs_conn_update(
-            self.get()?.lock()?.deref(),
-            table,
-            pkcol,
-            pk,
-            columns,
-            values,
-        )
+        self.wrapped_connection_methods()?
+            .update(table, pkcol, pk, columns, values)
+    }
+    fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
+        self.wrapped_connection_methods()?.delete(table, pkcol, pk)
     }
     fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
-        rs_conn_delete_where(self.get()?.lock()?.deref(), table, expr)
+        self.wrapped_connection_methods()?.delete_where(table, expr)
     }
     fn has_table(&self, table: &str) -> Result<bool> {
-        rs_conn_has_table(&self.get()?.lock()?.deref(), table)
+        self.wrapped_connection_methods()?.has_table(table)
     }
 }
 
-#[async_trait]
 impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
@@ -458,7 +449,7 @@ impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
             Some(trans) => Ok(trans.commit()?),
         }
     }
-    async fn rollback(&mut self) -> Result<()> {
+    fn rollback(&mut self) -> Result<()> {
         match self.trans.take() {
             None => Err(Self::already_consumed()),
             Some(trans) => Ok(trans.rollback()?),

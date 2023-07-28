@@ -23,7 +23,7 @@ use async_trait::async_trait;
 pub use memmigrations::{MemMigration, MemMigrations};
 
 /// A collection of migrations.
-#[async_trait]
+#[async_trait(?Send)]
 pub trait Migrations {
     type M: Migration;
 
@@ -112,7 +112,7 @@ pub trait Migrations {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 pub trait MigrationsMut: Migrations
 where
     Self::M: MigrationMut,
@@ -264,7 +264,7 @@ impl DataResult for ButaneMigration {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl DataObject for ButaneMigration {
     type PKType = String;
     type Fields = (); // we don't need Fields as we never filter

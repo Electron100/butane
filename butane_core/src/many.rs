@@ -127,7 +127,7 @@ where
 
     /// Query the values referred to by this many relationship from the
     /// database if necessary and returns a reference to them.
-    pub fn query(&self) -> Result<Query<T>> {
+    fn query(&self) -> Result<Query<T>> {
         let owner: &SqlVal = match &self.owner {
             Some(o) => o,
             None => return Err(Error::NotInitialized),
@@ -142,7 +142,7 @@ where
 
     /// Loads the values referred to by this many relationship from a
     /// database query if necessary and returns a reference to them.
-    pub fn load_query(
+    fn load_query(
         &self,
         conn: &impl ConnectionMethods,
         query: Query<T>,

@@ -22,7 +22,7 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 [dependencies]
 anyhow = "1.0"
 butane = { features = ["default", "pg", "sqlite"], workspace = true }
-cargo_metadata = "0.15"
+cargo_metadata = "0.17"
 chrono = { workspace = true }
 clap = { version = "4.1" }
 lazy_static = "1.4"

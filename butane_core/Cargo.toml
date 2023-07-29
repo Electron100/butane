@@ -26,7 +26,7 @@ bytes = { version = "1.0", optional = true }
 cfg-if = { workspace = true }
 chrono = { optional = true, workspace = true }
 fake = { workspace = true, optional = true }
-fallible-iterator = "0.2"
+fallible-iterator = "0.3"
 fallible-streaming-iterator = "0.1"
 fs2 = "0.4" # for file locks
 hex = "0.4"
@@ -54,7 +54,7 @@ assert_matches = "1.5"
 butane_test_helper = { workspace = true }
 env_logger = { workspace = true }
 paste = { workspace = true }
-tempdir = "0.3"
+tempfile = "3.7"
 
 [[test]]
 name = "uuid"

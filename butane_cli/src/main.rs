@@ -51,7 +51,7 @@ fn main() {
         )
         .subcommand(
             clap::Command::new("detachmigration")
-                .about("Detach the top migration")
+                .about("Detach the latest migration")
         )
         .subcommand(clap::Command::new("migrate").about("Apply migrations"))
         .subcommand(clap::Command::new("list").about("List migrations"))

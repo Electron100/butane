@@ -93,9 +93,15 @@ pub fn make_migration(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
 /// leaving the migration on the filesystem.
 pub fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
     let mut ms = get_migrations(base_dir)?;
-    let all_migrations = ms.all_migrations()?;
-    let initial_migration = all_migrations.first().expect("There are no migrations");
-    let top_migration = ms.latest().expect("There are no migrations");
+    let all_migrations = ms.all_migrations().unwrap_or_else(|e| {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    });
+    let initial_migration = all_migrations.first().unwrap_or_else(|| {
+        eprintln!("There are no migrations");
+        std::process::exit(1);
+    });
+    let top_migration = ms.latest().expect("Latest should exist");
     if initial_migration == &top_migration {
         eprintln!("Can not detach initial migration");
         std::process::exit(1);

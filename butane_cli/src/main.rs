@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{value_parser, Arg, ArgMatches};
 
@@ -113,7 +113,9 @@ fn main() {
         Some(("makemigration", sub_args)) => {
             handle_error(make_migration(&base_dir, Some(sub_args)))
         }
-        Some(("detachmigration", sub_args)) => handle_error(detach_migration(&base_dir, Some(sub_args))),
+        Some(("detachmigration", sub_args)) => {
+            handle_error(detach_migration(&base_dir, Some(sub_args)))
+        }
         Some(("migrate", _)) => handle_error(migrate(&base_dir)),
         Some(("rollback", sub_args)) => handle_error(rollback(&base_dir, Some(sub_args))),
         Some(("embed", _)) => handle_error(embed(&base_dir)),
@@ -149,7 +151,7 @@ fn make_migration(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
     butane_cli::make_migration(base_dir, name_arg)
 }
 
-fn detach_migration(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
+fn detach_migration(base_dir: &Path, args: Option<&ArgMatches>) -> Result<()> {
     let name_arg = args.and_then(|a| a.get_one::<String>("NAME"));
     butane_cli::detach_migration(base_dir, name_arg)
 }

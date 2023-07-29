@@ -89,7 +89,7 @@ pub fn make_migration(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
     Ok(())
 }
 
-pub fn detach_migration(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
+pub fn detach_migration(base_dir: &Path, name: Option<&String>) -> Result<()> {
     let mut ms = get_migrations(base_dir)?;
     let all_migrations = ms.all_migrations()?;
     let initial_migration = all_migrations.first().expect("There are no migrations");

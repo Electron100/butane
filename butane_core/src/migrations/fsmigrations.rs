@@ -1,7 +1,7 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::fs::{Filesystem, OsFilesystem};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
-use crate::{ConnectionMethods, DataObject, Result};
+use crate::{ConnectionMethods, Error, DataObject, Result};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -272,11 +272,10 @@ impl FsMigrations {
             .map_err(|e| e.into())
     }
     pub fn detach_latest_migration(&mut self) -> Result<()> {
-        let latest = self.latest().expect("There are no migrations");
+        let latest = self.latest().ok_or(Error::MigrationError("There are no migrations".to_string()))?;
         let from_name = latest
             .migration_from()?
-            .map(|s| s.to_string())
-            .expect("There is no previous migration");
+            .map(|s| s.to_string()).ok_or(Error::MigrationError("There is no previous migration".to_string()))?;
         let mut state = self.get_state()?;
         state.latest = Some(from_name);
         self.save_state(&state)?;

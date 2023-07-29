@@ -89,7 +89,9 @@ pub fn make_migration(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
     Ok(())
 }
 
-pub fn detach_migration(base_dir: &Path, name: Option<&String>) -> Result<()> {
+/// Detach the latest migration from the list of migrations,
+/// leaving the migration on the filesystem.
+pub fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
     let mut ms = get_migrations(base_dir)?;
     let all_migrations = ms.all_migrations()?;
     let initial_migration = all_migrations.first().expect("There are no migrations");
@@ -98,14 +100,16 @@ pub fn detach_migration(base_dir: &Path, name: Option<&String>) -> Result<()> {
         eprintln!("Can not detach initial migration");
         std::process::exit(1);
     }
-    // TODO: check the top migration hasnt been applied.
-    let previous_migration = &all_migrations[all_migrations.len() - 2];
-    if let Some(name) = name {
-        if top_migration.name() != name.as_str() {
-            eprintln!("Migration {name} is not the top migration");
-            std::process::exit(1);
+    if let Ok(spec) = db::ConnectionSpec::load(base_dir) {
+        let conn = db::connect(&spec)?;
+        if let Some(top_applied_migration) = ms.last_applied_migration(&conn)? {
+            if top_applied_migration == top_migration {
+                eprintln!("Can not detach an applied migration");
+                std::process::exit(1);
+            }
         }
     }
+    let previous_migration = &all_migrations[all_migrations.len() - 2];
     println!(
         "Detaching {} from {}",
         top_migration.name(),

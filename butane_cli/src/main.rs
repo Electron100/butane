@@ -1,10 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{value_parser, Arg, ArgMatches};
 
 use butane_cli::{
-    base_dir, clean, clear_data, collapse_migrations, delete_table, embed, handle_error,
-    list_migrations, migrate, Result,
+    base_dir, clean, clear_data, collapse_migrations, delete_table, detach_latest_migration, embed,
+    handle_error, list_migrations, migrate, Result,
 };
 
 fn main() {
@@ -52,12 +52,6 @@ fn main() {
         .subcommand(
             clap::Command::new("detachmigration")
                 .about("Detach the top migration")
-                .arg(
-                    Arg::new("NAME")
-                        .required(true)
-                        .index(1)
-                        .help("Name to use for the migration"),
-                ),
         )
         .subcommand(clap::Command::new("migrate").about("Apply migrations"))
         .subcommand(clap::Command::new("list").about("List migrations"))
@@ -113,9 +107,7 @@ fn main() {
         Some(("makemigration", sub_args)) => {
             handle_error(make_migration(&base_dir, Some(sub_args)))
         }
-        Some(("detachmigration", sub_args)) => {
-            handle_error(detach_migration(&base_dir, Some(sub_args)))
-        }
+        Some(("detachmigration", _)) => handle_error(detach_latest_migration(&base_dir)),
         Some(("migrate", _)) => handle_error(migrate(&base_dir)),
         Some(("rollback", sub_args)) => handle_error(rollback(&base_dir, Some(sub_args))),
         Some(("embed", _)) => handle_error(embed(&base_dir)),
@@ -149,11 +141,6 @@ fn init(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
 fn make_migration(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
     let name_arg = args.and_then(|a| a.get_one::<String>("NAME"));
     butane_cli::make_migration(base_dir, name_arg)
-}
-
-fn detach_migration(base_dir: &Path, args: Option<&ArgMatches>) -> Result<()> {
-    let name_arg = args.and_then(|a| a.get_one::<String>("NAME"));
-    butane_cli::detach_migration(base_dir, name_arg)
 }
 
 fn rollback(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {

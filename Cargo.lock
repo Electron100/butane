@@ -262,7 +262,6 @@ dependencies = [
  "cargo_metadata",
  "chrono",
  "clap",
- "lazy_static",
  "quote 1.0.32",
  "serde",
  "serde_json",

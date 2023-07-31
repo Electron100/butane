@@ -8,9 +8,6 @@ use butane_cli::{
 };
 
 fn main() {
-    lazy_static::lazy_static! {
-        static ref WORKING_DIR_PATH: PathBuf = base_dir();
-    }
     let app = clap::Command::new("butane")
         .version(env!("CARGO_PKG_VERSION"))
         .author("James Oakley <james@electronstudio.org>")
@@ -19,7 +16,7 @@ fn main() {
         .max_term_width(80)
         .arg(
             Arg::new("path").short('p').long("path")
-            .default_value(WORKING_DIR_PATH.as_os_str())
+            .default_value(base_dir().into_os_string())
             .value_parser(value_parser!(PathBuf))
             .help("Select directory to locate butane state")
         )

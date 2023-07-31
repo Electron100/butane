@@ -261,7 +261,9 @@ pub fn clean(base_dir: &Path) -> Result<()> {
 pub fn get_migrations(base_dir: &Path) -> Result<FsMigrations> {
     let root = base_dir.join("migrations");
     if !root.exists() {
-        eprintln!("No butane migrations directory found. Add at least one model to your project and build.");
+        eprintln!(
+            "No butane migrations directory found. Add at least one model to your project and build."
+        );
         std::process::exit(1);
     }
     Ok(migrations::from_root(root))

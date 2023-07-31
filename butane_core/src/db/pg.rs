@@ -1,4 +1,13 @@
 //! Postgresql database backend
+use std::cell::RefCell;
+use std::fmt::Write;
+
+use bytes::BufMut;
+#[cfg(feature = "datetime")]
+use chrono::NaiveDateTime;
+use postgres::fallible_iterator::FallibleIterator;
+use postgres::GenericClient;
+
 use super::connmethods::VecRows;
 use super::helper;
 use super::*;
@@ -6,13 +15,6 @@ use crate::custom::{SqlTypeCustom, SqlValRefCustom};
 use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::{debug, query};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
-use bytes::BufMut;
-#[cfg(feature = "datetime")]
-use chrono::NaiveDateTime;
-use postgres::fallible_iterator::FallibleIterator;
-use postgres::GenericClient;
-use std::cell::RefCell;
-use std::fmt::Write;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";

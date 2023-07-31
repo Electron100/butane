@@ -1,11 +1,10 @@
 use std::path::PathBuf;
 
-use clap::{value_parser, Arg, ArgMatches};
-
 use butane_cli::{
     base_dir, clean, clear_data, collapse_migrations, delete_table, embed, handle_error,
     list_migrations, migrate, Result,
 };
+use clap::{value_parser, Arg, ArgMatches};
 
 fn main() {
     let app = clap::Command::new("butane")

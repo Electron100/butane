@@ -1,8 +1,9 @@
+use syn::{Field, ItemStruct};
+
 use super::*;
 use crate::migrations::adb::{AColumn, ATable};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::Result;
-use syn::{Field, ItemStruct};
 
 pub fn write_table_to_disk<M>(
     ms: &mut impl MigrationsMut<M = M>,

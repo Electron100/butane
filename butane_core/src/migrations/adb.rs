@@ -2,10 +2,12 @@
 //! CLI tool, there is no need to use this module. Even if applying
 //! migrations without this tool, you are unlikely to need this module.
 
-use crate::{Error, Result, SqlType, SqlVal};
-use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+
+use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
+
+use crate::{Error, Result, SqlType, SqlVal};
 
 /// Identifier for a type as used in a database column. Supports both
 /// [SqlType](crate::SqlType) and identifiers known only by name. The

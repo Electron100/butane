@@ -1,11 +1,12 @@
+use std::borrow::Cow;
+use std::cmp::PartialEq;
+use std::fmt::Debug;
+
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::ButaneMigration;
 use crate::db::ConnectionMethods;
 use crate::query::{BoolExpr, Expr};
 use crate::{db, sqlval::ToSql, DataObject, DataResult, Error, Result};
-use std::borrow::Cow;
-use std::cmp::PartialEq;
-use std::fmt::Debug;
 
 /// Type representing a database migration. A migration describes how
 /// to bring the database from state A to state B. In general, the

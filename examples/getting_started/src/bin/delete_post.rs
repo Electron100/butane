@@ -1,7 +1,9 @@
-use self::models::Post;
+use std::env::args;
+
 use butane::query;
 use getting_started::*;
-use std::env::args;
+
+use self::models::Post;
 
 fn main() {
     let target = args().nth(1).expect("Expected a target to match against");

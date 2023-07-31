@@ -2,10 +2,9 @@ use butane::db::Connection;
 use butane::{butane_type, find, model, query};
 use butane::{colname, prelude::*};
 use butane::{ForeignKey, ObjectState};
+use butane_test_helper::*;
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 use serde::Serialize;
-
-use butane_test_helper::*;
 
 #[butane_type]
 pub type Whatsit = String;

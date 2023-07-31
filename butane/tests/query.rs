@@ -2,9 +2,8 @@ use butane::db::Connection;
 use butane::prelude::*;
 use butane::query::BoolExpr;
 use butane::{colname, filter, find, query, Many};
-use chrono::{TimeZone, Utc};
-
 use butane_test_helper::*;
+use chrono::{TimeZone, Utc};
 
 mod common;
 use common::blog;

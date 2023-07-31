@@ -4,12 +4,11 @@ use butane::migrations::{
 };
 use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
+use butane_test_helper::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser as SqlParser;
-
-use butane_test_helper::*;
 
 #[test]
 fn current_migration_basic() {

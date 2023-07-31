@@ -3,7 +3,6 @@ use butane::db::Connection;
 use butane::prelude::*;
 use butane::{model, query};
 use butane::{FieldType, FromSql, ObjectState, SqlVal, ToSql};
-
 use butane_test_helper::*;
 
 #[derive(PartialEq, Eq, Debug, Clone, FieldType)]

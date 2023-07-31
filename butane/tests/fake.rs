@@ -1,15 +1,13 @@
 use butane::db::Connection;
 use butane::{find, DataObject, ForeignKey};
-
 use butane_test_helper::*;
 
 mod common;
 
+use common::blog::{Blog, Post, Tag};
+use fake::{Fake, Faker};
+
 fn fake_blog_post(conn: Connection) {
-    use fake::{Fake, Faker};
-
-    use common::blog::{Blog, Post, Tag};
-
     let mut fake_blog: Blog = Faker.fake();
     fake_blog.save(&conn).unwrap();
 

@@ -1,12 +1,13 @@
 //! For working with migrations. If using the butane CLI tool, it is
 //! not necessary to use these types directly.
+use std::path::Path;
+
+use fallible_iterator::FallibleIterator;
+
 use crate::db::BackendRows;
 use crate::db::{Column, ConnectionMethods};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
-
-use fallible_iterator::FallibleIterator;
-use std::path::Path;
 
 pub mod adb;
 use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeIdentifier, ADB};

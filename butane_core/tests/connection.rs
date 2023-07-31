@@ -1,5 +1,4 @@
 use butane_core::db::{connect, BackendConnection, Connection, ConnectionSpec};
-
 use butane_test_helper::*;
 
 fn connection_not_closed(conn: Connection) {

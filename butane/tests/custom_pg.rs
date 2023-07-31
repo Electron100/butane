@@ -1,13 +1,13 @@
 // We wrap everything in an inner module just so it's easier to have the feature gate in one place
 #[cfg(feature = "pg")]
 mod custom_pg {
+    use std::result::Result;
+
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
     use butane::prelude::*;
     use butane::{butane_type, db::Connection, model, ObjectState};
     use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
     use butane_test_helper::{maketest, maketest_pg};
-
-    use std::result::Result;
 
     // newtype so we can implement traits for it.
     #[butane_type(Custom(POINT))]

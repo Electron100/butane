@@ -1,7 +1,8 @@
+pub use r2d2::ManageConnection;
+
 use super::connmethods::ConnectionMethodWrapper;
 use super::*;
 use crate::Result;
-pub use r2d2::ManageConnection;
 
 /// R2D2 support for Butane. Implements [`r2d2::ManageConnection`].
 #[derive(Clone, Debug)]

@@ -171,9 +171,10 @@ pub mod prelude {
     //! Its use is recommended, but not required. If not used, the use
     //! of butane's macros may require some of its re-exports to be
     //! used manually.
+    pub use butane_core::db::BackendConnection;
+
     #[doc(no_inline)]
     pub use crate::DataObject;
     #[doc(no_inline)]
     pub use crate::DataResult;
-    pub use butane_core::db::BackendConnection;
 }

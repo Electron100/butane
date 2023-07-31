@@ -1,8 +1,10 @@
 #![allow(clippy::expect_fun_call)]
-use self::models::Post;
+use std::env::args;
+
 use butane::prelude::*;
 use getting_started::*;
-use std::env::args;
+
+use self::models::Post;
 
 fn main() {
     let id = args()

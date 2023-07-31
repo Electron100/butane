@@ -1,9 +1,8 @@
 use butane::model;
 use butane::prelude::*;
 use butane::{db::Connection, ObjectState};
-use uuid_for_test::Uuid;
-
 use butane_test_helper::*;
+use uuid_for_test::Uuid;
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]

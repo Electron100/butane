@@ -1,6 +1,5 @@
-use butane_test_helper::{pg_connspec, setup_db, sqlite_connspec};
-
 use butane::db;
+use butane_test_helper::{pg_connspec, setup_db, sqlite_connspec};
 use r2d2_for_test as r2d2;
 
 #[cfg(feature = "sqlite")]

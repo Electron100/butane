@@ -1,7 +1,6 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::{model, query::OrderDirection, Many, ObjectState};
-
 use butane_test_helper::*;
 
 mod common;

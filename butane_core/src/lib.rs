@@ -1,9 +1,10 @@
 #![allow(clippy::iter_nth_zero)]
 #![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
-use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 use std::default::Default;
+
+use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
 
 pub mod codegen;
@@ -18,12 +19,10 @@ pub mod sqlval;
 #[cfg(feature = "uuid")]
 pub mod uuid;
 
+use custom::SqlTypeCustom;
+use db::{BackendRow, Column, ConnectionMethods};
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
-
-use db::{BackendRow, Column, ConnectionMethods};
-
-use custom::SqlTypeCustom;
 pub use query::Query;
 pub use sqlval::*;
 

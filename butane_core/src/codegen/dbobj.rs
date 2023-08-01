@@ -12,7 +12,7 @@ pub struct Config {
     pub table_name: Option<String>,
 }
 
-// implement the DataObject trait
+/// Code generation to implement the DataObject trait for a model
 pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let tablelit = make_tablelit(config, tyname);
@@ -164,6 +164,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     )
 }
 
+/// Code generation to implement the DataResult trait for a model
 pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();

@@ -289,6 +289,21 @@ impl FsMigrations {
         self.save_state(&state)?;
         Ok(())
     }
+    /// Determines if a migration has been detached.
+    pub fn has_detached_migration(&self) -> Result<bool> {
+        let migration_series = self.all_migrations()?;
+        for entry in std::fs::read_dir(self.root.clone())? {
+            let path = entry?.path();
+            let file_name = path.file_name().unwrap();
+            if file_name == "current" || file_name == "state.json" {
+                continue;
+            }
+            if !migration_series.iter().any(|item| item.root == path) {
+                return Ok(true);
+            };
+        }
+        Ok(false)
+    }
 }
 
 impl Migrations for FsMigrations {

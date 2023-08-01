@@ -122,6 +122,11 @@ pub fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
         previous_migration.name()
     );
     ms.detach_latest_migration()?;
+    let cli_state = CliState::load(base_dir)?;
+    if cli_state.embedded {
+        // The latest migration needs to be removed from the embedding
+        embed(base_dir)?;
+    }
     Ok(())
 }
 

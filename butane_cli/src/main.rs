@@ -52,6 +52,17 @@ fn main() {
         .subcommand(
             clap::Command::new("detachmigration")
                 .about("Detach the latest migration")
+                .after_help(r#"This command removes the latest migration from the list of migrations and sets butane state to before the latest migration was created.
+
+The removed migration is not deleted from file system.
+
+This operation is the first step of the process of rebasing a migration onto other migrations that have the same original migration.
+
+If the migration has not been manually edited, it can be automatically regenerated after being rebased. In this case, deleting the detached migration is often the best approach.
+
+However if the migration has been manually edited, it will need to be manually re-attached to the target migration series after the rebase has been completed.
+"#
+                )
         )
         .subcommand(clap::Command::new("migrate").about("Apply migrations"))
         .subcommand(clap::Command::new("list").about("List migrations"))

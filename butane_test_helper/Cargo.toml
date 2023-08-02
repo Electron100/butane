@@ -12,7 +12,6 @@ repository = "https://github.com/Electron100/butane"
 documentation = "https://docs.rs/butane/"
 
 [dependencies]
-# todo re-enable sqlite
 butane_core = { features = ["pg", "sqlite"], workspace = true }
 libc = "0.2"
 once_cell = { workspace = true }

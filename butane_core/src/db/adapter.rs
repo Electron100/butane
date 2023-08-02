@@ -147,7 +147,6 @@ impl<T: ?Sized> SendPtrMut<T> {
 }
 unsafe impl<T: ?Sized> Send for SendPtrMut<T> {}
 
-#[derive(Debug)]
 struct SyncSendPtrMut<T: ?Sized> {
     inner: *mut T,
 }
@@ -159,7 +158,7 @@ impl<T: ?Sized> SyncSendPtrMut<T> {
 }
 impl<T> From<T> for SyncSendPtrMut<T>
 where
-    T: Sized,
+    T: Debug + Sized,
 {
     fn from(val: T) -> Self {
         Self {
@@ -167,8 +166,14 @@ where
         } // todo should this be unsafe
     }
 }
-unsafe impl<T: ?Sized> Send for SyncSendPtrMut<T> {}
+unsafe impl<T: Debug + ?Sized> Send for SyncSendPtrMut<T> {}
 unsafe impl<T> Sync for SyncSendPtrMut<T> {}
+
+impl<T: Debug + ?Sized> Debug for SyncSendPtrMut<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        unsafe { (*self.inner).fmt(f) }
+    }
+}
 
 #[derive(Debug)]
 pub(super) struct AsyncAdapter<T: ?Sized> {

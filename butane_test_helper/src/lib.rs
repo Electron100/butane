@@ -199,7 +199,7 @@ pub fn sqlite_connspec() -> ConnectionSpec {
     ConnectionSpec::new(sqlite::BACKEND_NAME, ":memory:")
 }
 
-pub fn sqlite_setup() {}
+pub async fn sqlite_setup() {}
 pub fn sqlite_teardown(_: ()) {}
 
 #[macro_export]
@@ -237,12 +237,11 @@ macro_rules! maketest_pg {
 #[macro_export]
 macro_rules! testall {
     ($fname:ident) => {
-        // TODO re-enable
-        /*cfg_if::cfg_if! {
+        cfg_if::cfg_if! {
             if #[cfg(feature = "sqlite")] {
                 maketest!($fname, sqlite, &format!(":memory:"), setup_data, true);
             }
-        }*/
+        }
         cfg_if::cfg_if! {
             if #[cfg(feature = "pg")] {
                 maketest_pg!($fname, true);
@@ -254,12 +253,11 @@ macro_rules! testall {
 #[macro_export]
 macro_rules! testall_no_migrate {
     ($fname:ident) => {
-        // TODO re-enable
-        /*cfg_if::cfg_if! {
+        cfg_if::cfg_if! {
             if #[cfg(feature = "sqlite")] {
                 maketest!($fname, sqlite, &format!(":memory:"), setup_data, false);
             }
-        }*/
+        }
         cfg_if::cfg_if! {
             if #[cfg(feature = "pg")] {
                 maketest_pg!($fname, false);

@@ -64,10 +64,11 @@ async fn unreachable_pg_connection() {
 async fn debug_connection(conn: Connection) {
     let backend_name = conn.backend_name().clone();
 
+    let debug_str = format!("{:?}", conn);
     if backend_name == "pg" {
-        assert!(format!("{:?}", conn).contains("conn: true"));
+        assert!(debug_str.contains("conn: true"));
     } else {
-        assert!(format!("{:?}", conn).contains("path: Some(\"\")"));
+        assert!(debug_str.contains("path: Some(\"\")"));
     }
 }
 testall_no_migrate!(debug_connection);

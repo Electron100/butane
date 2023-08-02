@@ -112,10 +112,10 @@ impl ConnectionMethods for SQLiteConnection {
     fn execute(&self, sql: &str) -> Result<()> {
         ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
     }
-    fn query<'a, 'b, 'c>(
+    fn query<'a, 'c>(
         &'c self,
         table: &str,
-        columns: &'b [Column],
+        columns: &[Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
         offset: Option<i32>,
@@ -148,11 +148,11 @@ impl ConnectionMethods for SQLiteConnection {
         self.wrapped_connection_methods()?
             .insert_or_replace(table, columns, pkcol, values)
     }
-    fn update<'a>(
+    fn update(
         &self,
         table: &str,
         pkcol: Column,
-        pk: SqlValRef<'a>,
+        pk: SqlValRef<'_>,
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()> {
@@ -196,10 +196,10 @@ impl ConnectionMethods for rusqlite::Connection {
         Ok(())
     }
 
-    fn query<'b, 'c>(
+    fn query<'c>(
         &'c self,
         table: &str,
-        columns: &'b [Column],
+        columns: &[Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
         offset: Option<i32>,
@@ -384,10 +384,10 @@ impl ConnectionMethods for SqliteTransaction<'_> {
     fn execute(&self, sql: &str) -> Result<()> {
         ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
     }
-    fn query<'b, 'c>(
+    fn query<'c>(
         &'c self,
         table: &str,
-        columns: &'b [Column],
+        columns: &[Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
         offset: Option<i32>,
@@ -420,11 +420,11 @@ impl ConnectionMethods for SqliteTransaction<'_> {
         self.wrapped_connection_methods()?
             .insert_or_replace(table, columns, pkcol, values)
     }
-    fn update<'a>(
+    fn update(
         &self,
         table: &str,
         pkcol: Column,
-        pk: SqlValRef<'a>,
+        pk: SqlValRef<'_>,
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()> {

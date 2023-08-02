@@ -66,7 +66,7 @@ impl AsyncAdapterEnv {
         // https://stackoverflow.com/questions/52424449/is-there-a-way-to-express-same-generic-type-with-different-lifetime-bound
         //https://docs.rs/crossbeam/0.8.2/crossbeam/fn.scope.html
         // TODO ensure soundness and document why
-        Ok(rx.await??)
+        rx.await?
     }
 
     async fn invoke_mut<'c, 's, 'result, F, T, U>(
@@ -93,7 +93,7 @@ impl AsyncAdapterEnv {
         // https://stackoverflow.com/questions/52424449/is-there-a-way-to-express-same-generic-type-with-different-lifetime-bound
         //https://docs.rs/crossbeam/0.8.2/crossbeam/fn.scope.html
         // TODO ensure soundness and document why
-        Ok(rx.await??)
+        rx.await?
     }
 
     fn invoke_blocking<'c, 's, 'result, F, T, U>(&'s self, context: *const T, func: F) -> Result<U>

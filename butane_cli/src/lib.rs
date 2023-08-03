@@ -89,6 +89,47 @@ pub fn make_migration(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
     Ok(())
 }
 
+/// Detach the latest migration from the list of migrations,
+/// leaving the migration on the filesystem.
+pub fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
+    let mut ms = get_migrations(base_dir)?;
+    let all_migrations = ms.all_migrations().unwrap_or_else(|e| {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    });
+    let initial_migration = all_migrations.first().unwrap_or_else(|| {
+        eprintln!("There are no migrations");
+        std::process::exit(1);
+    });
+    let top_migration = ms.latest().expect("Latest should exist");
+    if initial_migration == &top_migration {
+        eprintln!("Can not detach initial migration");
+        std::process::exit(1);
+    }
+    if let Ok(spec) = db::ConnectionSpec::load(base_dir) {
+        let conn = db::connect(&spec)?;
+        if let Some(top_applied_migration) = ms.last_applied_migration(&conn)? {
+            if top_applied_migration == top_migration {
+                eprintln!("Can not detach an applied migration");
+                std::process::exit(1);
+            }
+        }
+    }
+    let previous_migration = &all_migrations[all_migrations.len() - 2];
+    println!(
+        "Detaching {} from {}",
+        top_migration.name(),
+        previous_migration.name()
+    );
+    ms.detach_latest_migration()?;
+    let cli_state = CliState::load(base_dir)?;
+    if cli_state.embedded {
+        // The latest migration needs to be removed from the embedding
+        embed(base_dir)?;
+    }
+    Ok(())
+}
+
 pub fn migrate(base_dir: &PathBuf) -> Result<()> {
     let spec = load_connspec(base_dir)?;
     let mut conn = db::connect(&spec)?;

@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use clap::{value_parser, Arg, ArgMatches};
 
 use butane_cli::{
-    base_dir, clean, clear_data, collapse_migrations, delete_table, embed, handle_error,
-    list_migrations, migrate, Result,
+    base_dir, clean, clear_data, collapse_migrations, delete_table, detach_latest_migration, embed,
+    get_migrations, handle_error, list_migrations, migrate, Result,
 };
 
 fn main() {
@@ -45,6 +45,22 @@ fn main() {
                         .index(1)
                         .help("Name to use for the migration"),
                 ),
+        )
+        .subcommand(
+            clap::Command::new("detach-migration")
+                .about("Detach the latest migration")
+                .alias("detachmigration")
+                .after_help(r#"This command removes the latest migration from the list of migrations and sets butane state to before the latest migration was created.
+
+The removed migration is not deleted from file system.
+
+This operation is the first step of the process of rebasing a migration onto other migrations that have the same original migration.
+
+If the migration has not been manually edited, it can be automatically regenerated after being rebased. In this case, deleting the detached migration is often the best approach.
+
+However if the migration has been manually edited, it will need to be manually re-attached to the target migration series after the rebase has been completed.
+"#
+                )
         )
         .subcommand(clap::Command::new("migrate").about("Apply migrations"))
         .subcommand(clap::Command::new("list").about("List migrations"))
@@ -95,11 +111,27 @@ fn main() {
     let args = app.get_matches();
     let mut base_dir = args.get_one::<PathBuf>("path").unwrap().clone();
     base_dir.push(".butane");
+
+    // List any detached migrations.
+    if let Ok(ms) = get_migrations(&base_dir) {
+        if let Ok(detached_migrations) = ms.detached_migration_paths() {
+            if !detached_migrations.is_empty() {
+                eprintln!(
+                    "Ignoring detached migrations. Please delete or manually re-attach these:"
+                );
+                for migration in detached_migrations {
+                    eprintln!("- {migration}");
+                }
+            }
+        };
+    };
+
     match args.subcommand() {
         Some(("init", sub_args)) => handle_error(init(&base_dir, Some(sub_args))),
         Some(("makemigration", sub_args)) => {
             handle_error(make_migration(&base_dir, Some(sub_args)))
         }
+        Some(("detach-migration", _)) => handle_error(detach_latest_migration(&base_dir)),
         Some(("migrate", _)) => handle_error(migrate(&base_dir)),
         Some(("rollback", sub_args)) => handle_error(rollback(&base_dir, Some(sub_args))),
         Some(("embed", _)) => handle_error(embed(&base_dir)),

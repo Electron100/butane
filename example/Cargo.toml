@@ -7,8 +7,7 @@ publish = false
 build = "build.rs"
 
 [dependencies]
-# todo re-enable sqlite
-butane = { features = ["pg"], workspace = true }
+butane = { features = ["pg", "sqlite"], workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 
 [dev-dependencies]

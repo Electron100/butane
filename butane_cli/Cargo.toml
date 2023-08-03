@@ -18,13 +18,11 @@ path = "src/main.rs"
 doc = false
 
 [features]
-# todo re-enable sqlite
-#sqlite-bundled = ["butane/sqlite-bundled"]
+sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
 anyhow = "1.0"
-# todo re-enable sqlite
-butane = { features = ["default", "pg"], workspace = true }
+butane = { features = ["default", "pg", "sqlite"], workspace = true }
 chrono = { workspace = true }
 clap = { version = "4.1" }
 quote = { workspace = true }

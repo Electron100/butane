@@ -394,7 +394,7 @@ where
 }
 
 #[derive(Clone)]
-pub(super) struct BackendAdapter<T>
+pub struct BackendAdapter<T>
 where
     T: sync::Backend + Clone,
 {
@@ -421,10 +421,9 @@ impl<T: sync::Backend + Clone + 'static> Backend for BackendAdapter<T> {
         tokio::task::spawn_blocking(move || {
             let connmethods_async =
                 adapter::AsyncAdapter::new(|| sync_backend.connect(&conn_str2))?;
-            let conn = Connection {
+            Ok(Connection {
                 conn: Box::new(connmethods_async),
-            };
-            Ok(conn)
+            })
         })
         .await?
     }

@@ -30,6 +30,8 @@ use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 
 #[cfg(feature = "async-adapter")]
 mod adapter;
+#[cfg(feature = "async-adapter")]
+pub use adapter::BackendAdapter;
 
 mod connmethods;
 pub use connmethods::{
@@ -43,11 +45,10 @@ pub mod pg;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
-// TODO re-enable
-//#[cfg(feature = "r2d2")]
-//pub mod r2;
-//#[cfg(feature = "r2d2")]
-//pub use r2::ConnectionManager;
+#[cfg(feature = "r2d2")]
+pub mod r2;
+#[cfg(feature = "r2d2")]
+pub use r2::ConnectionManager;
 
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
@@ -78,7 +79,7 @@ mod internal {
         async()
     )]
     #[async_trait(?Send)]
-    pub trait BackendConnection: ConnectionMethods + Debug + AsyncRequiresSend {
+    pub trait BackendConnection: ConnectionMethods + Debug + Send + AsyncRequiresSend {
         /// Begin a database transaction. The transaction object must be
         /// used in place of this connection until it is committed or aborted.
         async fn transaction(&mut self) -> Result<Transaction<'_>>;
@@ -338,13 +339,21 @@ impl sync::Backend for Box<dyn sync::Backend> {
     }
 }
 
+#[cfg(feature = "async-adapter")]
+impl<T> From<T> for BackendAdapter<T>
+where
+    T: sync::Backend + Clone,
+{
+    fn from(value: T) -> BackendAdapter<T> {
+        BackendAdapter::new(value)
+    }
+}
+
 /// Find a backend by name.
 pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
         #[cfg(feature = "sqlite")]
-        sqlite::BACKEND_NAME => Some(Box::new(adapter::BackendAdapter::new(
-            sqlite::SQLiteBackend::new(),
-        ))),
+        sqlite::BACKEND_NAME => Some(Box::new(BackendAdapter::from(sqlite::SQLiteBackend::new()))),
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         _ => None,
@@ -367,4 +376,21 @@ pub async fn connect(spec: &ConnectionSpec) -> Result<Connection> {
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
         .connect(&spec.conn_str)
         .await
+}
+
+/// Connect to a database. For non-boxed connections, see individual
+/// [Backend][crate::db::Backend] implementations.
+pub fn connect_sync(spec: &ConnectionSpec) -> Result<sync::Connection> {
+    get_backend_sync(&spec.backend_name)
+        .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
+        .connect(&spec.conn_str)
+}
+
+#[cfg(feature = "async-adapter")]
+/// Adapt a synchronous connection to an asynchronous one.
+pub fn adapt_connection(conn: sync::Connection) -> Result<Connection> {
+    let connmethods_async = adapter::AsyncAdapter::new(|| Ok(conn))?;
+    Ok(Connection {
+        conn: Box::new(connmethods_async),
+    })
 }

@@ -9,7 +9,10 @@ use butane_test_helper::sqlite_connspec;
 #[cfg(any(feature = "pg", feature = "sqlite"))]
 use r2d2_for_test as r2d2;
 
-#[cfg(feature = "sqlite")]
+#[cfg(feature = "r2d2")]
+use std::ops::DerefMut;
+
+#[cfg(all(feature = "sqlite", feature = "r2d2"))]
 #[test]
 fn r2d2_sqlite() {
     let manager = db::ConnectionManager::new(sqlite_connspec());
@@ -19,9 +22,10 @@ fn r2d2_sqlite() {
         let mut conn1 = pool.get().unwrap();
         assert_eq!(pool.state().connections, 3);
         assert_eq!(pool.state().idle_connections, 2);
+        let conn_async = butane::db::adapt_connection(conn1.deref_mut());
         setup_db(
-            Box::new(butane::db::sqlite::SQLiteBackend::new()),
-            &mut conn1,
+            Box::new(butane::db::sqlite::SQLiteBackend::new().into()),
+            conn_async,
             true,
         );
 

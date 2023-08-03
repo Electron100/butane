@@ -345,6 +345,7 @@ dependencies = [
  "postgres-native-tls",
  "proc-macro2 1.0.79",
  "quote 1.0.35",
+ "r2d2",
  "rand",
  "regex",
  "rusqlite",

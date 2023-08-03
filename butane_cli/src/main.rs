@@ -50,8 +50,9 @@ fn main() {
                 ),
         )
         .subcommand(
-            clap::Command::new("detachmigration")
+            clap::Command::new("detach-migration")
                 .about("Detach the latest migration")
+                .alias("detachmigration")
                 .after_help(r#"This command removes the latest migration from the list of migrations and sets butane state to before the latest migration was created.
 
 The removed migration is not deleted from file system.
@@ -114,25 +115,26 @@ However if the migration has been manually edited, it will need to be manually r
     let mut base_dir = args.get_one::<PathBuf>("path").unwrap().clone();
     base_dir.push(".butane");
 
-    // Prevent 'makemigration' when there is a detached migration.
-    match args.subcommand() {
-        Some(("makemigration", _)) => {
-            if let Ok(ms) = get_migrations(&base_dir) {
-                if ms.has_detached_migration().unwrap_or(false) {
-                    eprintln!("Found detached migration. Please delete or manually re-attach it.");
-                    std::process::exit(1);
+    // List any detached migrations.
+    if let Ok(ms) = get_migrations(&base_dir) {
+        if let Ok(detached_migrations) = ms.detached_migration_paths() {
+            if !detached_migrations.is_empty() {
+                eprintln!(
+                    "Ignoring detached migrations. Please delete or manually re-attach these:"
+                );
+                for migration in detached_migrations {
+                    eprintln!("- {migration}");
                 }
             }
-        }
-        Some((_, _)) | None => {}
-    }
+        };
+    };
 
     match args.subcommand() {
         Some(("init", sub_args)) => handle_error(init(&base_dir, Some(sub_args))),
         Some(("makemigration", sub_args)) => {
             handle_error(make_migration(&base_dir, Some(sub_args)))
         }
-        Some(("detachmigration", _)) => handle_error(detach_latest_migration(&base_dir)),
+        Some(("detach-migration", _)) => handle_error(detach_latest_migration(&base_dir)),
         Some(("migrate", _)) => handle_error(migrate(&base_dir)),
         Some(("rollback", sub_args)) => handle_error(rollback(&base_dir, Some(sub_args))),
         Some(("embed", _)) => handle_error(embed(&base_dir)),

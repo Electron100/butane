@@ -1,3 +1,5 @@
+//! Code-generation backend
+
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::{SqlType, SqlVal};
@@ -508,6 +510,7 @@ fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
     None
 }
 
+#[cfg(feature = "datetime")]
 fn last_path_segment(ty: &syn::Type) -> Option<&syn::PathSegment> {
     if let syn::Type::Path(syn::TypePath {
         path: syn::Path { segments, .. },
@@ -519,6 +522,7 @@ fn last_path_segment(ty: &syn::Type) -> Option<&syn::PathSegment> {
     None
 }
 
+#[cfg(feature = "datetime")]
 fn template_type(arguments: &syn::PathArguments) -> Option<&Ident> {
     if let syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
         args, ..

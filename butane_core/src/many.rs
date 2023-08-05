@@ -1,5 +1,7 @@
-use crate::db::Column;
-use crate::query::{BoolExpr, Expr};
+//! Implementation of many-to-many relationships between models.
+#![deny(missing_docs)]
+use crate::db::{Column, ConnectionMethods};
+use crate::query::{BoolExpr, Expr, OrderDirection, Query};
 use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -127,29 +129,45 @@ where
         Ok(())
     }
 
-    /// Loads the values referred to by this foreign key from the
+    /// Loads the values referred to by this many relationship from the
     /// database if necessary and returns a reference to them.
-    pub async fn load(
+    pub async fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
+        let query = self.query();
+        // If not initialised then there are no values
+        let vals: Result<Vec<&T>> = if query.is_err() {
+            Ok(Vec::new())
+        } else {
+            Ok(self.load_query(conn, query.unwrap()).await?.collect())
+        };
+        vals.map(|v| v.into_iter())
+    }
+
+    /// Query the values referred to by this many relationship from the
+    /// database if necessary and returns a reference to them.
+    fn query(&self) -> Result<Query<T>> {
+        let owner: &SqlVal = match &self.owner {
+            Some(o) => o,
+            None => return Err(Error::NotInitialized),
+        };
+        Ok(T::query().filter(BoolExpr::Subquery {
+            col: T::PKCOL,
+            tbl2: self.item_table.clone(),
+            tbl2_col: "has",
+            expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
+        }))
+    }
+
+    /// Loads the values referred to by this many relationship from a
+    /// database query if necessary and returns a reference to them.
+    async fn load_query(
         &self,
-        conn: &impl crate::ConnectionMethods,
+        conn: &impl ConnectionMethods,
+        query: Query<T>,
     ) -> Result<impl Iterator<Item = &T>> {
         let vals: Result<&Vec<T>> = self
             .all_values
             .get_or_try_init(|| async {
-                //if we don't have an owner then there are no values
-                let owner: &SqlVal = match &self.owner {
-                    Some(o) => o,
-                    None => return Ok(Vec::new()),
-                };
-                let mut vals = T::query()
-                    .filter(BoolExpr::Subquery {
-                        col: T::PKCOL,
-                        tbl2: self.item_table.clone(),
-                        tbl2_col: "has",
-                        expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
-                    })
-                    .load(conn)
-                    .await?;
+                let mut vals: Vec<T> = query.load(conn).await?;
                 // Now add in the values for things not saved to the db yet
                 if !self.new_values.is_empty() {
                     vals.append(
@@ -165,6 +183,27 @@ where
         vals.map(|v| v.iter())
     }
 
+    /// Loads and orders the values referred to by this many relationship from a
+    /// database if necessary and returns a reference to them.
+    pub async fn load_ordered(
+        &self,
+        conn: &impl ConnectionMethods,
+        order: OrderDirection,
+    ) -> Result<impl Iterator<Item = &T>> {
+        let query = self.query();
+        // If not initialised then there are no values
+        let vals: Result<Vec<&T>> = if query.is_err() {
+            Ok(Vec::new())
+        } else {
+            Ok(self
+                .load_query(conn, query.unwrap().order(T::PKCOL, order))
+                .await?
+                .collect())
+        };
+        vals.map(|v| v.into_iter())
+    }
+
+    /// Describes the columns of the Many table
     pub fn columns(&self) -> [Column; 2] {
         [
             Column::new("owner", self.owner_type.clone()),

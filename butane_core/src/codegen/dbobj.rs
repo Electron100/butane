@@ -12,7 +12,7 @@ pub struct Config {
     pub table_name: Option<String>,
 }
 
-// implement the DataObject trait
+/// Code generation to implement the DataObject trait for a model
 pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let tablelit = make_tablelit(config, tyname);
@@ -37,17 +37,24 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     post_insert.push(quote!(self.state.saved = true;));
 
     let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
-    let many_save: TokenStream2 = fields(ast_struct).filter(|f| is_many_to_many(f)).map(|f| {
-        let ident = f.ident.clone().expect("Fields must be named for butane");
-        let many_table_lit = many_table_lit(ast_struct, f, config);
-        let pksqltype =
-            quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
-        // Save  needs to ensure_initialized
-        quote!(
-            self.#ident.ensure_init(#many_table_lit, butane::ToSql::to_sql(self.pk()), #pksqltype);
-            self.#ident.save(conn).await?;
-        )
-    }).collect();
+    let many_save: TokenStream2 = fields(ast_struct)
+        .filter(|f| is_many_to_many(f))
+        .map(|f| {
+            let ident = f.ident.clone().expect("Fields must be named for butane");
+            let many_table_lit = many_table_lit(ast_struct, f, config);
+            let pksqltype =
+                quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
+            // Save needs to ensure_initialized
+            quote!(
+                self.#ident.ensure_init(
+                    #many_table_lit,
+                    butane::ToSql::to_sql(self.pk()),
+                    #pksqltype,
+                );
+                self.#ident.save(conn).await?;
+            )
+        })
+        .collect();
 
     let values: Vec<TokenStream2> = push_values(ast_struct, |_| true);
     let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
@@ -76,16 +83,24 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     // Already exists in db, do an update
                     #(#values_no_pk)*
                     if values.len() > 0 {
-                        conn.update(Self::TABLE,
-                                    pkcol,
-                                    butane::ToSql::to_sql_ref(self.pk()),
-                                    &[#save_cols], &values).await?;
+                        conn.update(
+                            Self::TABLE,
+                            pkcol,
+                            butane::ToSql::to_sql_ref(self.pk()),
+                            &[#save_cols],
+                            &values,
+                        ).await?;
                     }
                 } else if #auto_pk {
                     // Since we expect our pk field to be invalid and to be created by the insert,
                     // we do a pure insert, no upsert allowed.
                     #(#values)*
-                    let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values).await?;
+                    let pk = conn.insert_returning_pk(
+                        Self::TABLE,
+                        &[#insert_cols],
+                        &pkcol,
+                        &values,
+                    ).await?;
                     #(#post_insert)*
                 } else {
                     // Do an upsert
@@ -151,24 +166,29 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     )
 }
 
+/// Code generation to implement the DataResult trait for a model
 pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
     let rows = rows_for_from(ast_struct);
     let cols = columns(ast_struct, |_| true);
 
-    let many_init: TokenStream2 =
-        fields(ast_struct)
+    let many_init: TokenStream2 = fields(ast_struct)
         .filter(|f| is_many_to_many(f))
         .map(|f| {
-            let ident = f
-                .ident
-                .clone()
-                .expect("Fields must be named for butane");
+            let ident = f.ident.clone().expect("Fields must be named for butane");
             let many_table_lit = many_table_lit(ast_struct, f, config);
-            let pksqltype = quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
-            quote!(obj.#ident.ensure_init(#many_table_lit, butane::ToSql::to_sql(obj.pk()), #pksqltype);)
-        }).collect();
+            let pksqltype =
+                quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
+            quote!(
+                obj.#ident.ensure_init(
+                    #many_table_lit,
+                    butane::ToSql::to_sql(obj.pk()),
+                    #pksqltype,
+                );
+            )
+        })
+        .collect();
 
     let dbo_is_self = dbo == tyname;
     let ctor = if dbo_is_self {

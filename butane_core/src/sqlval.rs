@@ -1,7 +1,10 @@
+//! Types and traits for interacting with a value that can be stored in the database.
+
 use crate::custom::{SqlValCustom, SqlValRefCustom};
 use crate::{DataObject, Error::CannotConvertSqlVal, Result, SqlType};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+#[cfg(feature = "json")]
 use std::collections::HashMap;
 use std::fmt;
 

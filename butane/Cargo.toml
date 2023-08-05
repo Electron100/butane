@@ -58,3 +58,19 @@ uuid_for_test = { package = "uuid", version = "1.2", features = ["v4"] }
 
 [package.metadata.docs.rs]
 all-features = true
+
+[[test]]
+name = "fake"
+required-features = ["fake"]
+
+[[test]]
+name = "json"
+required-features = ["json"]
+
+[[test]]
+name = "r2d2"
+required-features = ["r2d2"]
+
+[[test]]
+name = "uuid"
+required-features = ["uuid"]

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Arg, ArgMatches};
+use clap::{value_parser, Arg, ArgMatches};
 
 use butane_cli::{
     base_dir, clean, clear_data, collapse_migrations, delete_table, embed, handle_error,
@@ -13,7 +13,14 @@ async fn main() {
         .version(env!("CARGO_PKG_VERSION"))
         .author("James Oakley <james@electronstudio.org>")
         .about("Manages butane database migrations")
+        .subcommand_required(true)
         .max_term_width(80)
+        .arg(
+            Arg::new("path").short('p').long("path")
+            .default_value(base_dir().into_os_string())
+            .value_parser(value_parser!(PathBuf))
+            .help("Select directory to locate butane state")
+        )
         .subcommand(
             clap::Command::new("init")
                 .about("Initialize the database")
@@ -87,7 +94,8 @@ async fn main() {
                 .about("Clean current migration state. Deletes the current migration working state which is generated on each build. This can be used as a workaround to remove stale tables from the schema, as Butane does not currently auto-detect model removals. The next build will recreate with only tables for the extant models."))
                 .arg_required_else_help(true);
     let args = app.get_matches();
-    let base_dir = base_dir().expect("Unable to find base directory");
+    let mut base_dir = args.get_one::<PathBuf>("path").unwrap().clone();
+    base_dir.push(".butane");
     match args.subcommand() {
         Some(("init", sub_args)) => handle_error(init(&base_dir, Some(sub_args)).await),
         Some(("makemigration", sub_args)) => {
@@ -112,8 +120,7 @@ async fn main() {
             _ => eprintln!("Unknown delete command. Try: delete table"),
         },
         Some(("clean", _)) => handle_error(clean(&base_dir)),
-        Some((cmd, _)) => eprintln!("Unknown command {cmd}"),
-        None => eprintln!("Unknown command"),
+        Some((_, _)) | None => panic!("Unreachable as clap handles this automatically"),
     }
 }
 

@@ -35,7 +35,7 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 /// in the database yet. Butane automatically creates the field
 /// `state: ObjectState` on `#[model]` structs. When initializing the
 /// state field, use `ObjectState::default()`.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Ord, PartialOrd)]
 pub struct ObjectState {
     pub saved: bool,
 }

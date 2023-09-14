@@ -17,7 +17,7 @@ In `Cargo.toml`, add a dependency on Butane:
 
 ``` toml
 [dependencies]
-butane = { version = "0.5", features=["default", "sqlite"] }
+butane = { version = "0.6", features=["default", "sqlite"] }
 ```
 
 Substitute another backend instead of "sqlite" as desired ("pg" for
@@ -166,7 +166,7 @@ Then we can use them in our `lib.rs`:
 ```rust
 pub mod models;
 
-use models::{Blog, Post};
+pub use models::{Blog, Post};
 ```
 
 Let's build our package now. If we look in the `.butane` directory,

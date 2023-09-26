@@ -146,6 +146,33 @@ fn remove_multiple_from_many(conn: Connection) {
 }
 testall!(remove_multiple_from_many);
 
+fn delete_all_from_many(conn: Connection) {
+    let mut cats_blog = Blog::new(1, "Cats");
+    cats_blog.save(&conn).unwrap();
+    let mut post = Post::new(
+        1,
+        "The Cheetah",
+        "This post is about a fast cat.",
+        &cats_blog,
+    );
+    let tag_fast = create_tag(&conn, "fast");
+    let tag_cat = create_tag(&conn, "cat");
+    let tag_european = create_tag(&conn, "european");
+    let tag_striped = create_tag(&conn, "striped");
+
+    post.tags.add(&tag_fast).unwrap();
+    post.tags.add(&tag_cat).unwrap();
+    post.tags.add(&tag_european).unwrap();
+    post.save(&conn).unwrap();
+    post.tags.add(&tag_striped).unwrap();
+
+    post.tags.delete(&conn).unwrap();
+
+    let post2 = Post::get(&conn, post.id).unwrap();
+    assert_eq!(post2.tags.load(&conn).unwrap().count(), 0);
+}
+testall!(delete_all_from_many);
+
 fn can_add_to_many_before_save(conn: Connection) {
     // Verify that for an object with an auto-pk, we can add items to a Many field before we actually
     // save the original object (and thus get the actual pk);

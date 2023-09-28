@@ -125,6 +125,20 @@ where
         Ok(())
     }
 
+    /// Delete all references from the database, and any unsaved additions.
+    pub fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+        let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
+        conn.delete_where(
+            &self.item_table,
+            BoolExpr::Eq("owner", Expr::Val(owner.clone())),
+        )?;
+        self.new_values.clear();
+        self.removed_values.clear();
+        // all_values is now out of date, so clear it
+        self.all_values = OnceCell::new();
+        Ok(())
+    }
+
     /// Loads the values referred to by this many relationship from the
     /// database if necessary and returns a reference to them.
     pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {

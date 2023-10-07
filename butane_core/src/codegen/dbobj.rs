@@ -56,6 +56,45 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         })
         .collect();
 
+    let fkey_save: TokenStream2 = fields(ast_struct)
+        .filter(|f| is_foreign_key(f))
+        .map(|f| {
+            let ident = f.ident.clone().expect("Fields must be named for butane");
+
+            #[cfg(feature = "auto-save-related")]
+            if is_option(f) {
+                quote!(
+                    if let Some(link_obj) = self.#ident.as_ref() {
+                        let rv = link_obj.get();
+                        //eprintln!("Saving Option {:?} ?", rv);
+                        match rv {
+                            Ok(val) => {
+                                // ignore failures, as they will be unique constraints
+                                let _ = val.clone().save(conn);
+                            },
+                            Err(_) => {},
+                        }
+                    }
+                )
+            } else {
+                quote!(
+                    let rv = self.#ident.get();
+                    //eprintln!("Saving non-Option {:?}", rv);
+                    match rv {
+                        Ok(val) => {
+                            // ignore failures, as they will be unique constraints
+                            let _ = val.clone().save(conn);
+                        },
+                        Err(_) => {},
+                    }
+                )
+            }
+            #[cfg(not(feature = "auto-save-related"))]
+            quote!(let _ = self.#ident;)
+            // quote!(self.#ident.ensure_valpk();)
+        })
+        .collect();
+
     let values: Vec<TokenStream2> = push_values(ast_struct, |_| true);
     let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
 
@@ -106,6 +145,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     conn.insert_or_replace(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
                     self.state.saved = true
                 }
+                #fkey_save
                 #many_save
                 Ok(())
             }
@@ -188,6 +228,17 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) ->
         })
         .collect();
 
+    /*let fkey_init: TokenStream2 =
+        fields(ast_struct)
+        .filter(|f| is_foreign_key(f))
+        .map(|f| {
+            let ident = f
+                .ident
+                .clone()
+                .expect("Fields must be named for butane");
+            quote!(let _ = obj.#ident.ensure_valpk();)
+        }).collect();
+    */
     let dbo_is_self = dbo == tyname;
     let ctor = if dbo_is_self {
         quote!(

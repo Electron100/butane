@@ -9,6 +9,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Electron100/butane"
 
 [features]
+auto-save-related = ["butane_core/auto-save-related"]
 datetime = ["butane_core/datetime"]
 json = ["butane_core/json"]
 uuid = ["butane_core/uuid"]

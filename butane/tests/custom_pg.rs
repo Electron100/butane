@@ -51,7 +51,7 @@ mod custom_pg {
     }
 
     #[model]
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     struct Trip {
         #[auto]
         id: i64,

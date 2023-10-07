@@ -10,6 +10,7 @@ repository = "https://github.com/Electron100/butane"
 
 
 [features]
+auto-save-related = []
 datetime = ["chrono", "postgres?/with-chrono-0_4"]
 debug = ["log"]
 fake = ["dep:fake", "rand"]

@@ -62,6 +62,7 @@ pub mod db {
 /// # use butane_codegen::model;
 /// # use butane_codegen::filter;
 /// #[model]
+/// #[derive(Clone)]
 /// struct Contestant {
 ///   #[pk]
 ///   name: String,
@@ -91,6 +92,7 @@ pub use butane_codegen::filter;
 /// # use butane::query;
 /// # use butane::prelude::*;
 /// #[model]
+/// #[derive(Clone)]
 /// struct Contestant {
 ///   #[pk]
 ///   name: String,
@@ -141,6 +143,7 @@ macro_rules! colname {
 /// # use butane::find;
 /// # use butane::DataObject;
 /// #[model]
+/// #[derive(Clone)]
 /// struct Contestant {
 ///   #[pk]
 ///   name: String,

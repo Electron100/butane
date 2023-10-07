@@ -11,7 +11,7 @@ use butane::prelude::*;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[model]
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct Blog {
     #[auto]
     id: i64,
@@ -19,7 +19,7 @@ struct Blog {
 }
 
 #[model]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Post {
     #[auto]
     id: i64,
@@ -32,7 +32,7 @@ struct Post {
     byline: Option<String>,
 }
 impl Post {
-    pub fn new(blog: &Blog, title: String, body: String) -> Self {
+    pub fn new(blog: Blog, title: String, body: String) -> Self {
         Post {
             id: -1,
             title,
@@ -48,7 +48,7 @@ impl Post {
 }
 
 #[model]
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct Tag {
     #[pk]
     tag: String,
@@ -68,7 +68,7 @@ fn query() -> Result<()> {
     };
     tag.save(&conn).unwrap();
 
-    let mut post = Post::new(&blog, "Grizzly".into(), "lorem ipsum".into());
+    let mut post = Post::new(blog, "Grizzly".into(), "lorem ipsum".into());
     post.published = true;
     post.tags.add(&tag)?;
     post.save(&conn).unwrap();

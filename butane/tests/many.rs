@@ -8,6 +8,7 @@ mod common;
 use common::blog::{create_tag, Blog, Post, Tag};
 
 #[model]
+#[derive(Clone)]
 struct AutoPkWithMany {
     #[auto]
     id: i64,
@@ -27,6 +28,7 @@ impl AutoPkWithMany {
 
 #[model]
 #[table = "renamed_many_table"]
+#[derive(Clone)]
 struct RenamedAutoPkWithMany {
     #[auto]
     id: i64,
@@ -45,6 +47,7 @@ impl RenamedAutoPkWithMany {
 }
 
 #[model]
+#[derive(Clone)]
 struct AutoItem {
     #[auto]
     id: i64,
@@ -58,7 +61,7 @@ fn load_sorted_from_many(conn: Connection) {
         1,
         "The Cheetah",
         "This post is about a fast cat.",
-        &cats_blog,
+        cats_blog,
     );
     let tag_fast = create_tag(&conn, "fast");
     let tag_cat = create_tag(&conn, "cat");
@@ -96,7 +99,7 @@ fn remove_one_from_many(conn: Connection) {
         1,
         "The Cheetah",
         "This post is about a fast cat.",
-        &cats_blog,
+        cats_blog,
     );
     let tag_fast = create_tag(&conn, "fast");
     let tag_cat = create_tag(&conn, "cat");
@@ -123,7 +126,7 @@ fn remove_multiple_from_many(conn: Connection) {
         1,
         "The Cheetah",
         "This post is about a fast cat.",
-        &cats_blog,
+        cats_blog,
     );
     let tag_fast = create_tag(&conn, "fast");
     let tag_cat = create_tag(&conn, "cat");
@@ -187,6 +190,7 @@ fn can_add_to_many_before_save(conn: Connection) {
 }
 testall!(can_add_to_many_before_save);
 
+#[cfg(not(feature = "auto-save-related"))]
 fn cant_add_unsaved_to_many(_conn: Connection) {
     let unsaved_item = AutoItem {
         id: -1,
@@ -198,6 +202,7 @@ fn cant_add_unsaved_to_many(_conn: Connection) {
         .add(&unsaved_item)
         .expect_err("unexpectedly not error");
 }
+#[cfg(not(feature = "auto-save-related"))]
 testall!(cant_add_unsaved_to_many);
 
 fn can_add_to_many_with_custom_table_name(conn: Connection) {

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
 #[cfg(feature = "fake")]
-use fake::{Dummy, Faker};
+use fake::{Dummy, Fake, Faker};
 
 fn default_oc<T>() -> OnceCell<Vec<T>> {
     OnceCell::default()
@@ -229,9 +229,15 @@ impl<T: DataObject> Default for Many<T> {
 }
 
 #[cfg(feature = "fake")]
-/// Fake data support is currently limited to empty Many relationships.
-impl<T: DataObject> Dummy<Faker> for Many<T> {
+/// Fake data support generates one value,
+/// however it is impossible to the many relationship to it.
+/// If we put them in `new_values`, we can only store the `.pk()`
+/// which makes it impossible to save the value being related to.
+impl<T: DataObject + Dummy<Faker>> Dummy<Faker> for Many<T> {
     fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
-        Self::new()
+        let obj = Faker.fake::<T>();
+        let ret = Self::new();
+        ret.all_values.set(vec![obj]).ok();
+        ret
     }
 }

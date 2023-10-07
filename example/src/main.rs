@@ -11,7 +11,7 @@ use butane::prelude::*;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[model]
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct Blog {
     #[auto]
     id: i64,
@@ -19,7 +19,7 @@ struct Blog {
 }
 
 #[model]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Post {
     #[auto]
     id: i64,
@@ -48,7 +48,7 @@ impl Post {
 }
 
 #[model]
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct Tag {
     #[pk]
     tag: String,

@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_names)]
+
 use std::collections::HashMap;
 
 use butane::model;

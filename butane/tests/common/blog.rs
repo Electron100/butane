@@ -1,6 +1,7 @@
 use butane::prelude::*;
 use butane::{dataresult, model};
 use butane::{db::Connection, ForeignKey, Many, ObjectState};
+#[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc};
 
 #[cfg(feature = "fake")]
@@ -23,6 +24,7 @@ impl Blog {
     }
 }
 
+#[cfg(feature = "datetime")]
 #[model]
 #[derive(Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "fake", derive(Dummy))]
@@ -36,6 +38,21 @@ pub struct Post {
     pub tags: Many<Tag>,
     pub blog: ForeignKey<Blog>,
 }
+
+#[cfg(not(feature = "datetime"))]
+#[model]
+#[derive(Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "fake", derive(Dummy))]
+pub struct Post {
+    pub id: i64,
+    pub title: String,
+    pub body: String,
+    pub published: bool,
+    pub likes: i32,
+    pub tags: Many<Tag>,
+    pub blog: ForeignKey<Blog>,
+}
+
 impl Post {
     pub fn new(id: i64, title: &str, body: &str, blog: &Blog) -> Self {
         Post {
@@ -43,6 +60,7 @@ impl Post {
             title: title.to_string(),
             body: body.to_string(),
             published: false,
+            #[cfg(feature = "datetime")]
             pub_time: None,
             likes: 0,
             tags: Many::new(),
@@ -52,11 +70,20 @@ impl Post {
     }
 }
 
+#[cfg(feature = "datetime")]
 #[dataresult(Post)]
 pub struct PostMetadata {
     pub id: i64,
     pub title: String,
+    #[cfg(feature = "datetime")]
     pub pub_time: Option<NaiveDateTime>,
+}
+
+#[cfg(not(feature = "datetime"))]
+#[dataresult(Post)]
+pub struct PostMetadata {
+    pub id: i64,
+    pub title: String,
 }
 
 #[model]
@@ -102,7 +129,10 @@ pub fn setup_blog(conn: &Connection) {
         &cats_blog,
     );
     post.published = true;
-    post.pub_time = Some(Utc::now().naive_utc());
+    #[cfg(feature = "datetime")]
+    {
+        post.pub_time = Some(Utc::now().naive_utc());
+    }
     post.likes = 4;
     post.tags.add(&tag_danger).unwrap();
     post.tags.add(&tag_asia).unwrap();

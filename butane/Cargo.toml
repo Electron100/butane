@@ -56,6 +56,10 @@ uuid_for_test = { package = "uuid", version = "1.2", features = ["v4"] }
 all-features = true
 
 [[test]]
+name = "custom_pg"
+required-features = ["pg"]
+
+[[test]]
 name = "fake"
 required-features = ["fake"]
 

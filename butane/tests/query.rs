@@ -2,6 +2,7 @@ use butane::db::Connection;
 use butane::prelude::*;
 use butane::query::BoolExpr;
 use butane::{colname, filter, find, query, Many};
+#[cfg(feature = "datetime")]
 use chrono::{TimeZone, Utc};
 
 use butane_test_helper::*;
@@ -179,6 +180,7 @@ fn many_objects_with_tag_explicit(conn: Connection) {
 }
 testall!(many_objects_with_tag_explicit);
 
+#[cfg(feature = "datetime")]
 fn by_timestamp(conn: Connection) {
     blog::setup_blog(&conn);
     let mut post = find!(Post, title == "Sir Charles", &conn).unwrap();
@@ -217,6 +219,7 @@ fn by_timestamp(conn: Connection) {
     assert_eq!(posts[0].title, "The Tiger");
     assert_eq!(posts[1].title, "Sir Charles");
 }
+#[cfg(feature = "datetime")]
 testall!(by_timestamp);
 
 fn limit(conn: Connection) {

@@ -24,6 +24,7 @@ impl FooUU {
 fn basic_uuid(conn: Connection) {
     //create
     let id = Uuid::new_v4();
+    #[allow(clippy::disallowed_names)]
     let mut foo = FooUU::new(id);
     foo.bar = 42;
     foo.save(&conn).unwrap();

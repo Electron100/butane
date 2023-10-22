@@ -62,7 +62,7 @@ fn unreachable_pg_connection() {
 }
 
 fn debug_connection(conn: Connection) {
-    let backend_name = conn.backend_name().clone();
+    let backend_name = conn.backend_name();
 
     if backend_name == "pg" {
         assert!(format!("{:?}", conn).contains("conn: true"));

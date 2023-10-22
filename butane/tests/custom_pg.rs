@@ -3,8 +3,8 @@
 mod custom_pg {
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
     use butane::prelude::*;
-    use butane::{butane_type, db::Connection, model, ObjectState};
-    use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
+    use butane::{butane_type, db::Connection, model};
+    use butane::{AutoPk, FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
     use butane_test_helper::{maketest, maketest_pg};
 
     use std::result::Result;
@@ -53,18 +53,16 @@ mod custom_pg {
     #[model]
     #[derive(Debug, PartialEq)]
     struct Trip {
-        #[auto]
-        id: i64,
+        id: AutoPk<i64>,
         pt_from: Point,
         pt_to: Point,
     }
 
     fn roundtrip_custom(conn: Connection) {
         let mut trip = Trip {
-            id: -1,
+            id: AutoPk::uninitialized(),
             pt_from: Point::new(0.0, 0.0),
             pt_to: Point::new(8.0, 9.0),
-            state: ObjectState::default(),
         };
         trip.save(&conn).unwrap();
 
@@ -81,7 +79,6 @@ mod custom_pg {
             id: -1,
             pt_from: origin.clone(),
             pt_to: Point::new(8.0, 9.0),
-            state: ObjectState::default(),
         };
         trip1.save(&conn).unwrap();
 
@@ -89,7 +86,6 @@ mod custom_pg {
             id: -1,
             pt_from: Point::new(1.1, 2.0),
             pt_to: Point::new(7.0, 6.0),
-            state: ObjectState::default(),
         };
         trip2.save(&conn).unwrap();
 

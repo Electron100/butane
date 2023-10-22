@@ -29,12 +29,40 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let pklit = make_ident_literal_str(&pkident);
     let auto_pk = is_auto(&pk_field);
 
+    let values: Vec<TokenStream2> = push_values(ast_struct, |_| true);
     let insert_cols = columns(ast_struct, |f| !is_auto(f));
-    let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
 
-    let mut post_insert: Vec<TokenStream2> = Vec::new();
-    add_post_insert_for_auto(&pk_field, &mut post_insert);
-    post_insert.push(quote!(self.state.saved = true;));
+    let save_core = if is_auto(&pk_field) {
+        let pkident = pk_field.ident.clone().unwrap();
+        let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
+        let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
+        quote!(
+            // Since we expect our pk field to be invalid and to be created by the insert,
+            // we do a pure insert or update, no upsert allowed.
+            if (butane::PrimaryKeyType::is_valid(&self.#pkident)) {
+                #(#values_no_pk)*
+                if values.len() > 0 {
+                    conn.update(
+                        Self::TABLE,
+                        pkcol,
+                        butane::ToSql::to_sql_ref(self.pk()),
+                        &[#save_cols],
+                        &values,
+                    )?;
+                }
+            } else {
+                #(#values)*
+                let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
+                self.#pkident = butane::FromSql::from_sql(pk)?;
+            }
+        )
+    } else {
+        // do an upsert
+        quote!(
+            #(#values)*
+            conn.insert_or_replace(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
+        )
+    };
 
     let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
     let many_save: TokenStream2 = fields(ast_struct).filter(|f| is_many_to_many(f)).map(|f| {
@@ -48,9 +76,6 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             self.#ident.save(conn)?;
         )
     }).collect();
-
-    let values: Vec<TokenStream2> = push_values(ast_struct, |_| true);
-    let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
 
     let dataresult = impl_dataresult(ast_struct, tyname, config);
     quote!(
@@ -70,27 +95,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 let pkcol = butane::db::Column::new(
                     #pklit,
                     <#pktype as butane::FieldType>::SQLTYPE);
-                if self.state.saved {
-                    // Already exists in db, do an update
-                    #(#values_no_pk)*
-                    if values.len() > 0 {
-                        conn.update(Self::TABLE,
-                                    pkcol,
-                                    butane::ToSql::to_sql_ref(self.pk()),
-                                    &[#save_cols], &values)?;
-                    }
-                } else if #auto_pk {
-                    // Since we expect our pk field to be invalid and to be created by the insert,
-                    // we do a pure insert, no upsert allowed.
-                    #(#values)*
-                    let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
-                    #(#post_insert)*
-                } else {
-                    // Do an upsert
-                    #(#values)*
-                    conn.insert_or_replace(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
-                    self.state.saved = true
-                }
+                #save_core
                 #many_save
                 Ok(())
             }
@@ -98,10 +103,6 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 use butane::ToSql;
                 use butane::prelude::DataObject;
                 conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
-            }
-
-            fn is_saved(&self) -> butane::Result<bool> {
-                Ok(self.state.saved)
             }
         }
         impl butane::ToSql for #tyname {
@@ -172,10 +173,8 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) ->
     let ctor = if dbo_is_self {
         quote!(
             let mut obj = #tyname {
-                                state: butane::ObjectState::default(),
                                 #(#rows),*
                         };
-                        obj.state.saved = true;
         )
     } else {
         quote!(
@@ -375,7 +374,7 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
     let pk_field = pk_field.unwrap();
     for f in fields(ast_struct) {
         if is_auto(f) {
-            match get_primitive_sql_type(&f.ty) {
+            match get_autopk_sql_type(&f.ty) {
                 Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int))) => (),
                 Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::BigInt))) => (),
                 _ => {
@@ -393,14 +392,6 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
         }
     }
     None
-}
-
-fn add_post_insert_for_auto(pk_field: &Field, post_insert: &mut Vec<TokenStream2>) {
-    if !is_auto(pk_field) {
-        return;
-    }
-    let pkident = pk_field.ident.clone().unwrap();
-    post_insert.push(quote!(self.#pkident = butane::FromSql::from_sql(pk)?;));
 }
 
 /// Builds code for pushing SqlVals for each column satisfying predicate into a vec called `values`

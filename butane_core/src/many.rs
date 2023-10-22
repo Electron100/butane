@@ -1,6 +1,6 @@
 use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr};
-use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
+use crate::{DataObject, Error, FieldType, PrimaryKeyType, Result, SqlType, SqlVal, ToSql};
 use once_cell::unsync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -72,11 +72,8 @@ where
     /// to have an uninitialized one.
     pub fn add(&mut self, new_val: &T) -> Result<()> {
         // Check for uninitialized pk
-        match new_val.is_saved() {
-            Ok(true) => (), // hooray
-            Ok(false) => return Err(Error::ValueNotSaved),
-            Err(Error::SaveDeterminationNotSupported) => (), // we don't know, so assume it's OK
-            Err(e) => return Err(e),                         // unexpected error
+        if !new_val.pk().is_valid() {
+            return Err(Error::ValueNotSaved);
         }
 
         // all_values is now out of date, so clear it

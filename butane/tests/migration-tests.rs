@@ -101,8 +101,7 @@ fn current_migration_auto_attribute() {
     let tokens = quote! {
         #[derive(PartialEq, Eq, Debug, Clone)]
         struct Foo {
-            #[auto]
-            id: i64,
+            id: AutoPk<i64>,
             bar: String,
         }
     };

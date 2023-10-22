@@ -1,6 +1,6 @@
+use butane::db::Connection;
 use butane::model;
 use butane::prelude::*;
-use butane::{db::Connection, ObjectState};
 use uuid_for_test::Uuid;
 
 use butane_test_helper::*;
@@ -13,11 +13,7 @@ struct FooUU {
 }
 impl FooUU {
     fn new(id: Uuid) -> Self {
-        FooUU {
-            id,
-            bar: 0,
-            state: ObjectState::default(),
-        }
+        FooUU { id, bar: 0 }
     }
 }
 

@@ -1,11 +1,11 @@
 use butane::prelude::*;
-use butane::{model, ForeignKey, Many, ObjectState};
+use butane::AutoPk;
+use butane::{model, ForeignKey, Many};
 
 #[model]
 #[derive(Debug, Default)]
 pub struct Blog {
-    #[auto]
-    pub id: i64,
+    pub id: AutoPk<i64>,
     pub name: String,
 }
 impl Blog {
@@ -19,8 +19,7 @@ impl Blog {
 
 #[model]
 pub struct Post {
-    #[auto]
-    pub id: i32,
+    pub id: AutoPk<i32>,
     pub title: String,
     pub body: String,
     pub published: bool,
@@ -28,12 +27,11 @@ pub struct Post {
     pub blog: ForeignKey<Blog>,
     pub byline: Option<String>,
     pub likes: i32,
-    state: butane::ObjectState,
 }
 impl Post {
     pub fn new(blog: &Blog, title: String, body: String) -> Self {
         Post {
-            id: -1,
+            id: AutoPk::uninitialized(),
             title,
             body,
             published: false,
@@ -41,7 +39,6 @@ impl Post {
             blog: blog.into(),
             byline: None,
             likes: 0,
-            state: ObjectState::default(),
         }
     }
 }

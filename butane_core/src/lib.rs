@@ -1,7 +1,6 @@
 #![allow(clippy::iter_nth_zero)]
 #![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 use thiserror::Error as ThisError;
@@ -18,8 +17,8 @@ pub mod sqlval;
 #[cfg(feature = "uuid")]
 pub mod uuid;
 
-#[cfg(feature = "fake")]
-use fake::{Dummy, Faker};
+mod autopk;
+pub use autopk::AutoPk;
 
 use db::{BackendRow, Column, ConnectionMethods};
 
@@ -29,31 +28,28 @@ pub use sqlval::*;
 
 pub type Result<T> = std::result::Result<T, crate::Error>;
 
-/// Used internally by butane to track state about the object.
-///
-/// Includes information such as whether it has actually been created
-/// in the database yet. Butane automatically creates the field
-/// `state: ObjectState` on `#[model]` structs. When initializing the
-/// state field, use `ObjectState::default()`.
-#[derive(Clone, Debug, Default)]
-pub struct ObjectState {
-    pub saved: bool,
+pub trait ToPkSql<T>
+where
+    T: PrimaryKeyType,
+{
+    fn to_pk_sql(&self) -> SqlVal;
 }
-/// Two `ObjectState`s always compare as equal. This effectively
-/// removes `ObjectState` from participating in equality tests between
-/// two objects
-impl PartialEq<ObjectState> for ObjectState {
-    fn eq(&self, _other: &ObjectState) -> bool {
-        true
+
+impl<T: PrimaryKeyType> ToPkSql<T> for T {
+    fn to_pk_sql(&self) -> SqlVal {
+        self.to_sql()
     }
 }
-impl Eq for ObjectState {}
 
-#[cfg(feature = "fake")]
-/// Fake data should always have `saved` set to `false`.
-impl Dummy<Faker> for ObjectState {
-    fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
-        Self::default()
+impl<T: PrimaryKeyType> ToPkSql<T> for &T {
+    fn to_pk_sql(&self) -> SqlVal {
+        self.to_sql()
+    }
+}
+
+impl<U: PrimaryKeyType> ToPkSql<AutoPk<U>> for U {
+    fn to_pk_sql(&self) -> SqlVal {
+        self.to_sql()
     }
 }
 
@@ -94,7 +90,7 @@ pub trait DataObject: DataResult<DBO = Self> {
     fn pk(&self) -> &Self::PKType;
     /// Find this object in the database based on primary key.
     /// Returns `Error::NoSuchObject` if the primary key does not exist.
-    fn get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType>) -> Result<Self>
+    fn get(conn: &impl ConnectionMethods, id: impl ToPkSql<Self::PKType>) -> Result<Self>
     where
         Self: Sized,
     {
@@ -102,14 +98,17 @@ pub trait DataObject: DataResult<DBO = Self> {
     }
     /// Find this object in the database based on primary key.
     /// Returns `None` if the primary key does not exist.
-    fn try_get(conn: &impl ConnectionMethods, id: impl Borrow<Self::PKType>) -> Result<Option<Self>>
+    fn try_get(
+        conn: &impl ConnectionMethods,
+        id: impl ToPkSql<Self::PKType>,
+    ) -> Result<Option<Self>>
     where
         Self: Sized,
     {
         Ok(<Self as DataResult>::query()
             .filter(query::BoolExpr::Eq(
                 Self::PKCOL,
-                query::Expr::Val(id.borrow().to_sql()),
+                query::Expr::Val(id.to_pk_sql()),
             ))
             .limit(1)
             .load(conn)?
@@ -120,9 +119,6 @@ pub trait DataObject: DataResult<DBO = Self> {
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
     /// Delete the object from the database.
     fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>;
-
-    /// Test if this object has been saved to the database at least once
-    fn is_saved(&self) -> Result<bool>;
 }
 
 pub trait ModelTyped {

@@ -5,7 +5,7 @@ pub use butane_core::many::Many;
 pub use butane_core::migrations;
 pub use butane_core::query;
 pub use butane_core::{
-    AsPrimaryKey, DataObject, DataResult, Error, FieldType, FromSql, ObjectState, PrimaryKeyType,
+    AsPrimaryKey, AutoPk, DataObject, DataResult, Error, FieldType, FromSql, PrimaryKeyType,
     Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
 

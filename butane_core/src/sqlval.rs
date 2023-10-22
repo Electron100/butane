@@ -284,7 +284,16 @@ pub trait FieldType: ToSql + FromSql {
 }
 
 /// Marker trait for a type suitable for being a primary key
-pub trait PrimaryKeyType: FieldType + Clone + PartialEq {}
+pub trait PrimaryKeyType: FieldType + Clone + PartialEq {
+    /// Test if this object's pk is valid. The only case in which this
+    /// returns false is if the pk is an AutoPk and it's not yet valid.
+    ///
+    /// If you're implementing [PrimaryKeyType], the default implementation returns true
+    /// and you do not need to change that unless you're doing something very unusual.
+    fn is_valid(&self) -> bool {
+        true
+    }
+}
 
 /// Trait for referencing the primary key for a given model. Used to
 /// implement ForeignKey equality tests.

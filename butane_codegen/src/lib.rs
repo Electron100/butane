@@ -26,10 +26,6 @@ mod filter;
 /// ## Helper Attributes
 /// * `#[table = "NAME"]` used on the struct to specify the name of the table (defaults to struct name)
 /// * `#[pk]` on a field to specify that it is the primary key.
-/// * `#[auto]` on a field indicates that the field's value is
-///    initialized based on serial/auto-increment. Currently supported
-///    only on the primary key and only if the primary key is an integer
-///    type
 /// * `#[unique]` on a field indicates that the field's value must be unique
 ///    (perhaps implemented as the SQL UNIQUE constraint by some backends).
 /// * `[default]` should be used on fields added by later migrations to avoid errors on existing objects.
@@ -40,9 +36,8 @@ mod filter;
 /// #[model]
 /// #[table = "posts"]
 /// pub struct Post {
-///   #[auto]
 ///   #[pk] // unnecessary if identifier were named id instead
-///   pub identifier: i32,
+///   pub identifier: AutoPk<i32>,
 ///   pub title: String,
 ///   pub content: String,
 ///   #[default = false]

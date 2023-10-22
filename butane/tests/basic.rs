@@ -1,7 +1,6 @@
 use butane::db::Connection;
-use butane::{butane_type, find, model, query};
+use butane::{butane_type, find, model, query, AutoPk, ForeignKey};
 use butane::{colname, prelude::*};
-use butane::{ForeignKey, ObjectState};
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 use serde::Serialize;
 
@@ -29,7 +28,6 @@ impl Foo {
             bar: 0,
             baz: String::new(),
             blobbity: Vec::new(),
-            state: ObjectState::default(),
         }
     }
 }
@@ -46,23 +44,20 @@ impl Bar {
         Bar {
             name: name.to_string(),
             foo: foo.into(),
-            state: ObjectState::default(),
         }
     }
 }
 
 #[model]
 struct Baz {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     text: String,
 }
 impl Baz {
     fn new(text: &str) -> Self {
         Baz {
-            id: -1, // will be set automatically when saved
+            id: AutoPk::default(),
             text: text.to_string(),
-            state: ObjectState::default(),
         }
     }
 }
@@ -73,10 +68,7 @@ struct HasOnlyPk {
 }
 impl HasOnlyPk {
     fn new(id: i64) -> Self {
-        HasOnlyPk {
-            id,
-            state: ObjectState::default(),
-        }
+        HasOnlyPk { id }
     }
 }
 
@@ -91,7 +83,6 @@ impl SelfReferential {
         SelfReferential {
             id,
             reference: None,
-            state: ObjectState::default(),
         }
     }
 }
@@ -229,8 +220,10 @@ testall!(foreign_key);
 fn auto_pk(conn: Connection) {
     let mut baz1 = Baz::new("baz1");
     baz1.save(&conn).unwrap();
+    eprintln!("{:?}", baz1.id);
     let mut baz2 = Baz::new("baz2");
     baz2.save(&conn).unwrap();
+    eprintln!("{:?}", baz2.id);
     let mut baz3 = Baz::new("baz3");
     baz3.save(&conn).unwrap();
     assert!(baz1.id < baz2.id);
@@ -344,7 +337,6 @@ fn basic_time(conn: Connection) {
         naive: now.naive_utc(),
         utc: now,
         when: now,
-        state: ObjectState::default(),
     };
     time.save(&conn).unwrap();
 

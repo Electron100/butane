@@ -1,6 +1,9 @@
+#![allow(clippy::disallowed_names)]
+
 use butane::db::Connection;
 use butane::{butane_type, find, model, query, AutoPk, ForeignKey};
 use butane::{colname, prelude::*};
+#[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 use serde::Serialize;
 
@@ -87,6 +90,7 @@ impl SelfReferential {
     }
 }
 
+#[cfg(feature = "datetime")]
 #[model]
 #[derive(Debug, Default, PartialEq, Clone)]
 struct TimeHolder {
@@ -330,6 +334,7 @@ fn fkey_same_type(conn: Connection) {
 }
 testall!(fkey_same_type);
 
+#[cfg(feature = "datetime")]
 fn basic_time(conn: Connection) {
     let now = Utc::now();
     let mut time = TimeHolder {
@@ -345,6 +350,7 @@ fn basic_time(conn: Connection) {
     // lose some precision when we go to the database.
     assert_eq!(time.naive.timestamp(), time2.naive.timestamp());
 }
+#[cfg(feature = "datetime")]
 testall!(basic_time);
 
 fn basic_load_first(conn: Connection) {

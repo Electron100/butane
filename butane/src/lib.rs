@@ -1,3 +1,10 @@
+//! An experimental ORM for Rust with a focus on simplicity and on writing Rust, not SQL
+
+//! Butane takes an object-oriented approach to database operations.
+//! It may be thought of as much as an object-persistence system as an ORM.
+//! The fact that it is backed by a SQL database is mostly an implementation detail to the API consumer.
+
+#![deny(missing_docs)]
 pub use butane_codegen::{butane_type, dataresult, model, FieldType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
@@ -10,6 +17,7 @@ pub use butane_core::{
 };
 
 pub mod db {
+    //! Database helpers
     pub use butane_core::db::*;
 }
 
@@ -64,7 +72,7 @@ pub mod db {
 /// let first_place = 1;
 /// let e2 = filter!(Contestant, rank == { first_place });
 /// let e3 = filter!(Contestant, name.like("A%"));
-///```
+/// ```
 ///
 /// [`BoolExpr`]: crate::query::BoolExpr
 /// [`Query`]: crate::query::Query
@@ -90,7 +98,7 @@ pub use butane_codegen::filter;
 ///   nationality: String
 /// }
 /// let top_tier: Query<Contestant> = query!(Contestant, rank <= 10);
-///```
+/// ```
 ///
 /// [`filter]: crate::filter
 /// [`Query`]: crate::query::Query
@@ -142,7 +150,7 @@ macro_rules! colname {
 ///
 /// let conn = butane::db::connect(&ConnectionSpec::new("sqlite", "foo.db")).unwrap();
 /// let alice: Result<Contestant, butane::Error> = find!(Contestant, name == "Alice", &conn);
-///```
+/// ```
 ///
 /// [`filter]: crate::filter
 /// [`Result`]: crate::Result

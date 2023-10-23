@@ -1,3 +1,6 @@
+//! Uuid support
+
+#![deny(missing_docs)]
 use crate::{
     Error::CannotConvertSqlVal, FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal,
     SqlValRef, ToSql,

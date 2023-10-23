@@ -9,7 +9,10 @@ use quote::quote;
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser as SqlParser;
 
-use butane_test_helper::*;
+#[cfg(feature = "pg")]
+use butane_test_helper::pg_connection;
+#[cfg(feature = "sqlite")]
+use butane_test_helper::sqlite_connection;
 
 #[test]
 fn current_migration_basic() {

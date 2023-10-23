@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use clap::{Arg, ArgMatches};
+use clap::{value_parser, Arg, ArgMatches};
 
 use butane_cli::{
-    base_dir, clean, clear_data, collapse_migrations, delete_table, embed, handle_error,
-    list_migrations, migrate, Result,
+    base_dir, clean, clear_data, collapse_migrations, delete_table, detach_latest_migration, embed,
+    get_migrations, handle_error, list_migrations, migrate, Result,
 };
 
 fn main() {
@@ -12,7 +12,14 @@ fn main() {
         .version(env!("CARGO_PKG_VERSION"))
         .author("James Oakley <james@electronstudio.org>")
         .about("Manages butane database migrations")
+        .subcommand_required(true)
         .max_term_width(80)
+        .arg(
+            Arg::new("path").short('p').long("path")
+            .default_value(base_dir().into_os_string())
+            .value_parser(value_parser!(PathBuf))
+            .help("Select directory to locate butane state")
+        )
         .subcommand(
             clap::Command::new("init")
                 .about("Initialize the database")
@@ -38,6 +45,22 @@ fn main() {
                         .index(1)
                         .help("Name to use for the migration"),
                 ),
+        )
+        .subcommand(
+            clap::Command::new("detach-migration")
+                .about("Detach the latest migration")
+                .alias("detachmigration")
+                .after_help(r#"This command removes the latest migration from the list of migrations and sets butane state to before the latest migration was created.
+
+The removed migration is not deleted from file system.
+
+This operation is the first step of the process of rebasing a migration onto other migrations that have the same original migration.
+
+If the migration has not been manually edited, it can be automatically regenerated after being rebased. In this case, deleting the detached migration is often the best approach.
+
+However if the migration has been manually edited, it will need to be manually re-attached to the target migration series after the rebase has been completed.
+"#
+                )
         )
         .subcommand(clap::Command::new("migrate").about("Apply migrations"))
         .subcommand(clap::Command::new("list").about("List migrations"))
@@ -86,12 +109,29 @@ fn main() {
                 .about("Clean current migration state. Deletes the current migration working state which is generated on each build. This can be used as a workaround to remove stale tables from the schema, as Butane does not currently auto-detect model removals. The next build will recreate with only tables for the extant models."))
                 .arg_required_else_help(true);
     let args = app.get_matches();
-    let base_dir = base_dir().expect("Unable to find base directory");
+    let mut base_dir = args.get_one::<PathBuf>("path").unwrap().clone();
+    base_dir.push(".butane");
+
+    // List any detached migrations.
+    if let Ok(ms) = get_migrations(&base_dir) {
+        if let Ok(detached_migrations) = ms.detached_migration_paths() {
+            if !detached_migrations.is_empty() {
+                eprintln!(
+                    "Ignoring detached migrations. Please delete or manually re-attach these:"
+                );
+                for migration in detached_migrations {
+                    eprintln!("- {migration}");
+                }
+            }
+        };
+    };
+
     match args.subcommand() {
         Some(("init", sub_args)) => handle_error(init(&base_dir, Some(sub_args))),
         Some(("makemigration", sub_args)) => {
             handle_error(make_migration(&base_dir, Some(sub_args)))
         }
+        Some(("detach-migration", _)) => handle_error(detach_latest_migration(&base_dir)),
         Some(("migrate", _)) => handle_error(migrate(&base_dir)),
         Some(("rollback", sub_args)) => handle_error(rollback(&base_dir, Some(sub_args))),
         Some(("embed", _)) => handle_error(embed(&base_dir)),
@@ -111,8 +151,7 @@ fn main() {
             _ => eprintln!("Unknown delete command. Try: delete table"),
         },
         Some(("clean", _)) => handle_error(clean(&base_dir)),
-        Some((cmd, _)) => eprintln!("Unknown command {cmd}"),
-        None => eprintln!("Unknown command"),
+        Some((_, _)) | None => panic!("Unreachable as clap handles this automatically"),
     }
 }
 

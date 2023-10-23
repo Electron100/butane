@@ -486,9 +486,7 @@ fn sql_valref_from_rusqlite<'a>(
             SQLITE_DT_FORMAT,
         )?),
         SqlType::Blob => SqlValRef::Blob(val.as_blob()?),
-        SqlType::Custom(v) => {
-            return Err(Error::IncompatibleCustomT(v.deref().clone(), BACKEND_NAME))
-        }
+        SqlType::Custom(v) => return Err(Error::IncompatibleCustomT(v.clone(), BACKEND_NAME)),
     })
 }
 

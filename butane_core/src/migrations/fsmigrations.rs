@@ -1,7 +1,7 @@
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::fs::{Filesystem, OsFilesystem};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
-use crate::{ConnectionMethods, DataObject, Result};
+use crate::{ConnectionMethods, DataObject, Error, Result};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -270,6 +270,40 @@ impl FsMigrations {
         let mut f = self.fs.write(&path)?;
         f.write_all(serde_json::to_string(state)?.as_bytes())
             .map_err(|e| e.into())
+    }
+    /// Detach the latest migration from the list of migrations,
+    /// leaving the migration on the filesystem.
+    pub fn detach_latest_migration(&mut self) -> Result<()> {
+        let latest = self
+            .latest()
+            .ok_or(Error::MigrationError("There are no migrations".to_string()))?;
+        let from_name =
+            latest
+                .migration_from()?
+                .map(|s| s.to_string())
+                .ok_or(Error::MigrationError(
+                    "There is no previous migration".to_string(),
+                ))?;
+        let mut state = self.get_state()?;
+        state.latest = Some(from_name);
+        self.save_state(&state)?;
+        Ok(())
+    }
+    /// Provides a Vec of migration directories that have been detached.
+    pub fn detached_migration_paths(&self) -> Result<Vec<String>> {
+        let migration_series = self.all_migrations()?;
+        let mut detached_directory_names: Vec<String> = vec![];
+        for entry in std::fs::read_dir(self.root.clone())? {
+            let path = entry?.path();
+            let name = path.file_name().unwrap();
+            if !path.is_dir() || name == "current" {
+                continue;
+            }
+            if !migration_series.iter().any(|item| item.root == path) {
+                detached_directory_names.push(path.display().to_string());
+            };
+        }
+        Ok(detached_directory_names)
     }
 }
 

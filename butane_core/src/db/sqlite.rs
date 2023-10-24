@@ -42,7 +42,7 @@ fn log_callback(error_code: std::ffi::c_int, message: &str) {
     }
 }
 
-/// SQLite [Backend][crate::db::Backend] implementation.
+/// SQLite [`Backend`] implementation.
 #[derive(Debug, Default)]
 pub struct SQLiteBackend {}
 impl SQLiteBackend {

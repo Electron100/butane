@@ -8,8 +8,8 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 /// Identifier for a type as used in a database column. Supports both
-/// [SqlType](crate::SqlType) and identifiers known only by name. The
-/// latter is used for custom types. `SqlType::Custom` cannot easily be used
+/// [`SqlType`] and identifiers known only by name.
+/// The latter is used for custom types. `SqlType::Custom` cannot easily be used
 /// directly at compile time when the proc macro serializing type information runs.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum TypeIdentifier {

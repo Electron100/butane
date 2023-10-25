@@ -1,13 +1,19 @@
+//! Contains the [AutoPk] type for autoincrementing primary keys.
+
 use super::{FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql};
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ordering, PartialOrd};
 
+/// Wrapper around a `PrimaryKeyType` to indicate the the primary key
+/// will be initialized automatically when the object is created in
+/// the database.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AutoPk<T: PrimaryKeyType> {
     inner: Option<T>,
 }
 
 impl<T: PrimaryKeyType> AutoPk<T> {
+    /// Create an uninitialized value for an object which has not yet been saved.
     pub fn uninitialized() -> Self
     where
         T: Default,
@@ -15,6 +21,9 @@ impl<T: PrimaryKeyType> AutoPk<T> {
         Self::default()
     }
 
+    /// Create an initialized primary key value for a previously saved
+    /// object. You do not usually need to call this directly (it will
+    /// happen implicitly when you load from the database).
     fn with_value(val: T) -> Self {
         AutoPk { inner: Some(val) }
     }

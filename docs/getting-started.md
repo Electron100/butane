@@ -67,15 +67,14 @@ use butane::{model, ForeignKey, Many, ObjectState};
 #[model]
 #[derive(Debug, Default)]
 pub struct Blog {
-    #[auto]
-    pub id: i64,
+    pub id: AutoPk<i64>,
     pub name: String,
 }
 impl Blog {
     pub fn new(name: impl Into<String>) -> Self {
         Blog {
-            name: name.into(),
-            ..Default::default()
+            id: AutoPk::uninitialized(),
+            name: name.into()
         }
     }
 }
@@ -98,13 +97,13 @@ The `#[model]` attribute does the heavy lifting here:
 The `id` field is special -- it's the primary key. All models must
 have a primary key. If we didn't want to name ours `id`, we could have
 added a `#[pk]` attribute to denote the primary key field. The
-`#[auto]` attribute says that the field should be populated
+`AutoPk` wrapping type says that the field should be populated
 automatically from an incrementing value. It is only allowed on
 integer types and will cause the underlying column to be
 `AUTOINCREMENT` for SQLite or `SERIAL`/`BIGSERIAL` for
-PostgreSQL. Since it's marked as `#[auto]` the value of `id` at
-construction time doesn't matter: it will be automatically set when
-the object is created (via its [`save`] method).
+PostgreSQL. When the object is created in the database via its
+[`save`] method, the `AutoPk` field will be updated to its initialized
+value.
 
 Now let's add a model to represent a blog post, and in the process take a look at a few more features.
 

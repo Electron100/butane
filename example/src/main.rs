@@ -8,7 +8,7 @@ use butane::{ForeignKey, Many};
 
 use butane::prelude::*;
 
-pub type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 #[model]
 #[derive(Debug, Default)]
@@ -32,7 +32,7 @@ struct Post {
     byline: Option<String>,
 }
 impl Post {
-    pub fn new(blog: &Blog, title: String, body: String) -> Self {
+    fn new(blog: &Blog, title: String, body: String) -> Self {
         Post {
             id: -1,
             title,
@@ -100,6 +100,7 @@ fn establish_connection() -> Result<Connection> {
     let conn = butane::db::connect(&spec)?;
     Ok(conn)
 }
+
 fn main() -> Result<()> {
     query()
 }

@@ -57,7 +57,6 @@ fn query() -> Result<()> {
 
     let mut tag = Tag {
         tag: "dinosaurs".into(),
-        ..Default::default()
     };
     tag.save(&conn).unwrap();
 

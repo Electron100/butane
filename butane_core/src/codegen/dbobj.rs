@@ -38,7 +38,10 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
         quote!(
             // Since we expect our pk field to be invalid and to be created by the insert,
-            // we do a pure insert or update, no upsert allowed.
+            // we do a pure insert or update, no upsert allowed. Note that some database backends
+            // do support upsert with auto-incrementing primary keys, but butane isn't well set up to
+            // take advantage of that, including missing support for constraints and the
+            // `insert_or_update` method not providing a way to retrieve the pk.
             if (butane::PrimaryKeyType::is_valid(&self.#pkident)) {
                 #(#values_no_pk)*
                 if values.len() > 0 {

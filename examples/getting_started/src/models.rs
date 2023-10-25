@@ -51,9 +51,6 @@ pub struct Tag {
 }
 impl Tag {
     pub fn new(tag: impl Into<String>) -> Self {
-        Tag {
-            tag: tag.into(),
-            ..Default::default()
-        }
+        Tag { tag: tag.into() }
     }
 }

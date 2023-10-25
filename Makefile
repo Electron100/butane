@@ -1,5 +1,5 @@
-CARGO := rustup run stable cargo
-CARGO_NIGHTLY := $(subst stable, nightly, $(CARGO))
+CARGO := cargo +stable
+CARGO_NIGHTLY := $(subst stable,nightly,$(CARGO))
 
 all : build
 
@@ -26,7 +26,7 @@ clean :
 
 
 doclint :
-	RUSTDOCFLAGS="" $(CARGO_NIGHTLY) doc --no-deps --all-features
+	RUSTDOCFLAGS="-D warnings" $(CARGO_NIGHTLY) doc --no-deps --all-features
 
 doc :
 	cd butane && $(CARGO_NIGHTLY) doc --no-deps --all-features

@@ -38,10 +38,11 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
         quote!(
             // Since we expect our pk field to be invalid and to be created by the insert,
-            // we do a pure insert or update, no upsert allowed. Note that some database backends
-            // do support upsert with auto-incrementing primary keys, but butane isn't well set up to
-            // take advantage of that, including missing support for constraints and the
-            // `insert_or_update` method not providing a way to retrieve the pk.
+            // we do a pure insert or update based on whether the AutoPk is already valid or not.
+            // Note that some database backends do support upsert with auto-incrementing primary
+            // keys, but butane isn't well set up to take advantage of that, including missing
+            // support for constraints and the `insert_or_update` method not providing a way to
+            // retrieve the pk.
             if (butane::PrimaryKeyType::is_valid(&self.#pkident)) {
                 #(#values_no_pk)*
                 if values.len() > 0 {
@@ -275,7 +276,7 @@ fn fieldexpr_func_regular(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
 
 fn fieldexpr_func_many(f: &Field, ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let fty = get_foreign_type_argument(&f.ty, &MANY_TYNAMES).expect("Many field misdetected");
+    let fty = get_type_argument(&f.ty, &MANY_TYNAMES).expect("Many field misdetected");
     let many_table_lit = many_table_lit(ast_struct, f, config);
     fieldexpr_func(
         f,

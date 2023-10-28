@@ -28,31 +28,6 @@ pub use sqlval::*;
 
 pub type Result<T> = std::result::Result<T, crate::Error>;
 
-pub trait ToPkSql<T>
-where
-    T: PrimaryKeyType,
-{
-    fn to_pk_sql(&self) -> SqlVal;
-}
-
-impl<T: PrimaryKeyType> ToPkSql<T> for T {
-    fn to_pk_sql(&self) -> SqlVal {
-        self.to_sql()
-    }
-}
-
-impl<T: PrimaryKeyType> ToPkSql<T> for &T {
-    fn to_pk_sql(&self) -> SqlVal {
-        self.to_sql()
-    }
-}
-
-impl<U: PrimaryKeyType> ToPkSql<AutoPk<U>> for U {
-    fn to_pk_sql(&self) -> SqlVal {
-        self.to_sql()
-    }
-}
-
 /// A type which may be the result of a database query.
 ///
 /// Every result type must have a corresponding object type and the
@@ -90,7 +65,7 @@ pub trait DataObject: DataResult<DBO = Self> {
     fn pk(&self) -> &Self::PKType;
     /// Find this object in the database based on primary key.
     /// Returns `Error::NoSuchObject` if the primary key does not exist.
-    fn get(conn: &impl ConnectionMethods, id: impl ToPkSql<Self::PKType>) -> Result<Self>
+    fn get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Self>
     where
         Self: Sized,
     {
@@ -98,17 +73,14 @@ pub trait DataObject: DataResult<DBO = Self> {
     }
     /// Find this object in the database based on primary key.
     /// Returns `None` if the primary key does not exist.
-    fn try_get(
-        conn: &impl ConnectionMethods,
-        id: impl ToPkSql<Self::PKType>,
-    ) -> Result<Option<Self>>
+    fn try_get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Option<Self>>
     where
         Self: Sized,
     {
         Ok(<Self as DataResult>::query()
             .filter(query::BoolExpr::Eq(
                 Self::PKCOL,
-                query::Expr::Val(id.to_pk_sql()),
+                query::Expr::Val(id.to_sql()),
             ))
             .limit(1)
             .load(conn)?

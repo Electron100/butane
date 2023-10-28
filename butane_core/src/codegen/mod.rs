@@ -258,7 +258,7 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
 }
 
 fn is_auto(field: &Field) -> bool {
-    get_foreign_type_argument(&field.ty, &AUTOPK_TYNAMES).is_some()
+    get_type_argument(&field.ty, &AUTOPK_TYNAMES).is_some()
 }
 
 fn is_unique(field: &Field) -> bool {
@@ -273,7 +273,7 @@ fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
 }
 
 fn get_option_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    get_foreign_type_argument(ty, &OPTION_TYNAMES).map(|path| {
+    get_type_argument(ty, &OPTION_TYNAMES).map(|path| {
         let inner_ty: syn::Type = syn::TypePath {
             qself: None,
             path: path.clone(),
@@ -289,7 +289,7 @@ fn get_many_sql_type(field: &Field) -> Option<DeferredSqlType> {
 }
 
 fn get_autopk_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    get_foreign_type_argument(ty, &AUTOPK_TYNAMES).map(|path| {
+    get_type_argument(ty, &AUTOPK_TYNAMES).map(|path| {
         let inner_ty: syn::Type = syn::TypePath {
             qself: None,
             path: path.clone(),
@@ -305,7 +305,7 @@ fn is_many_to_many(field: &Field) -> bool {
 }
 
 fn is_option(field: &Field) -> bool {
-    get_foreign_type_argument(&field.ty, &OPTION_TYNAMES).is_some()
+    get_type_argument(&field.ty, &OPTION_TYNAMES).is_some()
 }
 
 /// Check for special fields which won't correspond to rows and don't
@@ -327,10 +327,9 @@ fn is_same_path_ident(path1: &syn::Path, path2: &syn::Path) -> bool {
         .all(|(a, b)| a.ident == b.ident)
 }
 
-fn get_foreign_type_argument<'a>(
-    ty: &'a syn::Type,
-    tynames: &[&'static str],
-) -> Option<&'a syn::Path> {
+/// Gets the type argument of a type.
+/// E.g. for Foo<T>, returns T
+fn get_type_argument<'a>(ty: &'a syn::Type, tynames: &[&'static str]) -> Option<&'a syn::Path> {
     let path = match ty {
         syn::Type::Path(path) => &path.path,
         _ => return None,
@@ -360,7 +359,7 @@ fn get_foreign_type_argument<'a>(
 }
 
 fn get_foreign_sql_type(ty: &syn::Type, tynames: &[&'static str]) -> Option<DeferredSqlType> {
-    let typath = get_foreign_type_argument(ty, tynames);
+    let typath = get_type_argument(ty, tynames);
     typath.map(|typath| {
         DeferredSqlType::Deferred(TypeKey::PK(
             typath

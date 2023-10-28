@@ -4,7 +4,7 @@ use super::{FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValR
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ordering, PartialOrd};
 
-/// Wrapper around a `PrimaryKeyType` to indicate the the primary key
+/// Wrapper around a [PrimaryKeyType] to indicate the the primary key
 /// will be initialized automatically when the object is created in
 /// the database.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -82,7 +82,7 @@ impl<T: PrimaryKeyType> PartialEq for AutoPk<T> {
 impl<T: PrimaryKeyType> FieldType for AutoPk<T> {
     const SQLTYPE: SqlType = T::SQLTYPE;
     /// Reference type. Used for ergonomics with String (which has
-    /// reference type str). For most, it is Self
+    /// reference type str). For most, it is Self.
     type RefType = T::RefType;
 }
 impl<T: PrimaryKeyType> PrimaryKeyType for AutoPk<T> {

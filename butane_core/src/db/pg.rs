@@ -17,7 +17,7 @@ use std::fmt::Write;
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
 
-/// Pg [Backend][crate::db::Backend] implementation.
+/// Postgres [`Backend`] implementation.
 #[derive(Debug, Default)]
 pub struct PgBackend {}
 impl PgBackend {

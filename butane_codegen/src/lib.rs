@@ -274,7 +274,7 @@ fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenS
         .iter()
         .map(|variant| {
             let v_ident = &variant.ident;
-            let ident_literal = codegen::make_lit(&v_ident.to_string());
+            let ident_literal = codegen::make_ident_literal_str(v_ident);
             quote!(Self::#v_ident => #ident_literal,)
         })
         .collect();
@@ -283,7 +283,7 @@ fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenS
         .iter()
         .map(|variant| {
             let v_ident = &variant.ident;
-            let ident_literal = codegen::make_lit(&v_ident.to_string());
+            let ident_literal = codegen::make_ident_literal_str(v_ident);
             quote!(#ident_literal => Ok(Self::#v_ident),)
         })
         .collect();

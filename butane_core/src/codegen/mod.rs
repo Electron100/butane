@@ -33,6 +33,7 @@ macro_rules! make_compile_error {
 mod dbobj;
 mod migration;
 
+/// Implementation of `#[butane::model]`.
 pub fn model_with_migrations<M>(
     input: TokenStream2,
     ms: &mut impl MigrationsMut<M = M>,
@@ -74,6 +75,7 @@ where
     )
 }
 
+/// Implementation of `#[butane::dataresult(<Model>)]`.
 pub fn dataresult(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     let dbo: Ident = syn::parse2(args)
         .expect("Model type must be specified as argument to dataresult attribute");
@@ -136,6 +138,7 @@ fn parse_butane_type_args(args: TokenStream2) -> std::result::Result<TypeIdentif
     Err(quote!(compile_error!("Unexpected tokens in butane_type");))
 }
 
+/// Implementation of `#[butane::butane_type(<SqlType>)]`.
 pub fn butane_type_with_migrations<M>(
     args: TokenStream2,
     input: TokenStream2,
@@ -186,11 +189,13 @@ where
     }
 }
 
-fn make_ident_literal_str(ident: &Ident) -> LitStr {
+/// Create a [`struct@LitStr`] (UTF-8 string literal) from an [Ident].
+pub fn make_ident_literal_str(ident: &Ident) -> LitStr {
     let as_str = format!("{ident}");
     make_lit(&as_str)
 }
 
+/// Create a [`struct@LitStr`] (UTF-8 string literal) from a `str`.
 pub fn make_lit(s: &str) -> LitStr {
     LitStr::new(s, Span::call_site())
 }
@@ -372,6 +377,9 @@ fn get_foreign_sql_type(ty: &syn::Type, tynames: &[&'static str]) -> Option<Defe
     })
 }
 
+/// Determine whether a type refers to a data type that is supported directly by butane,
+/// or is a custom defined struct.
+/// It looks inside an [Option] or [butane_core::ForeignKey] to determine the inner type.
 pub fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
     get_primitive_sql_type(ty)
         .or_else(|| get_option_sql_type(ty))
@@ -584,5 +592,59 @@ impl CompilerErrorMsg {
 impl From<TokenStream2> for CompilerErrorMsg {
     fn from(ts: TokenStream2) -> Self {
         CompilerErrorMsg::new(ts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_foreign_type_argument_option() {
+        let expected_type_path: syn::Path = syn::parse_quote!(butane::ForeignKey<Foo>);
+
+        let type_path: syn::TypePath = syn::parse_quote!(Option<butane::ForeignKey<Foo>>);
+        let typ = syn::Type::Path(type_path);
+        let rv = get_foreign_type_argument(&typ, &OPTION_TYNAMES);
+        assert!(rv.is_some());
+        assert_eq!(rv.unwrap(), &expected_type_path);
+
+        let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignKey<Foo>);
+        let typ = syn::Type::Path(type_path);
+        let rv = get_foreign_type_argument(&typ, &OPTION_TYNAMES);
+
+        assert!(rv.is_none());
+    }
+
+    #[test]
+    fn test_get_foreign_type_argument_fky() {
+        let expected_type_path: syn::Path = syn::parse_quote!(Foo);
+
+        let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignKey<Foo>);
+        let typ = syn::Type::Path(type_path);
+        let rv = get_foreign_type_argument(&typ, &FKEY_TYNAMES);
+        assert!(rv.is_some());
+        assert_eq!(rv.unwrap(), &expected_type_path);
+
+        let type_path: syn::TypePath = syn::parse_quote!(Foo);
+        let typ = syn::Type::Path(type_path);
+        let rv = get_foreign_type_argument(&typ, &FKEY_TYNAMES);
+        assert!(rv.is_none());
+    }
+
+    #[test]
+    fn test_get_foreign_type_argument_many() {
+        let expected_type_path: syn::Path = syn::parse_quote!(Foo);
+
+        let type_path: syn::TypePath = syn::parse_quote!(butane::Many<Foo>);
+        let typ = syn::Type::Path(type_path);
+        let rv = get_foreign_type_argument(&typ, &MANY_TYNAMES);
+        assert!(rv.is_some());
+        assert_eq!(rv.unwrap(), &expected_type_path);
+
+        let type_path: syn::TypePath = syn::parse_quote!(Foo);
+        let typ = syn::Type::Path(type_path);
+        let rv = get_foreign_type_argument(&typ, &MANY_TYNAMES);
+        assert!(rv.is_none());
     }
 }

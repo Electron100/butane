@@ -88,8 +88,8 @@ impl BackendConnection for Connection {
 connection_method_wrapper!(Connection);
 
 /// Connection specification. Contains the name of a database backend
-/// and the backend-specific connection string. See [connect][crate::db::connect]
-/// to make a [Connection][crate::db::Connection] from a `ConnectionSpec`.
+/// and the backend-specific connection string. See [`connect`]
+/// to make a [`Connection`] from a `ConnectionSpec`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectionSpec {
     pub backend_name: String,
@@ -130,7 +130,7 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
     }
 }
 
-/// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
+/// Database backend. A boxed implementation can be returned by name via [`get_backend`].
 pub trait Backend {
     fn name(&self) -> &'static str;
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
@@ -161,7 +161,7 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
 }
 
 /// Connect to a database. For non-boxed connections, see individual
-/// [Backend][crate::db::Backend] implementations.
+/// [`Backend`] implementations.
 pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?

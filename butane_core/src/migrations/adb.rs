@@ -248,7 +248,7 @@ impl ADB {
 }
 
 /// Abstract representation of a database table schema.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ATable {
     pub name: String,
     pub columns: Vec<AColumn>,
@@ -388,7 +388,7 @@ impl AColumn {
 }
 
 /// Individual operation use to apply a migration.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum Operation {
     //future improvement: support column renames
     AddTable(ATable),
@@ -404,17 +404,28 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
     let new_names: HashSet<&String> = new.tables.keys().collect();
     let old_names: HashSet<&String> = old.tables.keys().collect();
-    let new_tables = new_names.difference(&old_names);
+
+    // Add new tables
+    let mut new_tables: Vec<&String> = new_names.difference(&old_names).copied().collect();
+    new_tables.sort();
     for added in new_tables {
         let added: &str = added.as_ref();
         ops.push(Operation::AddTable(
             new.tables.get(added).expect("no table").clone(),
         ));
     }
-    for removed in old_names.difference(&new_names) {
+
+    // Remove tables
+    let mut removed_tables: Vec<&String> = old_names.difference(&new_names).copied().collect();
+    removed_tables.sort();
+    for removed in removed_tables {
         ops.push(Operation::RemoveTable((*removed).to_string()));
     }
-    for table in new_names.intersection(&old_names) {
+
+    // Change existing tables
+    let mut existing_tables: Vec<&String> = new_names.intersection(&old_names).copied().collect();
+    existing_tables.sort();
+    for table in existing_tables {
         let table: &str = table.as_ref();
         ops.append(&mut diff_table(
             old.tables.get(table).expect("no table"),
@@ -432,7 +443,10 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
     let new_names: HashSet<&String> = new.columns.iter().map(|c| &c.name).collect();
     let old_names: HashSet<&String> = old.columns.iter().map(|c| &c.name).collect();
-    let added_names = new_names.difference(&old_names);
+
+    // Add columns
+    let mut added_names: Vec<&String> = new_names.difference(&old_names).copied().collect();
+    added_names.sort();
     for added in added_names {
         let added: &str = added.as_ref();
         ops.push(Operation::AddColumn(
@@ -440,13 +454,21 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
             col_by_name(&new.columns, added).unwrap().clone(),
         ));
     }
-    for removed in old_names.difference(&new_names) {
+
+    // Remove columns
+    let mut removed_names: Vec<&String> = old_names.difference(&new_names).copied().collect();
+    removed_names.sort();
+    for removed in removed_names {
         ops.push(Operation::RemoveColumn(
             old.name.clone(),
             (*removed).to_string(),
         ));
     }
-    for colname in new_names.intersection(&old_names) {
+
+    // Change columns
+    let mut existing_names: Vec<&String> = new_names.intersection(&old_names).copied().collect();
+    existing_names.sort();
+    for colname in existing_names {
         let colname: &str = colname.as_ref();
         let col = col_by_name(&new.columns, colname).unwrap();
         let old_col = col_by_name(&old.columns, colname).unwrap();
@@ -460,4 +482,25 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
         ));
     }
     ops
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    #[test]
+    /// Demostration that .difference() results are not stable.
+    fn show_unstable_migration_operation_order() {
+        let old = ["a", "b"];
+        let new = ["d", "b", "c"];
+        let new_names: HashSet<&str> = new.iter().copied().collect();
+        let old_names: HashSet<&str> = old.iter().copied().collect();
+        let added_tables = new_names.difference(&old_names);
+        let mut added_tables: Vec<&str> = added_tables.copied().collect();
+
+        // Remove this line, and running this multiple times will result in a mix of passes and failures.
+        added_tables.sort();
+
+        assert_eq!(added_tables, vec!["c", "d"]);
+    }
 }

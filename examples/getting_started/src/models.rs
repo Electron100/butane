@@ -1,15 +1,15 @@
 //! Models for the getting_started example.
 
 use butane::prelude::*;
-use butane::{model, ForeignKey, Many, ObjectState};
+use butane::AutoPk;
+use butane::{model, ForeignKey, Many};
 
 /// Blog metadata.
 #[model]
 #[derive(Debug, Default)]
 pub struct Blog {
     /// Id of the blog.
-    #[auto]
-    pub id: i64,
+    pub id: AutoPk<i64>,
     /// Name of the blog.
     pub name: String,
 }
@@ -28,8 +28,7 @@ impl Blog {
 #[model]
 pub struct Post {
     /// Id of the blog post.
-    #[auto]
-    pub id: i32,
+    pub id: AutoPk<i32>,
     /// Title of the blog post.
     pub title: String,
     /// Body of the blog post.
@@ -44,14 +43,12 @@ pub struct Post {
     pub byline: Option<String>,
     /// How many likes this post has.
     pub likes: i32,
-    /// Explicit internal butane state field.
-    state: butane::ObjectState,
 }
 impl Post {
     /// Create a new Post.
     pub fn new(blog: &Blog, title: String, body: String) -> Self {
         Post {
-            id: -1,
+            id: AutoPk::uninitialized(),
             title,
             body,
             published: false,
@@ -59,7 +56,6 @@ impl Post {
             blog: blog.into(),
             byline: None,
             likes: 0,
-            state: ObjectState::default(),
         }
     }
 }
@@ -75,9 +71,6 @@ pub struct Tag {
 impl Tag {
     /// Create a new Tag.
     pub fn new(tag: impl Into<String>) -> Self {
-        Tag {
-            tag: tag.into(),
-            ..Default::default()
-        }
+        Tag { tag: tag.into() }
     }
 }

@@ -1,9 +1,8 @@
 #![allow(clippy::disallowed_names)]
 
 use butane::db::Connection;
-use butane::{butane_type, find, model, query};
+use butane::{butane_type, find, model, query, AutoPk, ForeignKey};
 use butane::{colname, prelude::*};
-use butane::{ForeignKey, ObjectState};
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 use serde::Serialize;
@@ -32,7 +31,6 @@ impl Foo {
             bar: 0,
             baz: String::new(),
             blobbity: Vec::new(),
-            state: ObjectState::default(),
         }
     }
 }
@@ -49,23 +47,20 @@ impl Bar {
         Bar {
             name: name.to_string(),
             foo: foo.into(),
-            state: ObjectState::default(),
         }
     }
 }
 
 #[model]
 struct Baz {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     text: String,
 }
 impl Baz {
     fn new(text: &str) -> Self {
         Baz {
-            id: -1, // will be set automatically when saved
+            id: AutoPk::default(),
             text: text.to_string(),
-            state: ObjectState::default(),
         }
     }
 }
@@ -76,10 +71,7 @@ struct HasOnlyPk {
 }
 impl HasOnlyPk {
     fn new(id: i64) -> Self {
-        HasOnlyPk {
-            id,
-            state: ObjectState::default(),
-        }
+        HasOnlyPk { id }
     }
 }
 
@@ -94,7 +86,6 @@ impl SelfReferential {
         SelfReferential {
             id,
             reference: None,
-            state: ObjectState::default(),
         }
     }
 }
@@ -349,7 +340,6 @@ fn basic_time(conn: Connection) {
         naive: now.naive_utc(),
         utc: now,
         when: now,
-        state: ObjectState::default(),
     };
     time.save(&conn).unwrap();
 

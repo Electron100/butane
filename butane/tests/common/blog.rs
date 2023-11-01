@@ -1,6 +1,6 @@
 use butane::prelude::*;
 use butane::{dataresult, model};
-use butane::{db::Connection, ForeignKey, Many, ObjectState};
+use butane::{db::Connection, ForeignKey, Many};
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc};
 
@@ -19,7 +19,6 @@ impl Blog {
         Blog {
             id,
             name: name.to_string(),
-            state: ObjectState::default(),
         }
     }
 }
@@ -65,7 +64,6 @@ impl Post {
             likes: 0,
             tags: Many::new(),
             blog: ForeignKey::from(blog),
-            state: ObjectState::default(),
         }
     }
 }
@@ -98,7 +96,6 @@ impl Tag {
     pub fn new(tag: &str) -> Self {
         Tag {
             tag: tag.to_string(),
-            state: ObjectState::default(),
         }
     }
 }

@@ -1,6 +1,6 @@
 use butane::db::Connection;
 use butane::prelude::*;
-use butane::{model, query::OrderDirection, Many, ObjectState};
+use butane::{model, query::OrderDirection, AutoPk, Many};
 
 use butane_test_helper::testall;
 
@@ -12,18 +12,16 @@ use common::blog::{create_tag, Blog, Post, Tag};
 
 #[model]
 struct AutoPkWithMany {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     tags: Many<Tag>,
     items: Many<AutoItem>,
 }
 impl AutoPkWithMany {
     fn new() -> Self {
         AutoPkWithMany {
-            id: -1,
+            id: AutoPk::uninitialized(),
             tags: Many::default(),
             items: Many::default(),
-            state: ObjectState::default(),
         }
     }
 }
@@ -31,26 +29,23 @@ impl AutoPkWithMany {
 #[model]
 #[table = "renamed_many_table"]
 struct RenamedAutoPkWithMany {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     tags: Many<Tag>,
     items: Many<AutoItem>,
 }
 impl RenamedAutoPkWithMany {
     fn new() -> Self {
         RenamedAutoPkWithMany {
-            id: -1,
+            id: AutoPk::uninitialized(),
             tags: Many::default(),
             items: Many::default(),
-            state: ObjectState::default(),
         }
     }
 }
 
 #[model]
 struct AutoItem {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     val: String,
 }
 
@@ -192,9 +187,8 @@ testall!(can_add_to_many_before_save);
 
 fn cant_add_unsaved_to_many(_conn: Connection) {
     let unsaved_item = AutoItem {
-        id: -1,
+        id: AutoPk::uninitialized(),
         val: "shiny".to_string(),
-        state: ObjectState::default(),
     };
     let mut obj = AutoPkWithMany::new();
     obj.items

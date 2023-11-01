@@ -12,11 +12,7 @@ struct WithNullable {
 }
 impl WithNullable {
     fn new(id: i64) -> Self {
-        WithNullable {
-            id,
-            foo: None,
-            state: butane::ObjectState::default(),
-        }
+        WithNullable { id, foo: None }
     }
 }
 

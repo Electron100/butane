@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use butane::model;
 use butane::prelude::*;
-use butane::{db::Connection, FieldType, ObjectState};
+use butane::{db::Connection, FieldType};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -23,7 +23,6 @@ impl FooJJ {
             id,
             val: Value::default(),
             bar: 0,
-            state: ObjectState::default(),
         }
     }
 }
@@ -88,7 +87,6 @@ impl FooHH {
             id,
             val: HashMap::<String, String>::default(),
             bar: 0,
-            state: ObjectState::default(),
         }
     }
 }
@@ -133,7 +131,6 @@ impl FooHHO {
             id,
             val: HashMap::<String, HashedObject>::default(),
             bar: 0,
-            state: ObjectState::default(),
         }
     }
 }
@@ -179,11 +176,7 @@ struct OuterFoo {
 }
 impl OuterFoo {
     fn new(id: i64, bar: InlineFoo) -> Self {
-        OuterFoo {
-            id,
-            bar,
-            state: ObjectState::default(),
-        }
+        OuterFoo { id, bar }
     }
 }
 

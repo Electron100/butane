@@ -16,6 +16,7 @@ use syn::{
 const OPTION_TYNAMES: [&str; 2] = ["Option", "std::option::Option"];
 const MANY_TYNAMES: [&str; 2] = ["Many", "butane::Many"];
 const FKEY_TYNAMES: [&str; 2] = ["ForeignKey", "butane::ForeignKey"];
+const AUTOPK_TYNAMES: [&str; 2] = ["AutoPk", "butane::AutoPk"];
 
 #[macro_export]
 macro_rules! make_compile_error {
@@ -49,12 +50,6 @@ where
     // Filter out our helper attributes
     let attrs: Vec<Attribute> = filter_helper_attributes(&ast_struct);
 
-    let state_attrs = if has_derive_serialize(&attrs) {
-        quote!(#[serde(skip)])
-    } else {
-        TokenStream2::new()
-    };
-
     let vis = &ast_struct.vis;
 
     migration::write_table_to_disk(ms, &ast_struct, &config).unwrap();
@@ -68,16 +63,11 @@ where
             Err(err) => return err,
         };
 
-    // If the program already declared a state field, remove it
-    let fields = remove_existing_state_field(fields);
-
     let ident = ast_struct.ident;
 
     quote!(
         #(#attrs)*
         #vis struct #ident {
-            #state_attrs
-            pub state: butane::ObjectState,
             #fields
         }
         #impltraits
@@ -95,12 +85,6 @@ pub fn dataresult(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     // Filter out our helper attributes
     let attrs: Vec<Attribute> = filter_helper_attributes(&ast_struct);
 
-    let state_attrs = if has_derive_serialize(&attrs) {
-        quote!(#[serde(skip)])
-    } else {
-        TokenStream2::new()
-    };
-
     let vis = &ast_struct.vis;
 
     let impltraits = dbobj::impl_dataresult(&ast_struct, &dbo, &config);
@@ -115,7 +99,6 @@ pub fn dataresult(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     quote!(
         #(#attrs)*
         #vis struct #ident {
-            #state_attrs
             #fields
         }
         #impltraits
@@ -266,28 +249,6 @@ fn remove_helper_field_attributes(
     }
 }
 
-// We allow model structs to declare the state: butane::ObjectState
-// field for convenience so it doesn't appear so magical, but then we
-// recreate it.
-fn remove_existing_state_field(
-    fields: Punctuated<Field, syn::token::Comma>,
-) -> Punctuated<Field, syn::token::Comma> {
-    fields
-        .into_iter()
-        .filter(|f| match (&f.ident, &f.ty) {
-            (Some(ident), syn::Type::Path(typ)) => {
-                ident != "state"
-                    || typ
-                        .path
-                        .segments
-                        .last()
-                        .map_or(true, |seg| seg.ident != "ObjectState")
-            }
-            (_, _) => true,
-        })
-        .collect()
-}
-
 fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
     let pk_by_attribute =
         fields(ast_struct).find(|f| f.attrs.iter().any(|attr| attr.path().is_ident("pk")));
@@ -302,7 +263,7 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
 }
 
 fn is_auto(field: &Field) -> bool {
-    field.attrs.iter().any(|attr| attr.path().is_ident("auto"))
+    get_type_argument(&field.ty, &AUTOPK_TYNAMES).is_some()
 }
 
 fn is_unique(field: &Field) -> bool {
@@ -313,14 +274,11 @@ fn is_unique(field: &Field) -> bool {
 }
 
 fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
-    ast_struct
-        .fields
-        .iter()
-        .filter(|f| f.ident.clone().unwrap() != "state")
+    ast_struct.fields.iter()
 }
 
 fn get_option_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    get_foreign_type_argument(ty, &OPTION_TYNAMES).map(|path| {
+    get_type_argument(ty, &OPTION_TYNAMES).map(|path| {
         let inner_ty: syn::Type = syn::TypePath {
             qself: None,
             path: path.clone(),
@@ -335,12 +293,24 @@ fn get_many_sql_type(field: &Field) -> Option<DeferredSqlType> {
     get_foreign_sql_type(&field.ty, &MANY_TYNAMES)
 }
 
+fn get_autopk_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
+    get_type_argument(ty, &AUTOPK_TYNAMES).map(|path| {
+        let inner_ty: syn::Type = syn::TypePath {
+            qself: None,
+            path: path.clone(),
+        }
+        .into();
+
+        get_deferred_sql_type(&inner_ty)
+    })
+}
+
 fn is_many_to_many(field: &Field) -> bool {
     get_many_sql_type(field).is_some()
 }
 
 fn is_option(field: &Field) -> bool {
-    get_foreign_type_argument(&field.ty, &OPTION_TYNAMES).is_some()
+    get_type_argument(&field.ty, &OPTION_TYNAMES).is_some()
 }
 
 /// Check for special fields which won't correspond to rows and don't
@@ -362,10 +332,9 @@ fn is_same_path_ident(path1: &syn::Path, path2: &syn::Path) -> bool {
         .all(|(a, b)| a.ident == b.ident)
 }
 
-fn get_foreign_type_argument<'a>(
-    ty: &'a syn::Type,
-    tynames: &[&'static str],
-) -> Option<&'a syn::Path> {
+/// Gets the type argument of a type.
+/// E.g. for Foo<T>, returns T
+fn get_type_argument<'a>(ty: &'a syn::Type, tynames: &[&'static str]) -> Option<&'a syn::Path> {
     let path = match ty {
         syn::Type::Path(path) => &path.path,
         _ => return None,
@@ -395,7 +364,7 @@ fn get_foreign_type_argument<'a>(
 }
 
 fn get_foreign_sql_type(ty: &syn::Type, tynames: &[&'static str]) -> Option<DeferredSqlType> {
-    let typath = get_foreign_type_argument(ty, tynames);
+    let typath = get_type_argument(ty, tynames);
     typath.map(|typath| {
         DeferredSqlType::Deferred(TypeKey::PK(
             typath
@@ -415,6 +384,7 @@ pub fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
     get_primitive_sql_type(ty)
         .or_else(|| get_option_sql_type(ty))
         .or_else(|| get_foreign_sql_type(ty, &FKEY_TYNAMES))
+        .or_else(|| get_autopk_sql_type(ty))
         .unwrap_or_else(|| {
             DeferredSqlType::Deferred(TypeKey::CustomType(
                 ty.clone().into_token_stream().to_string(),
@@ -545,25 +515,6 @@ fn template_type(arguments: &syn::PathArguments) -> Option<&Ident> {
     None
 }
 
-fn has_derive_serialize(attrs: &[Attribute]) -> bool {
-    for attr in attrs {
-        if attr.path().is_ident("derive") {
-            let mut result = false;
-            attr.parse_nested_meta(|meta| {
-                result |= meta
-                    .path
-                    .segments
-                    .iter()
-                    .any(|segment| segment.ident == "Serialize");
-                Ok(())
-            })
-            .unwrap();
-            return result;
-        }
-    }
-    false
-}
-
 fn sqlval_from_lit(lit: Lit) -> std::result::Result<SqlVal, CompilerErrorMsg> {
     match lit {
         Lit::Str(lit) => Ok(SqlVal::Text(lit.value())),
@@ -649,51 +600,51 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_foreign_type_argument_option() {
+    fn test_get_type_argument_option() {
         let expected_type_path: syn::Path = syn::parse_quote!(butane::ForeignKey<Foo>);
 
         let type_path: syn::TypePath = syn::parse_quote!(Option<butane::ForeignKey<Foo>>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &OPTION_TYNAMES);
+        let rv = get_type_argument(&typ, &OPTION_TYNAMES);
         assert!(rv.is_some());
         assert_eq!(rv.unwrap(), &expected_type_path);
 
         let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignKey<Foo>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &OPTION_TYNAMES);
+        let rv = get_type_argument(&typ, &OPTION_TYNAMES);
 
         assert!(rv.is_none());
     }
 
     #[test]
-    fn test_get_foreign_type_argument_fky() {
+    fn test_get_type_argument_fky() {
         let expected_type_path: syn::Path = syn::parse_quote!(Foo);
 
         let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignKey<Foo>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &FKEY_TYNAMES);
+        let rv = get_type_argument(&typ, &FKEY_TYNAMES);
         assert!(rv.is_some());
         assert_eq!(rv.unwrap(), &expected_type_path);
 
         let type_path: syn::TypePath = syn::parse_quote!(Foo);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &FKEY_TYNAMES);
+        let rv = get_type_argument(&typ, &FKEY_TYNAMES);
         assert!(rv.is_none());
     }
 
     #[test]
-    fn test_get_foreign_type_argument_many() {
+    fn test_get_type_argument_many() {
         let expected_type_path: syn::Path = syn::parse_quote!(Foo);
 
         let type_path: syn::TypePath = syn::parse_quote!(butane::Many<Foo>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &MANY_TYNAMES);
+        let rv = get_type_argument(&typ, &MANY_TYNAMES);
         assert!(rv.is_some());
         assert_eq!(rv.unwrap(), &expected_type_path);
 
         let type_path: syn::TypePath = syn::parse_quote!(Foo);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &MANY_TYNAMES);
+        let rv = get_type_argument(&typ, &MANY_TYNAMES);
         assert!(rv.is_none());
     }
 }

@@ -66,7 +66,7 @@ impl<T: DataObject> ForeignKey<T> {
         self.val
             .get_or_try_init(|| {
                 let pk = self.valpk.get().unwrap();
-                T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
+                T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
             })
             .map(|v| v.as_ref())
     }

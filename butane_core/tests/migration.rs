@@ -133,7 +133,7 @@ fn stable_add_column_alpha_order() {
         ops,
         vec![
             Operation::AddColumn("a".to_owned(), column_a),
-            Operation::AddColumn("a".to_owned(), column_b)
+            Operation::AddColumn("a".to_owned(), column_b),
         ]
     );
 }

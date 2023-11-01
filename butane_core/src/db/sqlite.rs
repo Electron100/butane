@@ -6,7 +6,7 @@ use super::helper;
 use super::*;
 use crate::db::connmethods::BackendRows;
 use crate::debug;
-use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
+use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
 use crate::query;
 use crate::query::Order;
 use crate::{Result, SqlType, SqlVal, SqlValRef};
@@ -493,6 +493,7 @@ fn sql_valref_from_rusqlite<'a>(
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
         Operation::AddTable(table) => Ok(create_table(table, false)),
+        Operation::AddTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
@@ -509,7 +510,24 @@ fn create_table(table: &ATable, allow_exists: bool) -> String {
         .collect::<Vec<String>>()
         .join(",\n");
     let modifier = if allow_exists { "IF NOT EXISTS " } else { "" };
-    format!("CREATE TABLE {}{} (\n{}\n);", modifier, table.name, coldefs)
+    let mut constraints = create_table_constraints(table);
+    if !constraints.is_empty() {
+        constraints = ",\n".to_owned() + &constraints;
+    }
+    format!(
+        "CREATE TABLE {}{} (\n{}{}\n);",
+        modifier, table.name, coldefs, constraints
+    )
+}
+
+fn create_table_constraints(table: &ATable) -> String {
+    table
+        .columns
+        .iter()
+        .filter(|column| column.reference().is_some())
+        .map(define_constraint)
+        .collect::<Vec<String>>()
+        .join("\n")
 }
 
 fn define_column(col: &AColumn) -> String {
@@ -534,6 +552,24 @@ fn define_column(col: &AColumn) -> String {
         col_sqltype(col),
         constraints.join(" ")
     )
+}
+
+fn define_constraint(column: &AColumn) -> String {
+    let reference = column
+        .reference()
+        .as_ref()
+        .expect("must have a references value");
+    match reference {
+        ARef::Literal(literal) => {
+            format!(
+                "FOREIGN KEY ({}) REFERENCES {}({})",
+                helper::quote_reserved_word(column.name()),
+                helper::quote_reserved_word(literal.table_name()),
+                helper::quote_reserved_word(literal.column_name()),
+            )
+        }
+        _ => panic!(),
+    }
 }
 
 fn col_sqltype(col: &AColumn) -> Cow<str> {

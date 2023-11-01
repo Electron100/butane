@@ -289,6 +289,19 @@ fn get_option_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
     })
 }
 
+fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
+    if let Some(inner_type_path) = get_type_argument(&field.ty, &OPTION_TYNAMES) {
+        let inner_ty: syn::Type = syn::TypePath {
+            qself: None,
+            path: inner_type_path.clone(),
+        }
+        .into();
+
+        return get_foreign_sql_type(&inner_ty, &FKEY_TYNAMES);
+    }
+    get_foreign_sql_type(&field.ty, &FKEY_TYNAMES)
+}
+
 fn get_many_sql_type(field: &Field) -> Option<DeferredSqlType> {
     get_foreign_sql_type(&field.ty, &MANY_TYNAMES)
 }
@@ -307,6 +320,10 @@ fn get_autopk_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
 
 fn is_many_to_many(field: &Field) -> bool {
     get_many_sql_type(field).is_some()
+}
+
+fn is_foreign_key(field: &Field) -> bool {
+    get_foreign_key_sql_type(field).is_some()
 }
 
 fn is_option(field: &Field) -> bool {
@@ -598,6 +615,7 @@ impl From<TokenStream2> for CompilerErrorMsg {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use syn::parse::Parser;
 
     #[test]
     fn test_get_type_argument_option() {
@@ -646,5 +664,38 @@ mod tests {
         let typ = syn::Type::Path(type_path);
         let rv = get_type_argument(&typ, &MANY_TYNAMES);
         assert!(rv.is_none());
+    }
+
+    #[test]
+    fn test_is_foreign_key() {
+        let tokens = quote::quote! {
+           foos: butane::ForeignKey<Foo>
+        };
+        let field = syn::Field::parse_named.parse2(tokens).unwrap();
+        assert!(is_foreign_key(&field));
+
+        let tokens = quote::quote! {
+           foos: Option<butane::ForeignKey<Foo>>
+        };
+        let field = syn::Field::parse_named.parse2(tokens).unwrap();
+        assert!(is_foreign_key(&field));
+
+        let tokens = quote::quote! {
+            foos: i8
+        };
+        let field = syn::Field::parse_named.parse2(tokens).unwrap();
+        assert!(!is_foreign_key(&field));
+
+        let tokens = quote::quote! {
+            foos: Option<i8>
+        };
+        let field = syn::Field::parse_named.parse2(tokens).unwrap();
+        assert!(!is_foreign_key(&field));
+
+        let tokens = quote::quote! {
+           foos: Option<SomethingElse>
+        };
+        let field = syn::Field::parse_named.parse2(tokens).unwrap();
+        assert!(!is_foreign_key(&field));
     }
 }

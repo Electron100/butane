@@ -1,5 +1,7 @@
+use butane_core::db::{BackendConnection, Connection, ConnectionMethods};
 use butane_core::migrations::adb::*;
 use butane_core::SqlType;
+use butane_test_helper::*;
 
 #[test]
 fn empty_diff() {
@@ -153,19 +155,23 @@ fn add_table_fkey() {
         false, // auto
         false, // unique
         None,  // default
+        None,  // reference
     );
     table_a.add_column(column);
     new.replace_table(table_a.clone());
 
     let mut table_b = ATable::new("b".to_owned());
     let column = AColumn::new(
-        "b".to_owned(),
+        "fkey".to_owned(),
         DeferredSqlType::Deferred(TypeKey::PK("a".to_owned())),
         false, // nullable
         true,  // pk
         false, // auto
         false, // unique
         None,  // default
+        Some(ARef::Deferred(DeferredSqlType::Deferred(TypeKey::PK(
+            "a".to_owned(),
+        )))),
     );
     table_b.add_column(column);
     new.replace_table(table_b.clone());
@@ -174,13 +180,17 @@ fn add_table_fkey() {
 
     let mut resolved_table_b = ATable::new("b".to_owned());
     let column = AColumn::new(
-        "b".to_owned(),
+        "fkey".to_owned(),
         known_int_type.clone(),
         false, // nullable
         true,  // pk
         false, // auto
         false, // unique
         None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            "a".to_owned(),
+            "id".to_owned(),
+        ))),
     );
     resolved_table_b.add_column(column);
 
@@ -191,9 +201,298 @@ fn add_table_fkey() {
         vec![
             Operation::AddTable(table_a),
             Operation::AddTable(resolved_table_b.clone()),
+            Operation::AddTableConstraints(resolved_table_b),
         ]
     );
 }
+
+/// This is the same as test "add_table_fkey", except that it
+/// runs the DDL on a database, and then deletes the column.
+fn add_table_fkey_delete_column(conn: Connection) {
+    let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
+
+    let old = ADB::default();
+    let mut new = ADB::default();
+    let mut table_a = ATable::new("a".to_owned());
+    let id_column = AColumn::new(
+        "id".to_owned(),
+        known_int_type.clone(),
+        false, // nullable
+        true,  // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        None,  // reference
+    );
+    table_a.add_column(id_column.clone());
+    new.replace_table(table_a.clone());
+
+    let mut table_b = ATable::new("b".to_owned());
+    table_b.add_column(id_column.clone());
+    let column = AColumn::new(
+        "fkey".to_owned(),
+        DeferredSqlType::Deferred(TypeKey::PK("a".to_owned())),
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Deferred(DeferredSqlType::Deferred(TypeKey::PK(
+            "a".to_owned(),
+        )))),
+    );
+    table_b.add_column(column);
+    new.replace_table(table_b.clone());
+
+    new.resolve_types().unwrap();
+
+    let mut resolved_table_b = ATable::new("b".to_owned());
+    resolved_table_b.add_column(id_column);
+    let column = AColumn::new(
+        "fkey".to_owned(),
+        known_int_type.clone(),
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            "a".to_owned(),
+            "id".to_owned(),
+        ))),
+    );
+    resolved_table_b.add_column(column);
+
+    let ops = diff(&old, &new);
+
+    assert_eq!(
+        ops,
+        vec![
+            Operation::AddTable(table_a),
+            Operation::AddTable(resolved_table_b.clone()),
+            Operation::AddTableConstraints(resolved_table_b),
+        ]
+    );
+
+    let backend = conn.backend();
+    let sql = backend.create_migration_sql(&new, ops).unwrap();
+
+    conn.execute(&sql).unwrap();
+    conn.execute("SELECT * from a").unwrap();
+    conn.execute("SELECT * from b").unwrap();
+
+    // "ALTER TABLE b DROP COLUMN fkey;" fails due to sqlite not being
+    // able to remove the attached constraint, however the RemoveColumn
+    // operation already recreates the table, so this works.
+    let remove_column_op = Operation::RemoveColumn("b".to_owned(), "fkey".to_owned());
+    let sql = backend
+        .create_migration_sql(&new, vec![remove_column_op])
+        .unwrap();
+    conn.execute(&sql).unwrap();
+}
+testall_no_migrate!(add_table_fkey_delete_column);
+
+/// This is the same as test "add_table_fkey", except that it
+/// intentionally links a column on table a to table b, and
+/// it runs the DDL on a database.
+fn add_table_fkey_back_reference(conn: Connection) {
+    let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
+
+    let old = ADB::default();
+    let mut new = ADB::default();
+    let mut table_b = ATable::new("b".to_owned());
+    let column = AColumn::new(
+        "id".to_owned(),
+        known_int_type.clone(),
+        false, // nullable
+        true,  // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        None,  // reference
+    );
+    table_b.add_column(column);
+    new.replace_table(table_b.clone());
+
+    let mut table_a = ATable::new("a".to_owned());
+    let column = AColumn::new(
+        "fkey".to_owned(),
+        DeferredSqlType::Deferred(TypeKey::PK("b".to_owned())),
+        false, // nullable
+        true,  // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Deferred(DeferredSqlType::Deferred(TypeKey::PK(
+            "b".to_owned(),
+        )))),
+    );
+    table_a.add_column(column);
+    new.replace_table(table_a.clone());
+
+    new.resolve_types().unwrap();
+
+    let mut resolved_table_a = ATable::new("a".to_owned());
+    let column = AColumn::new(
+        "fkey".to_owned(),
+        known_int_type.clone(),
+        false, // nullable
+        true,  // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            "b".to_owned(),
+            "id".to_owned(),
+        ))),
+    );
+    resolved_table_a.add_column(column);
+
+    let ops = diff(&old, &new);
+
+    assert_eq!(
+        ops,
+        vec![
+            Operation::AddTable(resolved_table_a.clone()),
+            Operation::AddTable(table_b),
+            Operation::AddTableConstraints(resolved_table_a),
+        ]
+    );
+
+    let backend = conn.backend();
+    let sql = backend.create_migration_sql(&new, ops).unwrap();
+    let sql_lines: Vec<&str> = sql.lines().collect();
+    if backend.name() == "sqlite" {
+        assert_eq!(
+            sql_lines,
+            vec![
+                "CREATE TABLE a (",
+                "fkey INTEGER NOT NULL PRIMARY KEY,",
+                "FOREIGN KEY (fkey) REFERENCES b(id)",
+                ");",
+                "CREATE TABLE b (",
+                "id INTEGER NOT NULL PRIMARY KEY",
+                ");",
+            ]
+        );
+    }
+
+    conn.execute(&sql).unwrap();
+    conn.execute("SELECT * from a").unwrap();
+    conn.execute("SELECT * from b").unwrap();
+}
+testall_no_migrate!(add_table_fkey_back_reference);
+
+/// This is the same as test "add_table_fkey", except that it
+/// creates a table with multiple fkey constraints.
+fn add_table_fkey_multiple(conn: Connection) {
+    let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
+
+    let old = ADB::default();
+    let mut new = ADB::default();
+
+    let id_column = AColumn::new(
+        "id".to_owned(),
+        known_int_type.clone(),
+        false, // nullable
+        true,  // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        None,  // reference
+    );
+
+    let mut table_a = ATable::new("a".to_owned());
+    table_a.add_column(id_column.clone());
+    new.replace_table(table_a.clone());
+
+    let mut table_b = ATable::new("b".to_owned());
+    table_b.add_column(id_column.clone());
+    new.replace_table(table_b.clone());
+
+    let mut table_c = ATable::new("c".to_owned());
+    table_c.add_column(id_column.clone());
+    let column = AColumn::new(
+        "fkey_a".to_owned(),
+        DeferredSqlType::Deferred(TypeKey::PK("a".to_owned())),
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Deferred(DeferredSqlType::Deferred(TypeKey::PK(
+            "a".to_owned(),
+        )))),
+    );
+    table_c.add_column(column);
+    let column = AColumn::new(
+        "fkey_b".to_owned(),
+        DeferredSqlType::Deferred(TypeKey::PK("b".to_owned())),
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Deferred(DeferredSqlType::Deferred(TypeKey::PK(
+            "b".to_owned(),
+        )))),
+    );
+    table_c.add_column(column);
+    new.replace_table(table_c.clone());
+
+    new.resolve_types().unwrap();
+
+    let mut resolved_table_c = ATable::new("c".to_owned());
+    resolved_table_c.add_column(id_column);
+    let column = AColumn::new(
+        "fkey_a".to_owned(),
+        known_int_type.clone(),
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            "a".to_owned(),
+            "id".to_owned(),
+        ))),
+    );
+    resolved_table_c.add_column(column);
+    let column = AColumn::new(
+        "fkey_b".to_owned(),
+        known_int_type.clone(),
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            "b".to_owned(),
+            "id".to_owned(),
+        ))),
+    );
+    resolved_table_c.add_column(column);
+
+    let ops = diff(&old, &new);
+
+    assert_eq!(
+        ops,
+        vec![
+            Operation::AddTable(table_a),
+            Operation::AddTable(table_b),
+            Operation::AddTable(resolved_table_c.clone()),
+            Operation::AddTableConstraints(resolved_table_c),
+        ]
+    );
+
+    let backend = conn.backend();
+    let sql = backend.create_migration_sql(&new, ops).unwrap();
+
+    conn.execute(&sql).unwrap();
+    conn.execute("SELECT * from a").unwrap();
+    conn.execute("SELECT * from b").unwrap();
+}
+testall_no_migrate!(add_table_fkey_multiple);
 
 /// Creates the test case for adding a foreign key, returning the migration operations,
 /// the target ADB, and the tables which should be expected to be created.
@@ -211,6 +510,7 @@ fn create_add_renamed_table_fkey_ops() -> (Vec<Operation>, ADB, ATable, ATable) 
         false, // auto
         false, // unique
         None,  // default
+        None,  // reference
     );
     table_a.add_column(column);
     new.replace_table(table_a.clone());
@@ -229,6 +529,9 @@ fn create_add_renamed_table_fkey_ops() -> (Vec<Operation>, ADB, ATable, ATable) 
         false, // auto
         false, // unique
         None,  // default
+        Some(ARef::Deferred(DeferredSqlType::Deferred(TypeKey::PK(
+            "a".to_owned(),
+        )))),
     );
     table_b.add_column(column);
     new.replace_table(table_b.clone());
@@ -244,6 +547,10 @@ fn create_add_renamed_table_fkey_ops() -> (Vec<Operation>, ADB, ATable, ATable) 
         false, // auto
         false, // unique
         None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            "a_table".to_owned(),
+            "id".to_owned(),
+        ))),
     );
     resolved_table_b.add_column(column);
 
@@ -261,6 +568,7 @@ fn add_renamed_table_fkey() {
         vec![
             Operation::AddTable(table_a),
             Operation::AddTable(resolved_table_b.clone()),
+            Operation::AddTableConstraints(resolved_table_b),
         ]
     );
 }
@@ -279,7 +587,8 @@ fn add_renamed_table_fkey_ddl_sqlite() {
             "id INTEGER NOT NULL PRIMARY KEY",
             ");",
             "CREATE TABLE b (",
-            "b INTEGER NOT NULL PRIMARY KEY",
+            "b INTEGER NOT NULL PRIMARY KEY,",
+            "FOREIGN KEY (b) REFERENCES a_table(id)",
             ");",
         ]
     );
@@ -301,6 +610,7 @@ fn add_renamed_table_fkey_ddl_pg() {
             "CREATE TABLE b (",
             "b INTEGER NOT NULL PRIMARY KEY",
             ");",
+            "ALTER TABLE b ADD FOREIGN KEY (b) REFERENCES a_table(id);",
         ]
     );
 }
@@ -321,6 +631,7 @@ fn create_add_table_many_ops() -> (Vec<Operation>, ADB, ATable, ATable, ATable) 
         false, // auto
         false, // unique
         None,  // default
+        None,  // reference
     );
 
     let mut table_a = ATable::new("a".to_owned());
@@ -336,6 +647,7 @@ fn create_add_table_many_ops() -> (Vec<Operation>, ADB, ATable, ATable, ATable) 
         "b",
         "many_a",
         DeferredSqlType::Deferred(TypeKey::PK("a".to_owned())),
+        "id",
         known_int_type.clone(),
     );
     new.replace_table(many_table.clone());
@@ -343,8 +655,32 @@ fn create_add_table_many_ops() -> (Vec<Operation>, ADB, ATable, ATable, ATable) 
     new.resolve_types().unwrap();
 
     let mut resolved_many_table = ATable::new(many_table.name);
-    let resolved_owner_column = AColumn::new_simple("owner", known_int_type.clone());
-    let resolved_has_column = AColumn::new_simple("has", known_int_type.clone());
+    let resolved_owner_column = AColumn::new(
+        "owner",
+        known_int_type.clone(),
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            "b".to_owned(),
+            "id".to_owned(),
+        ))),
+    );
+    let resolved_has_column = AColumn::new(
+        "has",
+        known_int_type.clone(),
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            "a".to_owned(),
+            "id".to_owned(),
+        ))),
+    );
     resolved_many_table.add_column(resolved_owner_column);
     resolved_many_table.add_column(resolved_has_column);
 
@@ -356,12 +692,17 @@ fn create_add_table_many_ops() -> (Vec<Operation>, ADB, ATable, ATable, ATable) 
 fn add_table_many() {
     let (ops, _, table_a, table_b, resolved_many_table) = create_add_table_many_ops();
 
+    assert_eq!(ops[0], Operation::AddTable(table_a.clone()));
+    assert_eq!(ops[1], Operation::AddTable(table_b.clone()));
+    assert_eq!(ops[2], Operation::AddTable(resolved_many_table.clone()));
+
     assert_eq!(
         ops,
         vec![
             Operation::AddTable(table_a),
             Operation::AddTable(table_b.clone()),
             Operation::AddTable(resolved_many_table.clone()),
+            Operation::AddTableConstraints(resolved_many_table.clone()),
         ]
     );
 }
@@ -384,7 +725,9 @@ fn add_table_many_ddl_sqlite() {
             ");",
             "CREATE TABLE b_many_a_Many (",
             "owner INTEGER NOT NULL,",
-            "has INTEGER NOT NULL",
+            "has INTEGER NOT NULL,",
+            "FOREIGN KEY (owner) REFERENCES b(id)",
+            "FOREIGN KEY (has) REFERENCES a(id)",
             ");",
         ]
     );
@@ -410,6 +753,8 @@ fn add_table_many_ddl_pg() {
             "owner INTEGER NOT NULL,",
             "has INTEGER NOT NULL",
             ");",
+            "ALTER TABLE b_many_a_Many ADD FOREIGN KEY (owner) REFERENCES b(id);",
+            "ALTER TABLE b_many_a_Many ADD FOREIGN KEY (has) REFERENCES a(id);",
         ]
     );
 }

@@ -199,7 +199,8 @@ fn migrations_table() -> ATable {
         true,  // pk
         false, // auto
         false, // unique
-        None,
+        None,  // default
+        None,  // references
     );
     table.add_column(col);
     table

@@ -27,6 +27,10 @@ impl<T: PrimaryKeyType> AutoPk<T> {
     fn with_value(val: T) -> Self {
         AutoPk { inner: Some(val) }
     }
+
+    fn expect_inner(&self) -> &T {
+        self.inner.as_ref().expect("PK is not generated yet!")
+    }
 }
 
 impl<T: PrimaryKeyType> FromSql for AutoPk<T> {
@@ -53,16 +57,10 @@ impl<T: PrimaryKeyType> FromSql for AutoPk<T> {
 
 impl<T: PrimaryKeyType> ToSql for AutoPk<T> {
     fn to_sql(&self) -> SqlVal {
-        self.inner
-            .as_ref()
-            .expect("PK is not generated yet!")
-            .to_sql()
+        self.expect_inner().to_sql()
     }
     fn to_sql_ref(&self) -> SqlValRef<'_> {
-        self.inner
-            .as_ref()
-            .expect("PK is not generated yet!")
-            .to_sql_ref()
+        self.expect_inner().to_sql_ref()
     }
     fn into_sql(self) -> SqlVal {
         self.inner.expect("PK is not generated yet!").into_sql()
@@ -98,7 +96,7 @@ impl<T: PrimaryKeyType + std::fmt::Display> std::fmt::Display for AutoPk<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match &self.inner {
             Some(val) => val.fmt(f),
-            None => write!(f, "null"),
+            None => write!(f, "UNINITIALIZED"),
         }
     }
 }

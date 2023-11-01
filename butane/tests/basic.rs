@@ -224,10 +224,8 @@ testall!(foreign_key);
 fn auto_pk(conn: Connection) {
     let mut baz1 = Baz::new("baz1");
     baz1.save(&conn).unwrap();
-    eprintln!("{:?}", baz1.id);
     let mut baz2 = Baz::new("baz2");
     baz2.save(&conn).unwrap();
-    eprintln!("{:?}", baz2.id);
     let mut baz3 = Baz::new("baz3");
     baz3.save(&conn).unwrap();
     assert!(baz1.id < baz2.id);

@@ -379,7 +379,7 @@ fn get_foreign_sql_type(ty: &syn::Type, tynames: &[&'static str]) -> Option<Defe
 
 /// Determine whether a type refers to a data type that is supported directly by butane,
 /// or is a custom defined struct.
-/// It looks inside an [Option] or [butane_core::ForeignKey] to determine the inner type.
+/// It looks inside an [Option] or [crate::fkey::ForeignKey] to determine the inner type.
 pub fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
     get_primitive_sql_type(ty)
         .or_else(|| get_option_sql_type(ty))

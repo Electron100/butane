@@ -118,7 +118,6 @@ where
         }
     }
     pub fn contains(&self, q: BoolExpr) -> BoolExpr {
-        //let many_tbl = format!("{}_{}_Many", O::TABLE, self.name);
         BoolExpr::SubqueryJoin {
             col: O::PKCOL,
             tbl2: Cow::Borrowed(T::TABLE),

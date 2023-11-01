@@ -7,6 +7,9 @@ use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Seriali
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
+/// Suffix added to [`crate::many::Many`] tables.
+pub const MANY_SUFFIX: &str = "_Many";
+
 /// Identifier for a type as used in a database column. Supports both
 /// [`SqlType`] and identifiers known only by name.
 /// The latter is used for custom types. `SqlType::Custom` cannot easily be used
@@ -184,7 +187,10 @@ impl ADB {
                     if let Ok(pktype) = pktype {
                         changed |= resolver.insert_pk(&table.name, pktype.clone());
                     }
+                } else if !table.name.ends_with(MANY_SUFFIX) {
+                    unreachable!();
                 }
+
                 for col in &mut table.columns {
                     changed |= col.resolve_type(&resolver);
                 }

@@ -600,51 +600,51 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_foreign_type_argument_option() {
+    fn test_get_type_argument_option() {
         let expected_type_path: syn::Path = syn::parse_quote!(butane::ForeignKey<Foo>);
 
         let type_path: syn::TypePath = syn::parse_quote!(Option<butane::ForeignKey<Foo>>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &OPTION_TYNAMES);
+        let rv = get_type_argument(&typ, &OPTION_TYNAMES);
         assert!(rv.is_some());
         assert_eq!(rv.unwrap(), &expected_type_path);
 
         let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignKey<Foo>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &OPTION_TYNAMES);
+        let rv = get_type_argument(&typ, &OPTION_TYNAMES);
 
         assert!(rv.is_none());
     }
 
     #[test]
-    fn test_get_foreign_type_argument_fky() {
+    fn test_get_type_argument_fky() {
         let expected_type_path: syn::Path = syn::parse_quote!(Foo);
 
         let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignKey<Foo>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &FKEY_TYNAMES);
+        let rv = get_type_argument(&typ, &FKEY_TYNAMES);
         assert!(rv.is_some());
         assert_eq!(rv.unwrap(), &expected_type_path);
 
         let type_path: syn::TypePath = syn::parse_quote!(Foo);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &FKEY_TYNAMES);
+        let rv = get_type_argument(&typ, &FKEY_TYNAMES);
         assert!(rv.is_none());
     }
 
     #[test]
-    fn test_get_foreign_type_argument_many() {
+    fn test_get_type_argument_many() {
         let expected_type_path: syn::Path = syn::parse_quote!(Foo);
 
         let type_path: syn::TypePath = syn::parse_quote!(butane::Many<Foo>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &MANY_TYNAMES);
+        let rv = get_type_argument(&typ, &MANY_TYNAMES);
         assert!(rv.is_some());
         assert_eq!(rv.unwrap(), &expected_type_path);
 
         let type_path: syn::TypePath = syn::parse_quote!(Foo);
         let typ = syn::Type::Path(type_path);
-        let rv = get_foreign_type_argument(&typ, &MANY_TYNAMES);
+        let rv = get_type_argument(&typ, &MANY_TYNAMES);
         assert!(rv.is_none());
     }
 }

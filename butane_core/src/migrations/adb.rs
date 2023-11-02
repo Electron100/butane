@@ -5,7 +5,7 @@
 use crate::{Error, Result, SqlType, SqlVal};
 use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 /// Identifier for a type as used in a database column. Supports both
 /// [`SqlType`] and identifiers known only by name.
@@ -248,7 +248,7 @@ impl ADB {
 }
 
 /// Abstract representation of a database table schema.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ATable {
     pub name: String,
     pub columns: Vec<AColumn>,
@@ -388,7 +388,7 @@ impl AColumn {
 }
 
 /// Individual operation use to apply a migration.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum Operation {
     //future improvement: support column renames
     AddTable(ATable),
@@ -402,8 +402,10 @@ pub enum Operation {
 /// Determine the operations necessary to move the database schema from `old` to `new`.
 pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
-    let new_names: HashSet<&String> = new.tables.keys().collect();
-    let old_names: HashSet<&String> = old.tables.keys().collect();
+    let new_names: BTreeSet<&String> = new.tables.keys().collect();
+    let old_names: BTreeSet<&String> = old.tables.keys().collect();
+
+    // Add new tables
     let new_tables = new_names.difference(&old_names);
     for added in new_tables {
         let added: &str = added.as_ref();
@@ -411,9 +413,13 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
             new.tables.get(added).expect("no table").clone(),
         ));
     }
+
+    // Remove tables
     for removed in old_names.difference(&new_names) {
         ops.push(Operation::RemoveTable((*removed).to_string()));
     }
+
+    // Change existing tables
     for table in new_names.intersection(&old_names) {
         let table: &str = table.as_ref();
         ops.append(&mut diff_table(
@@ -430,8 +436,10 @@ fn col_by_name<'a>(columns: &'a [AColumn], name: &str) -> Option<&'a AColumn> {
 
 fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
-    let new_names: HashSet<&String> = new.columns.iter().map(|c| &c.name).collect();
-    let old_names: HashSet<&String> = old.columns.iter().map(|c| &c.name).collect();
+    let new_names: BTreeSet<&String> = new.columns.iter().map(|c| &c.name).collect();
+    let old_names: BTreeSet<&String> = old.columns.iter().map(|c| &c.name).collect();
+
+    // Add columns
     let added_names = new_names.difference(&old_names);
     for added in added_names {
         let added: &str = added.as_ref();
@@ -440,12 +448,16 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
             col_by_name(&new.columns, added).unwrap().clone(),
         ));
     }
+
+    // Remove columns
     for removed in old_names.difference(&new_names) {
         ops.push(Operation::RemoveColumn(
             old.name.clone(),
             (*removed).to_string(),
         ));
     }
+
+    // Change columns
     for colname in new_names.intersection(&old_names) {
         let colname: &str = colname.as_ref();
         let col = col_by_name(&new.columns, colname).unwrap();

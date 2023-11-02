@@ -1,5 +1,5 @@
 use super::*;
-use crate::migrations::adb::{DeferredSqlType, TypeIdentifier};
+use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
 use crate::SqlType;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
@@ -379,7 +379,7 @@ fn many_table_lit(ast_struct: &ItemStruct, field: &Field, config: &Config) -> Li
         Some(s) => s,
         None => &binding,
     };
-    make_lit(&format!("{}_{}_Many", &tyname, &ident))
+    make_lit(&format!("{}_{}{MANY_SUFFIX}", &tyname, &ident))
 }
 
 fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {

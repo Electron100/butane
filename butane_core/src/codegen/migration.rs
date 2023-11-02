@@ -1,5 +1,5 @@
 use super::*;
-use crate::migrations::adb::{AColumn, ATable};
+use crate::migrations::adb::{AColumn, ATable, MANY_SUFFIX};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::Result;
 use syn::{Field, ItemStruct};
@@ -67,7 +67,7 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .clone()
         .expect("fields must be named")
         .to_string();
-    let mut table = ATable::new(format!("{main_table_name}_{field_name}_Many"));
+    let mut table = ATable::new(format!("{main_table_name}_{field_name}{MANY_SUFFIX}"));
     let col = AColumn::new_simple("owner", get_deferred_sql_type(&pk_field.ty));
     table.add_column(col);
     let col = AColumn::new_simple(

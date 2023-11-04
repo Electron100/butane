@@ -195,6 +195,8 @@ fn add_table_fkey() {
     );
 }
 
+/// Creates the test case for adding a foreign key, returning the migration operations,
+/// the target ADB, and the tables which should be expected to be created.
 fn create_add_renamed_table_fkey_ops() -> (Vec<Operation>, ADB, ATable, ATable) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
@@ -303,6 +305,8 @@ fn add_renamed_table_fkey_ddl_pg() {
     );
 }
 
+/// Creates the test case for adding a many table, returning the migration operations,
+/// the target ADB, and the tables which should be expected to be created.
 fn create_add_table_many_ops() -> (Vec<Operation>, ADB, ATable, ATable, ATable) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 

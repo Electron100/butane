@@ -393,6 +393,22 @@ impl AColumn {
     }
 }
 
+/// Create a table for the [crate::many::Many] relationship.
+/// Should not be used directly, except in tests.
+pub fn create_many_table(
+    main_table_name: &str,
+    many_field_name: &str,
+    many_field_type: DeferredSqlType,
+    main_table_pk_field_type: DeferredSqlType,
+) -> ATable {
+    let mut table = ATable::new(format!("{main_table_name}_{many_field_name}{MANY_SUFFIX}"));
+    let col = AColumn::new_simple("owner", main_table_pk_field_type);
+    table.add_column(col);
+    let col = AColumn::new_simple("has", many_field_type);
+    table.add_column(col);
+    table
+}
+
 /// Individual operation use to apply a migration.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum Operation {

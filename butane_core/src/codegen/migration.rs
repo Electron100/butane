@@ -1,5 +1,5 @@
 use super::*;
-use crate::migrations::adb::{AColumn, ATable, MANY_SUFFIX};
+use crate::migrations::adb::{create_many_table, AColumn, ATable};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::Result;
 use syn::{Field, ItemStruct};
@@ -57,7 +57,7 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
             result.push(many_table(&table.name, f, &pk));
         }
     }
-    result.push(table);
+    result.insert(0, table);
     result
 }
 
@@ -67,16 +67,11 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .clone()
         .expect("fields must be named")
         .to_string();
-    let mut table = ATable::new(format!("{main_table_name}_{field_name}{MANY_SUFFIX}"));
-    let col = AColumn::new_simple("owner", get_deferred_sql_type(&pk_field.ty));
-    table.add_column(col);
-    let col = AColumn::new_simple(
-        "has",
-        get_many_sql_type(many_field)
-            .unwrap_or_else(|| panic!("Mis-identified Many field {field_name}")),
-    );
-    table.add_column(col);
-    table
+    let many_field_type = get_many_sql_type(many_field)
+        .unwrap_or_else(|| panic!("Mis-identified Many field {field_name}"));
+    let pk_field_type = get_deferred_sql_type(&pk_field.ty);
+
+    create_many_table(main_table_name, &field_name, many_field_type, pk_field_type)
 }
 
 fn is_nullable(field: &Field) -> bool {

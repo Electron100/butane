@@ -464,7 +464,7 @@ impl AColumn {
         tables: &HashMap<String, ATable>,
     ) {
         match &self.reference {
-             None | Some(ARef::Literal(_)) => {},
+            None | Some(ARef::Literal(_)) => {}
             Some(ARef::Deferred(DeferredSqlType::Deferred(referred_type_key))) => {
                 let referred_table_name: String;
                 if let Some(DeferredSqlType::Deferred(TypeKey::PK(referred_type))) =

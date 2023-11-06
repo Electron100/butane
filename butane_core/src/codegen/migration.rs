@@ -1,5 +1,8 @@
-use super::*;
-use crate::migrations::adb::{create_many_table, AColumn, ATable};
+use super::{
+    dbobj, fields, get_default, get_deferred_sql_type, get_many_sql_type, is_auto, is_foreign_key,
+    is_many_to_many, is_option, is_row_field, is_unique, pk_field,
+};
+use crate::migrations::adb::{create_many_table, AColumn, ARef, ATable, DeferredSqlType, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::Result;
 use syn::{Field, ItemStruct};
@@ -43,15 +46,20 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
             .expect("db object fields must be named")
             .to_string();
         if is_row_field(f) {
-            let col = AColumn::new(
+            let deferred_type = get_deferred_sql_type(&f.ty);
+            let mut col = AColumn::new(
                 name,
-                get_deferred_sql_type(&f.ty),
+                deferred_type.clone(),
                 is_nullable(f),
                 f == &pk,
                 is_auto(f),
                 is_unique(f),
                 get_default(f).expect("Malformed default attribute"),
+                None,
             );
+            if is_foreign_key(f) {
+                col.add_reference(&ARef::Deferred(deferred_type))
+            }
             table.add_column(col);
         } else if is_many_to_many(f) {
             result.push(many_table(&table.name, f, &pk));
@@ -69,9 +77,20 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .to_string();
     let many_field_type = get_many_sql_type(many_field)
         .unwrap_or_else(|| panic!("Mis-identified Many field {field_name}"));
+    let pk_field_name = pk_field
+        .ident
+        .as_ref()
+        .expect("fields must be named")
+        .to_string();
     let pk_field_type = get_deferred_sql_type(&pk_field.ty);
 
-    create_many_table(main_table_name, &field_name, many_field_type, pk_field_type)
+    create_many_table(
+        main_table_name,
+        &field_name,
+        many_field_type,
+        &pk_field_name,
+        pk_field_type,
+    )
 }
 
 fn is_nullable(field: &Field) -> bool {

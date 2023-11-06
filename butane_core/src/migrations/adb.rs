@@ -179,8 +179,17 @@ impl ADB {
     pub fn resolve_types(&mut self) -> Result<()> {
         let mut resolver = TypeResolver::new();
         let mut changed = true;
+
+        let current_tables = self.tables.clone();
+        for table in &mut self.tables.values_mut() {
+            for col in &mut table.columns {
+                col.resolve_reference_target(&self.extra_types, &current_tables);
+            }
+        }
+
         while changed {
             changed = false;
+
             for table in &mut self.tables.values_mut() {
                 if let Some(pk) = table.pk() {
                     let pktype = pk.typeid();
@@ -224,12 +233,14 @@ impl ADB {
         Ok(())
     }
 
+    /// Add an operation to this ADB.
     pub fn transform_with(&mut self, op: Operation) {
         use Operation::*;
         match op {
             AddTable(table) => {
                 self.tables.insert(table.name.clone(), table);
             }
+            AddTableConstraints(_) => {}
             AddTableIfNotExists(table) => {
                 self.tables.insert(table.name.clone(), table);
             }
@@ -318,19 +329,67 @@ impl From<TypeIdentifier> for DeferredSqlType {
     }
 }
 
+/// Abstract representation of a database column reference constraint.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum ARef {
+    /// A reference to a literal table column.
+    Literal(ARefLiteral),
+    /// A reference that has not been resolved yet.
+    Deferred(DeferredSqlType),
+}
+
+/// Abstract representation of a database column reference constraint to a literal table and column.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ARefLiteral {
+    /// Table name.
+    table_name: String,
+    /// Column name.
+    column_name: String,
+}
+
+impl ARefLiteral {
+    /// Create new literal reference to a table and column.
+    pub fn new(table_name: impl Into<String>, column_name: impl Into<String>) -> Self {
+        ARefLiteral {
+            table_name: table_name.into(),
+            column_name: column_name.into(),
+        }
+    }
+    /// Get table name.
+    pub fn table_name(&self) -> &str {
+        &self.table_name
+    }
+    /// Get column name.
+    pub fn column_name(&self) -> &str {
+        &self.column_name
+    }
+}
+
 /// Abstract representation of a database column schema.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct AColumn {
+    /// Column name.
     name: String,
+    /// Type of the column.
     sqltype: DeferredSqlType,
+    /// Whether the column is nullable.
     nullable: bool,
+    /// Whether the column is a primary key.
     pk: bool,
+    /// Whether the column is an auto-increment field.
     auto: bool,
+    /// Whether the column needs a unique constraint.
     #[serde(default)]
     unique: bool,
+    /// Default value for the column.
     default: Option<SqlVal>,
+    /// Whether this column refers to another column.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reference: Option<ARef>,
 }
 impl AColumn {
+    /// Create new column.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: impl Into<String>,
         sqltype: DeferredSqlType,
@@ -339,6 +398,7 @@ impl AColumn {
         auto: bool,
         unique: bool,
         default: Option<SqlVal>,
+        reference: Option<ARef>,
     ) -> Self {
         AColumn {
             name: name.into(),
@@ -348,11 +408,12 @@ impl AColumn {
             auto,
             unique,
             default,
+            reference,
         }
     }
     /// Simple column that is non-null, non-auto, non-pk, non-unique with no default
     pub fn new_simple(name: impl Into<String>, sqltype: DeferredSqlType) -> Self {
-        Self::new(name, sqltype, false, false, false, false, None)
+        Self::new(name, sqltype, false, false, false, false, None, None)
     }
     pub fn name(&self) -> &str {
         &self.name
@@ -368,6 +429,14 @@ impl AColumn {
     }
     pub fn default(&self) -> &Option<SqlVal> {
         &self.default
+    }
+    /// Returns whether this column refers to another column.
+    pub fn reference(&self) -> &Option<ARef> {
+        &self.reference
+    }
+    /// Set another column that this column refers to.
+    pub fn add_reference(&mut self, reference: &ARef) {
+        self.reference = Some(reference.clone())
     }
     pub fn typeid(&self) -> Result<TypeIdentifier> {
         match &self.sqltype {
@@ -388,6 +457,38 @@ impl AColumn {
             false
         }
     }
+    /// Resolve a column constraints target.
+    fn resolve_reference_target(
+        &mut self,
+        extra_types: &HashMap<TypeKey, DeferredSqlType>,
+        tables: &HashMap<String, ATable>,
+    ) {
+        match &self.reference {
+            None | Some(ARef::Literal(_)) => {}
+            Some(ARef::Deferred(DeferredSqlType::Deferred(referred_type_key))) => {
+                let referred_table_name: String;
+                if let Some(DeferredSqlType::Deferred(TypeKey::PK(referred_type))) =
+                    extra_types.get(referred_type_key)
+                {
+                    referred_table_name = referred_type.to_owned();
+                } else if let TypeKey::PK(referred_type) = referred_type_key {
+                    referred_table_name = referred_type.to_owned();
+                } else {
+                    unreachable!("Unexpected reference {:?}", self.reference);
+                }
+                if let Some(table) = tables.get(&referred_table_name) {
+                    if let Some(pk) = table.pk() {
+                        self.reference = Some(ARef::Literal(ARefLiteral::new(
+                            referred_table_name,
+                            pk.name.clone(),
+                        )));
+                    }
+                }
+            }
+            _ => unreachable!("can only resolve deferred references"),
+        }
+    }
+
     pub fn is_auto(&self) -> bool {
         self.auto
     }
@@ -399,12 +500,28 @@ pub fn create_many_table(
     main_table_name: &str,
     many_field_name: &str,
     many_field_type: DeferredSqlType,
+    main_table_pk_field_name: &str,
     main_table_pk_field_type: DeferredSqlType,
 ) -> ATable {
     let mut table = ATable::new(format!("{main_table_name}_{many_field_name}{MANY_SUFFIX}"));
-    let col = AColumn::new_simple("owner", main_table_pk_field_type);
+    let col = AColumn::new(
+        "owner",
+        main_table_pk_field_type,
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            main_table_name.to_owned(),
+            main_table_pk_field_name,
+        ))),
+    );
     table.add_column(col);
-    let col = AColumn::new_simple("has", many_field_type);
+    let mut col = AColumn::new_simple("has", many_field_type.clone());
+    if matches!(many_field_type, DeferredSqlType::Deferred(TypeKey::PK(_))) {
+        col.add_reference(&ARef::Deferred(many_field_type));
+    }
     table.add_column(col);
     table
 }
@@ -413,11 +530,19 @@ pub fn create_many_table(
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum Operation {
     //future improvement: support column renames
+    /// Add a table.
     AddTable(ATable),
+    /// Add table constraints referring to other tables, if the backend supports it.
+    AddTableConstraints(ATable),
+    /// Add a table, if it doesnt already exist.
     AddTableIfNotExists(ATable),
+    /// Remove named table.
     RemoveTable(String),
+    /// Add a table column.
     AddColumn(String, AColumn),
+    /// Remove a table column.
     RemoveColumn(String, String),
+    /// Change a table columns type.
     ChangeColumn(String, AColumn, AColumn),
 }
 
@@ -429,7 +554,7 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
 
     // Add new tables
     let new_tables = new_names.difference(&old_names);
-    for added in new_tables {
+    for added in new_tables.clone() {
         let added: &str = added.as_ref();
         ops.push(Operation::AddTable(
             new.tables.get(added).expect("no table").clone(),
@@ -448,6 +573,13 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
             old.tables.get(table).expect("no table"),
             new.tables.get(table).expect("no table"),
         ));
+    }
+    for added in new_tables {
+        let added: &str = added.as_ref();
+        let table = new.tables.get(added).expect("no table");
+        if table.columns.iter().any(|x| x.reference.is_some()) {
+            ops.push(Operation::AddTableConstraints(table.clone()));
+        }
     }
     ops
 }

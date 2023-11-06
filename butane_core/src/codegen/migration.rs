@@ -79,7 +79,7 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .unwrap_or_else(|| panic!("Mis-identified Many field {field_name}"));
     let pk_field_name = pk_field
         .ident
-        .clone()
+        .as_ref()
         .expect("fields must be named")
         .to_string();
     let pk_field_type = get_deferred_sql_type(&pk_field.ty);

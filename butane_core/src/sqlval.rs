@@ -547,18 +547,10 @@ impl PrimaryKeyType for NaiveDateTime {}
 #[cfg(feature = "datetime")]
 impl FromSql for DateTime<chrono::offset::Utc> {
     fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
-        use chrono::Utc;
-        Ok(DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_sql_ref(valref)?,
-            Utc,
-        ))
+        Ok(NaiveDateTime::from_sql_ref(valref)?.and_utc())
     }
     fn from_sql(val: SqlVal) -> Result<Self> {
-        use chrono::Utc;
-        Ok(DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_sql(val)?,
-            Utc,
-        ))
+        Ok(NaiveDateTime::from_sql(val)?.and_utc())
     }
 }
 #[cfg(feature = "datetime")]

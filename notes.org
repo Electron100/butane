@@ -37,24 +37,29 @@
 		 let posts_in_blog = query!(Post, &conn, blog = {blog}).load(&conn)
 	 }
 	 #+END_SRC
+
 	 struct Posts
+
+	 #+BEGIN_SRC sql
 	 CREATE TABLE posts (
-  id SERIAL PRIMARY KEY,
-  title VARCHAR NOT NULL,
-  body TEXT NOT NULL,
-  published BOOLEAN NOT NULL DEFAULT 'f'
-)
+		id SERIAL PRIMARY KEY,
+		title VARCHAR NOT NULL,
+		body TEXT NOT NULL,
+		published BOOLEAN NOT NULL DEFAULT 'f'
+	 )
+	 #+END_SRC
+
 * Roadmap
 ** vNext
-	 + foreign key constraints in db, cascade setting
+	 + foreign key constraints in db, cascade setting [[https://github.com/Electron100/butane/issues/21]]
 	 + incremental save
 	 + Many backreferences
-	 + Column renames in migrations
+	 + Column renames in migrations [[https://github.com/Electron100/butane/issues/89]]
 	 + prepared/reusable queries
 	 + Improved custom support, including raw sql where clauses
 	 + More precise spans in macro errors for invalid field names
 	 + Remove timestamp from migration names
-	 + auto FieldType for primitive enums
-	 + small int type
-	 + NaiveDate, maybe non-naive versions
+	 + auto FieldType for primitive enums - [[https://github.com/Electron100/butane/pull/68]] ?
+	 + small int type [[https://github.com/Electron100/butane/issues/86]]
+	 + NaiveDate, maybe non-naive versions [[https://github.com/Electron100/butane/issues/87]]
 

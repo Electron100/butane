@@ -2,6 +2,9 @@
 //! CLI tool, there is no need to use this module. Even if applying
 //! migrations without this tool, you are unlikely to need this module.
 
+#[cfg(feature = "json")]
+use once_cell::sync::Lazy;
+
 use crate::{Error, Result, SqlType, SqlVal};
 use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -9,6 +12,27 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// Suffix added to [`crate::many::Many`] tables.
 pub const MANY_SUFFIX: &str = "_Many";
+
+#[cfg(feature = "json")]
+static JSON_MAP_PREFIXES: Lazy<Vec<String>> = Lazy::new(|| {
+    let map_type_names: [&str; 6] = [
+        "HashMap",
+        "collections::HashMap",
+        "std::collections::HashMap",
+        "BTreeMap",
+        "collections::BTreeMap",
+        "std::collections::BTreeMap",
+    ];
+    let string_tynames: [&str; 3] = ["String", "string::String", "std::string::String"];
+
+    let mut prefixes = Vec::new();
+    for map_type_name in map_type_names {
+        for string_type_name in string_tynames {
+            prefixes.push(format!("{map_type_name}<{string_type_name},"));
+        }
+    }
+    prefixes
+});
 
 /// Identifier for a type as used in a database column. Supports both
 /// [`SqlType`] and identifiers known only by name.
@@ -120,10 +144,13 @@ impl TypeResolver {
     fn find_type(&self, key: &TypeKey) -> Option<TypeIdentifier> {
         #[cfg(feature = "json")]
         if let TypeKey::CustomType(ct) = key {
-            if ct.starts_with("HashMap < String,") {
-                return Some(TypeIdentifier::from(SqlType::Json));
+            for prefix in JSON_MAP_PREFIXES.iter() {
+                if ct.starts_with(prefix) {
+                    return Some(TypeIdentifier::from(SqlType::Json));
+                }
             }
         }
+
         self.types.get(key).cloned()
     }
     fn insert(&mut self, key: TypeKey, ty: TypeIdentifier) -> bool {

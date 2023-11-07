@@ -13,7 +13,7 @@ use syn::{
     MetaNameValue,
 };
 
-const OPTION_TYNAMES: [&str; 2] = ["Option", "std::option::Option"];
+const OPTION_TYNAMES: [&str; 3] = ["Option", "option::Option", "std::option::Option"];
 const MANY_TYNAMES: [&str; 2] = ["Many", "butane::Many"];
 const FKEY_TYNAMES: [&str; 2] = ["ForeignKey", "butane::ForeignKey"];
 const AUTOPK_TYNAMES: [&str; 2] = ["AutoPk", "butane::AutoPk"];
@@ -404,7 +404,7 @@ pub fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
         .or_else(|| get_autopk_sql_type(ty))
         .unwrap_or_else(|| {
             DeferredSqlType::Deferred(TypeKey::CustomType(
-                ty.clone().into_token_stream().to_string(),
+                ty.clone().into_token_stream().to_string().replace(' ', ""),
             ))
         })
 }

@@ -20,7 +20,7 @@ butane_core = { version = "0.6", path = "butane_core" }
 butane_codegen = { version = "0.6", path = "butane_codegen" }
 butane_test_helper = { path = "butane_test_helper" }
 cfg-if = "^1.0"
-chrono = { version = "0.4", default-features = false, features = [
+chrono = { version = "0.4.25", default-features = false, features = [
   "serde",
   "std",
 ] }

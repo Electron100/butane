@@ -193,16 +193,20 @@ pub fn embed(base_dir: &Path) -> Result<()> {
         copy_migration(&m, &mut new_m)?;
         mem_ms.add_migration(new_m)?;
     }
-    let json = serde_json::to_string(&mem_ms)?;
+    let json = serde_json::to_string_pretty(&mem_ms)?;
 
     let src = format!(
-        "
-use butane::migrations::MemMigrations;
+        "//! Butane migrations embedded in Rust.
 use std::result::Result;
+
+use butane::migrations::MemMigrations;
+
+/// Load the butane migrations embedded in Rust.
 pub fn get_migrations() -> Result<MemMigrations, butane::Error> {{
     let json = r#\"{json}\"#;
     MemMigrations::from_json(json)
-}}"
+}}
+"
     );
 
     let mut f = std::fs::File::create(path)?;

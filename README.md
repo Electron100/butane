@@ -95,7 +95,7 @@ enabled: you will want to enable either `sqlite` or `pg`:
 
 Butane is young. The following features are currently missing, but planned
 
-* Foreign key constraints
+* Foreign key constraint cascade setting
 * Incremental object save
 * Back-references for `ForeignKey` and `Many`.
 * Field/column rename support in migrations

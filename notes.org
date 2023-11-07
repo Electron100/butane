@@ -1,52 +1,6 @@
-* Desired Syntax
-** Blog Example
-	 #+BEGIN_SRC rust
-	 #[model]
-	 struct Blog {
-	   id: i64,
-		 name: String
-	 }
-	 
-	 #[model]
-	 struct Post {
-	   id: i64,
-		 title: String,
-		 body: String,
-		 published: bool,
-		 likes: i32,
-		 tags: ManyToMany<Tag>,
-		 blog: ForeignKey<Blog>
-	 }
-	 
-	 #[model]
-	 struct Tag {
-	   #[pk]
-		 tag: String,
-	 }
-
-	 use crate::butane::prelude::*;
-
-	 fn query() {
-	   let conn = establish_connection();
-		 let specific_post = Post::get(&conn, 1);
-		 let published_posts = query!(Post, published == true).limit(5).load(&conn);
-		 let unliked_posts = query!(Post, published == true && likes < 5)).load(&conn);
-		 let tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn);
-		 let tagged_posts2 = query!(Post, tags.contains(tag == "dinosaurs")).load(&conn);
-		 let blog = find!(Blog, &conn, name = "Bears").expect();
-		 let posts_in_blog = query!(Post, &conn, blog = {blog}).load(&conn)
-	 }
-	 #+END_SRC
-	 struct Posts
-	 CREATE TABLE posts (
-  id SERIAL PRIMARY KEY,
-  title VARCHAR NOT NULL,
-  body TEXT NOT NULL,
-  published BOOLEAN NOT NULL DEFAULT 'f'
-)
 * Roadmap
 ** vNext
-	 + foreign key constraints in db, cascade setting
+	 + foreign key constraint cascade setting
 	 + incremental save
 	 + Many backreferences
 	 + Column renames in migrations
@@ -54,7 +8,6 @@
 	 + Improved custom support, including raw sql where clauses
 	 + More precise spans in macro errors for invalid field names
 	 + Remove timestamp from migration names
-	 + auto FieldType for primitive enums
 	 + small int type
 	 + NaiveDate, maybe non-naive versions
 

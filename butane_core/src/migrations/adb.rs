@@ -5,7 +5,7 @@
 use crate::{Error, Result, SqlType, SqlVal};
 use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// Suffix added to [`crate::many::Many`] tables.
 pub const MANY_SUFFIX: &str = "_Many";
@@ -145,14 +145,14 @@ impl TypeResolver {
 /// Abstract representation of a database schema.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ADB {
-    tables: HashMap<String, ATable>,
-    extra_types: HashMap<TypeKey, DeferredSqlType>,
+    tables: BTreeMap<String, ATable>,
+    extra_types: BTreeMap<TypeKey, DeferredSqlType>,
 }
 impl ADB {
     pub fn new() -> Self {
         ADB {
-            tables: HashMap::new(),
-            extra_types: HashMap::new(),
+            tables: BTreeMap::new(),
+            extra_types: BTreeMap::new(),
         }
     }
     pub fn tables(&self) -> impl Iterator<Item = &ATable> {
@@ -161,7 +161,7 @@ impl ADB {
     pub fn get_table<'a>(&'a self, name: &str) -> Option<&'a ATable> {
         self.tables.get(name)
     }
-    pub fn types(&self) -> &HashMap<TypeKey, DeferredSqlType> {
+    pub fn types(&self) -> &BTreeMap<TypeKey, DeferredSqlType> {
         &self.extra_types
     }
     pub fn replace_table(&mut self, table: ATable) {
@@ -460,8 +460,8 @@ impl AColumn {
     /// Resolve a column constraints target.
     fn resolve_reference_target(
         &mut self,
-        extra_types: &HashMap<TypeKey, DeferredSqlType>,
-        tables: &HashMap<String, ATable>,
+        extra_types: &BTreeMap<TypeKey, DeferredSqlType>,
+        tables: &BTreeMap<String, ATable>,
     ) {
         match &self.reference {
             None | Some(ARef::Literal(_)) => {}

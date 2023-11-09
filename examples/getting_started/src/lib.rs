@@ -1,5 +1,6 @@
 //! Common helpers for the getting_started example CLI.
 
+pub mod butane_migrations;
 pub mod models;
 
 use butane::db::{Connection, ConnectionSpec};

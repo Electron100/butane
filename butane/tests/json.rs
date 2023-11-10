@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_names)]
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use butane::model;
 use butane::prelude::*;
@@ -28,7 +28,7 @@ impl FooJJ {
 }
 
 fn json_null(conn: Connection) {
-    //create
+    // create
     let id = 4;
     let mut foo = FooJJ::new(id);
     foo.save(&conn).unwrap();
@@ -46,7 +46,7 @@ fn json_null(conn: Connection) {
 testall!(json_null);
 
 fn basic_json(conn: Connection) {
-    //create
+    // create
     let id = 4;
     let mut foo = FooJJ::new(id);
     let data = r#"
@@ -83,7 +83,7 @@ struct FooHH {
 }
 impl FooHH {
     fn new(id: i64) -> Self {
-        FooHH {
+        Self {
             id,
             val: HashMap::<String, String>::default(),
             bar: 0,
@@ -91,7 +91,7 @@ impl FooHH {
     }
 }
 fn basic_hashmap(conn: Connection) {
-    //create
+    // create
     let id = 4;
     let mut foo = FooHH::new(id);
     let mut data = HashMap::<String, String>::new();
@@ -111,6 +111,82 @@ fn basic_hashmap(conn: Connection) {
     assert_eq!(foo2, foo3);
 }
 testall!(basic_hashmap);
+
+#[model]
+#[derive(PartialEq, Eq, Debug, Clone)]
+struct FooFullPrefixHashMap {
+    id: i64,
+    val: std::collections::HashMap<String, String>,
+    bar: u32,
+}
+impl FooFullPrefixHashMap {
+    fn new(id: i64) -> Self {
+        Self {
+            id,
+            val: HashMap::<String, String>::default(),
+            bar: 0,
+        }
+    }
+}
+fn basic_hashmap_full_prefix(conn: Connection) {
+    // create
+    let id = 4;
+    let mut foo = FooFullPrefixHashMap::new(id);
+    let mut data = HashMap::<String, String>::new();
+    data.insert("a".to_string(), "1".to_string());
+
+    foo.val = data;
+    foo.save(&conn).unwrap();
+
+    // read
+    let mut foo2 = FooFullPrefixHashMap::get(&conn, id).unwrap();
+    assert_eq!(foo, foo2);
+
+    // update
+    foo2.bar = 43;
+    foo2.save(&conn).unwrap();
+    let foo3 = FooFullPrefixHashMap::get(&conn, id).unwrap();
+    assert_eq!(foo2, foo3);
+}
+testall!(basic_hashmap_full_prefix);
+
+#[model]
+#[derive(PartialEq, Eq, Debug, Clone)]
+struct FooBTreeMap {
+    id: i64,
+    val: BTreeMap<String, String>,
+    bar: u32,
+}
+impl FooBTreeMap {
+    fn new(id: i64) -> Self {
+        Self {
+            id,
+            val: BTreeMap::<String, String>::default(),
+            bar: 0,
+        }
+    }
+}
+fn basic_btreemap(conn: Connection) {
+    // create
+    let id = 4;
+    let mut foo = FooBTreeMap::new(id);
+    let mut data = BTreeMap::<String, String>::new();
+    data.insert("a".to_string(), "1".to_string());
+
+    foo.val = data;
+    foo.save(&conn).unwrap();
+
+    // read
+    let mut foo2 = FooBTreeMap::get(&conn, id).unwrap();
+    assert_eq!(foo, foo2);
+
+    // update
+    foo2.bar = 43;
+    foo2.save(&conn).unwrap();
+    let foo3 = FooBTreeMap::get(&conn, id).unwrap();
+    assert_eq!(foo2, foo3);
+}
+testall!(basic_btreemap);
 
 #[derive(PartialEq, Eq, Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 struct HashedObject {
@@ -135,7 +211,7 @@ impl FooHHO {
     }
 }
 fn hashmap_with_object_values(conn: Connection) {
-    //create
+    // create
     let id = 4;
     let mut foo = FooHHO::new(id);
     let mut data = HashMap::<String, HashedObject>::new();
@@ -181,7 +257,7 @@ impl OuterFoo {
 }
 
 fn inline_json(conn: Connection) {
-    //create
+    // create
     let id = 4;
     let mut foo = OuterFoo::new(id, InlineFoo::new(4, 8));
     foo.save(&conn).unwrap();

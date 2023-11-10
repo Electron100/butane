@@ -63,7 +63,7 @@ fn test_get_deferred_sql_type() {
     let typ = syn::Type::Path(type_path);
     let rv = get_deferred_sql_type(&typ);
     if let DeferredSqlType::Deferred(TypeKey::CustomType(typ)) = rv {
-        assert_eq!(typ, "butane :: ForeignType < Foo >");
+        assert_eq!(typ, "butane::ForeignType<Foo>");
     } else {
         panic!()
     }
@@ -72,7 +72,7 @@ fn test_get_deferred_sql_type() {
     let typ = syn::Type::Path(type_path);
     let rv = get_deferred_sql_type(&typ);
     if let DeferredSqlType::Deferred(TypeKey::CustomType(typ)) = rv {
-        assert_eq!(typ, "butane :: ForeignType < Foo >");
+        assert_eq!(typ, "butane::ForeignType<Foo>");
     } else {
         panic!()
     }
@@ -81,7 +81,7 @@ fn test_get_deferred_sql_type() {
     let typ = syn::Type::Path(type_path);
     let rv = get_deferred_sql_type(&typ);
     if let DeferredSqlType::Deferred(TypeKey::CustomType(typ)) = rv {
-        assert_eq!(typ, "butane :: Many < Foo >");
+        assert_eq!(typ, "butane::Many<Foo>");
     } else {
         panic!()
     }

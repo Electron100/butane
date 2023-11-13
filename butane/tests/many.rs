@@ -1,9 +1,7 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::{model, query::OrderDirection, AutoPk, Many};
-
 use butane_test_helper::testall;
-
 #[cfg(any(feature = "pg", feature = "sqlite"))]
 use butane_test_helper::*;
 

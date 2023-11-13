@@ -1,3 +1,5 @@
+use syn::{Field, ItemStruct};
+
 use super::{
     dbobj, fields, get_default, get_deferred_sql_type, get_many_sql_type, is_auto, is_foreign_key,
     is_many_to_many, is_option, is_row_field, is_unique, pk_field,
@@ -5,7 +7,6 @@ use super::{
 use crate::migrations::adb::{create_many_table, AColumn, ARef, ATable, DeferredSqlType, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::Result;
-use syn::{Field, ItemStruct};
 
 pub fn write_table_to_disk<M>(
     ms: &mut impl MigrationsMut<M = M>,

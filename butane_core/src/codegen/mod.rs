@@ -1,8 +1,5 @@
 //! Code-generation backend
 
-use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
-use crate::migrations::{MigrationMut, MigrationsMut};
-use crate::{SqlType, SqlVal};
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span, TokenTree};
 use quote::{quote, ToTokens};
@@ -12,6 +9,10 @@ use syn::{
     punctuated::Punctuated, Attribute, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta,
     MetaNameValue,
 };
+
+use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
+use crate::migrations::{MigrationMut, MigrationsMut};
+use crate::{SqlType, SqlVal};
 
 const OPTION_TYNAMES: [&str; 3] = ["Option", "option::Option", "std::option::Option"];
 const MANY_TYNAMES: [&str; 2] = ["Many", "butane::Many"];
@@ -614,8 +615,9 @@ impl From<TokenStream2> for CompilerErrorMsg {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use syn::parse::Parser;
+
+    use super::*;
 
     #[test]
     fn test_get_type_argument_option() {

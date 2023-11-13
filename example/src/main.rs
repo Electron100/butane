@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 use butane::db::{Connection, ConnectionSpec};
-use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};
-
 use butane::prelude::*;
+use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};
 
 type Result<T> = std::result::Result<T, Error>;
 

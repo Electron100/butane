@@ -2,10 +2,9 @@ use butane::db::Connection;
 use butane::prelude::*;
 use butane::query::BoolExpr;
 use butane::{colname, filter, find, query, Many};
+use butane_test_helper::*;
 #[cfg(feature = "datetime")]
 use chrono::{TimeZone, Utc};
-
-use butane_test_helper::*;
 
 mod common;
 use common::blog;

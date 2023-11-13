@@ -1,10 +1,11 @@
-use super::*;
-use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
-use crate::SqlType;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Field, ItemStruct};
+
+use super::*;
+use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
+use crate::SqlType;
 
 // Configuration that can be specified with attributes to override default behavior
 #[derive(Clone, Debug, Default)]

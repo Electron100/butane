@@ -5,10 +5,9 @@ use std::collections::{BTreeMap, HashMap};
 use butane::model;
 use butane::prelude::*;
 use butane::{db::Connection, FieldType};
+use butane_test_helper::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-use butane_test_helper::*;
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]

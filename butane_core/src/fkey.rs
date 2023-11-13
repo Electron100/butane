@@ -1,14 +1,15 @@
 //! Implementation of foreign key relationships between models.
 #![deny(missing_docs)]
-use crate::db::ConnectionMethods;
-use crate::*;
-use once_cell::unsync::OnceCell;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
+use once_cell::unsync::OnceCell;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::db::ConnectionMethods;
+use crate::*;
 
 /// Used to implement a relationship between models.
 ///

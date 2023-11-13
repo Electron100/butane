@@ -1,8 +1,9 @@
-use super::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{spanned::Spanned, BinOp, Expr, ExprBinary, ExprMethodCall, ExprPath, Ident, LitStr};
+
+use super::*;
 
 pub fn for_expr(dbres: &Ident, expr: &Expr) -> TokenStream2 {
     handle_expr(&quote!(<#dbres as butane::DataResult>::DBO::fields()), expr)

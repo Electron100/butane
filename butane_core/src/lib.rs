@@ -23,7 +23,7 @@ pub use autopk::AutoPk;
 use custom::SqlTypeCustom;
 use db::{BackendRow, Column, ConnectionMethods};
 pub use query::Query;
-pub use sqlval::*;
+pub use sqlval::{AsPrimaryKey, FieldType, FromSql, PrimaryKeyType, SqlVal, SqlValRef, ToSql};
 
 pub type Result<T> = std::result::Result<T, crate::Error>;
 

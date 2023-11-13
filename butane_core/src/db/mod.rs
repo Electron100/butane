@@ -25,6 +25,9 @@ use crate::query::BoolExpr;
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 
 mod connmethods;
+pub use connmethods::{
+    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
+};
 mod helper;
 mod macros;
 #[cfg(feature = "pg")]
@@ -34,9 +37,6 @@ pub mod sqlite;
 
 #[cfg(feature = "r2d2")]
 pub mod r2;
-pub use connmethods::{
-    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
-};
 #[cfg(feature = "r2d2")]
 pub use r2::ConnectionManager;
 

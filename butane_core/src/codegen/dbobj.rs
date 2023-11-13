@@ -1,9 +1,12 @@
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
-use quote::{quote, quote_spanned};
-use syn::{spanned::Spanned, Field, ItemStruct};
+use quote::{quote, quote_spanned, ToTokens};
+use syn::{spanned::Spanned, Field, ItemStruct, LitStr};
 
-use super::*;
+use super::{
+    fields, get_autopk_sql_type, get_type_argument, is_auto, is_many_to_many, is_row_field,
+    make_ident_literal_str, make_lit, pk_field, MANY_TYNAMES,
+};
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
 use crate::SqlType;
 

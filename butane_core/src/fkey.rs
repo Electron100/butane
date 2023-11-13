@@ -9,7 +9,9 @@ use once_cell::unsync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::db::ConnectionMethods;
-use crate::*;
+use crate::{
+    AsPrimaryKey, DataObject, Error, FieldType, FromSql, Result, SqlType, SqlVal, SqlValRef, ToSql,
+};
 
 /// Used to implement a relationship between models.
 ///

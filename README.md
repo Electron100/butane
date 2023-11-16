@@ -74,7 +74,7 @@ enabled: you will want to enable either `sqlite` or `pg`:
 * `datetime`: Support for timestamps (using `chrono::NaiveDateTime`).
 * `log`: Log certain warnings to the `log` crate facade (target "butane").
 * `pg`: Support for PostgreSQL.
-* `r2d2`: R2D2 support (`propane::db::ConnectionManager`).
+* `r2d2`: R2D2 support (`butane::db::ConnectionManager`).
 * `sqlite`: Support for SQLite.
 * `sqlite-bundled`: Bundles sqlite instead of using the system version.
 * `tls`: Support for TLS when using PostgreSQL.

@@ -49,6 +49,7 @@ connection parameters. At this point, we can add a method (in our
 
 ``` rust
 use butane::db::{Connection, ConnectionSpec};
+
 pub fn establish_connection() -> Connection {
     butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap()
 }
@@ -248,8 +249,9 @@ doc = false
 And write its code (in `src/bin/write_post.rs`).
 
 ``` rust
-use getting_started::*;
 use std::io::{stdin, Read};
+
+use getting_started::*;
 
 fn main() {
     let conn = establish_connection();
@@ -318,7 +320,8 @@ Let's add another binary to `Cargo.toml`, this one called `show_posts`, and writ
 
 ``` rust
 use butane::query;
-use getting_started::models::*;
+
+use getting_started::models::Post;
 use getting_started::*;
 
 fn main() {
@@ -350,10 +353,12 @@ mark it as published, and save it again.
 Add `publish_post` binary to `Cargo.toml`, and write its code (in `src/bin/publish_post.rs`).
 
 ``` rust
-use self::models::Post;
-use butane::prelude::*;
-use getting_started::*;
 use std::env::args;
+
+use butane::prelude::*;
+
+use getting_started::models::Post;
+use getting_started::*;
 
 fn main() {
     let id = args()
@@ -384,10 +389,12 @@ commonly) with the `delete` method on `Query` to delete directly.
 Here's our `delete_post` program (in `src/bin/delete_post.rs`):
 
 ``` rust
-use self::models::Post;
-use getting_started::*;
-use butane::query;
 use std::env::args;
+
+use butane::query;
+
+use getting_started::models::Post;
+use getting_started::*;
 
 fn main() {
     let target = args().nth(1).expect("Expected a target to match against");

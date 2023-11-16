@@ -5,13 +5,14 @@
 #![deny(missing_docs)]
 extern crate proc_macro;
 
+use std::path::PathBuf;
+
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
 use butane_core::{codegen, make_compile_error, migrations, SqlType};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
 use quote::quote;
-use std::path::PathBuf;
 use syn::{Expr, Ident};
 
 mod filter;

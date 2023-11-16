@@ -4,15 +4,14 @@ use butane::migrations::{
 };
 use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
-use proc_macro2::TokenStream;
-use quote::quote;
-use sqlparser::dialect::GenericDialect;
-use sqlparser::parser::Parser as SqlParser;
-
 #[cfg(feature = "pg")]
 use butane_test_helper::pg_connection;
 #[cfg(feature = "sqlite")]
 use butane_test_helper::sqlite_connection;
+use proc_macro2::TokenStream;
+use quote::quote;
+use sqlparser::dialect::GenericDialect;
+use sqlparser::parser::Parser as SqlParser;
 
 #[test]
 fn current_migration_basic() {

@@ -1,8 +1,9 @@
 #![allow(clippy::iter_nth_zero)]
 #![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
-use serde::{Deserialize, Serialize};
 use std::cmp::{Eq, PartialEq};
 use std::default::Default;
+
+use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
 
 pub mod codegen;
@@ -19,12 +20,10 @@ pub mod uuid;
 
 mod autopk;
 pub use autopk::AutoPk;
-
-use db::{BackendRow, Column, ConnectionMethods};
-
 use custom::SqlTypeCustom;
+use db::{BackendRow, Column, ConnectionMethods};
 pub use query::Query;
-pub use sqlval::*;
+pub use sqlval::{AsPrimaryKey, FieldType, FromSql, PrimaryKeyType, SqlVal, SqlValRef, ToSql};
 
 pub type Result<T> = std::result::Result<T, crate::Error>;
 

@@ -1,22 +1,28 @@
 //! SQLite database backend
+use std::borrow::Cow;
+use std::fmt::{Debug, Write};
+use std::ops::Deref;
+use std::path::Path;
+use std::pin::Pin;
 #[cfg(feature = "log")]
 use std::sync::Once;
 
-use super::helper;
-use super::*;
-use crate::db::connmethods::BackendRows;
-use crate::debug;
-use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
-use crate::query;
-use crate::query::Order;
-use crate::{Result, SqlType, SqlVal, SqlValRef};
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use pin_project::pin_project;
-use std::borrow::Cow;
-use std::fmt::Write;
-use std::pin::Pin;
+
+use super::helper;
+use crate::connection_method_wrapper;
+use crate::db::{
+    Backend, BackendConnection, BackendRow, BackendRows, BackendTransaction, Column, Connection,
+    ConnectionMethods, RawQueryResult, Transaction,
+};
+use crate::debug;
+use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
+use crate::query;
+use crate::query::{BoolExpr, Order};
+use crate::{Error, Result, SqlType, SqlVal, SqlValRef};
 
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";

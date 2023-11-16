@@ -2,13 +2,14 @@
 //! CLI tool, there is no need to use this module. Even if applying
 //! migrations without this tool, you are unlikely to need this module.
 
-#[cfg(feature = "json")]
-use once_cell::sync::Lazy;
-
-use crate::{Error, Result, SqlType, SqlVal};
-use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+#[cfg(feature = "json")]
+use once_cell::sync::Lazy;
+use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
+
+use crate::{Error, Result, SqlType, SqlVal};
 
 /// Suffix added to [`crate::many::Many`] tables.
 pub const MANY_SUFFIX: &str = "_Many";

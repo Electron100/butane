@@ -12,9 +12,6 @@
 //!    what a `BackendConnection` can do, but allows using a single concrete type that is not tied to a particular
 //!    database backend. It is returned by the `connect` method.
 
-use crate::query::BoolExpr;
-use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fs;
@@ -22,7 +19,15 @@ use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
+use serde::{Deserialize, Serialize};
+
+use crate::query::BoolExpr;
+use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
+
 mod connmethods;
+pub use connmethods::{
+    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
+};
 mod helper;
 mod macros;
 #[cfg(feature = "pg")]
@@ -37,10 +42,6 @@ pub use r2::ConnectionManager;
 
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
-
-pub use connmethods::{
-    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
-};
 
 /// Database connection.
 pub trait BackendConnection: ConnectionMethods + Debug + Send + 'static {

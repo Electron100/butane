@@ -1,5 +1,6 @@
-use getting_started::*;
 use std::io::{stdin, Read};
+
+use getting_started::*;
 
 fn main() {
     let conn = establish_connection();

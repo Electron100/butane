@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::{ButaneMigration, Migration, MigrationMut, Migrations, MigrationsMut};
 use crate::query::BoolExpr;
 use crate::{ConnectionMethods, DataObject, Result};
-use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use std::collections::BTreeMap;
 
 /// A migration stored in memory.
 #[derive(Clone, Debug, Deserialize, Serialize)]

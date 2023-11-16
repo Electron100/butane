@@ -1,16 +1,17 @@
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+
+use fs2::FileExt;
+use serde::{Deserialize, Serialize};
+
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::fs::{Filesystem, OsFilesystem};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
 use crate::{ConnectionMethods, DataObject, Error, Result};
-use fs2::FileExt;
-use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::fs::{File, OpenOptions};
-
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 const TYPES_FILENAME: &str = "types.json";

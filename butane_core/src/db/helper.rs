@@ -3,17 +3,18 @@
 // may occur if no backends are selected
 #![allow(unused)]
 
+use std::borrow::Cow;
+use std::fmt::Write;
+
+#[cfg(feature = "datetime")]
+use chrono::naive::NaiveDateTime;
+
 use super::Column;
 use crate::migrations::adb::{AColumn, TypeIdentifier};
 use crate::query::Expr::{Condition, Placeholder, Val};
 use crate::query::{BoolExpr::*, Expr, Join, Order, OrderDirection};
 use crate::Error;
 use crate::{query, Result, SqlType, SqlVal};
-use std::borrow::Cow;
-use std::fmt::Write;
-
-#[cfg(feature = "datetime")]
-use chrono::naive::NaiveDateTime;
 
 pub trait PlaceholderSource {
     fn next_placeholder(&mut self) -> Cow<str>;

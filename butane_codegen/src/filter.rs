@@ -1,4 +1,4 @@
-use super::*;
+use butane_core::make_compile_error;
 use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};

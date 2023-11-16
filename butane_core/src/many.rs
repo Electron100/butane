@@ -1,14 +1,15 @@
 //! Implementation of many-to-many relationships between models.
 #![deny(missing_docs)]
-use crate::db::{Column, ConnectionMethods};
-use crate::query::{BoolExpr, Expr, OrderDirection, Query};
-use crate::{DataObject, Error, FieldType, PrimaryKeyType, Result, SqlType, SqlVal, ToSql};
-use once_cell::unsync::OnceCell;
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
+use once_cell::unsync::OnceCell;
+use serde::{Deserialize, Serialize};
+
+use crate::db::{Column, ConnectionMethods};
+use crate::query::{BoolExpr, Expr, OrderDirection, Query};
+use crate::{DataObject, Error, FieldType, PrimaryKeyType, Result, SqlType, SqlVal, ToSql};
 
 fn default_oc<T>() -> OnceCell<Vec<T>> {
     OnceCell::default()

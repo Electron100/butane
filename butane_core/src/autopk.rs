@@ -1,8 +1,10 @@
 //! Contains the [AutoPk] type for autoincrementing primary keys.
 
-use super::{FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql};
-use serde::{Deserialize, Serialize};
 use std::cmp::{Ordering, PartialOrd};
+
+use serde::{Deserialize, Serialize};
+
+use super::{FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql};
 
 /// Wrapper around a [PrimaryKeyType] to indicate the the primary key
 /// will be initialized automatically when the object is created in

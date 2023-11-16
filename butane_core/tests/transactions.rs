@@ -1,5 +1,4 @@
 use butane_core::db::{BackendConnection, Connection};
-
 use butane_test_helper::*;
 
 fn commit_empty_transaction(mut conn: Connection) {

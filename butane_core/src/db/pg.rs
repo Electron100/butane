@@ -1,18 +1,24 @@
 //! Postgresql database backend
-use super::connmethods::VecRows;
-use super::helper;
-use super::*;
-use crate::custom::{SqlTypeCustom, SqlValRefCustom};
-use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
-use crate::{debug, query};
-use crate::{Result, SqlType, SqlVal, SqlValRef};
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::fmt::{Debug, Write};
+
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
 use postgres::fallible_iterator::FallibleIterator;
 use postgres::GenericClient;
-use std::cell::RefCell;
-use std::fmt::Write;
+
+use super::connmethods::VecRows;
+use super::helper;
+use crate::custom::{SqlTypeCustom, SqlValRefCustom};
+use crate::db::{
+    Backend, BackendConnection, BackendRow, BackendTransaction, Column, Connection,
+    ConnectionMethods, RawQueryResult, Transaction,
+};
+use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
+use crate::{debug, query};
+use crate::{query::BoolExpr, Error, Result, SqlType, SqlVal, SqlValRef};
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";

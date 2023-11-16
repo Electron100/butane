@@ -3,7 +3,6 @@ use butane::{dataresult, model};
 use butane::{db::Connection, ForeignKey, Many};
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc};
-
 #[cfg(feature = "fake")]
 use fake::Dummy;
 

@@ -1,0 +1,1 @@
+{"name":"Patches","columns":[{"name":"id","sqltype":{"KnownId":{"Ty":"BigInt"}},"nullable":false,"pk":true,"auto":true,"unique":false,"default":null},{"name":"patch","sqltype":{"Deferred":"CT:Patch"},"nullable":false,"pk":false,"auto":false,"unique":false,"default":null}]}

@@ -1,0 +1,2 @@
+DROP TABLE Patches;
+DROP TABLE Record;

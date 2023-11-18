@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use butane::db::{Connection, ConnectionSpec};
 use butane::prelude::*;
 use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};

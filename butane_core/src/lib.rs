@@ -89,7 +89,9 @@ pub trait DataObject: DataResult<DBO = Self> {
     /// Save the object to the database.
     fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
     /// Delete the object from the database.
-    fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>;
+    fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
+        conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
+    }
 }
 
 pub trait ModelTyped {

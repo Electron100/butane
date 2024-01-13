@@ -189,9 +189,11 @@ fn cant_add_unsaved_to_many(_conn: Connection) {
         val: "shiny".to_string(),
     };
     let mut obj = AutoPkWithMany::new();
-    obj.items
+    let err = obj
+        .items
         .add(&unsaved_item)
         .expect_err("unexpectedly not error");
+    assert!(matches!(err, butane::Error::ValueNotSaved));
 }
 testall!(cant_add_unsaved_to_many);
 

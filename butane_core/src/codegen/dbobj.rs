@@ -36,7 +36,14 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let values: Vec<TokenStream2> = push_values(ast_struct, |_| true);
     let insert_cols = columns(ast_struct, |f| !is_auto(f));
 
-    let save_core = if is_auto(&pk_field) {
+    let save_core = if auto_pk && values.len() == 1 {
+        quote!(
+            if !butane::PrimaryKeyType::is_valid(self.pk()) {
+                let pk = conn.insert_returning_pk(Self::TABLE, &[], &pkcol, &[])?;
+                self.#pkident = butane::FromSql::from_sql(pk)?;
+            }
+        )
+    } else if auto_pk {
         let pkident = pk_field.ident.clone().unwrap();
         let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
         let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
@@ -47,17 +54,15 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             // keys, but butane isn't well set up to take advantage of that, including missing
             // support for constraints and the `insert_or_update` method not providing a way to
             // retrieve the pk.
-            if (butane::PrimaryKeyType::is_valid(&self.#pkident)) {
+            if butane::PrimaryKeyType::is_valid(self.pk()) {
                 #(#values_no_pk)*
-                if values.len() > 0 {
-                    conn.update(
-                        Self::TABLE,
-                        pkcol,
-                        butane::ToSql::to_sql_ref(self.pk()),
-                        &[#save_cols],
-                        &values,
-                    )?;
-                }
+                conn.update(
+                    Self::TABLE,
+                    pkcol,
+                    butane::ToSql::to_sql_ref(self.pk()),
+                    &[#save_cols],
+                    &values,
+                )?;
             } else {
                 #(#values)*
                 let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
@@ -72,7 +77,6 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         )
     };
 
-    let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
     let many_save: TokenStream2 = fields(ast_struct)
         .filter(|f| is_many_to_many(f))
         .map(|f| {
@@ -93,8 +97,12 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         .collect();
 
     let dataresult = impl_dataresult(ast_struct, tyname, config);
+    // Note the many impls following DataObject can not be generic because they implement for T and &T,
+    // which become conflicting types as &T is included in T.
+    // https://stackoverflow.com/questions/66241700
     quote!(
-                #dataresult
+        #dataresult
+
         impl butane::DataObject for #tyname {
             type PKType = #pktype;
             type Fields = #fields_type;
@@ -106,10 +114,12 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             }
             fn save(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
                 //future perf improvement use an array on the stack
-                let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(#numdbfields);
+                let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(
+                    <Self as butane::DataResult>::COLUMNS.len()
+                );
                 let pkcol = butane::db::Column::new(
-                    #pklit,
-                    <#pktype as butane::FieldType>::SQLTYPE);
+                    Self::PKCOL,
+                    <Self::PKType as butane::FieldType>::SQLTYPE);
                 #save_core
                 #many_save
                 Ok(())

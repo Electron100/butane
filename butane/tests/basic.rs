@@ -75,6 +75,12 @@ impl HasOnlyPk {
 }
 
 #[model]
+#[derive(Default)]
+struct HasOnlyAutoPk {
+    id: AutoPk<i64>,
+}
+
+#[model]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct SelfReferential {
     pub id: i32,
@@ -235,11 +241,26 @@ testall!(auto_pk);
 fn only_pk(conn: Connection) {
     let mut obj = HasOnlyPk::new(1);
     obj.save(&conn).unwrap();
+    assert_eq!(obj.id, 1);
     // verify we can still save the object even though it has no
     // fields to modify
     obj.save(&conn).unwrap();
+    // verify it didnt get a new id
+    assert_eq!(obj.id, 1);
 }
 testall!(only_pk);
+
+fn only_auto_pk(conn: Connection) {
+    let mut obj = HasOnlyAutoPk::default();
+    obj.save(&conn).unwrap();
+    let pk = obj.id;
+    // verify we can still save the object even though it has no
+    // fields to modify
+    obj.save(&conn).unwrap();
+    // verify it didnt get a new id
+    assert_eq!(obj.id, pk);
+}
+testall!(only_auto_pk);
 
 fn basic_committed_transaction(mut conn: Connection) {
     let tr = conn.transaction().unwrap();

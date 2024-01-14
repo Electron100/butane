@@ -40,11 +40,12 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         quote!(
             if !butane::PrimaryKeyType::is_valid(self.pk()) {
                 let pk = conn.insert_returning_pk(Self::TABLE, &[], &pkcol, &[])?;
-                self.#pkident = butane::FromSql::from_sql(pk)?;
-            }
+                Some(butane::FromSql::from_sql(pk)?)
+            } else {
+                None
+            };
         )
     } else if auto_pk {
-        let pkident = pk_field.ident.clone().unwrap();
         let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
         let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
         quote!(
@@ -63,17 +64,21 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                     &[#save_cols],
                     &values,
                 )?;
+                None
             } else {
                 #(#values)*
                 let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
-                self.#pkident = butane::FromSql::from_sql(pk)?;
-            }
+                Some(butane::FromSql::from_sql(pk)?)
+            };
         )
     } else {
         // do an upsert
         quote!(
-            #(#values)*
-            conn.insert_or_replace(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
+            {
+                #(#values)*
+                conn.insert_or_replace(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
+                None
+            };
         )
     };
 
@@ -120,7 +125,10 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
                 let pkcol = butane::db::Column::new(
                     Self::PKCOL,
                     <Self::PKType as butane::FieldType>::SQLTYPE);
-                #save_core
+                let new_pk = #save_core
+                if let Some(new_pk) = new_pk {
+                    self.#pkident = new_pk;
+                }
                 #many_save
                 Ok(())
             }

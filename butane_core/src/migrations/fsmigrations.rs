@@ -68,14 +68,11 @@ impl FsMigration {
     }
 
     fn write_info(&self, info: &MigrationInfo) -> Result<()> {
-        self.write_contents(
-            "info.json",
-            &[serde_json::to_string_pretty(info)?.as_bytes(), b"\n"].concat(),
-        )
+        self.write_contents("info.json", serde_json::to_string_pretty(info)?.as_bytes())
     }
 
     fn write_sql(&self, name: &str, sql: &str) -> Result<()> {
-        self.write_contents(&format!("{name}.sql"), &[sql.as_bytes(), b"\n"].concat())
+        self.write_contents(&format!("{name}.sql"), sql.as_bytes())
     }
 
     fn read_sql(&self, backend: &str, direction: &str) -> Result<Option<String>> {
@@ -134,7 +131,7 @@ impl MigrationMut for FsMigration {
     fn write_table(&mut self, table: &ATable) -> Result<()> {
         self.write_contents(
             &format!("{}.table", table.name),
-            &[serde_json::to_string_pretty(table)?.as_bytes(), b"\n"].concat(),
+            serde_json::to_string_pretty(table)?.as_bytes(),
         )
     }
 
@@ -169,16 +166,12 @@ impl MigrationMut for FsMigration {
         types.insert(key, sqltype);
         self.write_contents(
             TYPES_FILENAME,
-            &[
-                serde_json::to_string(&types)
-                    .map_err(|e| {
-                        eprintln!("failed to write types {typefile:?}");
-                        e
-                    })?
-                    .as_bytes(),
-                b"\n",
-            ]
-            .concat(),
+            serde_json::to_string(&types)
+                .map_err(|e| {
+                    eprintln!("failed to write types {typefile:?}");
+                    e
+                })?
+                .as_bytes(),
         )?;
         Ok(())
     }

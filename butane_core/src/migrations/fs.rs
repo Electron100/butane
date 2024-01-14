@@ -13,6 +13,8 @@ pub trait Filesystem: Debug {
     fn list_dir(&self, path: &Path) -> std::io::Result<Vec<PathBuf>>;
     /// Opens a file for writing. Creates it if it does not exist. Truncates it otherwise.
     fn write(&self, path: &Path) -> std::io::Result<Box<dyn Write>>;
+    /// Opens a file for writing in append mode. Fails if file does not exist.
+    fn append(&self, path: &Path) -> std::io::Result<Box<dyn Write>>;
     /// Opens a file for reading.
     fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>>;
 }
@@ -31,6 +33,12 @@ impl Filesystem for OsFilesystem {
     }
     fn write(&self, path: &Path) -> std::io::Result<Box<dyn Write>> {
         std::fs::File::create(path).map(|f| Box::new(f) as Box<dyn Write>)
+    }
+    fn append(&self, path: &Path) -> std::io::Result<Box<dyn Write>> {
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(path)
+            .map(|f| Box::new(f) as Box<dyn Write>)
     }
     fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>> {
         std::fs::File::open(path).map(|f| Box::new(f) as Box<dyn Read>)

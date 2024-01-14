@@ -92,16 +92,15 @@ impl FsMigration {
     fn write_contents(&self, fname: &str, contents: &[u8]) -> Result<()> {
         self.ensure_dir()?;
         let path = self.root.join(fname);
+        let mut contents: Vec<u8> = contents.into();
+        if contents[contents.len() - 1] != b'\n' {
+            contents.push(b'\n');
+        }
         self.fs
             .write(&path)?
-            .write_all(contents)
+            .write_all(&contents)
             .map_err(<std::io::Error as Into<Error>>::into)?;
-        if contents[contents.len() - 1] != b'\n' {
-            self.fs
-                .append(&path)?
-                .write(b"\n")
-                .map_err(<std::io::Error as Into<Error>>::into)?;
-        }
+
         Ok(())
     }
 

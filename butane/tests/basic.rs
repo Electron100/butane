@@ -331,6 +331,13 @@ fn fkey_same_type(conn: Connection) {
 }
 testall!(fkey_same_type);
 
+fn cant_save_unsaved_fkey(conn: Connection) {
+    let foo = Foo::new(1);
+    let mut bar = Bar::new("tarzan", foo);
+    assert!(bar.save(&conn).is_err());
+}
+testall!(cant_save_unsaved_fkey);
+
 #[cfg(feature = "datetime")]
 fn basic_time(conn: Connection) {
     let now = Utc::now();

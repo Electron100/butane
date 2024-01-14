@@ -12,6 +12,8 @@
 //!    what a `BackendConnection` can do, but allows using a single concrete type that is not tied to a particular
 //!    database backend. It is returned by the `connect` method.
 
+#![allow(missing_docs)]
+
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fs;

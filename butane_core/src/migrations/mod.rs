@@ -1,5 +1,8 @@
 //! For working with migrations. If using the butane CLI tool, it is
 //! not necessary to use these types directly.
+
+#![allow(missing_docs)]
+
 use std::path::Path;
 
 use fallible_iterator::FallibleIterator;

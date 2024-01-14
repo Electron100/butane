@@ -1,5 +1,9 @@
+//! Library providing functionality used by butane macros and tools.
+
 #![allow(clippy::iter_nth_zero)]
 #![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
+#![deny(missing_docs)]
+
 use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 
@@ -25,6 +29,7 @@ use db::{BackendRow, Column, ConnectionMethods};
 pub use query::Query;
 pub use sqlval::{AsPrimaryKey, FieldType, FromSql, PrimaryKeyType, SqlVal, SqlValRef, ToSql};
 
+/// Result type that uses [`crate::Error`].
 pub type Result<T> = std::result::Result<T, crate::Error>;
 
 /// A type which may be the result of a database query.
@@ -37,10 +42,15 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 pub trait DataResult: Sized {
     /// Corresponding object type.
     type DBO: DataObject;
+
+    /// Metadata for eaCH column.
     const COLUMNS: &'static [Column];
+
+    /// Load an object from a database backend row.
     fn from_row<'a>(row: &(dyn BackendRow + 'a)) -> Result<Self>
     where
         Self: Sized;
+
     /// Create a blank query (matching all rows) for this type.
     fn query() -> Query<Self>;
 }
@@ -52,6 +62,7 @@ pub trait DataResult: Sized {
 pub trait DataObject: DataResult<DBO = Self> {
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
+    /// Link to a generated struct providing query helpers for each field.
     type Fields: Default;
     /// The name of the primary key column.
     const PKCOL: &'static str;
@@ -60,6 +71,7 @@ pub trait DataObject: DataResult<DBO = Self> {
     /// Whether or not this model uses an automatic primary key set on
     /// the first save.
     const AUTO_PK: bool;
+
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
     /// Find this object in the database based on primary key.
@@ -95,6 +107,7 @@ pub trait DataObject: DataResult<DBO = Self> {
 }
 
 /// Butane errors.
+#[allow(missing_docs)]
 #[derive(Debug, ThisError)]
 pub enum Error {
     #[error("No such object exists")]
@@ -187,6 +200,7 @@ impl From<rusqlite::types::FromSqlError> for Error {
 /// See also [`SqlVal`].
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlType {
+    /// Boolean
     Bool,
     /// 4 bytes
     Int,
@@ -194,12 +208,17 @@ pub enum SqlType {
     BigInt,
     /// 8 byte float
     Real,
+    /// String
     Text,
     #[cfg(feature = "datetime")]
+    /// Timestamp
     Timestamp,
+    /// Blob
     Blob,
     #[cfg(feature = "json")]
+    /// JSON
     Json,
+    /// Custom SQL type
     Custom(SqlTypeCustom),
 }
 impl std::fmt::Display for SqlType {
@@ -230,11 +249,15 @@ pub use log::warn;
 #[cfg(not(feature = "log"))]
 mod btlog {
     // this module is just for grouping -- macro_export puts them in the crate root
+
+    /// Noop for when feature log is not enabled.
     #[macro_export]
     macro_rules! debug {
         (target: $target:expr, $($arg:tt)+) => {};
         ($($arg:tt)+) => {};
     }
+
+    /// Noop for when feature log is not enabled.
     #[macro_export]
     macro_rules! warn {
         (target: $target:expr, $($arg:tt)+) => {};

@@ -19,6 +19,7 @@ const MANY_TYNAMES: [&str; 2] = ["Many", "butane::Many"];
 const FKEY_TYNAMES: [&str; 2] = ["ForeignKey", "butane::ForeignKey"];
 const AUTOPK_TYNAMES: [&str; 2] = ["AutoPk", "butane::AutoPk"];
 
+/// Create a compiler error.
 #[macro_export]
 macro_rules! make_compile_error {
     ($span:expr=> $($arg:tt)*) => ({

@@ -5,6 +5,7 @@
 //! The fact that it is backed by a SQL database is mostly an implementation detail to the API consumer.
 
 #![deny(missing_docs)]
+
 pub use butane_codegen::{butane_type, dataresult, model, FieldType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;

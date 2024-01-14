@@ -1,5 +1,7 @@
 //! Common helpers for the getting_started example CLI.
 
+#![deny(missing_docs)]
+
 pub mod butane_migrations;
 pub mod models;
 

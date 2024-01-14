@@ -94,10 +94,6 @@ pub trait DataObject: DataResult<DBO = Self> {
     }
 }
 
-pub trait ModelTyped {
-    type Model: DataObject;
-}
-
 /// Butane errors.
 #[derive(Debug, ThisError)]
 pub enum Error {

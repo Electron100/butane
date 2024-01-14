@@ -161,7 +161,7 @@ impl MigrationMut for FsMigration {
             TYPES_FILENAME,
             serde_json::to_string(&types)
                 .map_err(|e| {
-                    eprintln!("failed to read types");
+                    eprintln!("failed to write types {typefile:?}");
                     e
                 })?
                 .as_bytes(),

@@ -107,7 +107,7 @@ impl ConnectionSpec {
     pub fn save(&self, path: &Path) -> Result<()> {
         let path = conn_complete_if_dir(path);
         let mut f = fs::File::create(path)?;
-        f.write_all(serde_json::to_string(self)?.as_bytes())
+        f.write_all(serde_json::to_string_pretty(self)?.as_bytes())
             .map_err(|e| e.into())
     }
     /// Load a previously saved connection spec

@@ -68,7 +68,7 @@ impl FsMigration {
     }
 
     fn write_info(&self, info: &MigrationInfo) -> Result<()> {
-        self.write_contents("info.json", serde_json::to_string(info)?.as_bytes())
+        self.write_contents("info.json", serde_json::to_string_pretty(info)?.as_bytes())
     }
 
     fn write_sql(&self, name: &str, sql: &str) -> Result<()> {
@@ -92,10 +92,16 @@ impl FsMigration {
     fn write_contents(&self, fname: &str, contents: &[u8]) -> Result<()> {
         self.ensure_dir()?;
         let path = self.root.join(fname);
+        let mut contents: Vec<u8> = contents.into();
+        if contents[contents.len() - 1] != b'\n' {
+            contents.push(b'\n');
+        }
         self.fs
             .write(&path)?
-            .write_all(contents)
-            .map_err(|e| e.into())
+            .write_all(&contents)
+            .map_err(<std::io::Error as Into<Error>>::into)?;
+
+        Ok(())
     }
 
     fn ensure_dir(&self) -> Result<()> {
@@ -124,7 +130,7 @@ impl MigrationMut for FsMigration {
     fn write_table(&mut self, table: &ATable) -> Result<()> {
         self.write_contents(
             &format!("{}.table", table.name),
-            serde_json::to_string(table)?.as_bytes(),
+            serde_json::to_string_pretty(table)?.as_bytes(),
         )
     }
 
@@ -269,7 +275,7 @@ impl FsMigrations {
     fn save_state(&mut self, state: &MigrationsState) -> Result<()> {
         let path = self.root.join("state.json");
         let mut f = self.fs.write(&path)?;
-        f.write_all(serde_json::to_string(state)?.as_bytes())
+        f.write_all(serde_json::to_string_pretty(state)?.as_bytes())
             .map_err(|e| e.into())
     }
     /// Detach the latest migration from the list of migrations,

@@ -20,12 +20,12 @@ fn make_litstr_from_str() {
 
 #[test]
 fn test_get_deferred_sql_type() {
-    // primative type
+    // primitive type
     let type_path: syn::TypePath = syn::parse_quote!(i8);
     let typ = syn::Type::Path(type_path);
     let rv = get_deferred_sql_type(&typ);
-    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_tye)) = rv {
-        assert_eq!(sql_tye, SqlType::Int);
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Int);
     } else {
         panic!()
     }
@@ -33,8 +33,8 @@ fn test_get_deferred_sql_type() {
     let type_path: syn::TypePath = syn::parse_quote!(Option<i8>);
     let typ = syn::Type::Path(type_path);
     let rv = get_deferred_sql_type(&typ);
-    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_tye)) = rv {
-        assert_eq!(sql_tye, SqlType::Int);
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Int);
     } else {
         panic!()
     }

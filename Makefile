@@ -15,7 +15,7 @@ lint :
 	$(CARGO) clippy --all-features -- -D warnings
 
 
-check : build test doclint lint
+check : build test doclint lint spellcheck
 
 
 test :
@@ -24,6 +24,9 @@ test :
 clean :
 	$(CARGO) clean
 
+
+spellcheck :
+	typos
 
 doclint :
 	RUSTDOCFLAGS="-D warnings" $(CARGO_NIGHTLY) doc --no-deps --all-features

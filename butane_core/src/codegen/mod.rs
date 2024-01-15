@@ -338,7 +338,7 @@ fn is_row_field(f: &Field) -> bool {
 }
 
 /// Test if the ident of each segment in two paths is the same without
-/// looking at the argments
+/// looking at the arguments.
 fn is_same_path_ident(path1: &syn::Path, path2: &syn::Path) -> bool {
     if path1.segments.len() != path2.segments.len() {
         return false;

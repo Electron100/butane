@@ -77,7 +77,7 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .expect("fields must be named")
         .to_string();
     let many_field_type = get_many_sql_type(many_field)
-        .unwrap_or_else(|| panic!("Mis-identified Many field {field_name}"));
+        .unwrap_or_else(|| panic!("Misidentified Many field {field_name}"));
     let pk_field_name = pk_field
         .ident
         .as_ref()

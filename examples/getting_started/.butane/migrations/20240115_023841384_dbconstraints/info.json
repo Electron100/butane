@@ -1,0 +1,6 @@
+{
+  "from_name": "20201229_171630604_likes",
+  "backends": [
+    "sqlite"
+  ]
+}

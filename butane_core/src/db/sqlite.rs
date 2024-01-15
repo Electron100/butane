@@ -58,7 +58,9 @@ impl SQLiteBackend {
 }
 impl SQLiteBackend {
     fn connect(&self, path: &str) -> Result<SQLiteConnection> {
-        SQLiteConnection::open(Path::new(path))
+        let connection = SQLiteConnection::open(Path::new(path))?;
+        connection.execute("PRAGMA foreign_keys = ON")?;
+        Ok(connection)
     }
 }
 impl Backend for SQLiteBackend {

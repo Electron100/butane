@@ -1,5 +1,7 @@
 //! Types and traits for interacting with a value that can be stored in the database.
 
+#![allow(missing_docs)]
+
 use std::borrow::Cow;
 #[cfg(feature = "json")]
 use std::collections::{BTreeMap, HashMap};

@@ -2,6 +2,8 @@
 //! the `query!`, `filter!`, and `find!` macros instead of using this
 //! module directly.
 
+#![allow(missing_docs)]
+
 use std::borrow::Cow;
 use std::marker::PhantomData;
 

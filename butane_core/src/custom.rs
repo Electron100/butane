@@ -5,6 +5,8 @@
 //! source repository. Not supported for the Sqlite backend as Sqlite
 //! supports a very limited set of types to begin with.
 
+#![allow(missing_docs)]
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};

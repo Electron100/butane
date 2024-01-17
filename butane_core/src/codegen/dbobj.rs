@@ -10,7 +10,7 @@ use super::{
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
 use crate::SqlType;
 
-// Configuration that can be specified with attributes to override default behavior
+/// Configuration that can be specified with attributes to override default behavior
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     pub table_name: Option<String>,
@@ -263,10 +263,12 @@ pub fn add_fieldexprs(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 
     let fields_type = fields_type(tyname);
     quote!(
         impl #tyname {
+            /// Get fields.
             pub fn fields() -> #fields_type {
                 #fields_type::default()
             }
         }
+        /// Helper struct for butane model.
         #vis struct #fields_type {
         }
         impl #fields_type {
@@ -321,6 +323,7 @@ fn fieldexpr_func(
     };
     let fnid = Ident::new(&format!("{fid}"), f.span());
     quote!(
+        /// Create query expression.
         #vis fn #fnid(&self) -> #field_expr_type {
             #field_expr_ctor
         }

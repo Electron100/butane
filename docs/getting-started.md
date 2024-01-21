@@ -111,8 +111,7 @@ Now let's add a model to represent a blog post, and in the process take a look a
 ``` rust
 #[model]
 pub struct Post {
-    #[auto]
-    pub id: i32,
+    pub id: AutoPk<i32>,
     pub title: String,
     pub body: String,
     pub published: bool,
@@ -436,8 +435,7 @@ making the full model
 ``` rust
 #[model]
 pub struct Post {
-    #[auto]
-    pub id: i32,
+    pub id: AutoPk<i32>,
     pub title: String,
     pub body: String,
     pub published: bool,

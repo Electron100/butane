@@ -29,8 +29,7 @@ schema. For example the Post model for a blog might look like this:
 #[model]
 #[derive(Default)]
 struct Post {
-    #[auto]
-    id: i64,
+    id: AutoPk<i32>,
     title: String,
     body: String,
     published: bool,

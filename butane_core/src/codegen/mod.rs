@@ -239,7 +239,6 @@ fn remove_helper_field_attributes(
             for field in &mut fields.named {
                 field.attrs.retain(|a| {
                     !a.path().is_ident("pk")
-                        && !a.path().is_ident("auto")
                         && !a.path().is_ident("sqltype")
                         && !a.path().is_ident("default")
                         && !a.path().is_ident("unique")

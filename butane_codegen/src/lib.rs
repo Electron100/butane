@@ -31,7 +31,7 @@ mod filter;
 /// * `#[pk]` on a field to specify that it is the primary key.
 /// * `#[unique]` on a field indicates that the field's value must be unique
 ///    (perhaps implemented as the SQL UNIQUE constraint by some backends).
-/// * `[default]` should be used on fields added by later migrations to avoid errors on existing objects.
+/// * `#[default]` should be used on fields added by later migrations to avoid errors on existing objects.
 ///     Unnecessary if the new field is an `Option<>`
 ///
 /// For example

@@ -50,7 +50,7 @@ fn log_callback(error_code: std::ffi::c_int, message: &str) {
 
 /// SQLite [`Backend`] implementation.
 #[derive(Debug, Default)]
-pub struct SQLiteBackend {}
+pub struct SQLiteBackend;
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
         SQLiteBackend {}
@@ -728,7 +728,7 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: 
 }
 
 #[derive(Debug)]
-struct SQLitePlaceholderSource {}
+struct SQLitePlaceholderSource;
 impl SQLitePlaceholderSource {
     fn new() -> Self {
         SQLitePlaceholderSource {}

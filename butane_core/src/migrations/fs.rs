@@ -18,7 +18,7 @@ pub trait Filesystem: Debug {
 }
 
 #[derive(Debug)]
-pub struct OsFilesystem {}
+pub struct OsFilesystem;
 
 impl Filesystem for OsFilesystem {
     fn ensure_dir(&self, path: &Path) -> std::io::Result<()> {

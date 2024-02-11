@@ -269,8 +269,7 @@ pub fn add_fieldexprs(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 
             }
         }
         /// Helper struct for butane model.
-        #vis struct #fields_type {
-        }
+        #vis struct #fields_type;
         impl #fields_type {
             #(#fieldexprs)*
         }

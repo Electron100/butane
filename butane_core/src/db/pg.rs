@@ -25,7 +25,7 @@ pub const BACKEND_NAME: &str = "pg";
 
 /// Postgres [`Backend`] implementation.
 #[derive(Debug, Default)]
-pub struct PgBackend {}
+pub struct PgBackend;
 impl PgBackend {
     pub fn new() -> PgBackend {
         PgBackend {}

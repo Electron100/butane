@@ -17,6 +17,7 @@ pub trait Filesystem: Debug {
     fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>>;
 }
 
+/// `[Filesystem`] implementation using [`std::fs`].
 #[derive(Debug)]
 pub struct OsFilesystem;
 

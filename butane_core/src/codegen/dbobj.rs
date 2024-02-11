@@ -247,6 +247,7 @@ fn make_tablelit(config: &Config, tyname: &Ident) -> LitStr {
     }
 }
 
+/// Help to generate field expressions for each `#[butane::model]`.
 pub fn add_fieldexprs(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let vis = &ast_struct.vis;

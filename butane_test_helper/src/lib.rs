@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::process::{ChildStderr, Command, Stdio};
 use std::sync::Mutex;
 
+use block_id::{Alphabet, BlockId};
 use butane_core::db::{connect, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec};
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
@@ -34,7 +35,7 @@ pub struct PgServerState {
     /// Temporary directory containing the test server
     pub dir: PathBuf,
     /// Directory for the socket
-    pub sockdir: PathBuf,
+    pub sockdir: tempfile::TempDir,
     /// Process of the test server
     pub proc: std::process::Child,
     /// stderr from the test server
@@ -58,12 +59,15 @@ pub struct PgSetupData {
 
 /// Create and start a temporary postgres server instance.
 pub fn create_tmp_server() -> PgServerState {
-    eprintln!("create tmp server");
+    let seed: u128 = rand::random::<u64>() as u128;
+    let instance_id = BlockId::new(Alphabet::alphanumeric(), seed, 8)
+        .encode_string(0)
+        .unwrap();
     // create a temporary directory
     let dir = std::env::current_dir()
         .unwrap()
         .join("tmp_pg")
-        .join(Uuid::new_v4().to_string());
+        .join(instance_id);
     std::fs::create_dir_all(&dir).unwrap();
 
     // Run initdb to create a postgres cluster in our temporary director
@@ -80,17 +84,19 @@ pub fn create_tmp_server() -> PgServerState {
         panic!("postgres initdb failed")
     }
 
-    let sockdir = dir.join("socket");
-    std::fs::create_dir(&sockdir).unwrap();
+    let sockdir = tempfile::TempDir::new().unwrap();
 
     // Run postgres to actually create the server
+    // See https://www.postgresql.org/docs/current/app-postgres.html for CLI args.
+    // PGOPTIONS can be used to set args.
+    // PGDATA can be used instead of -D
     let mut proc = Command::new("postgres")
         .arg("-c")
         .arg("logging_collector=false")
         .arg("-D")
         .arg(&dir)
         .arg("-k")
-        .arg(&sockdir)
+        .arg(sockdir.path())
         .arg("-h")
         .arg("")
         .stderr(Stdio::piped())
@@ -101,6 +107,7 @@ pub fn create_tmp_server() -> PgServerState {
     loop {
         buf.clear();
         stderr.read_line(&mut buf).unwrap();
+        eprintln!("{buf}");
         if buf.contains("ready to accept connections") {
             break;
         }
@@ -142,7 +149,7 @@ pub fn pg_setup() -> PgSetupData {
         Err(_) => {
             let server_mguard = &TMP_SERVER.deref().lock().unwrap();
             let server: &PgServerState = server_mguard.as_ref().unwrap();
-            let host = server.sockdir.to_str().unwrap();
+            let host = server.sockdir.path().to_str().unwrap();
             format!("host={host} user=postgres")
         }
     };

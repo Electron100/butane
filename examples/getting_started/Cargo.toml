@@ -21,7 +21,7 @@ doc = false
 doc = false
 
 [dependencies]
-butane = { features = ["default", "sqlite"], workspace = true }
+butane = { features = ["pg", "sqlite"], workspace = true }
 
 
 [package.metadata.release]

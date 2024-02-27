@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - actions
+      - actions-*
   pull_request:
     branches:
       - master
@@ -14,20 +14,33 @@ env:
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v2
       # Postgresql setup adapted from Diesel CI
       # Disable ssl as server doesn't have a trusted cert
-    - name: Setup postgres
+    - name: Setup postgres on Linux
+      if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
         sudo apt-get install -y postgresql
         sudo sed -i "s/scram-sha-256/trust/" /etc/postgresql/14/main/pg_hba.conf
         sudo cat /etc/postgresql/14/main/pg_hba.conf
         sudo service postgresql restart && sleep 3
+        echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
+    - name: Setup postgres on MacOS
+      if: matrix.os == 'macos-latest'
+      run: |
+        initdb -D /usr/local/var/postgres
+        pg_ctl -D /usr/local/var/postgres start
+        sleep 3
+        createuser -s postgres
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
     - name: Install Rust tools
       run: cargo install typos-cli

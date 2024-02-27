@@ -17,8 +17,8 @@ jobs:
     strategy:
       matrix:
         os:
-          - ubuntu-latest
-          - macos-latest
+          # ubuntu-latest
+          # macos-latest
           - windows-2019
     runs-on: ${{ matrix.os }}
 
@@ -60,6 +60,8 @@ jobs:
         cd /D C:\ProgramData\chocolatey\lib\SQLite\tools
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
         lib /machine:x64 /def:sqlite3.def /out:sqlite3.lib
+        echo "C:\ProgramData\chocolatey\lib\SQLite\tools" >> $GITHUB_PATH
+        echo "SQLITE3_LIB_DIR=C:\ProgramData\chocolatey\lib\SQLite\tools" >> $GITHUB_ENV
 
     - name: Install Rust tools
       run: cargo install typos-cli

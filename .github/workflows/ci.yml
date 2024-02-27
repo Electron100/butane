@@ -19,7 +19,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          - windows-latest
+          - windows-2019
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -27,7 +27,7 @@ jobs:
       # Postgresql setup adapted from Diesel CI
       # Disable ssl as server doesn't have a trusted cert
     - name: Setup postgres on Linux
-      if: matrix.os == 'ubuntu-latest'
+      if: runner.os == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y postgresql
@@ -36,7 +36,7 @@ jobs:
         sudo service postgresql restart && sleep 3
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
     - name: Setup postgres on MacOS
-      if: matrix.os == 'macos-latest'
+      if: runner.os == 'macOS'
       run: |
         initdb -D /usr/local/var/postgres
         pg_ctl -D /usr/local/var/postgres start
@@ -44,7 +44,7 @@ jobs:
         createuser -s postgres
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
     - name: Install postgres (Windows)
-      if: matrix.os == 'windows-latest'
+      if: runner.os == 'Windows'
       shell: bash
       run: |
         choco install postgresql12 --force --params '/Password:root'
@@ -52,6 +52,14 @@ jobs:
         echo "C:\Program Files\PostgreSQL\12\lib" >> $GITHUB_PATH
         echo "PQ_LIB_DIR=C:\Program Files\PostgreSQL\12\lib" >> $GITHUB_ENV
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres password=root sslmode=disable port=5432" >> $GITHUB_ENV
+    - name: Install sqlite (Windows)
+      if: runner.os == 'Windows'
+      shell: cmd
+      run: |
+        choco install sqlite
+        cd /D C:\ProgramData\chocolatey\lib\SQLite\tools
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        lib /machine:x64 /def:sqlite3.def /out:sqlite3.lib
 
     - name: Install Rust tools
       run: cargo install typos-cli

@@ -23,6 +23,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::_filenames::CONNECTION_JSON_FILENAME;
 use crate::query::BoolExpr;
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 
@@ -112,7 +113,7 @@ impl ConnectionSpec {
         f.write_all(serde_json::to_string_pretty(self)?.as_bytes())
             .map_err(|e| e.into())
     }
-    /// Load a previously saved connection spec
+    /// Load a previously saved connection spec.
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = conn_complete_if_dir(path.as_ref());
         serde_json::from_reader(fs::File::open(path)?).map_err(|e| e.into())
@@ -127,7 +128,8 @@ impl ConnectionSpec {
 
 fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
     if path.is_dir() {
-        Cow::from(path.join("connection.json"))
+        //let path = path.join(CONNECTION_JSON_FILENAME);
+        Cow::from(path.join(CONNECTION_JSON_FILENAME))
     } else {
         Cow::from(path)
     }

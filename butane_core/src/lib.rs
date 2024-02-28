@@ -29,6 +29,15 @@ use db::{BackendRow, Column, ConnectionMethods};
 pub use query::Query;
 pub use sqlval::{AsPrimaryKey, FieldType, FromSql, PrimaryKeyType, SqlVal, SqlValRef, ToSql};
 
+/// Filenames used in butane.
+pub mod _filenames {
+    /// Directory to hold butane metadata.
+    pub const BUTANE_DIRNAME: &'static str = ".butane";
+    /// Filename for storing connection metadata.
+    pub const CONNECTION_JSON_FILENAME: &'static str = "connection.json";
+    /// Directory to hold butane migration data.
+    pub const MIGRATIONS_DIRNAME: &'static str = "migrations";
+}
 /// Result type that uses [`crate::Error`].
 pub type Result<T> = std::result::Result<T, crate::Error>;
 

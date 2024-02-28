@@ -12,6 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use butane::_filenames::{BUTANE_DIRNAME, MIGRATIONS_DIRNAME};
 use butane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
@@ -304,7 +305,7 @@ pub fn clean(base_dir: &Path) -> Result<()> {
 }
 
 pub fn get_migrations(base_dir: &Path) -> Result<FsMigrations> {
-    let root = base_dir.join("migrations");
+    let root = base_dir.join(MIGRATIONS_DIRNAME);
     if !root.exists() {
         eprintln!("No butane migrations directory found. Add at least one model to your project and build.");
         std::process::exit(1);
@@ -342,7 +343,7 @@ pub fn find_butane_workspace_member_paths() -> Result<Vec<PathBuf>> {
     // Find all workspace member with a .butane
     for member in workspace_members {
         let package_dir = extract_package_directory(&metadata.packages, member)?;
-        let member_butane_dir = package_dir.join(".butane/");
+        let member_butane_dir = package_dir.join(BUTANE_DIRNAME);
 
         if member_butane_dir.exists() {
             possible_directories.push(package_dir);

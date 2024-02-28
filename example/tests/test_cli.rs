@@ -1,9 +1,10 @@
 use assert_cmd::Command;
+use butane::_filenames::{BUTANE_DIRNAME, CONNECTION_JSON_FILENAME};
 
 #[test]
 fn test_migrate_and_query() {
     let db = "db.sqlite";
-    let connspec = ".butane/connection.json";
+    let connspec = format!("{BUTANE_DIRNAME}/{CONNECTION_JSON_FILENAME}");
 
     // These files should have been removed by build.rs
     assert!(!std::path::Path::new(&db).exists());

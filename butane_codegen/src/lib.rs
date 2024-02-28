@@ -7,6 +7,7 @@ extern crate proc_macro;
 
 use std::path::PathBuf;
 
+use butane_core::_filenames::*;
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
 use butane_core::{codegen, make_compile_error, migrations, SqlType};
 use proc_macro::TokenStream;
@@ -219,8 +220,8 @@ fn migrations_dir() -> PathBuf {
     let mut dir = PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR expected to be set"),
     );
-    dir.push(".butane");
-    dir.push("migrations");
+    dir.push(BUTANE_DIRNAME);
+    dir.push(MIGRATIONS_DIRNAME);
     dir
 }
 

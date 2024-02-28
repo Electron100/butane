@@ -4,7 +4,7 @@ use butane_cli::{
     base_dir, clean, clear_data, collapse_migrations, delete_table, detach_latest_migration, embed,
     get_migrations, handle_error, list_migrations, migrate, Result,
 };
-use clap::{value_parser, Arg, ArgMatches};
+use clap::{value_parser, Arg, ArgMatches, ArgAction};
 
 fn main() {
     let app = clap::Command::new("butane")
@@ -33,6 +33,14 @@ fn main() {
                         .required(true)
                         .index(2)
                         .help("Database connection string. Format depends on backend"),
+                )
+                .arg(
+                    Arg::new("connect")
+                    .long("no-connect")
+                    .action(ArgAction::SetFalse)
+                    .required(false)
+                    .num_args(0)
+                    .help("Do not connect to the database"),
                 ),
         )
         .subcommand(
@@ -158,7 +166,8 @@ fn init(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {
     let args = args.unwrap();
     let name: &String = args.get_one("BACKEND").unwrap();
     let connstr: &String = args.get_one("CONNECTION").unwrap();
-    butane_cli::init(base_dir, name, connstr)
+    let connect: bool = *args.get_one::<bool>("connect").unwrap();
+    butane_cli::init(base_dir, name, connstr, connect)
 }
 
 fn make_migration(base_dir: &PathBuf, args: Option<&ArgMatches>) -> Result<()> {

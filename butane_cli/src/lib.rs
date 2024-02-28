@@ -49,14 +49,16 @@ pub fn default_name() -> String {
     Utc::now().format("%Y%m%d_%H%M%S%3f").to_string()
 }
 
-pub fn init(base_dir: &PathBuf, name: &str, connstr: &str) -> Result<()> {
+pub fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) -> Result<()> {
     if db::get_backend(name).is_none() {
         eprintln!("Unknown backend {name}");
         std::process::exit(1);
     };
 
     let spec = db::ConnectionSpec::new(name, connstr);
-    db::connect(&spec)?; // ensure we can
+    if connect {
+        db::connect(&spec)?;
+    }
     std::fs::create_dir_all(base_dir)?;
     spec.save(base_dir)?;
 

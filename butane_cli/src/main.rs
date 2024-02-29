@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use butane::_filenames::BUTANE_DIRNAME;
 use butane_cli::{
     base_dir, clean, clear_data, collapse_migrations, delete_table, detach_latest_migration, embed,
     get_migrations, handle_error, list_migrations, migrate, Result,
@@ -117,7 +118,7 @@ However if the migration has been manually edited, it will need to be manually r
                 .arg_required_else_help(true);
     let args = app.get_matches();
     let mut base_dir = args.get_one::<PathBuf>("path").unwrap().clone();
-    base_dir.push(".butane");
+    base_dir.push(BUTANE_DIRNAME);
 
     // List any detached migrations.
     if let Ok(ms) = get_migrations(&base_dir) {

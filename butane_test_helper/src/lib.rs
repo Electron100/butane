@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::{ChildStderr, Command, Stdio};
 use std::sync::Mutex;
 
+use butane_core::_filenames::{BUTANE_DIRNAME, MIGRATIONS_DIRNAME};
 use butane_core::db::{connect, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec};
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
@@ -159,7 +160,8 @@ pub fn pg_connstr(data: &PgSetupData) -> String {
 
 pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool) {
     let mut root = std::env::current_dir().unwrap();
-    root.push(".butane/migrations");
+    root.push(BUTANE_DIRNAME);
+    root.push(MIGRATIONS_DIRNAME);
     let mut disk_migrations = migrations::from_root(&root);
     let disk_current = disk_migrations.current();
     eprintln!("{:?}", disk_current);

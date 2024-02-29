@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+
+use butane::_filenames::BUTANE_DIRNAME;
 use butane::db::{Connection, ConnectionSpec};
 use butane::prelude::*;
 use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};
@@ -86,7 +88,7 @@ fn query() -> Result<()> {
 
 fn establish_connection() -> Result<Connection> {
     let mut cwd = std::env::current_dir()?;
-    cwd.push(".butane");
+    cwd.push(BUTANE_DIRNAME);
     let spec = ConnectionSpec::load(cwd)?;
     let conn = butane::db::connect(&spec)?;
     Ok(conn)

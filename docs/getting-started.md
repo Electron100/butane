@@ -51,6 +51,7 @@ connection parameters. At this point, we can add a method (in our
 use butane::db::{Connection, ConnectionSpec};
 
 pub fn establish_connection() -> Connection {
+    let connection_spec = format!(".butane/{CONNECTIONS_JSON_FILENAME}");
     butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap()
 }
 ```

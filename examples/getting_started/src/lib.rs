@@ -5,13 +5,15 @@
 pub mod butane_migrations;
 pub mod models;
 
+use butane::_filenames::{BUTANE_DIRNAME, CONNECTION_JSON_FILENAME};
 use butane::db::{Connection, ConnectionSpec};
 use butane::prelude::*;
 use models::{Blog, Post};
 
 /// Load a [Connection].
 pub fn establish_connection() -> Connection {
-    butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap()
+    let connspec = format!("{BUTANE_DIRNAME}/{CONNECTION_JSON_FILENAME}");
+    butane::db::connect(&ConnectionSpec::load(connspec).unwrap()).unwrap()
 }
 
 /// Create a [Blog].

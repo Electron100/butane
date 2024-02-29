@@ -17,8 +17,13 @@ pub use butane_core::{
     Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
 
+pub mod _filenames {
+    //! Filenames used in butane.
+    pub use butane_core::_filenames::*;
+}
+
 pub mod db {
-    //! Database helpers
+    //! Database helpers.
     pub use butane_core::db::*;
 }
 

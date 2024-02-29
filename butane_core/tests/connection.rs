@@ -54,6 +54,9 @@ fn unreachable_pg_connection() {
         Err(butane_core::Error::Postgres(e)) => {
             eprintln!("{e:?}");
             assert!(format!("{e:?}").contains("Connect"));
+            #[cfg(target_os = "windows")]
+            assert!(format!("{e}").contains("No such host is known"));
+            #[cfg(not(target_os = "windows"))]
             assert!(format!("{e}").contains("failed to lookup address information"));
         }
         _ => panic!(),

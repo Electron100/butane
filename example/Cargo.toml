@@ -6,6 +6,9 @@ edition.workspace = true
 publish = false
 build = "build.rs"
 
+[features]
+sqlite-bundled = ["butane/sqlite-bundled"]
+
 [dependencies]
 butane = { features = ["sqlite"], workspace = true }
 

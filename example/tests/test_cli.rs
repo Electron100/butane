@@ -11,7 +11,7 @@ fn test_migrate_and_query() {
 
     // This ensures the binary exists if `example` is the first project tested
     Command::new("cargo")
-        .args(["build", "--workspace", "--bin=butane"])
+        .args(["build", "--workspace", "--bin=butane", "--all-features"])
         .assert()
         .success();
 

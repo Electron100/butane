@@ -99,6 +99,9 @@ pub trait MigrationMut: Migration {
     /// Set the backend-specific commands to apply/undo this migration.
     fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()>;
 
+    /// Remove the backend-specific commands to apply/undo this migration.
+    fn remove_sql(&mut self, backend_name: &str) -> Result<()>;
+
     /// Adds a TypeKey -> SqlType mapping. Only meaningful on the special current migration.
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()>;
 

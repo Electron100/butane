@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
 use butane_cli::{
-    base_dir, clean, clear_data, collapse_migrations, delete_table, detach_latest_migration, embed,
-    get_migrations, handle_error, init, list_migrations, make_migration, migrate, rollback,
+    add_backend, base_dir, clean, clear_data, collapse_migrations, delete_table,
+    detach_latest_migration, embed, get_migrations, handle_error, init, list_migrations,
+    make_migration, migrate, remove_backend, rollback,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
@@ -20,6 +21,15 @@ struct Cli {
 enum Commands {
     /// Initialize the database.
     Init(InitCommand),
+    /// Add a backend to existing migrations.
+    AddBackend {
+        /// Backend name to add.
+        name: String,
+    },
+    RemoveBackend {
+        /// Backend name to add.
+        name: String,
+    },
     /// Create a new migration.
     #[command(alias = "makemigration")]
     MakeMigration {
@@ -127,6 +137,8 @@ fn main() {
             &args.connection,
             args.connect,
         )),
+        Commands::RemoveBackend { name } => handle_error(remove_backend(&base_dir, name)),
+        Commands::AddBackend { name } => handle_error(add_backend(&base_dir, name)),
         Commands::MakeMigration { name } => handle_error(make_migration(&base_dir, Some(name))),
         Commands::DetachMigration => handle_error(detach_latest_migration(&base_dir)),
         Commands::Migrate { name } => handle_error(migrate(&base_dir, name.to_owned())),

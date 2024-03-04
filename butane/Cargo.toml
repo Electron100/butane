@@ -40,6 +40,7 @@ env_logger = { workspace = true }
 fake = { workspace = true, features = ["chrono", "derive", "uuid"] }
 geo-types = "0.7"
 log_for_test = { package = "log", version = "0.4" }
+nonempty.workspace = true
 quote = { workspace = true }
 proc-macro2 = { workspace = true }
 once_cell = { workspace = true }

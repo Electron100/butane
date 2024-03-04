@@ -194,7 +194,7 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
 
     assert!(
         mem_migrations
-            .create_migration(&backend, "init", None)
+            .create_migration(&nonempty::nonempty![backend], "init", None)
             .expect("expected to create migration without error"),
         "expected to create migration"
     );

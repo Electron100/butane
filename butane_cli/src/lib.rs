@@ -132,7 +132,7 @@ pub fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub fn migrate(base_dir: &PathBuf) -> Result<()> {
+pub fn migrate(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
     let spec = load_connspec(base_dir)?;
     let mut conn = db::connect(&spec)?;
     let to_apply = get_migrations(base_dir)?.unapplied_migrations(&conn)?;
@@ -140,8 +140,24 @@ pub fn migrate(base_dir: &PathBuf) -> Result<()> {
     for m in to_apply {
         println!("Applying migration {}", m.name());
         m.apply(&mut conn)?;
+        if let Some(ref name) = name {
+            if name == &m.name().to_string() {
+                println!("Finishing at migration {}", m.name());
+                break;
+            }
+        }
     }
     Ok(())
+}
+
+pub fn rollback(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
+    let spec = load_connspec(base_dir)?;
+    let conn = butane::db::connect(&spec)?;
+
+    match name {
+        Some(to) => rollback_to(base_dir, conn, &to),
+        None => rollback_latest(base_dir, conn),
+    }
 }
 
 pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()> {
@@ -154,10 +170,35 @@ pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()
         }
     };
 
-    let to_unapply = ms.migrations_since(&to_migration)?;
+    let latest = ms
+        .last_applied_migration(&conn)
+        .unwrap_or_else(|err| {
+            eprintln!("Err: {err}");
+            std::process::exit(1);
+        })
+        .unwrap_or_else(|| {
+            eprintln!("No migrations applied!");
+            std::process::exit(1);
+        });
+
+    if to_migration == latest {
+        eprintln!("That is the latest applied migration, not rolling back to anything.");
+        std::process::exit(1);
+    }
+
+    let mut to_unapply = ms.migrations_since(&to_migration)?;
     if to_unapply.is_empty() {
         eprintln!("That is the latest migration, not rolling back to anything. If you expected something to happen, try specifying the migration to rollback to.");
+        std::process::exit(1);
     }
+
+    if *to_unapply.last().unwrap() != latest {
+        let index = to_unapply.iter().position(|m| {
+            m.name() == latest.name()
+        }).unwrap();
+        to_unapply = to_unapply.split_at(index + 1).0.into();
+    }
+
     for m in to_unapply.into_iter().rev() {
         println!("Rolling back migration {}", m.name());
         m.downgrade(&mut conn)?;
@@ -166,7 +207,7 @@ pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()
 }
 
 pub fn rollback_latest(base_dir: &Path, mut conn: Connection) -> Result<()> {
-    match get_migrations(base_dir)?.latest() {
+    match get_migrations(base_dir)?.last_applied_migration(&conn)? {
         Some(m) => {
             println!("Rolling back migration {}", m.name());
             m.downgrade(&mut conn)?;

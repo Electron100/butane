@@ -1,3 +1,6 @@
+//! Test helpers to set up database connections.
+#![deny(missing_docs)]
+
 use std::io::{BufRead, BufReader, Read, Write};
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -9,12 +12,14 @@ use butane_core::migrations::{self, MemMigrations, Migration, Migrations, Migrat
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 
+/// Create a postgres [`Connection`].
 pub fn pg_connection() -> (Connection, PgSetupData) {
     let backend = get_backend(pg::BACKEND_NAME).unwrap();
     let data = pg_setup();
     (backend.connect(&pg_connstr(&data)).unwrap(), data)
 }
 
+/// Create a postgres [`ConnectionSpec`].
 pub fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
     let data = pg_setup();
     (
@@ -23,7 +28,7 @@ pub fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
     )
 }
 
-/// Server state for a test PostgreSQL server
+/// Server state for a test PostgreSQL server.
 #[derive(Debug)]
 pub struct PgServerState {
     /// Temporary directory containing the test server
@@ -44,13 +49,14 @@ impl Drop for PgServerState {
     }
 }
 
-/// Connection spec for a test server
+/// Connection spec for a test server.
 #[derive(Clone, Debug)]
 pub struct PgSetupData {
     /// Connection string
     pub connstr: String,
 }
 
+/// Create and start a temporary postgres server instance.
 pub fn create_tmp_server() -> PgServerState {
     eprintln!("create tmp server");
     // create a temporary directory
@@ -125,6 +131,7 @@ extern "C" fn proc_teardown() {
 static TMP_SERVER: Lazy<Mutex<Option<PgServerState>>> =
     Lazy::new(|| Mutex::new(Some(create_tmp_server())));
 
+/// Create a running empty postgres database named `butane_test_<uuid>`.
 pub fn pg_setup() -> PgSetupData {
     eprintln!("pg_setup");
     // By default we set up a temporary, local postgres server just
@@ -149,14 +156,18 @@ pub fn pg_setup() -> PgSetupData {
     let connstr = format!("{connstr} dbname={new_dbname}");
     PgSetupData { connstr }
 }
+
+/// Tear down postgres database created by [`pg_setup`].
 pub fn pg_teardown(_data: PgSetupData) {
     // All the work is done by the drop implementation
 }
 
+/// Obtain the connection string for the postgres database.
 pub fn pg_connstr(data: &PgSetupData) -> String {
     data.connstr.clone()
 }
 
+/// Populate the database schema.
 pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool) {
     let mut root = std::env::current_dir().unwrap();
     root.push(".butane/migrations");
@@ -188,18 +199,23 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
     }
 }
 
+/// Create a sqlite [`Connection`].
 pub fn sqlite_connection() -> Connection {
     let backend = get_backend(sqlite::BACKEND_NAME).unwrap();
     backend.connect(":memory:").unwrap()
 }
 
+/// Create a sqlite [`ConnectionSpec`].
 pub fn sqlite_connspec() -> ConnectionSpec {
     ConnectionSpec::new(sqlite::BACKEND_NAME, ":memory:")
 }
 
+/// Setup the test sqlite database.
 pub fn sqlite_setup() {}
+/// Tear down the test sqlite database.
 pub fn sqlite_teardown(_: ()) {}
 
+/// Wrap `$fname` in a `#[test]` with a `Connection` to `$connstr`.
 #[macro_export]
 macro_rules! maketest {
     ($fname:ident, $backend:expr, $connstr:expr, $dataname:ident, $migrate:expr) => {
@@ -219,6 +235,7 @@ macro_rules! maketest {
     };
 }
 
+/// Wrap `$fname` in a `#[test]` with a postgres `Connection` to `$connstr`.
 #[macro_export]
 macro_rules! maketest_pg {
     ($fname:ident, $migrate:expr) => {
@@ -232,6 +249,7 @@ macro_rules! maketest_pg {
     };
 }
 
+/// Create a sqlite and postgres `#[test]` that each invoke `$fname` with a [`Connection`] containing the schema.
 #[macro_export]
 macro_rules! testall {
     ($fname:ident) => {
@@ -248,6 +266,7 @@ macro_rules! testall {
     };
 }
 
+/// Create a sqlite and postgres `#[test]` that each invoke `$fname` with a [`Connection`] with no schema.
 #[macro_export]
 macro_rules! testall_no_migrate {
     ($fname:ident) => {

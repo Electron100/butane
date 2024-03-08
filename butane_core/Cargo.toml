@@ -54,7 +54,7 @@ assert_matches = "1.5"
 butane_test_helper = { workspace = true }
 env_logger = { workspace = true }
 paste = { workspace = true }
-tempfile = "3.7"
+tempfile.workspace = true
 
 [[test]]
 name = "uuid"

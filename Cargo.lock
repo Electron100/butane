@@ -209,6 +209,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-id"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28af93b9e274f9109b06714ef4391d9e159ad849cba25fbd184ef7e281650263"
+dependencies = [
+ "rand",
+ "rand_core",
+ "rand_pcg",
+]
+
+[[package]]
 name = "bstr"
 version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -318,10 +329,13 @@ dependencies = [
 name = "butane_test_helper"
 version = "0.6.1"
 dependencies = [
+ "block-id",
  "butane_core",
  "libc",
  "once_cell",
  "postgres",
+ "rand",
+ "tempfile",
  "uuid",
 ]
 
@@ -1378,6 +1392,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "rand_pcg"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59cad018caf63deb318e5a4586d99a24424a364f40f1e5778c29aca23f4fc73e"
+dependencies = [
+ "rand_core",
 ]
 
 [[package]]

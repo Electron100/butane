@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use butane_cli::{
     base_dir, clean, clear_data, collapse_migrations, delete_table, detach_latest_migration, embed,
-    get_migrations, handle_error, init, list_migrations, make_migration, migrate, Result,
+    get_migrations, handle_error, init, list_migrations, make_migration, migrate, rollback,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
@@ -42,7 +42,10 @@ However if the migration has been manually edited, it will need to be manually r
     )]
     DetachMigration,
     /// Apply migrations.
-    Migrate,
+    Migrate {
+        /// Migration to migrate to.
+        name: Option<String>,
+    },
     /// List migrations.
     List,
     /// Replace all migrations with a single migration representing the current model state.
@@ -55,7 +58,7 @@ However if the migration has been manually edited, it will need to be manually r
     /// Rollback migrations. With no arguments, undoes the latest migration. If the name of a migration is specified, rolls back until that migration is the latest applied migration.
     Rollback {
         /// Migration to roll back to.
-        name: String,
+        name: Option<String>,
     },
     /// Clear.
     Clear {
@@ -126,8 +129,8 @@ fn main() {
         )),
         Commands::MakeMigration { name } => handle_error(make_migration(&base_dir, Some(name))),
         Commands::DetachMigration => handle_error(detach_latest_migration(&base_dir)),
-        Commands::Migrate => handle_error(migrate(&base_dir)),
-        Commands::Rollback { name } => handle_error(rollback(&base_dir, Some(name))),
+        Commands::Migrate { name } => handle_error(migrate(&base_dir, name.to_owned())),
+        Commands::Rollback { name } => handle_error(rollback(&base_dir, name.to_owned())),
         Commands::Embed => handle_error(embed(&base_dir)),
         Commands::List => handle_error(list_migrations(&base_dir)),
         Commands::Collapse { name } => handle_error(collapse_migrations(&base_dir, Some(name))),
@@ -138,15 +141,5 @@ fn main() {
             DeleteCommands::Table { name } => handle_error(delete_table(&base_dir, name)),
         },
         Commands::Clean => handle_error(clean(&base_dir)),
-    }
-}
-
-fn rollback(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
-    let spec = butane_cli::load_connspec(base_dir)?;
-    let conn = butane::db::connect(&spec)?;
-
-    match name {
-        Some(to) => butane_cli::rollback_to(base_dir, conn, to),
-        None => butane_cli::rollback_latest(base_dir, conn),
     }
 }

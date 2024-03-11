@@ -303,8 +303,15 @@ pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     for mut m in migration_list {
         eprintln!("Updating {}", m.name());
         let to_db = m.db()?;
-        let ops = adb::diff(&from_db, &to_db);
+        let mut ops = adb::diff(&from_db, &to_db);
         assert!(!ops.is_empty());
+
+        if from_db.tables().count() == 0 {
+            // This is the first migration. Create the butane_migration table
+            ops.push(adb::Operation::AddTableIfNotExists(
+                migrations::migrations_table(),
+            ));
+        }
 
         let up_sql = backend.create_migration_sql(&from_db, ops)?;
         let down_sql = backend.create_migration_sql(&to_db, adb::diff(&to_db, &from_db))?;
@@ -341,9 +348,7 @@ pub fn remove_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn load_latest_migration_backends(
-    base_dir: &Path,
-) -> Result<NonEmpty<Box<dyn db::Backend>>> {
+pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {
     if let Ok(ms) = get_migrations(base_dir) {
         if let Some(latest_migration) = ms.latest() {
             if let Ok(backend_names) = latest_migration.sql_backends() {

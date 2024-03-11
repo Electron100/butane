@@ -283,6 +283,7 @@ pub fn load_connspec(base_dir: &PathBuf) -> Result<db::ConnectionSpec> {
     }
 }
 
+/// Add backend to existing migrations.
 pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     let existing_backends = load_latest_migration_backends(base_dir)?;
 
@@ -325,6 +326,7 @@ pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Remove a backend from existing migrations.
 pub fn remove_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     let existing_backends = load_latest_migration_backends(base_dir)?;
 
@@ -348,6 +350,8 @@ pub fn remove_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Load the [`db::Backend`]s used in the latest migration.
+/// Error if there are no existing migrations.
 pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {
     if let Ok(ms) = get_migrations(base_dir) {
         if let Some(latest_migration) = ms.latest() {

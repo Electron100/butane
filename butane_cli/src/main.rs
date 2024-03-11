@@ -26,6 +26,7 @@ enum Commands {
         /// Backend name to add.
         name: String,
     },
+    /// Remove a backend from existing migrations.
     RemoveBackend {
         /// Backend name to add.
         name: String,

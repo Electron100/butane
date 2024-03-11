@@ -200,6 +200,7 @@ where
     }
 }
 
+/// Returns [`ATable`] describing the migration metadata.
 pub fn migrations_table() -> ATable {
     let mut table = ATable::new("butane_migrations".to_string());
     let col = AColumn::new(

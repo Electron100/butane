@@ -1,1 +1,7 @@
-{"from_name":null,"backends":["sqlite"]}
+{
+  "from_name": null,
+  "backends": [
+    "sqlite",
+    "pg"
+  ]
+}

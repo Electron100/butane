@@ -81,6 +81,11 @@ impl MigrationMut for MemMigration {
             .insert(backend_name.to_string(), down_sql.to_string());
         Ok(())
     }
+    fn remove_sql(&mut self, backend_name: &str) -> Result<()> {
+        self.up.remove(backend_name);
+        self.down.remove(backend_name);
+        Ok(())
+    }
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
         self.db.add_type(key, sqltype);
         self.db.resolve_types()?;

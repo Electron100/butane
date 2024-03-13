@@ -17,14 +17,18 @@ name = "butane"
 path = "src/main.rs"
 
 [features]
+default = ["pg", "sqlite"]
+pg = ["butane/pg"]
+sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
 anyhow = "1.0"
-butane = { features = ["default", "pg", "sqlite"], workspace = true }
+butane.workspace = true
 cargo_metadata = "0.18"
 chrono = { workspace = true }
 clap = { version = "4.1", features = ["derive", "string", "wrap_help"] }
+nonempty.workspace = true
 quote = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

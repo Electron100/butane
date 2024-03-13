@@ -75,6 +75,10 @@ impl FsMigration {
         self.write_contents(&format!("{name}.sql"), sql.as_bytes())
     }
 
+    fn delete_sql(&self, name: &str) -> Result<()> {
+        self.delete_file(&format!("{name}.sql"))
+    }
+
     fn read_sql(&self, backend: &str, direction: &str) -> Result<Option<String>> {
         let path = self.sql_path(backend, direction);
         let mut buf = String::new();
@@ -87,6 +91,13 @@ impl FsMigration {
 
     fn sql_path(&self, backend: &str, direction: &str) -> PathBuf {
         self.root.join(format!("{backend}_{direction}.sql"))
+    }
+
+    fn delete_file(&self, fname: &str) -> Result<()> {
+        self.ensure_dir()?;
+        let path = self.root.join(fname);
+        self.fs.delete(&path)?;
+        Ok(())
     }
 
     fn write_contents(&self, fname: &str, contents: &[u8]) -> Result<()> {
@@ -147,6 +158,15 @@ impl MigrationMut for FsMigration {
         self.write_sql(&format!("{backend_name}_down"), down_sql)?;
         let mut info = self.info()?;
         info.backends.push(backend_name.to_string());
+        self.write_info(&info)?;
+        Ok(())
+    }
+
+    fn remove_sql(&mut self, backend_name: &str) -> Result<()> {
+        self.delete_sql(&format!("{backend_name}_up"))?;
+        self.delete_sql(&format!("{backend_name}_down"))?;
+        let mut info = self.info()?;
+        info.backends.retain(|x| x != backend_name);
         self.write_info(&info)?;
         Ok(())
     }

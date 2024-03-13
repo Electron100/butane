@@ -6,12 +6,14 @@
 //! breakages in the future.
 //! Backwards compatibility of the library will not even be considered, as the
 //! only objective of the crate is to provide a stable CLI.
+
 use std::{
     fs::File,
     io::Write,
     path::{Path, PathBuf},
 };
 
+use butane::migrations::adb;
 use butane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
@@ -19,6 +21,7 @@ use butane::query::BoolExpr;
 use butane::{db, db::Connection, db::ConnectionMethods, migrations};
 use cargo_metadata::MetadataCommand;
 use chrono::Utc;
+use nonempty::NonEmpty;
 use serde::{Deserialize, Serialize};
 
 pub type Result<T> = std::result::Result<T, anyhow::Error>;
@@ -65,7 +68,9 @@ pub fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) -> Res
     Ok(())
 }
 
-pub fn make_migration(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
+/// Make a migration.
+/// The backends are selected from the existing migrations, or the initialised connection.
+pub fn make_migration(base_dir: &Path, name: Option<&String>) -> Result<()> {
     let name = match name {
         Some(name) => format!("{}_{}", default_name(), name),
         None => default_name(),
@@ -75,15 +80,11 @@ pub fn make_migration(base_dir: &PathBuf, name: Option<&String>) -> Result<()> {
         eprintln!("Migration {name} already exists");
         std::process::exit(1);
     }
-    let spec = load_connspec(base_dir)?;
-    let backend = spec.get_backend()?;
-    let created = ms.create_migration(&backend, &name, ms.latest().as_ref())?;
+    let backends = load_backends(base_dir)?;
+
+    let created = ms.create_migration(&backends, &name, ms.latest().as_ref())?;
     if created {
-        let cli_state = CliState::load(base_dir)?;
-        if cli_state.embedded {
-            // Better include the new migration in the embedding
-            embed(base_dir)?;
-        }
+        update_embedded(base_dir)?;
         println!("Created migration {name}");
     } else {
         println!("No changes to migrate");
@@ -124,11 +125,10 @@ pub fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
         previous_migration.name()
     );
     ms.detach_latest_migration()?;
-    let cli_state = CliState::load(base_dir)?;
-    if cli_state.embedded {
-        // The latest migration needs to be removed from the embedding
-        embed(base_dir)?;
-    }
+
+    // The latest migration needs to be removed from the embedding
+    update_embedded(base_dir)?;
+
     Ok(())
 }
 
@@ -193,9 +193,10 @@ pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()
     }
 
     if *to_unapply.last().unwrap() != latest {
-        let index = to_unapply.iter().position(|m| {
-            m.name() == latest.name()
-        }).unwrap();
+        let index = to_unapply
+            .iter()
+            .position(|m| m.name() == latest.name())
+            .unwrap();
         to_unapply = to_unapply.split_at(index + 1).0.into();
     }
 
@@ -220,6 +221,7 @@ pub fn rollback_latest(base_dir: &Path, mut conn: Connection) -> Result<()> {
     Ok(())
 }
 
+/// Create `src/butane_migrations.rs` containing the migrations metadata.
 pub fn embed(base_dir: &Path) -> Result<()> {
     let srcdir = base_dir.join("../src");
     if !srcdir.exists() {
@@ -261,6 +263,16 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {{
     Ok(())
 }
 
+/// Update `src/butane_migrations.rs` if embedding is enabled.
+pub fn update_embedded(base_dir: &Path) -> Result<()> {
+    let cli_state = CliState::load(base_dir)?;
+    if cli_state.embedded {
+        // Update the embedding
+        embed(base_dir)?;
+    }
+    Ok(())
+}
+
 pub fn load_connspec(base_dir: &PathBuf) -> Result<db::ConnectionSpec> {
     match db::ConnectionSpec::load(base_dir) {
         Ok(spec) => Ok(spec),
@@ -270,6 +282,123 @@ pub fn load_connspec(base_dir: &PathBuf) -> Result<db::ConnectionSpec> {
         }
         Err(e) => Err(e.into()),
     }
+}
+
+/// List backends used in existing migrations.
+pub fn list_backends(base_dir: &Path) -> Result<()> {
+    let backends = load_latest_migration_backends(base_dir)?;
+    for backend in backends {
+        println!("{}", backend.name());
+    }
+    Ok(())
+}
+
+/// Add backend to existing migrations.
+pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
+    let existing_backends = load_latest_migration_backends(base_dir)?;
+
+    for backend in existing_backends {
+        if backend.name() == backend_name {
+            return Err(anyhow::anyhow!(
+                "Backend {backend_name} already present in migrations."
+            ));
+        }
+    }
+
+    let backend =
+        db::get_backend(backend_name).ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
+
+    let migrations = get_migrations(base_dir)?;
+    let migration_list = migrations.all_migrations()?;
+    let mut from_db = adb::ADB::new();
+    for mut m in migration_list {
+        println!("Updating {}", m.name());
+        let to_db = m.db()?;
+        let mut ops = adb::diff(&from_db, &to_db);
+        assert!(!ops.is_empty());
+
+        if from_db.tables().count() == 0 {
+            // This is the first migration. Create the butane_migration table
+            ops.push(adb::Operation::AddTableIfNotExists(
+                migrations::migrations_table(),
+            ));
+        }
+
+        let up_sql = backend.create_migration_sql(&from_db, ops)?;
+        let down_sql = backend.create_migration_sql(&to_db, adb::diff(&to_db, &from_db))?;
+        m.add_sql(backend.name(), &up_sql, &down_sql)?;
+
+        from_db = to_db;
+    }
+
+    update_embedded(base_dir)?;
+
+    Ok(())
+}
+
+/// Remove a backend from existing migrations.
+pub fn remove_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
+    let existing_backends = load_latest_migration_backends(base_dir)?;
+
+    if existing_backends.len() == 1 {
+        return Err(anyhow::anyhow!("Can not remove the last backend."));
+    }
+
+    let backend =
+        db::get_backend(backend_name).ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
+
+    let migrations = get_migrations(base_dir)?;
+    let migration_list = migrations.all_migrations()?;
+
+    for mut m in migration_list {
+        println!("Updating {}", m.name());
+        m.remove_sql(backend.name())?;
+    }
+
+    update_embedded(base_dir)?;
+
+    Ok(())
+}
+
+/// Load the [`db::Backend`]s used in the latest migration.
+/// Error if there are no existing migrations.
+pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {
+    if let Ok(ms) = get_migrations(base_dir) {
+        if let Some(latest_migration) = ms.latest() {
+            if let Ok(backend_names) = latest_migration.sql_backends() {
+                assert!(!backend_names.is_empty());
+                let mut backends: Vec<Box<dyn db::Backend>> = vec![];
+
+                for backend_name in backend_names {
+                    backends.push(
+                        db::get_backend(&backend_name)
+                            .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?,
+                    );
+                }
+                return Ok(NonEmpty::<Box<dyn db::Backend>>::from_vec(backends).unwrap());
+            }
+        }
+    }
+    Err(anyhow::anyhow!("There are no exiting migrations."))
+}
+
+/// Load [`db::Backend`]s selected in the latest migration, or when there are no migrations,
+/// fallback to the backend named in the connection.
+pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {
+    // Try to use the same backends as the latest migration.
+    let backends = load_latest_migration_backends(base_dir);
+    if backends.is_ok() {
+        return backends;
+    }
+
+    // Otherwise use the backend used during `init`.
+    if let Ok(spec) = db::ConnectionSpec::load(base_dir) {
+        return Ok(nonempty::nonempty![spec.get_backend().unwrap()]);
+    }
+
+    Err(anyhow::anyhow!(
+        "No Butane connection info found. Run `butane init`"
+    ))
 }
 
 pub fn list_migrations(base_dir: &PathBuf) -> Result<()> {
@@ -289,30 +418,50 @@ pub fn list_migrations(base_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// Collapse multiple applied migrations into a new migration.
 pub fn collapse_migrations(base_dir: &PathBuf, new_initial_name: Option<&String>) -> Result<()> {
     let name = match new_initial_name {
         Some(name) => format!("{}_{}", default_name(), name),
         None => default_name(),
     };
-    let spec = load_connspec(base_dir)?;
-    let backend = spec.get_backend()?;
-    let conn = db::connect(&spec)?;
+
     let mut ms = get_migrations(base_dir)?;
-    let latest = ms.last_applied_migration(&conn)?;
-    if latest.is_none() {
+
+    let all_migrations = ms.all_migrations().unwrap_or_else(|e| {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    });
+    let initial_migration = all_migrations.first().unwrap_or_else(|| {
         eprintln!("There are no migrations to collapse");
         std::process::exit(1);
+    });
+    let latest_migration = ms.latest().expect("Latest should exist");
+    if initial_migration == &latest_migration {
+        eprintln!("Can not collapse a single migration");
+        std::process::exit(1);
     }
+
+    // Use the same backends as the latest migration.
+    let backends = load_latest_migration_backends(base_dir)?;
+
+    // TODO: it should also be possible to collapse migrations on the filesystem
+    // when the database hasnt been migrated at all.
+    let spec = load_connspec(base_dir)?;
+    let conn = db::connect(&spec)?;
+    let latest = ms.last_applied_migration(&conn)?;
+    if latest.is_none() {
+        eprintln!("There are no applied migrations to collapse");
+        std::process::exit(1);
+    }
+
     let latest_db = latest.unwrap().db()?;
     ms.clear_migrations(&conn)?;
-    ms.create_migration_to(&backend, &name, None, latest_db)?;
+    ms.create_migration_to(&backends, &name, None, latest_db)?;
     let new_migration = ms.latest().unwrap();
     new_migration.mark_applied(&conn)?;
-    let cli_state = CliState::load(base_dir)?;
-    if cli_state.embedded {
-        // Update the embedding
-        embed(base_dir)?;
-    }
+
+    update_embedded(base_dir)?;
+
     println!("Collapsed all changes into new single migration '{name}'");
     Ok(())
 }

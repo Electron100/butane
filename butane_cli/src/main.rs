@@ -1,8 +1,12 @@
+//! butane CLI.
+#![deny(missing_docs)]
+
 use std::path::PathBuf;
 
 use butane_cli::{
-    base_dir, clean, clear_data, collapse_migrations, delete_table, detach_latest_migration, embed,
-    get_migrations, handle_error, init, list_migrations, make_migration, migrate, rollback,
+    add_backend, base_dir, clean, clear_data, collapse_migrations, delete_table,
+    detach_latest_migration, embed, get_migrations, handle_error, init, list_backends,
+    list_migrations, make_migration, migrate, remove_backend, rollback,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
@@ -20,6 +24,11 @@ struct Cli {
 enum Commands {
     /// Initialize the database.
     Init(InitCommand),
+    /// Backends.
+    Backend {
+        #[clap(subcommand)]
+        subcommand: BackendCommands,
+    },
     /// Create a new migration.
     #[command(alias = "makemigration")]
     MakeMigration {
@@ -86,6 +95,22 @@ struct InitCommand {
 }
 
 #[derive(Subcommand)]
+enum BackendCommands {
+    /// Add a backend to existing migrations.
+    Add {
+        /// Backend name to add.
+        name: String,
+    },
+    /// Remove a backend from existing migrations.
+    Remove {
+        /// Backend name to remove.
+        name: String,
+    },
+    /// List backends present in existing migrations.
+    List,
+}
+
+#[derive(Subcommand)]
 enum ClearCommands {
     /// Clear all data from the database. The schema is left intact, but all instances of all models (i.e. all rows of all tables defined by the models) are deleted.
     Data,
@@ -127,6 +152,11 @@ fn main() {
             &args.connection,
             args.connect,
         )),
+        Commands::Backend { subcommand } => match subcommand {
+            BackendCommands::Add { name } => handle_error(add_backend(&base_dir, name)),
+            BackendCommands::Remove { name } => handle_error(remove_backend(&base_dir, name)),
+            BackendCommands::List => handle_error(list_backends(&base_dir)),
+        },
         Commands::MakeMigration { name } => handle_error(make_migration(&base_dir, Some(name))),
         Commands::DetachMigration => handle_error(detach_latest_migration(&base_dir)),
         Commands::Migrate { name } => handle_error(migrate(&base_dir, name.to_owned())),

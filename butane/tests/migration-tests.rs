@@ -288,12 +288,13 @@ fn test_migrate(
 ) {
     let mut ms = MemMigrations::new();
     let backend = conn.backend();
+    let backends = nonempty::nonempty![backend];
     model_with_migrations(init_tokens, &mut ms);
-    assert!(ms.create_migration(&backend, "init", None).unwrap());
+    assert!(ms.create_migration(&backends, "init", None).unwrap());
 
     model_with_migrations(v2_tokens, &mut ms);
     assert!(ms
-        .create_migration(&backend, "v2", ms.latest().as_ref())
+        .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
     let mut to_apply = ms.unapplied_migrations(conn).unwrap();
@@ -395,12 +396,13 @@ fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected
 
     let mut ms = MemMigrations::new();
     let backend = conn.backend();
+    let backends = nonempty::nonempty![backend];
     model_with_migrations(init_tokens, &mut ms);
-    assert!(ms.create_migration(&backend, "init", None).unwrap());
+    assert!(ms.create_migration(&backends, "init", None).unwrap());
 
     ms.current().delete_table("Foo").unwrap();
     assert!(ms
-        .create_migration(&backend, "v2", ms.latest().as_ref())
+        .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
     let mut to_apply = ms.unapplied_migrations(conn).unwrap();

@@ -237,9 +237,9 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
             #[cfg(feature = "json")]
             SqlType::Json => SqlVal::Json(serde_json::Value::default()),
             #[cfg(feature = "datetime")]
-            SqlType::Timestamp => SqlVal::Timestamp(
-                chrono::DateTime::from_timestamp(0, 0).unwrap().naive_utc()
-            ),
+            SqlType::Timestamp => {
+                SqlVal::Timestamp(chrono::DateTime::from_timestamp(0, 0).unwrap().naive_utc())
+            }
             SqlType::Custom(_) => return Err(Error::NoCustomDefault),
         },
         TypeIdentifier::Name(_) => return Err(Error::NoCustomDefault),

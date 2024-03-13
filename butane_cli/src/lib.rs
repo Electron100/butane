@@ -6,6 +6,7 @@
 //! breakages in the future.
 //! Backwards compatibility of the library will not even be considered, as the
 //! only objective of the crate is to provide a stable CLI.
+
 use std::{
     fs::File,
     io::Write,
@@ -68,7 +69,7 @@ pub fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) -> Res
 }
 
 /// Make a migration.
-/// When `backend_names` is empty, the backend is selected from the existing migrations or connection.
+/// The backends are selected from the existing migrations, or the initialised connection.
 pub fn make_migration(base_dir: &Path, name: Option<&String>) -> Result<()> {
     let name = match name {
         Some(name) => format!("{}_{}", default_name(), name),
@@ -283,6 +284,15 @@ pub fn load_connspec(base_dir: &PathBuf) -> Result<db::ConnectionSpec> {
     }
 }
 
+/// List backends used in existing migrations.
+pub fn list_backends(base_dir: &Path) -> Result<()> {
+    let backends = load_latest_migration_backends(base_dir)?;
+    for backend in backends {
+        println!("{}", backend.name());
+    }
+    Ok(())
+}
+
 /// Add backend to existing migrations.
 pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     let existing_backends = load_latest_migration_backends(base_dir)?;
@@ -302,7 +312,7 @@ pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     let migration_list = migrations.all_migrations()?;
     let mut from_db = adb::ADB::new();
     for mut m in migration_list {
-        eprintln!("Updating {}", m.name());
+        println!("Updating {}", m.name());
         let to_db = m.db()?;
         let mut ops = adb::diff(&from_db, &to_db);
         assert!(!ops.is_empty());
@@ -341,7 +351,7 @@ pub fn remove_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     let migration_list = migrations.all_migrations()?;
 
     for mut m in migration_list {
-        eprintln!("Updating {}", m.name());
+        println!("Updating {}", m.name());
         m.remove_sql(backend.name())?;
     }
 

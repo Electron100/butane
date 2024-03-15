@@ -1,4 +1,5 @@
 //! Test helpers to set up database connections.
+//! Macros depend on [`butane_core`], `env_logger` and [`log`].
 #![deny(missing_docs)]
 
 use std::io::{BufRead, BufReader, Read, Write};
@@ -107,18 +108,18 @@ pub fn create_tmp_server() -> PgServerState {
     loop {
         buf.clear();
         stderr.read_line(&mut buf).unwrap();
-        eprintln!("{buf}");
+        log::trace!("{buf}");
         if buf.contains("ready to accept connections") {
             break;
         }
         if proc.try_wait().unwrap().is_some() {
             buf.clear();
             stderr.read_to_string(&mut buf).unwrap();
-            eprint!("{buf}");
+            log::error!("{buf}");
             panic!("postgres process died");
         }
     }
-    eprintln!("created tmp server!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    log::info!("created tmp pg server.");
     unsafe {
         // Try to delete all the pg files when the process exits
         libc::atexit(proc_teardown);
@@ -140,7 +141,7 @@ static TMP_SERVER: Lazy<Mutex<Option<PgServerState>>> =
 
 /// Create a running empty postgres database named `butane_test_<uuid>`.
 pub fn pg_setup() -> PgSetupData {
-    eprintln!("pg_setup");
+    log::trace!("starting pg_setup");
     // By default we set up a temporary, local postgres server just
     // for this test. This can be overridden by the environment
     // variable BUTANE_PG_CONNSTR
@@ -154,7 +155,7 @@ pub fn pg_setup() -> PgSetupData {
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
-    eprintln!("new db is `{}`", &new_dbname);
+    log::info!("new db is `{}`", &new_dbname);
 
     let mut conn = connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
@@ -180,7 +181,7 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
     root.push(".butane/migrations");
     let mut disk_migrations = migrations::from_root(&root);
     let disk_current = disk_migrations.current();
-    eprintln!("{:?}", disk_current);
+    log::info!("Loading migrations from {:?}", disk_current);
     if !migrate {
         return;
     }
@@ -198,10 +199,10 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
             .expect("expected to create migration without error"),
         "expected to create migration"
     );
-    println!("created current migration");
+    log::info!("created current migration");
     let to_apply = mem_migrations.unapplied_migrations(conn).unwrap();
     for m in to_apply {
-        println!("Applying migration {}", m.name());
+        log::info!("Applying migration {}", m.name());
         m.apply(conn).unwrap();
     }
 }
@@ -232,7 +233,7 @@ macro_rules! maketest {
                 env_logger::try_init().ok();
                 let backend = butane_core::db::get_backend(&stringify!($backend)).expect("Could not find backend");
                 let $dataname = butane_test_helper::[<$backend _setup>]();
-                eprintln!("connecting to {}", &$connstr);
+                log::info!("connecting to {}..", &$connstr);
                 let mut conn = backend.connect(&$connstr).expect("Could not connect backend");
                 butane_test_helper::setup_db(backend, &mut conn, $migrate);
                 $fname(conn);

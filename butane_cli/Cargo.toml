@@ -28,6 +28,9 @@ butane.workspace = true
 cargo_metadata = "0.18"
 chrono = { workspace = true }
 clap = { version = "4.1", features = ["derive", "string", "wrap_help"] }
+clap-verbosity-flag = "2.2"
+env_logger.workspace = true
+log.workspace = true
 nonempty.workspace = true
 quote = { workspace = true }
 serde = { workspace = true }

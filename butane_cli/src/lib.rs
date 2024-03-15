@@ -367,6 +367,8 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
         if let Some(latest_migration) = ms.latest() {
             if let Ok(backend_names) = latest_migration.sql_backends() {
                 assert!(!backend_names.is_empty());
+                log::info!("Latest migration contains backends: {}", backend_names.join(", "));
+
                 let mut backends: Vec<Box<dyn db::Backend>> = vec![];
 
                 for backend_name in backend_names {
@@ -375,6 +377,7 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
                             .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?,
                     );
                 }
+
                 return Ok(NonEmpty::<Box<dyn db::Backend>>::from_vec(backends).unwrap());
             }
         }

@@ -17,12 +17,11 @@ In `Cargo.toml`, add a dependency on Butane:
 
 ``` toml
 [dependencies]
-butane = { version = "0.6", features=["default", "sqlite"] }
+butane = { version = "0.6", features=["pg", "sqlite"] }
 ```
 
-Substitute another backend instead of "sqlite" as desired ("pg" for
-PostgreSQL). This will apply throughout this guide, we'll assume
-SQLite, but Postgres can be used instead.
+This guide will focus on using SQLite initially, and use "pg" for
+PostgreSQL support at the end.
 
 A word on error-handling: for simplicity, this example unwraps errors
 to panic on failure. In a real program, you would of course handle
@@ -41,10 +40,14 @@ cargo install butane_cli
 butane init sqlite example.db
 ```
 
-This will have created an `example.db` sqlite file in the current
+This will have created an `example.db` SQLite file in the current
 directory as well as a `.butane` subdirectory. Inside that
 subdirectory, we see a `connection.json` file containing our
-connection parameters. At this point, we can add a method (in our
+connection parameters.
+
+## Connection
+
+At this point, we can add a method (in our
 `lib.rs`) to establish a connection in code.
 
 ``` rust
@@ -476,6 +479,57 @@ butane migrate
 ```
 
 And that's it! Now we can use our new field.
+
+## Embedding migrations
+
+So far, the migrations are stored on the file-system.
+If the application is distributed as an executable, those migrations need to be included.
+
+To do that, the `embed` command will create a Rust file `butane_migrations.rs` which can be included into the code.
+
+``` shell
+butane embed
+```
+
+After running the `embed` sub-command, the generated code needs to be included into the Rust code.
+
+Edit the `lib.rs` and add the following at the top:
+
+``` rust
+pub mod butane_migrations;
+```
+
+Opening the generated `butane_migrations.rs` shows it includes the same SQLite migrations that are stored on disk.
+
+Now compiling the code will include the migrations, however we need to update the function `establish_connection`
+to use these migrations:
+
+``` rust
+pub fn establish_connection() -> Connection {
+    use butane::migrations::{Migration, Migrations};
+
+    let mut connection = butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap();
+    let migrations = butane_migrations::get_migrations().unwrap();
+    let to_apply = migrations.unapplied_migrations(&connection).unwrap();
+    for migration in to_apply {
+        migration.apply(&mut connection).unwrap();
+    }
+    connection
+}
+```
+
+Now the executable can automatically migrate a database to the current schema that executable requires.
+
+## Adding PostgreSQL support
+
+To add the PostgreSQL backend, run:
+
+``` shell
+butane backend add pg
+```
+
+The file-system migrations will be updated to include PostgreSQL support, and `butane_migrations.rs`
+will also be updated to include the PostgreSQL migration scripts.
 
 ## Summary
 

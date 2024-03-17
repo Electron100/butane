@@ -293,6 +293,11 @@ impl FsMigrations {
         }
     }
     fn save_state(&mut self, state: &MigrationsState) -> Result<()> {
+        let path = self.root.join(".gitignore");
+        if !path.exists() {
+            let mut f = self.fs.write(&path)?;
+            f.write_all(b"lock\n")?;
+        }
         let path = self.root.join("state.json");
         let mut f = self.fs.write(&path)?;
         f.write_all(serde_json::to_string_pretty(state)?.as_bytes())

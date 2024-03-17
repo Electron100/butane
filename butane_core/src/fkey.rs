@@ -1,13 +1,16 @@
 //! Implementation of foreign key relationships between models.
 #![deny(missing_docs)]
-use crate::*;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
 use tokio::sync::OnceCell;
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::{
+    AsPrimaryKey, DataObject, Error, FieldType, FromSql, Result, SqlType, SqlVal, SqlValRef, ToSql,
+};
 
 /// Used to implement a relationship between models.
 ///
@@ -86,7 +89,7 @@ impl<T: DataObject + Send> ForeignKey<T> {
         self.val
             .get_or_try_init(|| async {
                 let pk = self.valpk.get().unwrap();
-                T::get(conn, &T::PKType::from_sql_ref(pk.as_ref())?)
+                T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?)
                     .await
                     .map(Box::new)
             })

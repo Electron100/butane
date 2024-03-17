@@ -1,11 +1,11 @@
+use std::borrow::Cow;
+use std::fmt::Debug;
+
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::ButaneMigration;
 use crate::db::ConnectionMethods;
 use crate::query::{BoolExpr, Expr};
 use crate::{db, sqlval::ToSql, DataObject, DataResult, Error, Result};
-use std::borrow::Cow;
-use std::cmp::PartialEq;
-use std::fmt::Debug;
 
 /// Type representing a database migration. A migration describes how
 /// to bring the database from state A to state B. In general, the
@@ -100,6 +100,9 @@ pub trait MigrationMut: Migration {
 
     /// Set the backend-specific commands to apply/undo this migration.
     fn add_sql(&mut self, backend_name: &str, up_sql: &str, down_sql: &str) -> Result<()>;
+
+    /// Remove the backend-specific commands to apply/undo this migration.
+    fn remove_sql(&mut self, backend_name: &str) -> Result<()>;
 
     /// Adds a TypeKey -> SqlType mapping. Only meaningful on the special current migration.
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()>;

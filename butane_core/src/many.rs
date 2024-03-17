@@ -2,7 +2,7 @@
 #![deny(missing_docs)]
 use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr, OrderDirection, Query};
-use crate::{DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
+use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use tokio::sync::OnceCell;
@@ -75,11 +75,8 @@ where
     /// to have an uninitialized one.
     pub fn add(&mut self, new_val: &T) -> Result<()> {
         // Check for uninitialized pk
-        match new_val.is_saved() {
-            Ok(true) => (), // hooray
-            Ok(false) => return Err(Error::ValueNotSaved),
-            Err(Error::SaveDeterminationNotSupported) => (), // we don't know, so assume it's OK
-            Err(e) => return Err(e),                         // unexpected error
+        if !new_val.pk().is_valid() {
+            return Err(Error::ValueNotSaved);
         }
 
         // all_values is now out of date, so clear it
@@ -126,6 +123,21 @@ where
             .await?;
         }
         self.new_values.clear();
+        Ok(())
+    }
+
+    /// Delete all references from the database, and any unsaved additions.
+    pub async fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+        let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
+        conn.delete_where(
+            &self.item_table,
+            BoolExpr::Eq("owner", Expr::Val(owner.clone())),
+        )
+        .await?;
+        self.new_values.clear();
+        self.removed_values.clear();
+        // all_values is now out of date, so clear it
+        self.all_values = OnceCell::new();
         Ok(())
     }
 

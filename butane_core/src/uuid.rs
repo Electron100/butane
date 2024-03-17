@@ -1,11 +1,12 @@
 //! Uuid support
 
 #![deny(missing_docs)]
+use uuid::Uuid;
+
 use crate::{
     Error::CannotConvertSqlVal, FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal,
     SqlValRef, ToSql,
 };
-use uuid::Uuid;
 
 impl ToSql for Uuid {
     fn to_sql(&self) -> SqlVal {

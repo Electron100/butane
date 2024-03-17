@@ -1,28 +1,21 @@
 #![allow(dead_code)]
 use butane::db::{Connection, ConnectionSpec};
-use butane::model;
-use butane::Error;
-use butane::ObjectState;
-use butane::{find, query};
-use butane::{ForeignKey, Many};
-
 use butane::prelude::*;
+use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};
 
-pub type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 #[model]
 #[derive(Debug, Default)]
 struct Blog {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     name: String,
 }
 
 #[model]
 #[derive(Debug)]
 struct Post {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     title: String,
     body: String,
     published: bool,
@@ -32,9 +25,9 @@ struct Post {
     byline: Option<String>,
 }
 impl Post {
-    pub fn new(blog: &Blog, title: String, body: String) -> Self {
+    fn new(blog: &Blog, title: String, body: String) -> Self {
         Post {
-            id: -1,
+            id: AutoPk::default(),
             title,
             body,
             published: false,
@@ -42,7 +35,6 @@ impl Post {
             blog: blog.into(),
             byline: None,
             likes: 0,
-            state: ObjectState::default(),
         }
     }
 }
@@ -64,7 +56,6 @@ async fn query() -> Result<()> {
 
     let mut tag = Tag {
         tag: "dinosaurs".into(),
-        ..Default::default()
     };
     tag.save(&conn).await.unwrap();
 

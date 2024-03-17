@@ -1,18 +1,20 @@
 //! Types and traits for interacting with a value that can be stored in the database.
 
-use crate::custom::{SqlValCustom, SqlValRefCustom};
-use crate::{DataObject, Error::CannotConvertSqlVal, Result, SqlType};
-use serde::{Deserialize, Serialize};
+#![allow(missing_docs)]
+
 use std::borrow::Cow;
 #[cfg(feature = "json")]
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
-
-#[cfg(feature = "pg")]
-use crate::custom::SqlTypeCustom;
 
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, DateTime};
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "pg")]
+use crate::custom::SqlTypeCustom;
+use crate::custom::{SqlValCustom, SqlValRefCustom};
+use crate::{DataObject, Error::CannotConvertSqlVal, Result, SqlType};
 
 #[derive(Clone, Debug)]
 pub enum SqlValRef<'a> {
@@ -287,7 +289,16 @@ pub trait FieldType: ToSql + FromSql {
 }
 
 /// Marker trait for a type suitable for being a primary key
-pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync{}
+pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync {
+    /// Test if this object's pk is valid. The only case in which this
+    /// returns false is if the pk is an AutoPk and it's not yet valid.
+    ///
+    /// If you're implementing [PrimaryKeyType], the default implementation returns true
+    /// and you do not need to change that unless you're doing something very unusual.
+    fn is_valid(&self) -> bool {
+        true
+    }
+}
 
 /// Trait for referencing the primary key for a given model. Used to
 /// implement ForeignKey equality tests.
@@ -476,6 +487,7 @@ impl FieldType for serde_json::Value {
 #[cfg(feature = "json")]
 impl PrimaryKeyType for serde_json::Value {}
 
+// JSON HashMap support
 #[cfg(feature = "json")]
 impl<T> ToSql for HashMap<String, T>
 where
@@ -504,8 +516,47 @@ where
         sql_conv_err!(val, Json)
     }
 }
+
 #[cfg(feature = "json")]
 impl<T> FieldType for HashMap<String, T>
+where
+    T: Clone + PartialEq + for<'a> serde::Deserialize<'a> + serde::Serialize,
+{
+    type RefType = Self;
+    const SQLTYPE: SqlType = SqlType::Json;
+}
+
+// JSON BTreeMap support
+#[cfg(feature = "json")]
+impl<T> ToSql for BTreeMap<String, T>
+where
+    T: Clone + PartialEq + Serialize,
+{
+    fn to_sql(&self) -> SqlVal {
+        self.to_sql_ref().into()
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Json(serde_json::to_value(self).unwrap())
+    }
+}
+
+#[cfg(feature = "json")]
+impl<T> FromSql for BTreeMap<String, T>
+where
+    T: Clone + PartialEq + for<'a> serde::Deserialize<'a>,
+{
+    fn from_sql_ref(val: SqlValRef) -> Result<Self> {
+        if let SqlValRef::Json(serde_json::Value::Object(m)) = val {
+            return Ok(m
+                .iter()
+                .map(|(k, v)| (k.to_owned(), T::deserialize(v).unwrap()))
+                .collect::<BTreeMap<String, T>>());
+        }
+        sql_conv_err!(val, Json)
+    }
+}
+#[cfg(feature = "json")]
+impl<T> FieldType for BTreeMap<String, T>
 where
     T: Clone + PartialEq + for<'a> serde::Deserialize<'a> + serde::Serialize,
 {
@@ -538,18 +589,10 @@ impl PrimaryKeyType for NaiveDateTime {}
 #[cfg(feature = "datetime")]
 impl FromSql for DateTime<chrono::offset::Utc> {
     fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
-        use chrono::Utc;
-        Ok(DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_sql_ref(valref)?,
-            Utc,
-        ))
+        Ok(NaiveDateTime::from_sql_ref(valref)?.and_utc())
     }
     fn from_sql(val: SqlVal) -> Result<Self> {
-        use chrono::Utc;
-        Ok(DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_sql(val)?,
-            Utc,
-        ))
+        Ok(NaiveDateTime::from_sql(val)?.and_utc())
     }
 }
 #[cfg(feature = "datetime")]

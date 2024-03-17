@@ -2,11 +2,15 @@
 //! the `query!`, `filter!`, and `find!` macros instead of using this
 //! module directly.
 
-use crate::db::{BackendRows, ConnectionMethods, QueryResult};
-use crate::{DataResult, Result, SqlVal};
-use fallible_iterator::FallibleIterator;
+#![allow(missing_docs)]
+
 use std::borrow::Cow;
 use std::marker::PhantomData;
+
+use fallible_iterator::FallibleIterator;
+
+use crate::db::{BackendRows, ConnectionMethods, QueryResult};
+use crate::{DataResult, Result, SqlVal};
 
 mod fieldexpr;
 

@@ -21,9 +21,8 @@ doc = false
 doc = false
 
 [dependencies]
-butane = { features = ["default", "pg", "sqlite"], workspace = true }
+butane = { features = ["pg", "sqlite"], workspace = true }
 tokio = { workspace = true, features = ["macros"] }
-
 
 [package.metadata.release]
 release = false

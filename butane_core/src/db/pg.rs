@@ -1,28 +1,32 @@
 //! Postgresql database backend
-use super::connmethods::VecRows;
-use super::helper;
-use super::*;
-use crate::custom::{SqlTypeCustom, SqlValRefCustom};
-use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
-use crate::query::Expr;
-use crate::{debug, query, warn};
-use crate::{Result, SqlType, SqlVal, SqlValRef};
+use std::borrow::Cow;
+use std::fmt::{Debug, Write};
+
 use async_trait::async_trait;
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
+
+use super::connmethods::VecRows;
+use super::helper;
+use crate::custom::{SqlTypeCustom, SqlValRefCustom};
+use crate::db::{
+    Backend, BackendConnection, BackendRow, BackendTransaction, Column, Connection,
+    ConnectionMethods, RawQueryResult, Transaction,
+};
+use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
+use crate::query::{BoolExpr, Expr};
+use crate::{debug, query, warn, Error, Result, SqlType, SqlVal, SqlValRef};
 use futures_util::stream::StreamExt;
-use std::fmt::Write;
-use tokio;
 use tokio_postgres as postgres;
 use tokio_postgres::GenericClient;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
 
-/// Pg [Backend][crate::db::Backend] implementation.
+/// Postgres [`Backend`] implementation.
 #[derive(Debug, Default, Clone)]
-pub struct PgBackend {}
+pub struct PgBackend;
 impl PgBackend {
     pub fn new() -> PgBackend {
         PgBackend {}
@@ -575,6 +579,7 @@ where
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
         Operation::AddTable(table) => Ok(create_table(table, false)?),
+        Operation::AddTableConstraints(table) => Ok(create_table_constraints(table)),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)?),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
@@ -599,6 +604,16 @@ fn create_table(table: &ATable, allow_exists: bool) -> Result<String> {
     ))
 }
 
+fn create_table_constraints(table: &ATable) -> String {
+    table
+        .columns
+        .iter()
+        .filter(|column| column.reference().is_some())
+        .map(|column| define_constraint(table, column))
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
 fn define_column(col: &AColumn) -> Result<String> {
     let mut constraints: Vec<String> = Vec::new();
     if !col.nullable() {
@@ -616,6 +631,25 @@ fn define_column(col: &AColumn) -> Result<String> {
         col_sqltype(col)?,
         constraints.join(" ")
     ))
+}
+
+fn define_constraint(table: &ATable, column: &AColumn) -> String {
+    let reference = column
+        .reference()
+        .as_ref()
+        .expect("must have a references value");
+    match reference {
+        ARef::Literal(literal) => {
+            format!(
+                "ALTER TABLE {} ADD FOREIGN KEY ({}) REFERENCES {}({});",
+                helper::quote_reserved_word(&table.name),
+                helper::quote_reserved_word(column.name()),
+                helper::quote_reserved_word(literal.table_name()),
+                helper::quote_reserved_word(literal.column_name()),
+            )
+        }
+        _ => panic!(),
+    }
 }
 
 fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {

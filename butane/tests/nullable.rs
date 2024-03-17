@@ -1,8 +1,6 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::{model, query};
-use paste;
-
 use butane_test_helper::*;
 
 #[model]
@@ -13,11 +11,7 @@ struct WithNullable {
 }
 impl WithNullable {
     fn new(id: i64) -> Self {
-        WithNullable {
-            id,
-            foo: None,
-            state: butane::ObjectState::default(),
-        }
+        WithNullable { id, foo: None }
     }
 }
 

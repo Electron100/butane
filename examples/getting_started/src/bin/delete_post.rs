@@ -1,7 +1,8 @@
-use self::models::Post;
-use butane::query;
-use getting_started::*;
 use std::env::args;
+
+use butane::query;
+use getting_started::models::Post;
+use getting_started::*;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {

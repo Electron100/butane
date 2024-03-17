@@ -2,14 +2,42 @@
 //! CLI tool, there is no need to use this module. Even if applying
 //! migrations without this tool, you are unlikely to need this module.
 
-use crate::{Error, Result, SqlType, SqlVal};
-use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+#[cfg(feature = "json")]
+use once_cell::sync::Lazy;
+use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
+
+use crate::{Error, Result, SqlType, SqlVal};
+
+/// Suffix added to [`crate::many::Many`] tables.
+pub const MANY_SUFFIX: &str = "_Many";
+
+#[cfg(feature = "json")]
+static JSON_MAP_PREFIXES: Lazy<Vec<String>> = Lazy::new(|| {
+    let map_type_names: [&str; 6] = [
+        "HashMap",
+        "collections::HashMap",
+        "std::collections::HashMap",
+        "BTreeMap",
+        "collections::BTreeMap",
+        "std::collections::BTreeMap",
+    ];
+    let string_tynames: [&str; 3] = ["String", "string::String", "std::string::String"];
+
+    let mut prefixes = Vec::new();
+    for map_type_name in map_type_names {
+        for string_type_name in string_tynames {
+            prefixes.push(format!("{map_type_name}<{string_type_name},"));
+        }
+    }
+    prefixes
+});
 
 /// Identifier for a type as used in a database column. Supports both
-/// [SqlType](crate::SqlType) and identifiers known only by name. The
-/// latter is used for custom types. `SqlType::Custom` cannot easily be used
+/// [`SqlType`] and identifiers known only by name.
+/// The latter is used for custom types. `SqlType::Custom` cannot easily be used
 /// directly at compile time when the proc macro serializing type information runs.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum TypeIdentifier {
@@ -117,10 +145,13 @@ impl TypeResolver {
     fn find_type(&self, key: &TypeKey) -> Option<TypeIdentifier> {
         #[cfg(feature = "json")]
         if let TypeKey::CustomType(ct) = key {
-            if ct.starts_with("HashMap < String,") {
-                return Some(TypeIdentifier::from(SqlType::Json));
+            for prefix in JSON_MAP_PREFIXES.iter() {
+                if ct.starts_with(prefix) {
+                    return Some(TypeIdentifier::from(SqlType::Json));
+                }
             }
         }
+
         self.types.get(key).cloned()
     }
     fn insert(&mut self, key: TypeKey, ty: TypeIdentifier) -> bool {
@@ -142,14 +173,14 @@ impl TypeResolver {
 /// Abstract representation of a database schema.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ADB {
-    tables: HashMap<String, ATable>,
-    extra_types: HashMap<TypeKey, DeferredSqlType>,
+    tables: BTreeMap<String, ATable>,
+    extra_types: BTreeMap<TypeKey, DeferredSqlType>,
 }
 impl ADB {
     pub fn new() -> Self {
         ADB {
-            tables: HashMap::new(),
-            extra_types: HashMap::new(),
+            tables: BTreeMap::new(),
+            extra_types: BTreeMap::new(),
         }
     }
     pub fn tables(&self) -> impl Iterator<Item = &ATable> {
@@ -158,7 +189,7 @@ impl ADB {
     pub fn get_table<'a>(&'a self, name: &str) -> Option<&'a ATable> {
         self.tables.get(name)
     }
-    pub fn types(&self) -> &HashMap<TypeKey, DeferredSqlType> {
+    pub fn types(&self) -> &BTreeMap<TypeKey, DeferredSqlType> {
         &self.extra_types
     }
     pub fn replace_table(&mut self, table: ATable) {
@@ -176,15 +207,27 @@ impl ADB {
     pub fn resolve_types(&mut self) -> Result<()> {
         let mut resolver = TypeResolver::new();
         let mut changed = true;
+
+        let current_tables = self.tables.clone();
+        for table in &mut self.tables.values_mut() {
+            for col in &mut table.columns {
+                col.resolve_reference_target(&self.extra_types, &current_tables);
+            }
+        }
+
         while changed {
             changed = false;
+
             for table in &mut self.tables.values_mut() {
                 if let Some(pk) = table.pk() {
                     let pktype = pk.typeid();
                     if let Ok(pktype) = pktype {
                         changed |= resolver.insert_pk(&table.name, pktype.clone());
                     }
+                } else if !table.name.ends_with(MANY_SUFFIX) {
+                    unreachable!();
                 }
+
                 for col in &mut table.columns {
                     changed |= col.resolve_type(&resolver);
                 }
@@ -218,12 +261,14 @@ impl ADB {
         Ok(())
     }
 
+    /// Add an operation to this ADB.
     pub fn transform_with(&mut self, op: Operation) {
         use Operation::*;
         match op {
             AddTable(table) => {
                 self.tables.insert(table.name.clone(), table);
             }
+            AddTableConstraints(_) => {}
             AddTableIfNotExists(table) => {
                 self.tables.insert(table.name.clone(), table);
             }
@@ -248,7 +293,7 @@ impl ADB {
 }
 
 /// Abstract representation of a database table schema.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ATable {
     pub name: String,
     pub columns: Vec<AColumn>,
@@ -312,19 +357,67 @@ impl From<TypeIdentifier> for DeferredSqlType {
     }
 }
 
+/// Abstract representation of a database column reference constraint.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum ARef {
+    /// A reference to a literal table column.
+    Literal(ARefLiteral),
+    /// A reference that has not been resolved yet.
+    Deferred(DeferredSqlType),
+}
+
+/// Abstract representation of a database column reference constraint to a literal table and column.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ARefLiteral {
+    /// Table name.
+    table_name: String,
+    /// Column name.
+    column_name: String,
+}
+
+impl ARefLiteral {
+    /// Create new literal reference to a table and column.
+    pub fn new(table_name: impl Into<String>, column_name: impl Into<String>) -> Self {
+        ARefLiteral {
+            table_name: table_name.into(),
+            column_name: column_name.into(),
+        }
+    }
+    /// Get table name.
+    pub fn table_name(&self) -> &str {
+        &self.table_name
+    }
+    /// Get column name.
+    pub fn column_name(&self) -> &str {
+        &self.column_name
+    }
+}
+
 /// Abstract representation of a database column schema.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct AColumn {
+    /// Column name.
     name: String,
+    /// Type of the column.
     sqltype: DeferredSqlType,
+    /// Whether the column is nullable.
     nullable: bool,
+    /// Whether the column is a primary key.
     pk: bool,
+    /// Whether the column is an auto-increment field.
     auto: bool,
+    /// Whether the column needs a unique constraint.
     #[serde(default)]
     unique: bool,
+    /// Default value for the column.
     default: Option<SqlVal>,
+    /// Whether this column refers to another column.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reference: Option<ARef>,
 }
 impl AColumn {
+    /// Create new column.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: impl Into<String>,
         sqltype: DeferredSqlType,
@@ -333,6 +426,7 @@ impl AColumn {
         auto: bool,
         unique: bool,
         default: Option<SqlVal>,
+        reference: Option<ARef>,
     ) -> Self {
         AColumn {
             name: name.into(),
@@ -342,11 +436,12 @@ impl AColumn {
             auto,
             unique,
             default,
+            reference,
         }
     }
     /// Simple column that is non-null, non-auto, non-pk, non-unique with no default
     pub fn new_simple(name: impl Into<String>, sqltype: DeferredSqlType) -> Self {
-        Self::new(name, sqltype, false, false, false, false, None)
+        Self::new(name, sqltype, false, false, false, false, None, None)
     }
     pub fn name(&self) -> &str {
         &self.name
@@ -362,6 +457,14 @@ impl AColumn {
     }
     pub fn default(&self) -> &Option<SqlVal> {
         &self.default
+    }
+    /// Returns whether this column refers to another column.
+    pub fn reference(&self) -> &Option<ARef> {
+        &self.reference
+    }
+    /// Set another column that this column refers to.
+    pub fn add_reference(&mut self, reference: &ARef) {
+        self.reference = Some(reference.clone())
     }
     pub fn typeid(&self) -> Result<TypeIdentifier> {
         match &self.sqltype {
@@ -382,44 +485,129 @@ impl AColumn {
             false
         }
     }
+    /// Resolve a column constraints target.
+    fn resolve_reference_target(
+        &mut self,
+        extra_types: &BTreeMap<TypeKey, DeferredSqlType>,
+        tables: &BTreeMap<String, ATable>,
+    ) {
+        match &self.reference {
+            None | Some(ARef::Literal(_)) => {}
+            Some(ARef::Deferred(DeferredSqlType::Deferred(referred_type_key))) => {
+                let referred_table_name: String;
+                if let Some(DeferredSqlType::Deferred(TypeKey::PK(referred_type))) =
+                    extra_types.get(referred_type_key)
+                {
+                    referred_table_name = referred_type.to_owned();
+                } else if let TypeKey::PK(referred_type) = referred_type_key {
+                    referred_table_name = referred_type.to_owned();
+                } else {
+                    unreachable!("Unexpected reference {:?}", self.reference);
+                }
+                if let Some(table) = tables.get(&referred_table_name) {
+                    if let Some(pk) = table.pk() {
+                        self.reference = Some(ARef::Literal(ARefLiteral::new(
+                            referred_table_name,
+                            pk.name.clone(),
+                        )));
+                    }
+                }
+            }
+            _ => unreachable!("can only resolve deferred references"),
+        }
+    }
+
     pub fn is_auto(&self) -> bool {
         self.auto
     }
 }
 
+/// Create a table for the [crate::many::Many] relationship.
+/// Should not be used directly, except in tests.
+pub fn create_many_table(
+    main_table_name: &str,
+    many_field_name: &str,
+    many_field_type: DeferredSqlType,
+    main_table_pk_field_name: &str,
+    main_table_pk_field_type: DeferredSqlType,
+) -> ATable {
+    let mut table = ATable::new(format!("{main_table_name}_{many_field_name}{MANY_SUFFIX}"));
+    let col = AColumn::new(
+        "owner",
+        main_table_pk_field_type,
+        false, // nullable
+        false, // pk
+        false, // auto
+        false, // unique
+        None,  // default
+        Some(ARef::Literal(ARefLiteral::new(
+            main_table_name.to_owned(),
+            main_table_pk_field_name,
+        ))),
+    );
+    table.add_column(col);
+    let mut col = AColumn::new_simple("has", many_field_type.clone());
+    if matches!(many_field_type, DeferredSqlType::Deferred(TypeKey::PK(_))) {
+        col.add_reference(&ARef::Deferred(many_field_type));
+    }
+    table.add_column(col);
+    table
+}
+
 /// Individual operation use to apply a migration.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum Operation {
     //future improvement: support column renames
+    /// Add a table.
     AddTable(ATable),
+    /// Add table constraints referring to other tables, if the backend supports it.
+    AddTableConstraints(ATable),
+    /// Add a table, if it doesnt already exist.
     AddTableIfNotExists(ATable),
+    /// Remove named table.
     RemoveTable(String),
+    /// Add a table column.
     AddColumn(String, AColumn),
+    /// Remove a table column.
     RemoveColumn(String, String),
+    /// Change a table columns type.
     ChangeColumn(String, AColumn, AColumn),
 }
 
 /// Determine the operations necessary to move the database schema from `old` to `new`.
 pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
-    let new_names: HashSet<&String> = new.tables.keys().collect();
-    let old_names: HashSet<&String> = old.tables.keys().collect();
+    let new_names: BTreeSet<&String> = new.tables.keys().collect();
+    let old_names: BTreeSet<&String> = old.tables.keys().collect();
+
+    // Add new tables
     let new_tables = new_names.difference(&old_names);
-    for added in new_tables {
+    for added in new_tables.clone() {
         let added: &str = added.as_ref();
         ops.push(Operation::AddTable(
             new.tables.get(added).expect("no table").clone(),
         ));
     }
+
+    // Remove tables
     for removed in old_names.difference(&new_names) {
         ops.push(Operation::RemoveTable((*removed).to_string()));
     }
+
+    // Change existing tables
     for table in new_names.intersection(&old_names) {
         let table: &str = table.as_ref();
         ops.append(&mut diff_table(
             old.tables.get(table).expect("no table"),
             new.tables.get(table).expect("no table"),
         ));
+    }
+    for added in new_tables {
+        let added: &str = added.as_ref();
+        let table = new.tables.get(added).expect("no table");
+        if table.columns.iter().any(|x| x.reference.is_some()) {
+            ops.push(Operation::AddTableConstraints(table.clone()));
+        }
     }
     ops
 }
@@ -430,8 +618,10 @@ fn col_by_name<'a>(columns: &'a [AColumn], name: &str) -> Option<&'a AColumn> {
 
 fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
-    let new_names: HashSet<&String> = new.columns.iter().map(|c| &c.name).collect();
-    let old_names: HashSet<&String> = old.columns.iter().map(|c| &c.name).collect();
+    let new_names: BTreeSet<&String> = new.columns.iter().map(|c| &c.name).collect();
+    let old_names: BTreeSet<&String> = old.columns.iter().map(|c| &c.name).collect();
+
+    // Add columns
     let added_names = new_names.difference(&old_names);
     for added in added_names {
         let added: &str = added.as_ref();
@@ -440,12 +630,16 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
             col_by_name(&new.columns, added).unwrap().clone(),
         ));
     }
+
+    // Remove columns
     for removed in old_names.difference(&new_names) {
         ops.push(Operation::RemoveColumn(
             old.name.clone(),
             (*removed).to_string(),
         ));
     }
+
+    // Change columns
     for colname in new_names.intersection(&old_names) {
         let colname: &str = colname.as_ref();
         let col = col_by_name(&new.columns, colname).unwrap();

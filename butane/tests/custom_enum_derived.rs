@@ -2,8 +2,7 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::{model, query};
-use butane::{FieldType, FromSql, ObjectState, SqlVal, ToSql};
-
+use butane::{FieldType, FromSql, SqlVal, ToSql};
 use butane_test_helper::*;
 
 #[derive(PartialEq, Eq, Debug, Clone, FieldType)]
@@ -21,11 +20,7 @@ struct HasCustomField2 {
 }
 impl HasCustomField2 {
     fn new(id: i64, frob: Whatsit) -> Self {
-        HasCustomField2 {
-            id,
-            frob,
-            state: ObjectState::default(),
-        }
+        HasCustomField2 { id, frob }
     }
 }
 

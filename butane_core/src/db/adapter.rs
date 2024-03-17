@@ -106,7 +106,7 @@ impl AsyncAdapterEnv {
         'c: 'result,
     {
         let (tx, rx) = crossbeam_channel::unbounded();
-        let context_ptr = SendPtr::new(context as *const T);
+        let context_ptr = SendPtr::new(context);
         let func_taking_ptr = |ctx: SendPtr<T>| func(unsafe { ctx.inner.as_ref() }.unwrap());
         let wrapped_func = move || _ = tx.send(func_taking_ptr(context_ptr));
         let boxed_func: Box<dyn FnOnce() + Send + 'result> = Box::new(wrapped_func);

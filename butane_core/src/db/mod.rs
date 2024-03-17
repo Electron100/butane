@@ -12,11 +12,8 @@
 //!    what a `BackendConnection` can do, but allows using a single concrete type that is not tied to a particular
 //!    database backend. It is returned by the `connect` method.
 
-use crate::query::BoolExpr;
-use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
-use async_trait::async_trait;
-use dyn_clone::DynClone;
-use serde::{Deserialize, Serialize};
+#![allow(missing_docs)]
+
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fs;
@@ -24,10 +21,20 @@ use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
+use async_trait::async_trait;
+use dyn_clone::DynClone;
+use serde::{Deserialize, Serialize};
+
+use crate::query::BoolExpr;
+use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
+
 #[cfg(feature = "async-adapter")]
 mod adapter;
 
 mod connmethods;
+pub use connmethods::{
+    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
+};
 mod helper;
 mod macros;
 #[cfg(feature = "pg")]
@@ -44,10 +51,6 @@ pub mod sqlite;
 
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
-
-pub use connmethods::{BackendRow, BackendRows, Column, MapDeref, QueryResult, RawQueryResult};
-
-pub use connmethods::ConnectionMethods;
 
 mod internal {
     use super::*;
@@ -267,8 +270,8 @@ pub mod sync {
 }
 
 /// Connection specification. Contains the name of a database backend
-/// and the backend-specific connection string. See [connect][crate::db::connect]
-/// to make a [Connection][crate::db::Connection] from a `ConnectionSpec`.
+/// and the backend-specific connection string. See [`connect`]
+/// to make a [`Connection`] from a `ConnectionSpec`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectionSpec {
     pub backend_name: String,
@@ -285,7 +288,7 @@ impl ConnectionSpec {
     pub fn save(&self, path: &Path) -> Result<()> {
         let path = conn_complete_if_dir(path);
         let mut f = fs::File::create(path)?;
-        f.write_all(serde_json::to_string(self)?.as_bytes())
+        f.write_all(serde_json::to_string_pretty(self)?.as_bytes())
             .map_err(|e| e.into())
     }
     /// Load a previously saved connection spec
@@ -309,6 +312,7 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
     }
 }
 
+/// Database backend. A boxed implementation can be returned by name via [`get_backend`].
 #[async_trait]
 impl Backend for Box<dyn Backend> {
     fn name(&self) -> &'static str {
@@ -357,7 +361,7 @@ pub fn get_backend_sync(name: &str) -> Option<Box<dyn sync::Backend>> {
 }
 
 /// Connect to a database. For non-boxed connections, see individual
-/// [Backend][crate::db::Backend] implementations.
+/// [`Backend`] implementations.
 pub async fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?

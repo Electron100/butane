@@ -1,9 +1,8 @@
+use butane::db::Connection;
 use butane::model;
 use butane::prelude::*;
-use butane::{db::Connection, ObjectState};
-use uuid_for_test::Uuid;
-
 use butane_test_helper::*;
+use uuid_for_test::Uuid;
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -13,17 +12,14 @@ struct FooUU {
 }
 impl FooUU {
     fn new(id: Uuid) -> Self {
-        FooUU {
-            id,
-            bar: 0,
-            state: ObjectState::default(),
-        }
+        FooUU { id, bar: 0 }
     }
 }
 
 async fn basic_uuid(conn: Connection) {
     //create
     let id = Uuid::new_v4();
+    #[allow(clippy::disallowed_names)]
     let mut foo = FooUU::new(id);
     foo.bar = 42;
     foo.save(&conn).await.unwrap();

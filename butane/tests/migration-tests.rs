@@ -4,12 +4,14 @@ use butane::migrations::{
 };
 use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
+#[cfg(feature = "pg")]
+use butane_test_helper::pg_connection;
+#[cfg(feature = "sqlite")]
+use butane_test_helper::sqlite_connection;
 use proc_macro2::TokenStream;
 use quote::quote;
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser as SqlParser;
-
-use butane_test_helper::*;
 
 #[test]
 fn current_migration_basic() {
@@ -101,8 +103,7 @@ fn current_migration_auto_attribute() {
     let tokens = quote! {
         #[derive(PartialEq, Eq, Debug, Clone)]
         struct Foo {
-            #[auto]
-            id: i64,
+            id: AutoPk<i64>,
             bar: String,
         }
     };
@@ -294,12 +295,13 @@ async fn test_migrate(
 ) {
     let mut ms = MemMigrations::new();
     let backend = conn.backend();
+    let backends = nonempty::nonempty![backend];
     model_with_migrations(init_tokens, &mut ms);
-    assert!(ms.create_migration(&backend, "init", None).unwrap());
+    assert!(ms.create_migration(&backends, "init", None).unwrap());
 
     model_with_migrations(v2_tokens, &mut ms);
     assert!(ms
-        .create_migration(&backend, "v2", ms.latest().as_ref())
+        .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
     let mut to_apply = ms.unapplied_migrations(conn).await.unwrap();
@@ -405,12 +407,13 @@ async fn migration_delete_table(
 
     let mut ms = MemMigrations::new();
     let backend = conn.backend();
+    let backends = nonempty::nonempty![backend];
     model_with_migrations(init_tokens, &mut ms);
-    assert!(ms.create_migration(&backend, "init", None).unwrap());
+    assert!(ms.create_migration(&backends, "init", None).unwrap());
 
     ms.current().delete_table("Foo").unwrap();
     assert!(ms
-        .create_migration(&backend, "v2", ms.latest().as_ref())
+        .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
     let mut to_apply = ms.unapplied_migrations(conn).await.unwrap();

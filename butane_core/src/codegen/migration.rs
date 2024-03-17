@@ -1,8 +1,12 @@
-use super::*;
-use crate::migrations::adb::{AColumn, ATable};
+use syn::{Field, ItemStruct};
+
+use super::{
+    dbobj, fields, get_default, get_deferred_sql_type, get_many_sql_type, is_auto, is_foreign_key,
+    is_many_to_many, is_option, is_row_field, is_unique, pk_field,
+};
+use crate::migrations::adb::{create_many_table, AColumn, ARef, ATable, DeferredSqlType, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::Result;
-use syn::{Field, ItemStruct};
 
 pub fn write_table_to_disk<M>(
     ms: &mut impl MigrationsMut<M = M>,
@@ -43,21 +47,26 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
             .expect("db object fields must be named")
             .to_string();
         if is_row_field(f) {
-            let col = AColumn::new(
+            let deferred_type = get_deferred_sql_type(&f.ty);
+            let mut col = AColumn::new(
                 name,
-                get_deferred_sql_type(&f.ty),
+                deferred_type.clone(),
                 is_nullable(f),
                 f == &pk,
                 is_auto(f),
                 is_unique(f),
                 get_default(f).expect("Malformed default attribute"),
+                None,
             );
+            if is_foreign_key(f) {
+                col.add_reference(&ARef::Deferred(deferred_type))
+            }
             table.add_column(col);
         } else if is_many_to_many(f) {
             result.push(many_table(&table.name, f, &pk));
         }
     }
-    result.push(table);
+    result.insert(0, table);
     result
 }
 
@@ -67,16 +76,22 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .clone()
         .expect("fields must be named")
         .to_string();
-    let mut table = ATable::new(format!("{main_table_name}_{field_name}_Many"));
-    let col = AColumn::new_simple("owner", get_deferred_sql_type(&pk_field.ty));
-    table.add_column(col);
-    let col = AColumn::new_simple(
-        "has",
-        get_many_sql_type(many_field)
-            .unwrap_or_else(|| panic!("Mis-identified Many field {field_name}")),
-    );
-    table.add_column(col);
-    table
+    let many_field_type = get_many_sql_type(many_field)
+        .unwrap_or_else(|| panic!("Misidentified Many field {field_name}"));
+    let pk_field_name = pk_field
+        .ident
+        .as_ref()
+        .expect("fields must be named")
+        .to_string();
+    let pk_field_type = get_deferred_sql_type(&pk_field.ty);
+
+    create_many_table(
+        main_table_name,
+        &field_name,
+        many_field_type,
+        &pk_field_name,
+        pk_field_type,
+    )
 }
 
 fn is_nullable(field: &Field) -> bool {

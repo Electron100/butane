@@ -1,32 +1,41 @@
+CARGO := cargo +stable
+CARGO_NIGHTLY := $(subst stable,nightly,$(CARGO))
 
 all : build
 
 build :
-	cargo check
+	$(CARGO) check
 	# build some intermediate configuration to test different feature combinations
-	cd butane && cargo check --features pg
-	cd butane && cargo check --features pg,datetime
-	cd butane && cargo check --features sqlite
+	cd butane && $(CARGO) check --features pg
+	cd butane && $(CARGO) check --features pg,datetime
+	cd butane && $(CARGO) check --features sqlite
 	cargo build --all-features
 
 lint :
-	cargo clippy --all-features -- -D warnings
+	$(CARGO) clippy --all-features -- -D warnings
 
 
-check : build test doc lint
+check : build test doclint lint spellcheck
 
 
 test :
-	cargo test --all-features
+	$(CARGO) test --all-features
 
 clean :
-	cargo clean
+	$(CARGO) clean
+
+
+spellcheck :
+	typos
+
+doclint :
+	RUSTDOCFLAGS="-D warnings" $(CARGO_NIGHTLY) doc --no-deps --all-features
 
 doc :
-	cd butane && cargo +nightly doc --all-features
+	cd butane && $(CARGO_NIGHTLY) doc --no-deps --all-features
 
 docview :
-	cd butane && cargo +nightly doc --all-features --open
+	cd butane && $(CARGO_NIGHTLY) doc --all-features --open
 
 install :
-	cd butane_cli && cargo install --path .
+	cd butane_cli && $(CARGO) install --path .

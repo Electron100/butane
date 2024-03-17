@@ -1,12 +1,17 @@
 //! For working with migrations. If using the butane CLI tool, it is
 //! not necessary to use these types directly.
+
+#![allow(missing_docs)]
+
+use std::path::Path;
+
+use fallible_iterator::FallibleIterator;
+use nonempty::NonEmpty;
+
 use crate::db::BackendRows;
 use crate::db::{Column, ConnectionMethods};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
-
-use fallible_iterator::FallibleIterator;
-use std::path::Path;
 
 pub mod adb;
 use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeIdentifier, ADB};
@@ -112,6 +117,7 @@ pub trait Migrations {
     }
 }
 
+/// Extension of [`Migrations`] to modify the series of migrations.
 #[async_trait(?Send)]
 pub trait MigrationsMut: Migrations
 where
@@ -151,12 +157,12 @@ where
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration(
         &mut self,
-        backend: &impl db::Backend,
+        backends: &NonEmpty<Box<dyn db::Backend>>,
         name: &str,
         from: Option<&Self::M>,
     ) -> Result<bool> {
         let to_db = self.current().db()?;
-        self.create_migration_to(backend, name, from, to_db)
+        self.create_migration_to(backends, name, from, to_db)
     }
 
     /// Create a migration `from` -> `to_db` named `name`. From may be None, in which
@@ -164,7 +170,7 @@ where
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration_to(
         &mut self,
-        backend: &impl db::Backend,
+        backends: &NonEmpty<Box<dyn db::Backend>>,
         name: &str,
         from: Option<&Self::M>,
         to_db: ADB,
@@ -182,14 +188,18 @@ where
             ops.push(Operation::AddTableIfNotExists(migrations_table()));
         }
 
-        let up_sql = backend.create_migration_sql(&from_db, ops)?;
-        let down_sql = backend.create_migration_sql(&to_db, adb::diff(&to_db, &from_db))?;
         let mut m = self.new_migration(name);
         // Save the DB for use by other migrations from this one
         for table in to_db.tables() {
             m.write_table(table)?;
         }
-        m.add_sql(backend.name(), &up_sql, &down_sql)?;
+
+        for backend in backends {
+            let up_sql = backend.create_migration_sql(&from_db, ops.clone())?;
+            let down_sql = backend.create_migration_sql(&to_db, adb::diff(&to_db, &from_db))?;
+            m.add_sql(backend.name(), &up_sql, &down_sql)?;
+        }
+
         m.set_migration_from(from.map(|m| m.name().to_string()))?;
 
         self.add_migration(m)?;
@@ -197,7 +207,8 @@ where
     }
 }
 
-fn migrations_table() -> ATable {
+/// Returns [`ATable`] describing the migration metadata.
+pub fn migrations_table() -> ATable {
     let mut table = ATable::new("butane_migrations".to_string());
     let col = AColumn::new(
         "name",
@@ -206,7 +217,8 @@ fn migrations_table() -> ATable {
         true,  // pk
         false, // auto
         false, // unique
-        None,
+        None,  // default
+        None,  // references
     );
     table.add_column(col);
     table
@@ -288,10 +300,5 @@ impl DataObject for ButaneMigration {
     async fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
         conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
             .await
-    }
-    fn is_saved(&self) -> Result<bool> {
-        // In practice we don't expect this to be called as
-        // ButaneMigration is not exposed outside the library
-        Err(Error::SaveDeterminationNotSupported)
     }
 }

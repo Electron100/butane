@@ -1,5 +1,5 @@
 use butane::query;
-use getting_started::models::*;
+use getting_started::models::Post;
 use getting_started::*;
 
 #[tokio::main(flavor = "current_thread")]

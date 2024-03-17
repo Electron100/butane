@@ -5,6 +5,7 @@
 //! The fact that it is backed by a SQL database is mostly an implementation detail to the API consumer.
 
 #![deny(missing_docs)]
+
 pub use butane_codegen::{butane_type, dataresult, model, FieldType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
@@ -12,7 +13,7 @@ pub use butane_core::many::Many;
 pub use butane_core::migrations;
 pub use butane_core::query;
 pub use butane_core::{
-    AsPrimaryKey, DataObject, DataResult, Error, FieldType, FromSql, ObjectState, PrimaryKeyType,
+    AsPrimaryKey, AutoPk, DataObject, DataResult, Error, FieldType, FromSql, PrimaryKeyType,
     Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
 
@@ -176,11 +177,12 @@ pub mod prelude {
     //! Its use is recommended, but not required. If not used, the use
     //! of butane's macros may require some of its re-exports to be
     //! used manually.
+    pub use butane_core::db::BackendConnection;
+
     #[doc(no_inline)]
     pub use crate::DataObject;
     #[doc(no_inline)]
     pub use crate::DataResult;
-    pub use butane_core::db::BackendConnection;
 }
 
 pub mod internal {

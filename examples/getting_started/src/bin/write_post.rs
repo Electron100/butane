@@ -1,5 +1,6 @@
-use getting_started::*;
 use std::io::{stdin, Read};
+
+use getting_started::*;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {

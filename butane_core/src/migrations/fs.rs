@@ -15,10 +15,13 @@ pub trait Filesystem: Debug {
     fn write(&self, path: &Path) -> std::io::Result<Box<dyn Write>>;
     /// Opens a file for reading.
     fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>>;
+    /// Delete a file.
+    fn delete(&self, path: &Path) -> std::io::Result<()>;
 }
 
+/// `[Filesystem`] implementation using [`std::fs`].
 #[derive(Debug)]
-pub struct OsFilesystem {}
+pub struct OsFilesystem;
 
 impl Filesystem for OsFilesystem {
     fn ensure_dir(&self, path: &Path) -> std::io::Result<()> {
@@ -34,5 +37,8 @@ impl Filesystem for OsFilesystem {
     }
     fn read(&self, path: &Path) -> std::io::Result<Box<dyn Read>> {
         std::fs::File::open(path).map(|f| Box::new(f) as Box<dyn Read>)
+    }
+    fn delete(&self, path: &Path) -> std::io::Result<()> {
+        std::fs::remove_file(path)
     }
 }

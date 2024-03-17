@@ -29,8 +29,7 @@ schema. For example the Post model for a blog might look like this:
 #[model]
 #[derive(Default)]
 struct Post {
-    #[auto]
-    id: i64,
+    id: AutoPk<i32>,
     title: String,
     body: String,
     published: bool,
@@ -67,18 +66,20 @@ For a detailed tutorial, see the [Getting Started Guide](https://electron100.git
 ## Cargo Features
 
 Butane exposes several features to Cargo. By default, no backends are
-enabled: you will want to enable either `sqlite` or `pg`:
+enabled: you will want to enable `sqlite` and/or `pg`:
 
-* `default`: Turns on `datetime` and `uuid`.
+* `default`: Turns on `datetime`, `json` and `uuid`.
 * `debug`: Used in developing Butane, not expected to be enabled by consumers.
-* `datetime`: Support for timestamps (using `chrono::NaiveDateTime`).
-* `log`: Log certain warnings to the `log` crate facade (target "butane").
-* `pg`: Support for PostgreSQL.
-* `r2d2`: R2D2 support (`propane::db::ConnectionManager`).
-* `sqlite`: Support for SQLite.
+* `datetime`: Support for timestamps (using [`chrono`](https://crates.io/crates/chrono) crate).
+* `fake`: Support for the [`fake`](https://crates.io/crates/fake) crate's generation of fake data.
+* `json`: Support for storing structs as JSON, including using postgres' `JSONB` field type.
+* `log`: Log certain warnings to the [`log`](https://crates.io/crates/log) crate facade (target "butane").
+* `pg`: Support for PostgreSQL using [`postgres`](https://crates.io/crates/postgres) crate.
+* `r2d2`: Connection pooling using [`r2d2`](https://crates.io/crates/r2d2) support (See `butane::db::ConnectionManager`).
+* `sqlite`: Support for SQLite using [`rusqlite`](https://crates.io/crates/rusqlite) crate.
 * `sqlite-bundled`: Bundles sqlite instead of using the system version.
-* `tls`: Support for TLS when using PostgreSQL.
-* `uuid`: Support for UUIDs (using the `uuid` crate).
+* `tls`: Support for TLS when using PostgreSQL, using [`postgres-native-tls`](https://crates.io/crates/postgres-native-tls) crate.
+* `uuid`: Support for UUIDs (using the [`uuid`](https://crates.io/crates/uuid) crate).
 
 ## Limitations
 
@@ -95,7 +96,7 @@ enabled: you will want to enable either `sqlite` or `pg`:
 
 Butane is young. The following features are currently missing, but planned
 
-* Foreign key constraints
+* Foreign key constraint cascade setting
 * Incremental object save
 * Back-references for `ForeignKey` and `Many`.
 * Field/column rename support in migrations

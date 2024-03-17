@@ -1,8 +1,7 @@
 use butane::db::Connection;
 use butane::prelude::*;
 use butane::{butane_type, model, query};
-use butane::{FieldType, FromSql, ObjectState, SqlType, SqlVal, SqlValRef, ToSql};
-
+use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
 use butane_test_helper::*;
 
 #[butane_type(Text)]
@@ -57,11 +56,7 @@ struct HasCustomField {
 }
 impl HasCustomField {
     fn new(id: i64, frob: Frobnozzle) -> Self {
-        HasCustomField {
-            id,
-            frob,
-            state: ObjectState::default(),
-        }
+        HasCustomField { id, frob }
     }
 }
 

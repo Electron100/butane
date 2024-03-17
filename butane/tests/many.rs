@@ -1,7 +1,8 @@
 use butane::db::Connection;
 use butane::prelude::*;
-use butane::{model, query::OrderDirection, Many, ObjectState};
-
+use butane::{model, query::OrderDirection, AutoPk, Many};
+use butane_test_helper::testall;
+#[cfg(any(feature = "pg", feature = "sqlite"))]
 use butane_test_helper::*;
 
 mod common;
@@ -9,18 +10,16 @@ use common::blog::{create_tag, Blog, Post, Tag};
 
 #[model]
 struct AutoPkWithMany {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     tags: Many<Tag>,
     items: Many<AutoItem>,
 }
 impl AutoPkWithMany {
     fn new() -> Self {
         AutoPkWithMany {
-            id: -1,
+            id: AutoPk::uninitialized(),
             tags: Many::default(),
             items: Many::default(),
-            state: ObjectState::default(),
         }
     }
 }
@@ -28,26 +27,23 @@ impl AutoPkWithMany {
 #[model]
 #[table = "renamed_many_table"]
 struct RenamedAutoPkWithMany {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     tags: Many<Tag>,
     items: Many<AutoItem>,
 }
 impl RenamedAutoPkWithMany {
     fn new() -> Self {
         RenamedAutoPkWithMany {
-            id: -1,
+            id: AutoPk::uninitialized(),
             tags: Many::default(),
             items: Many::default(),
-            state: ObjectState::default(),
         }
     }
 }
 
 #[model]
 struct AutoItem {
-    #[auto]
-    id: i64,
+    id: AutoPk<i64>,
     val: String,
 }
 
@@ -148,6 +144,33 @@ async fn remove_multiple_from_many(conn: Connection) {
 }
 testall!(remove_multiple_from_many);
 
+async fn delete_all_from_many(conn: Connection) {
+    let mut cats_blog = Blog::new(1, "Cats");
+    cats_blog.save(&conn).await.unwrap();
+    let mut post = Post::new(
+        1,
+        "The Cheetah",
+        "This post is about a fast cat.",
+        &cats_blog,
+    );
+    let tag_fast = create_tag(&conn, "fast").await;
+    let tag_cat = create_tag(&conn, "cat").await;
+    let tag_european = create_tag(&conn, "european").await;
+    let tag_striped = create_tag(&conn, "striped").await;
+
+    post.tags.add(&tag_fast).unwrap();
+    post.tags.add(&tag_cat).unwrap();
+    post.tags.add(&tag_european).unwrap();
+    post.save(&conn).await.unwrap();
+    post.tags.add(&tag_striped).unwrap();
+
+    post.tags.delete(&conn).await.unwrap();
+
+    let post2 = Post::get(&conn, post.id).await.unwrap();
+    assert_eq!(post2.tags.load(&conn).await.unwrap().count(), 0);
+}
+testall!(delete_all_from_many);
+
 async fn can_add_to_many_before_save(conn: Connection) {
     // Verify that for an object with an auto-pk, we can add items to a Many field before we actually
     // save the original object (and thus get the actual pk);
@@ -164,14 +187,15 @@ testall!(can_add_to_many_before_save);
 
 async fn cant_add_unsaved_to_many(_conn: Connection) {
     let unsaved_item = AutoItem {
-        id: -1,
+        id: AutoPk::uninitialized(),
         val: "shiny".to_string(),
-        state: ObjectState::default(),
     };
     let mut obj = AutoPkWithMany::new();
-    obj.items
+    let err = obj
+        .items
         .add(&unsaved_item)
         .expect_err("unexpectedly not error");
+    assert!(matches!(err, butane::Error::ValueNotSaved));
 }
 testall!(cant_add_unsaved_to_many);
 

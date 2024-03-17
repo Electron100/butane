@@ -1,12 +1,12 @@
 //! Not expected to be used directly.
 
+use std::borrow::{Borrow, Cow};
+use std::marker::PhantomData;
+
 use crate::fkey::ForeignKey;
 use crate::query::{BoolExpr, Column, Expr, Join};
 use crate::sqlval::{FieldType, SqlVal, ToSql};
 use crate::DataObject;
-use std::borrow::{Borrow, Cow};
-use std::cmp::{PartialEq, PartialOrd};
-use std::marker::PhantomData;
 
 macro_rules! binary_op {
     ($func_name:ident, $bound:path, $cond:ident) => {
@@ -118,7 +118,6 @@ where
         }
     }
     pub fn contains(&self, q: BoolExpr) -> BoolExpr {
-        //let many_tbl = format!("{}_{}_Many", O::TABLE, self.name);
         BoolExpr::SubqueryJoin {
             col: O::PKCOL,
             tbl2: Cow::Borrowed(T::TABLE),

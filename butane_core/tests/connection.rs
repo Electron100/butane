@@ -1,5 +1,4 @@
 use butane_core::db::{connect, BackendConnection, Connection, ConnectionSpec};
-
 use butane_test_helper::*;
 
 async fn connection_not_closed(conn: Connection) {
@@ -55,6 +54,9 @@ async fn unreachable_pg_connection() {
         Err(butane_core::Error::Postgres(e)) => {
             eprintln!("{e:?}");
             assert!(format!("{e:?}").contains("Connect"));
+            #[cfg(target_os = "windows")]
+            assert!(format!("{e}").contains("No such host is known"));
+            #[cfg(not(target_os = "windows"))]
             assert!(format!("{e}").contains("failed to lookup address information"));
         }
         _ => panic!(),
@@ -62,7 +64,7 @@ async fn unreachable_pg_connection() {
 }
 
 async fn debug_connection(conn: Connection) {
-    let backend_name = conn.backend_name().clone();
+    let backend_name = conn.backend_name();
 
     let debug_str = format!("{:?}", conn);
     if backend_name == "pg" {

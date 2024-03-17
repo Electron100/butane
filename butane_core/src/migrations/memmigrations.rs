@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::{ButaneMigration, Migration, MigrationMut, Migrations, MigrationsMut};
 use crate::query::BoolExpr;
 use crate::{ConnectionMethods, DataObject, Result};
-use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use std::collections::HashMap;
 
 /// A migration stored in memory.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -12,8 +14,8 @@ pub struct MemMigration {
     name: String,
     db: ADB,
     from: Option<String>,
-    up: HashMap<String, String>,
-    down: HashMap<String, String>,
+    up: BTreeMap<String, String>,
+    down: BTreeMap<String, String>,
 }
 
 impl MemMigration {
@@ -22,8 +24,8 @@ impl MemMigration {
             name,
             db: ADB::new(),
             from: None,
-            up: HashMap::new(),
-            down: HashMap::new(),
+            up: BTreeMap::new(),
+            down: BTreeMap::new(),
         }
     }
 }
@@ -79,6 +81,11 @@ impl MigrationMut for MemMigration {
             .insert(backend_name.to_string(), down_sql.to_string());
         Ok(())
     }
+    fn remove_sql(&mut self, backend_name: &str) -> Result<()> {
+        self.up.remove(backend_name);
+        self.down.remove(backend_name);
+        Ok(())
+    }
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
         self.db.add_type(key, sqltype);
         self.db.resolve_types()?;
@@ -93,7 +100,7 @@ impl MigrationMut for MemMigration {
 /// A collection of migrations stored in memory.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MemMigrations {
-    migrations: HashMap<String, MemMigration>,
+    migrations: BTreeMap<String, MemMigration>,
     current: MemMigration,
     latest: Option<String>,
 }
@@ -101,7 +108,7 @@ pub struct MemMigrations {
 impl MemMigrations {
     pub fn new() -> Self {
         MemMigrations {
-            migrations: HashMap::new(),
+            migrations: BTreeMap::new(),
             current: MemMigration::new("current".to_string()),
             latest: None,
         }

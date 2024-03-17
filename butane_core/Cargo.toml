@@ -39,6 +39,7 @@ hex = "0.4"
 log = { optional = true, workspace = true }
 maybe-async-cfg = { workspace = true }
 native-tls = { version = "0.2", optional = true }
+nonempty.workspace = true
 once_cell = { workspace = true }
 pin-project = "1"
 tokio = {workspace = true, features = ["rt", "sync", "rt-multi-thread"]}
@@ -63,7 +64,7 @@ assert_matches = "1.5"
 butane_test_helper = { workspace = true }
 env_logger = { workspace = true }
 paste = { workspace = true }
-tempfile = "3.7"
+tempfile.workspace = true
 
 [[test]]
 name = "uuid"

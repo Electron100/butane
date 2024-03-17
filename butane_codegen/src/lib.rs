@@ -5,13 +5,14 @@
 #![deny(missing_docs)]
 extern crate proc_macro;
 
+use std::path::PathBuf;
+
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
 use butane_core::{codegen, make_compile_error, migrations, SqlType};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
 use quote::quote;
-use std::path::PathBuf;
 use syn::{Expr, Ident};
 
 mod filter;
@@ -28,13 +29,9 @@ mod filter;
 /// ## Helper Attributes
 /// * `#[table = "NAME"]` used on the struct to specify the name of the table (defaults to struct name)
 /// * `#[pk]` on a field to specify that it is the primary key.
-/// * `#[auto]` on a field indicates that the field's value is
-///    initialized based on serial/auto-increment. Currently supported
-///    only on the primary key and only if the primary key is an integer
-///    type
 /// * `#[unique]` on a field indicates that the field's value must be unique
 ///    (perhaps implemented as the SQL UNIQUE constraint by some backends).
-/// * `[default]` should be used on fields added by later migrations to avoid errors on existing objects.
+/// * `#[default]` should be used on fields added by later migrations to avoid errors on existing objects.
 ///     Unnecessary if the new field is an `Option<>`
 ///
 /// For example
@@ -42,9 +39,8 @@ mod filter;
 /// #[model]
 /// #[table = "posts"]
 /// pub struct Post {
-///   #[auto]
 ///   #[pk] // unnecessary if identifier were named id instead
-///   pub identifier: i32,
+///   pub identifier: AutoPk<i32>,
 ///   pub title: String,
 ///   pub content: String,
 ///   #[default = false]
@@ -274,7 +270,7 @@ fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenS
         .iter()
         .map(|variant| {
             let v_ident = &variant.ident;
-            let ident_literal = codegen::make_lit(&v_ident.to_string());
+            let ident_literal = codegen::make_ident_literal_str(v_ident);
             quote!(Self::#v_ident => #ident_literal,)
         })
         .collect();
@@ -283,7 +279,7 @@ fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenS
         .iter()
         .map(|variant| {
             let v_ident = &variant.ident;
-            let ident_literal = codegen::make_lit(&v_ident.to_string());
+            let ident_literal = codegen::make_ident_literal_str(v_ident);
             quote!(#ident_literal => Ok(Self::#v_ident),)
         })
         .collect();

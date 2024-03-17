@@ -17,12 +17,11 @@ In `Cargo.toml`, add a dependency on Butane:
 
 ``` toml
 [dependencies]
-butane = { version = "0.5", features=["default", "sqlite"] }
+butane = { version = "0.6", features=["pg", "sqlite"] }
 ```
 
-Substitute another backend instead of "sqlite" as desired ("pg" for
-PostgreSQL). This will apply throughout this guide, we'll assume
-SQLite, but Postgres can be used instead.
+This guide will focus on using SQLite initially, and use "pg" for
+PostgreSQL support at the end.
 
 A word on error-handling: for simplicity, this example unwraps errors
 to panic on failure. In a real program, you would of course handle
@@ -41,14 +40,19 @@ cargo install butane_cli
 butane init sqlite example.db
 ```
 
-This will have created an `example.db` sqlite file in the current
+This will have created an `example.db` SQLite file in the current
 directory as well as a `.butane` subdirectory. Inside that
 subdirectory, we see a `connection.json` file containing our
-connection parameters. At this point, we can add a method (in our
+connection parameters.
+
+## Connection
+
+At this point, we can add a method (in our
 `lib.rs`) to establish a connection in code.
 
 ``` rust
 use butane::db::{Connection, ConnectionSpec};
+
 pub fn establish_connection() -> Connection {
     butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap()
 }
@@ -67,15 +71,14 @@ use butane::{model, ForeignKey, Many, ObjectState};
 #[model]
 #[derive(Debug, Default)]
 pub struct Blog {
-    #[auto]
-    pub id: i64,
+    pub id: AutoPk<i64>,
     pub name: String,
 }
 impl Blog {
     pub fn new(name: impl Into<String>) -> Self {
         Blog {
-            name: name.into(),
-            ..Default::default()
+            id: AutoPk::uninitialized(),
+            name: name.into()
         }
     }
 }
@@ -98,21 +101,20 @@ The `#[model]` attribute does the heavy lifting here:
 The `id` field is special -- it's the primary key. All models must
 have a primary key. If we didn't want to name ours `id`, we could have
 added a `#[pk]` attribute to denote the primary key field. The
-`#[auto]` attribute says that the field should be populated
+`AutoPk` wrapping type says that the field should be populated
 automatically from an incrementing value. It is only allowed on
 integer types and will cause the underlying column to be
 `AUTOINCREMENT` for SQLite or `SERIAL`/`BIGSERIAL` for
-PostgreSQL. Since it's marked as `#[auto]` the value of `id` at
-construction time doesn't matter: it will be automatically set when
-the object is created (via its [`save`] method).
+PostgreSQL. When the object is created in the database via its
+[`save`] method, the `AutoPk` field will be updated to its initialized
+value.
 
 Now let's add a model to represent a blog post, and in the process take a look at a few more features.
 
 ``` rust
 #[model]
 pub struct Post {
-    #[auto]
-    pub id: i32,
+    pub id: AutoPk<i32>,
     pub title: String,
     pub body: String,
     pub published: bool,
@@ -166,7 +168,7 @@ Then we can use them in our `lib.rs`:
 ```rust
 pub mod models;
 
-use models::{Blog, Post};
+pub use models::{Blog, Post};
 ```
 
 Let's build our package now. If we look in the `.butane` directory,
@@ -249,8 +251,9 @@ doc = false
 And write its code (in `src/bin/write_post.rs`).
 
 ``` rust
-use getting_started::*;
 use std::io::{stdin, Read};
+
+use getting_started::*;
 
 fn main() {
     let conn = establish_connection();
@@ -319,7 +322,8 @@ Let's add another binary to `Cargo.toml`, this one called `show_posts`, and writ
 
 ``` rust
 use butane::query;
-use getting_started::models::*;
+
+use getting_started::models::Post;
 use getting_started::*;
 
 fn main() {
@@ -351,10 +355,12 @@ mark it as published, and save it again.
 Add `publish_post` binary to `Cargo.toml`, and write its code (in `src/bin/publish_post.rs`).
 
 ``` rust
-use self::models::Post;
-use butane::prelude::*;
-use getting_started::*;
 use std::env::args;
+
+use butane::prelude::*;
+
+use getting_started::models::Post;
+use getting_started::*;
 
 fn main() {
     let id = args()
@@ -385,10 +391,12 @@ commonly) with the `delete` method on `Query` to delete directly.
 Here's our `delete_post` program (in `src/bin/delete_post.rs`):
 
 ``` rust
-use self::models::Post;
-use getting_started::*;
-use butane::query;
 use std::env::args;
+
+use butane::query;
+
+use getting_started::models::Post;
+use getting_started::*;
 
 fn main() {
     let target = args().nth(1).expect("Expected a target to match against");
@@ -430,8 +438,7 @@ making the full model
 ``` rust
 #[model]
 pub struct Post {
-    #[auto]
-    pub id: i32,
+    pub id: AutoPk<i32>,
     pub title: String,
     pub body: String,
     pub published: bool,
@@ -472,6 +479,57 @@ butane migrate
 ```
 
 And that's it! Now we can use our new field.
+
+## Embedding migrations
+
+So far, the migrations are stored on the file-system.
+If the application is distributed as an executable, those migrations need to be included.
+
+To do that, the `embed` command will create a Rust file `butane_migrations.rs` which can be included into the code.
+
+``` shell
+butane embed
+```
+
+After running the `embed` sub-command, the generated code needs to be included into the Rust code.
+
+Edit the `lib.rs` and add the following at the top:
+
+``` rust
+pub mod butane_migrations;
+```
+
+Opening the generated `butane_migrations.rs` shows it includes the same SQLite migrations that are stored on disk.
+
+Now compiling the code will include the migrations, however we need to update the function `establish_connection`
+to use these migrations:
+
+``` rust
+pub fn establish_connection() -> Connection {
+    use butane::migrations::{Migration, Migrations};
+
+    let mut connection = butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap();
+    let migrations = butane_migrations::get_migrations().unwrap();
+    let to_apply = migrations.unapplied_migrations(&connection).unwrap();
+    for migration in to_apply {
+        migration.apply(&mut connection).unwrap();
+    }
+    connection
+}
+```
+
+Now the executable can automatically migrate a database to the current schema that executable requires.
+
+## Adding PostgreSQL support
+
+To add the PostgreSQL backend, run:
+
+``` shell
+butane backend add pg
+```
+
+The file-system migrations will be updated to include PostgreSQL support, and `butane_migrations.rs`
+will also be updated to include the PostgreSQL migration scripts.
 
 ## Summary
 

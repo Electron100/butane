@@ -1,5 +1,4 @@
 use butane_core::db::{BackendConnection, Connection};
-
 use butane_test_helper::*;
 
 async fn commit_empty_transaction(mut conn: Connection) {
@@ -23,7 +22,7 @@ async fn rollback_empty_transaction(mut conn: Connection) {
 testall_no_migrate!(rollback_empty_transaction);
 
 async fn debug_transaction_before_consuming(mut conn: Connection) {
-    let backend_name = conn.backend_name().clone();
+    let backend_name = conn.backend_name();
 
     let tr = conn.transaction().await.unwrap();
 

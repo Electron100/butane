@@ -1,4 +1,9 @@
 //! SQLite database backend
+use std::borrow::Cow;
+use std::fmt::{Debug, Write};
+use std::ops::Deref;
+use std::path::Path;
+use std::pin::Pin;
 #[cfg(feature = "log")]
 use std::sync::Once;
 
@@ -7,6 +12,7 @@ use super::sync::{
 };
 use super::{helper, BackendRow, Column, RawQueryResult};
 use crate::db::connmethods::BackendRows;
+use crate::migrations::adb::ARef;
 use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::query::{BoolExpr, Order};
 use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
@@ -14,11 +20,6 @@ use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 use chrono::naive::NaiveDateTime;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use pin_project::pin_project;
-use std::borrow::Cow;
-use std::fmt::Write;
-use std::ops::Deref;
-use std::path::Path;
-use std::pin::Pin;
 
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -44,9 +45,9 @@ fn log_callback(error_code: std::ffi::c_int, message: &str) {
     }
 }
 
-/// SQLite [Backend][crate::db::Backend] implementation.
+/// SQLite [`Backend`] implementation.
 #[derive(Debug, Default, Clone)]
-pub struct SQLiteBackend {}
+pub struct SQLiteBackend;
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
         SQLiteBackend {}
@@ -54,7 +55,9 @@ impl SQLiteBackend {
 }
 impl SQLiteBackend {
     fn connect(&self, path: &str) -> Result<SQLiteConnection> {
-        SQLiteConnection::open(Path::new(path))
+        let connection = SQLiteConnection::open(Path::new(path))?;
+        connection.execute("PRAGMA foreign_keys = ON")?;
+        Ok(connection)
     }
 }
 impl Backend for SQLiteBackend {
@@ -609,15 +612,14 @@ fn sql_valref_from_rusqlite<'a>(
             SQLITE_DT_FORMAT,
         )?),
         SqlType::Blob => SqlValRef::Blob(val.as_blob()?),
-        SqlType::Custom(v) => {
-            return Err(Error::IncompatibleCustomT(v.deref().clone(), BACKEND_NAME))
-        }
+        SqlType::Custom(v) => return Err(Error::IncompatibleCustomT(v.clone(), BACKEND_NAME)),
     })
 }
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
         Operation::AddTable(table) => Ok(create_table(table, false)),
+        Operation::AddTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
@@ -634,7 +636,24 @@ fn create_table(table: &ATable, allow_exists: bool) -> String {
         .collect::<Vec<String>>()
         .join(",\n");
     let modifier = if allow_exists { "IF NOT EXISTS " } else { "" };
-    format!("CREATE TABLE {}{} (\n{}\n);", modifier, table.name, coldefs)
+    let mut constraints = create_table_constraints(table);
+    if !constraints.is_empty() {
+        constraints = ",\n".to_owned() + &constraints;
+    }
+    format!(
+        "CREATE TABLE {}{} (\n{}{}\n);",
+        modifier, table.name, coldefs, constraints
+    )
+}
+
+fn create_table_constraints(table: &ATable) -> String {
+    table
+        .columns
+        .iter()
+        .filter(|column| column.reference().is_some())
+        .map(define_constraint)
+        .collect::<Vec<String>>()
+        .join("\n")
 }
 
 fn define_column(col: &AColumn) -> String {
@@ -659,6 +678,24 @@ fn define_column(col: &AColumn) -> String {
         col_sqltype(col),
         constraints.join(" ")
     )
+}
+
+fn define_constraint(column: &AColumn) -> String {
+    let reference = column
+        .reference()
+        .as_ref()
+        .expect("must have a references value");
+    match reference {
+        ARef::Literal(literal) => {
+            format!(
+                "FOREIGN KEY ({}) REFERENCES {}({})",
+                helper::quote_reserved_word(column.name()),
+                helper::quote_reserved_word(literal.table_name()),
+                helper::quote_reserved_word(literal.column_name()),
+            )
+        }
+        _ => panic!(),
+    }
 }
 
 fn col_sqltype(col: &AColumn) -> Cow<str> {
@@ -809,7 +846,7 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: 
 }
 
 #[derive(Debug)]
-struct SQLitePlaceholderSource {}
+struct SQLitePlaceholderSource;
 impl SQLitePlaceholderSource {
     fn new() -> Self {
         SQLitePlaceholderSource {}

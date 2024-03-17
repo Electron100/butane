@@ -1,13 +1,14 @@
 // We wrap everything in an inner module just so it's easier to have the feature gate in one place
 #[cfg(feature = "pg")]
 mod custom_pg {
+    use std::result::Result;
+
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
     use butane::prelude::*;
-    use butane::{butane_type, db::Connection, model, ObjectState};
-    use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
+    use butane::{butane_type, db::Connection, model};
+    use butane::{AutoPk, FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
     use butane_test_helper::{maketest, maketest_pg};
     use geo_types;
-    use std::result::Result;
     use tokio_postgres as postgres;
 
     // newtype so we can implement traits for it.
@@ -54,18 +55,16 @@ mod custom_pg {
     #[model]
     #[derive(Debug, PartialEq)]
     struct Trip {
-        #[auto]
-        id: i64,
+        id: AutoPk<i64>,
         pt_from: Point,
         pt_to: Point,
     }
 
     async fn roundtrip_custom(conn: Connection) {
         let mut trip = Trip {
-            id: -1,
+            id: AutoPk::uninitialized(),
             pt_from: Point::new(0.0, 0.0),
             pt_to: Point::new(8.0, 9.0),
-            state: ObjectState::default(),
         };
         trip.save(&conn).await.unwrap();
 
@@ -82,7 +81,6 @@ mod custom_pg {
             id: -1,
             pt_from: origin.clone(),
             pt_to: Point::new(8.0, 9.0),
-            state: ObjectState::default(),
         };
         trip1.save(&conn).unwrap();
 
@@ -90,7 +88,6 @@ mod custom_pg {
             id: -1,
             pt_from: Point::new(1.1, 2.0),
             pt_to: Point::new(7.0, 6.0),
-            state: ObjectState::default(),
         };
         trip2.save(&conn).unwrap();
 

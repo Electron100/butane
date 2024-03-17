@@ -1,7 +1,14 @@
-use super::connmethods::ConnectionMethodWrapper;
-use super::*;
-use crate::Result;
+//! R2D2 support for Butane.
+use std::ops::Deref;
+
 pub use r2d2::ManageConnection;
+
+use crate::connection_method_wrapper;
+use crate::db::connmethods::ConnectionMethodWrapper;
+use crate::db::{
+    BackendConnection, Column, Connection, ConnectionMethods, ConnectionSpec, RawQueryResult,
+};
+use crate::{query::BoolExpr, Result, SqlVal, SqlValRef};
 
 /// R2D2 support for Butane. Implements [`r2d2::ManageConnection`].
 #[derive(Clone, Debug)]

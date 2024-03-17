@@ -3,17 +3,15 @@
 // may occur if no backends are selected
 #![allow(unused)]
 
+use std::borrow::Cow;
+use std::fmt::Write;
+
 use super::Column;
 use crate::migrations::adb::{AColumn, TypeIdentifier};
 use crate::query::Expr::{Condition, Placeholder, Val};
 use crate::query::{BoolExpr::*, Expr, Join, Order, OrderDirection};
 use crate::Error;
 use crate::{query, Result, SqlType, SqlVal};
-use std::borrow::Cow;
-use std::fmt::Write;
-
-#[cfg(feature = "datetime")]
-use chrono::naive::NaiveDateTime;
 
 pub trait PlaceholderSource {
     fn next_placeholder(&mut self) -> Cow<str>;
@@ -220,6 +218,7 @@ pub fn sql_order(order: &[Order], w: &mut impl Write) {
     });
 }
 
+/// Return column default.
 pub fn column_default(col: &AColumn) -> Result<SqlVal> {
     if let Some(val) = col.default() {
         return Ok(val.clone());
@@ -239,7 +238,7 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
             SqlType::Json => SqlVal::Json(serde_json::Value::default()),
             #[cfg(feature = "datetime")]
             SqlType::Timestamp => {
-                SqlVal::Timestamp(NaiveDateTime::from_timestamp_opt(0, 0).unwrap())
+                SqlVal::Timestamp(chrono::DateTime::from_timestamp(0, 0).unwrap().naive_utc())
             }
             SqlType::Custom(_) => return Err(Error::NoCustomDefault),
         },

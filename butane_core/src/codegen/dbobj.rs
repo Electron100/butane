@@ -34,53 +34,8 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let auto_pk = is_auto(&pk_field);
 
     let values: Vec<TokenStream2> = push_values(ast_struct, |_| true);
+    let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
     let insert_cols = columns(ast_struct, |f| !is_auto(f));
-
-    let save_core = if auto_pk && values.len() == 1 {
-        quote!(
-            if !butane::PrimaryKeyType::is_valid(self.pk()) {
-                let pk = conn.insert_returning_pk(Self::TABLE, &[], &pkcol, &[])?;
-                Some(butane::FromSql::from_sql(pk)?)
-            } else {
-                None
-            };
-        )
-    } else if auto_pk {
-        let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
-        let save_cols = columns(ast_struct, |f| !is_auto(f) && f != &pk_field);
-        quote!(
-            // Since we expect our pk field to be invalid and to be created by the insert,
-            // we do a pure insert or update based on whether the AutoPk is already valid or not.
-            // Note that some database backends do support upsert with auto-incrementing primary
-            // keys, but butane isn't well set up to take advantage of that, including missing
-            // support for constraints and the `insert_or_update` method not providing a way to
-            // retrieve the pk.
-            if butane::PrimaryKeyType::is_valid(self.pk()) {
-                #(#values_no_pk)*
-                conn.update(
-                    Self::TABLE,
-                    pkcol,
-                    butane::ToSql::to_sql_ref(self.pk()),
-                    &[#save_cols],
-                    &values,
-                )?;
-                None
-            } else {
-                #(#values)*
-                let pk = conn.insert_returning_pk(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
-                Some(butane::FromSql::from_sql(pk)?)
-            };
-        )
-    } else {
-        // do an upsert
-        quote!(
-            {
-                #(#values)*
-                conn.insert_or_replace(Self::TABLE, &[#insert_cols], &pkcol, &values)?;
-                None
-            };
-        )
-    };
 
     let many_save: TokenStream2 = fields(ast_struct)
         .filter(|f| is_many_to_many(f))
@@ -108,29 +63,40 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     quote!(
         #dataresult
 
+        impl butane::internal::DataObjectInternal for #tyname {
+            const NON_AUTO_COLUMNS: &'static [butane::db::Column] = &[
+                #insert_cols
+            ];
+
+            fn pk_mut(&mut self) -> &mut impl butane::PrimaryKeyType {
+                &mut self.#pkident
+            }
+            fn save_many_to_many(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
+                #many_save
+                Ok(())
+            }
+            fn values(&self, include_pk: bool) -> Vec<butane::SqlValRef> {
+                let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(
+                    <Self as butane::DataResult>::COLUMNS.len()
+                );
+                if (include_pk) {
+                    #(#values)*
+                } else {
+                    #(#values_no_pk)*
+                }
+                values
+            }
+        }
+
         impl butane::DataObject for #tyname {
             type PKType = #pktype;
             type Fields = #fields_type;
             const PKCOL: &'static str = #pklit;
             const TABLE: &'static str = #tablelit;
             const AUTO_PK: bool = #auto_pk;
+
             fn pk(&self) -> &Self::PKType {
                 &self.#pkident
-            }
-            fn save(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
-                //future perf improvement use an array on the stack
-                let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(
-                    <Self as butane::DataResult>::COLUMNS.len()
-                );
-                let pkcol = butane::db::Column::new(
-                    Self::PKCOL,
-                    <Self::PKType as butane::FieldType>::SQLTYPE);
-                let new_pk = #save_core
-                if let Some(new_pk) = new_pk {
-                    self.#pkident = new_pk;
-                }
-                #many_save
-                Ok(())
             }
         }
         impl butane::ToSql for #tyname {

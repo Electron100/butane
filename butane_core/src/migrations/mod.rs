@@ -274,17 +274,24 @@ impl DataObject for ButaneMigration {
     fn pk(&self) -> &String {
         &self.name
     }
-    fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
-        let mut values: Vec<SqlValRef<'_>> = Vec::with_capacity(2usize);
-        values.push(self.name.to_sql_ref());
-        conn.insert_or_replace(
-            Self::TABLE,
-            <Self as DataResult>::COLUMNS,
-            &Column::new(Self::PKCOL, SqlType::Text),
-            &values,
-        )
-    }
     fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
         conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
+    }
+}
+
+impl crate::internal::DataObjectInternal for ButaneMigration {
+    const NON_AUTO_COLUMNS: &'static [Column] = Self::COLUMNS;
+    fn pk_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+    fn values(&self, include_pk: bool) -> Vec<SqlValRef> {
+        let mut values: Vec<SqlValRef<'_>> = Vec::with_capacity(2usize);
+        if include_pk {
+            values.push(self.name.to_sql_ref());
+        }
+        values
+    }
+    fn save_many_to_many(&mut self, _conn: &impl ConnectionMethods) -> Result<()> {
+        Ok(()) // no-op
     }
 }

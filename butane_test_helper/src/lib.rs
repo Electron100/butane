@@ -194,6 +194,11 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
     migrations::copy_migration(disk_current, mem_current).unwrap();
 
     assert!(
+        disk_current.db().unwrap().tables().count() != 0,
+        "No tables to migrate"
+    );
+
+    assert!(
         mem_migrations
             .create_migration(&nonempty::nonempty![backend], "init", None)
             .expect("expected to create migration without error"),

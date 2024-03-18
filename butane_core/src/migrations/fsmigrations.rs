@@ -205,9 +205,9 @@ impl MigrationMut for FsMigration {
 
 impl Migration for FsMigration {
     fn db(&self) -> Result<ADB> {
+        self.ensure_dir()?;
         let _lock = self.lock_shared()?;
         let mut db = ADB::new();
-        self.ensure_dir()?;
         let entries = self.fs.list_dir(&self.root)?;
         for entry in entries {
             match entry.file_name() {

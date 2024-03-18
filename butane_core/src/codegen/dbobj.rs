@@ -65,7 +65,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
 
         impl butane::internal::DataObjectInternal for #tyname {
             const NON_AUTO_COLUMNS: &'static [butane::db::Column] = &[
-                                #insert_cols
+                #insert_cols
             ];
 
             fn pk_mut(&mut self) -> &mut impl butane::PrimaryKeyType {

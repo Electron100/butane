@@ -11,7 +11,7 @@ use nonempty::NonEmpty;
 use crate::db::BackendRows;
 use crate::db::{Column, ConnectionMethods};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
-use crate::{db, query, DataObject, DataResult, Error, Result, SqlType};
+use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
 
 pub mod adb;
 use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeIdentifier, ADB};
@@ -281,7 +281,7 @@ impl DataObject for ButaneMigration {
 
 impl crate::internal::DataObjectInternal for ButaneMigration {
     const NON_AUTO_COLUMNS: &'static [Column] = Self::COLUMNS;
-    fn pk_mut(&mut self) -> &mut String {
+    fn pk_mut(&mut self) -> &mut impl PrimaryKeyType {
         &mut self.name
     }
     fn values(&self, include_pk: bool) -> Vec<SqlValRef> {

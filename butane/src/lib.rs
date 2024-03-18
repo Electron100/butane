@@ -9,6 +9,7 @@
 pub use butane_codegen::{butane_type, dataresult, model, FieldType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
+pub use butane_core::internal;
 pub use butane_core::many::Many;
 pub use butane_core::migrations;
 pub use butane_core::query;

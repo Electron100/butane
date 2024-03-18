@@ -5,7 +5,6 @@
 #![deny(missing_docs)]
 
 use std::cmp::{Eq, PartialEq};
-use std::default::Default;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;

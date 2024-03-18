@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::cmp::PartialEq;
 use std::fmt::Debug;
 
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};

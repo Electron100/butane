@@ -1,5 +1,4 @@
 //! Butane migrations embedded in Rust.
-use std::result::Result;
 
 use butane::migrations::MemMigrations;
 

@@ -18,6 +18,8 @@ struct Cli {
     command: Commands,
     #[arg(short = 'p', long, default_value=base_dir().into_os_string())]
     path: PathBuf,
+    #[command(flatten)]
+    verbose: clap_verbosity_flag::Verbosity,
 }
 
 #[derive(Subcommand)]
@@ -127,6 +129,10 @@ enum DeleteCommands {
 
 fn main() {
     let cli = Cli::parse();
+
+    env_logger::Builder::new()
+        .filter_level(cli.verbose.log_level_filter())
+        .init();
 
     let mut base_dir = cli.path;
     base_dir.push(".butane");

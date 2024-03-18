@@ -274,6 +274,9 @@ dependencies = [
  "cargo_metadata",
  "chrono",
  "clap",
+ "clap-verbosity-flag",
+ "env_logger",
+ "log",
  "nonempty",
  "quote 1.0.35",
  "serde",
@@ -335,6 +338,7 @@ dependencies = [
  "block-id",
  "butane_core",
  "libc",
+ "log",
  "nonempty",
  "once_cell",
  "postgres",
@@ -420,6 +424,16 @@ checksum = "b230ab84b0ffdf890d5a10abdbc8b83ae1c4918275daea1ab8801f71536b2651"
 dependencies = [
  "clap_builder",
  "clap_derive",
+]
+
+[[package]]
+name = "clap-verbosity-flag"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb9b20c0dd58e4c2e991c8d203bbeb76c11304d1011659686b5b644bc29aa478"
+dependencies = [
+ "clap",
+ "log",
 ]
 
 [[package]]

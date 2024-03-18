@@ -15,6 +15,7 @@ documentation = "https://docs.rs/butane/"
 block-id = "0.2"
 butane_core = { features = ["pg", "sqlite"], workspace = true }
 libc = "0.2"
+log.workspace = true
 nonempty.workspace = true
 once_cell = { workspace = true }
 postgres = { features = ["with-geo-types-0_7"], workspace = true }

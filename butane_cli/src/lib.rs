@@ -242,7 +242,6 @@ pub fn embed(base_dir: &Path) -> Result<()> {
 
     let src = format!(
         "//! Butane migrations embedded in Rust.
-use std::result::Result;
 
 use butane::migrations::MemMigrations;
 

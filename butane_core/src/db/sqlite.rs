@@ -344,9 +344,6 @@ impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
     fn connection_methods(&self) -> &dyn ConnectionMethods {
         self
     }
-    fn connection_methods_mut(&mut self) -> &mut dyn ConnectionMethods {
-        self
-    }
 }
 
 impl rusqlite::ToSql for SqlVal {

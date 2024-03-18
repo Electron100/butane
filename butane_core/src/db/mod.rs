@@ -182,7 +182,6 @@ trait BackendTransaction<'c>: ConnectionMethods + Debug {
 
     // Workaround for https://github.com/rust-lang/rfcs/issues/2765
     fn connection_methods(&self) -> &dyn ConnectionMethods;
-    fn connection_methods_mut(&mut self) -> &mut dyn ConnectionMethods;
 }
 
 /// Database transaction.

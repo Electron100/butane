@@ -1,6 +1,6 @@
 //! Contains the [AutoPk] type for autoincrementing primary keys.
 
-use std::cmp::{Ordering, PartialOrd};
+use std::cmp::Ordering;
 
 use serde::{Deserialize, Serialize};
 

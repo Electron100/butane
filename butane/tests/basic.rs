@@ -373,7 +373,7 @@ fn basic_time(conn: Connection) {
     let time2 = TimeHolder::get(&conn, 1).unwrap();
     // Note, we don't just compare the objects directly because we
     // lose some precision when we go to the database.
-    assert_eq!(time.naive.timestamp(), time2.naive.timestamp());
+    assert_eq!(time.utc.timestamp(), time2.utc.timestamp());
 }
 #[cfg(feature = "datetime")]
 testall!(basic_time);

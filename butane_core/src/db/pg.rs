@@ -182,7 +182,6 @@ where
         if cfg!(feature = "log") {
             debug!("query sql {}", sqlquery);
         }
-        eprintln!("query sql {sqlquery}");
 
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
         let stmt = self

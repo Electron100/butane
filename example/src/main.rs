@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+//! Simple example with all code in a single file.
 use butane::db::{Connection, ConnectionSpec};
 use butane::prelude::*;
 use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};

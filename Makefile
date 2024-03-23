@@ -14,8 +14,9 @@ build :
 lint :
 	$(CARGO) clippy --all-features -- -D warnings
 
+lint-ci : doclint lint spellcheck check-fmt
 
-check : build test doclint lint spellcheck
+check : build test doclint lint spellcheck check-fmt
 
 
 test :
@@ -24,6 +25,12 @@ test :
 clean :
 	$(CARGO) clean
 
+
+fmt :
+	$(CARGO_NIGHTLY) fmt
+
+check-fmt :
+	$(CARGO_NIGHTLY) fmt --check
 
 spellcheck :
 	typos

@@ -63,12 +63,17 @@ jobs:
         echo "C:\ProgramData\chocolatey\lib\SQLite\tools" >> $GITHUB_PATH
         echo "SQLITE3_LIB_DIR=C:\ProgramData\chocolatey\lib\SQLite\tools" >> $GITHUB_ENV
 
+    - name: Add Rust nightly toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: nightly
+        components: rustfmt
     - name: Install Rust tools
       run: cargo install typos-cli
     - name: Build
       run: make build
     - name: Lint
-      run: make lint
+      run: make lint-ci
     - name: Test Core
       run: cd butane_core && cargo test --all-features
     - name: Test Codegen

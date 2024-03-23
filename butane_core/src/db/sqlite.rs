@@ -551,12 +551,20 @@ fn define_column(col: &AColumn) -> String {
     if col.unique() {
         constraints.push("UNIQUE".to_string());
     }
-    format!(
-        "{} {} {}",
-        helper::quote_reserved_word(col.name()),
-        col_sqltype(col),
-        constraints.join(" ")
-    )
+    if constraints.is_empty() {
+        format!(
+            "{} {}",
+            helper::quote_reserved_word(col.name()),
+            col_sqltype(col),
+        )
+    } else {
+        format!(
+            "{} {} {}",
+            helper::quote_reserved_word(col.name()),
+            col_sqltype(col),
+            constraints.join(" ")
+        )
+    }
 }
 
 fn define_constraint(column: &AColumn) -> String {

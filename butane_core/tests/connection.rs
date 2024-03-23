@@ -31,7 +31,6 @@ fn invalid_pg_connection() {
     assert!(matches!(result, Err(butane_core::Error::Postgres(_))));
     match result {
         Err(butane_core::Error::Postgres(e)) => {
-            eprintln!("{e}");
             assert!(format!("{e:?}").contains("ConfigParse"));
             assert_eq!(format!("{e}"), "invalid connection string: unexpected EOF");
         }
@@ -52,7 +51,6 @@ fn unreachable_pg_connection() {
     assert!(matches!(result, Err(butane_core::Error::Postgres(_))));
     match result {
         Err(butane_core::Error::Postgres(e)) => {
-            eprintln!("{e:?}");
             assert!(format!("{e:?}").contains("Connect"));
             #[cfg(target_os = "windows")]
             assert!(format!("{e}").contains("No such host is known"));

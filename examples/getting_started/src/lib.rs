@@ -12,7 +12,8 @@ use models::{Blog, Post};
 
 /// Load a [Connection].
 pub fn establish_connection() -> Connection {
-    let mut connection = butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap();
+    let mut connection =
+        butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap();
     let migrations = butane_migrations::get_migrations().unwrap();
     let to_apply = migrations.unapplied_migrations(&connection).unwrap();
     for migration in to_apply {

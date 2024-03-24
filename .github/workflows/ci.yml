@@ -83,12 +83,12 @@ jobs:
     - name: Lint
       run: make lint-ci
     - name: Test Core
-      run: cd butane_core && cargo test --all-features
+      run: cd butane_core && cargo +stable test --all-features
     - name: Test Codegen
-      run: cd butane_codegen && cargo test --all-features
+      run: cd butane_codegen && cargo +stable test --all-features
     - name: Test CLI
-      run: cd butane_cli && cargo test --all-features
+      run: cd butane_cli && cargo +stable test --all-features
     - name: Run example cli tests
-      run: cd example && cargo test --all-features
+      run: cd example && cargo +stable test --all-features
     - name: Test
-      run: cd butane && cargo test --all-features
+      run: cd butane && cargo +stable test --all-features

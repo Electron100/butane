@@ -27,7 +27,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       # Postgresql setup adapted from Diesel CI
       # Disable ssl as server doesn't have a trusted cert
     - name: Setup postgres on Linux

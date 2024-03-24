@@ -18,7 +18,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL,
 FOREIGN KEY (blog) REFERENCES Blog(id)
 );
@@ -31,7 +31,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL,
 FOREIGN KEY (blog) REFERENCES Blog(id)
 );
@@ -44,7 +44,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL,
 FOREIGN KEY (blog) REFERENCES Blog(id)
 );
@@ -57,7 +57,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL,
 FOREIGN KEY (blog) REFERENCES Blog(id)
 );
@@ -70,7 +70,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL,
 FOREIGN KEY (blog) REFERENCES Blog(id)
 );
@@ -83,7 +83,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL,
 FOREIGN KEY (blog) REFERENCES Blog(id)
 );
@@ -96,7 +96,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL,
 FOREIGN KEY (blog) REFERENCES Blog(id)
 );

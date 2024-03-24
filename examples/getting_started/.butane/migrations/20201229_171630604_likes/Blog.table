@@ -1,1 +1,27 @@
-{"name":"Blog","columns":[{"name":"id","sqltype":{"Known":"BigInt"},"nullable":false,"pk":true,"auto":true,"default":null},{"name":"name","sqltype":{"Known":"Text"},"nullable":false,"pk":false,"auto":false,"default":null}]}
+{
+  "name": "Blog",
+  "columns": [
+    {
+      "name": "id",
+      "sqltype": {
+        "Known": "BigInt"
+      },
+      "nullable": false,
+      "pk": true,
+      "auto": true,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "name",
+      "sqltype": {
+        "Known": "Text"
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

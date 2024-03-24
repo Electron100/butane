@@ -157,8 +157,11 @@ impl MigrationMut for FsMigration {
         self.write_sql(&format!("{backend_name}_up"), up_sql)?;
         self.write_sql(&format!("{backend_name}_down"), down_sql)?;
         let mut info = self.info()?;
-        info.backends.push(backend_name.to_string());
-        self.write_info(&info)?;
+        let backend_name = backend_name.to_string();
+        if !info.backends.contains(&backend_name) {
+            info.backends.push(backend_name.to_string());
+            self.write_info(&info)?;
+        }
         Ok(())
     }
 

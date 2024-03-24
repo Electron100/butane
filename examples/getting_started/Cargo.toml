@@ -20,9 +20,22 @@ doc = false
 [lib]
 doc = false
 
-[dependencies]
-butane = { features = ["pg", "sqlite"], workspace = true }
+[features]
+default = ["pg", "sqlite"]
+pg = ["butane/pg"]
+sqlite = ["butane/sqlite"]
 
+[dependencies]
+butane.workspace = true
+
+[dev-dependencies]
+butane_cli.workspace = true
+butane_core.workspace = true
+butane_test_helper.workspace = true
+cfg-if.workspace = true
+env_logger.workspace = true
+log.workspace = true
+paste.workspace = true
 
 [package.metadata.release]
 release = false

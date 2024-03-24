@@ -4,7 +4,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT 
+byline TEXT
 );
 INSERT INTO Post__butane_tmp SELECT id, title, body, published, blog, byline FROM Post;
 DROP TABLE Post;

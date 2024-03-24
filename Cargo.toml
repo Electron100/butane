@@ -16,6 +16,7 @@ edition = "2021"
 
 [workspace.dependencies]
 butane = { version = "0.6", path = "butane" }
+butane_cli = { version = "0.6", path = "butane_cli" }
 butane_core = { version = "0.6", path = "butane_core" }
 butane_codegen = { version = "0.6", path = "butane_codegen" }
 butane_test_helper = { path = "butane_test_helper" }

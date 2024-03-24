@@ -27,7 +27,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       # Postgresql setup adapted from Diesel CI
       # Disable ssl as server doesn't have a trusted cert
     - name: Setup postgres on Linux
@@ -72,6 +72,10 @@ jobs:
       with:
         toolchain: nightly
         components: rustfmt
+    - name: Add Rust nightly toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
     - name: Install Rust tools
       run: cargo install typos-cli
     - name: Build
@@ -79,12 +83,12 @@ jobs:
     - name: Lint
       run: make lint-ci
     - name: Test Core
-      run: cd butane_core && cargo test --all-features
+      run: cd butane_core && cargo +stable test --all-features
     - name: Test Codegen
-      run: cd butane_codegen && cargo test --all-features
+      run: cd butane_codegen && cargo +stable test --all-features
     - name: Test CLI
-      run: cd butane_cli && cargo test --all-features
+      run: cd butane_cli && cargo +stable test --all-features
     - name: Run example cli tests
-      run: cd example && cargo test --all-features
+      run: cd example && cargo +stable test --all-features
     - name: Test
-      run: cd butane && cargo test --all-features
+      run: cd butane && cargo +stable test --all-features

@@ -18,7 +18,7 @@ where
 {
     let current_migration = ms.current();
     for table in create_atables(ast_struct, config) {
-        current_migration.write_table(&table)?;
+        current_migration.add_modified_table(&table)?;
     }
     if let Some(name) = &config.table_name {
         // Custom table name, need to also be able to map with the type name

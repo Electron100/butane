@@ -66,7 +66,7 @@ impl PartialEq for MemMigration {
 impl Eq for MemMigration {}
 
 impl MigrationMut for MemMigration {
-    fn write_table(&mut self, table: &ATable) -> Result<()> {
+    fn add_modified_table(&mut self, table: &ATable) -> Result<()> {
         self.db.replace_table(table.clone());
         self.db.resolve_types()?;
         Ok(())

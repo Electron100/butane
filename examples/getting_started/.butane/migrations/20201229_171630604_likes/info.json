@@ -1,5 +1,10 @@
 {
   "from_name": "20201229_144636751_init",
+  "existing_schema": {
+    "Blog": "20201229_144636751_init",
+    "Post_tags_Many": "20201229_144636751_init",
+    "Tag": "20201229_144636751_init"
+  },
   "backends": [
     "sqlite",
     "pg"

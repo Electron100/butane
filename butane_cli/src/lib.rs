@@ -378,7 +378,13 @@ pub fn regenerate_migrations(base_dir: &Path) -> Result<()> {
             from_migration = migrations.get_migration(&from_migration_name);
         }
 
-        migrations.create_migration_to(&backends, &m.name(), from_migration.as_ref(), to_db)?;
+        m.delete_db()?;
+        migrations.create_migration_to(
+            &backends,
+            &m.name(),
+            from_migration.as_ref(),
+            to_db.clone(),
+        )?;
 
         from_migration_name = Some(m.name().to_string());
     }
@@ -393,24 +399,23 @@ pub fn regenerate_migrations(base_dir: &Path) -> Result<()> {
 pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {
     if let Ok(ms) = get_migrations(base_dir) {
         if let Some(latest_migration) = ms.latest() {
-            if let Ok(backend_names) = latest_migration.sql_backends() {
-                assert!(!backend_names.is_empty());
-                log::info!(
-                    "Latest migration contains backends: {}",
-                    backend_names.join(", ")
+            let backend_names = latest_migration.sql_backends()?;
+            assert!(!backend_names.is_empty());
+            log::info!(
+                "Latest migration contains backends: {}",
+                backend_names.join(", ")
+            );
+
+            let mut backends: Vec<Box<dyn db::Backend>> = vec![];
+
+            for backend_name in backend_names {
+                backends.push(
+                    db::get_backend(&backend_name)
+                        .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?,
                 );
-
-                let mut backends: Vec<Box<dyn db::Backend>> = vec![];
-
-                for backend_name in backend_names {
-                    backends.push(
-                        db::get_backend(&backend_name)
-                            .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?,
-                    );
-                }
-
-                return Ok(NonEmpty::<Box<dyn db::Backend>>::from_vec(backends).unwrap());
             }
+
+            return Ok(NonEmpty::<Box<dyn db::Backend>>::from_vec(backends).unwrap());
         }
     }
     Err(anyhow::anyhow!("There are no exiting migrations."))

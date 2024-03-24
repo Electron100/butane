@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::fs::{Filesystem, OsFilesystem};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
-use crate::{ConnectionMethods, DataObject, Error, Result};
+use crate::{Error, Result};
 
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 const TYPES_FILENAME: &str = "types.json";
@@ -394,7 +394,7 @@ impl MigrationsMut for FsMigrations {
         Ok(())
     }
 
-    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    fn delete_migrations(&mut self) -> Result<()> {
         crate::info!(
             "Deleting everything in {} except 'current'",
             self.root.display()
@@ -410,7 +410,6 @@ impl MigrationsMut for FsMigrations {
                 std::fs::remove_file(entry.path())?;
             }
         }
-        conn.delete_where(super::ButaneMigration::TABLE, crate::query::BoolExpr::True)?;
         Ok(())
     }
 }

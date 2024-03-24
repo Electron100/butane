@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
-use super::{ButaneMigration, Migration, MigrationMut, Migrations, MigrationsMut};
-use crate::query::BoolExpr;
-use crate::{ConnectionMethods, DataObject, Result};
+use super::{Migration, MigrationMut, Migrations, MigrationsMut};
+
+use crate::Result;
 
 /// A migration stored in memory.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -164,10 +164,9 @@ impl MigrationsMut for MemMigrations {
         Ok(())
     }
 
-    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    fn delete_migrations(&mut self) -> Result<()> {
         self.migrations.clear();
         self.latest = None;
-        conn.delete_where(ButaneMigration::TABLE, BoolExpr::True)?;
         Ok(())
     }
 }

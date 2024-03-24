@@ -298,6 +298,7 @@ name = "butane_core"
 version = "0.6.1"
 dependencies = [
  "assert_matches",
+ "butane_core",
  "butane_test_helper",
  "bytes",
  "cfg-if",

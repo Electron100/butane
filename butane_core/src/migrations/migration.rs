@@ -86,10 +86,11 @@ pub trait MigrationMut: Migration {
     /// Adds an abstract table to the migration. The table state should
     /// represent the expected state after the migration has been
     /// applied. It is expected that all tables will be added to the
-    /// migration in this fashion.
+    /// migration in this fashion, if they were modified in this migration.
     fn add_modified_table(&mut self, table: &ATable) -> Result<()>;
 
-    /// Marks a table as not modified.
+    /// Marks a table as not modified in this migration.
+    /// Use instead of `add_modified_table`.
     #[allow(unused_variables)]
     fn add_unmodified_table(
         &mut self,

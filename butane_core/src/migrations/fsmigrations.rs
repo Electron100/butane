@@ -16,14 +16,19 @@ use crate::{Error, Result};
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 const TYPES_FILENAME: &str = "types.json";
 
-#[derive(Debug, Deserialize, Serialize)]
+/// Metadata stored in each migration in the filesystem.
+#[derive(Debug, Default, Deserialize, Serialize)]
 struct MigrationInfo {
     /// The migration this one is based on, or None if this is the
     /// first migration in the chain
     #[serde(default, skip_serializing_if = "Option::is_none")]
     from_name: Option<String>,
+    /// A mapping of table name to the prior migration where it was
+    /// last modified, and therefore where the last .table file for
+    /// it exists.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     existing_schema: BTreeMap<String, String>,
+    /// List of backends supported by this migration.
     backends: Vec<String>,
 }
 impl MigrationInfo {
@@ -36,6 +41,7 @@ impl MigrationInfo {
     }
 }
 
+/// Metadata about the migration series.
 #[derive(Debug, Deserialize, Serialize)]
 struct MigrationsState {
     latest: Option<String>,
@@ -46,7 +52,7 @@ impl MigrationsState {
     }
 }
 
-/// A migration stored in the filesystem
+/// A migration stored in the filesystem.
 #[derive(Clone, Debug)]
 pub struct FsMigration {
     fs: Rc<dyn Filesystem>,
@@ -140,6 +146,8 @@ impl FsMigration {
         MigrationLock::new_shared(&self.root.join("lock"))
     }
 
+    /// Delete all of the files except info.json which is recreated
+    /// with only `from_name` set to allow migration series traversal.
     pub fn delete_db(&self) -> Result<()> {
         let entries = self.fs.list_dir(&self.root)?;
         for entry in entries {
@@ -147,7 +155,16 @@ impl FsMigration {
                 None => continue,
                 Some(name) => {
                     let name = name.to_string_lossy();
-                    if name != "info.json" {
+                    if name == "info.json" {
+                        // Re-create info.json using the minimum required to allow
+                        // `all_migrations` to traverse the list.
+                        let info = self.info()?;
+                        let info = MigrationInfo {
+                            from_name: info.from_name,
+                            ..Default::default()
+                        };
+                        self.write_info(&info)?;
+                    } else {
                         self.fs.delete(&entry)?;
                     }
                 }
@@ -179,7 +196,10 @@ impl MigrationMut for FsMigration {
             .iter()
             .find(|&m| m.name() == from_migration.name())
             .unwrap();
-        let from_existing_schema = from_mutation.info()?.existing_schema;
+        let from_info = from_mutation
+            .info()
+            .unwrap_or_else(|err| panic!("Failed to read info of {}: {err}", from_mutation.name()));
+        let from_existing_schema = from_info.existing_schema;
         // In the previous migration, either the 'source' migration is in the
         // pre-existing schema info, or the previous migration is the 'source'.
         let migration_name = if let Some(migration_name) = from_existing_schema.get(&table.name) {

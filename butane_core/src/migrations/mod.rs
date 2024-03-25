@@ -206,8 +206,6 @@ where
             ops.push(Operation::AddTableIfNotExists(migrations_table()));
         }
 
-        let mut unmodified_tables: Vec<String> = Vec::new();
-
         let mut m = self.new_migration(name);
         // Save the DB for use by other migrations from this one
         for table in to_db.tables() {
@@ -215,7 +213,6 @@ where
                 m.add_modified_table(table)?;
             } else {
                 m.add_unmodified_table(table, from.expect("unmodified requires a from"))?;
-                unmodified_tables.push(table.name.clone());
             }
         }
 

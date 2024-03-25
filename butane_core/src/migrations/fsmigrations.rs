@@ -170,10 +170,12 @@ impl MigrationMut for FsMigration {
         table: &ATable,
         from_migration: &impl Migration,
     ) -> Result<()> {
+        // It isnt possible to use from_migration.info() as that isnt part of `Migration` trait.
         let migrations_dir = self.root.parent().unwrap();
         let migrations = crate::migrations::from_root(migrations_dir);
         let migration_list = migrations.all_migrations()?;
         let mut last_touch = None;
+        // Find the most recent FsMigration containing the identical table.
         for m in migration_list {
             if let Some(other_table) = m.db()?.get_table(&table.name) {
                 if table == other_table {

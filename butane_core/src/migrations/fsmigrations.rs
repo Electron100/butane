@@ -170,42 +170,26 @@ impl MigrationMut for FsMigration {
         table: &ATable,
         from_migration: &impl Migration,
     ) -> Result<()> {
-        // It isnt possible to use from_migration.info() as that isnt part of `Migration` trait.
+        // It isnt possible to use from_migration.info() as that isn't part of `Migration` trait.
+        // So first step is to convert to FsMutation.
         let migrations_dir = self.root.parent().unwrap();
         let migrations = crate::migrations::from_root(migrations_dir);
         let migration_list = migrations.all_migrations()?;
-        let mut last_touch = None;
-        // Find the most recent FsMigration containing the identical table.
-        for m in migration_list {
-            if let Some(other_table) = m.db()?.get_table(&table.name) {
-                if table == other_table {
-                    crate::debug!("    Found identical table {} at {}", table.name, m.name());
-                    let existing_schema = m.info()?.existing_schema;
-                    if !existing_schema.contains_key(&table.name) {
-                        last_touch = Some(m.name().to_string());
-                    }
-                } else {
-                    crate::debug!(
-                        "      Ignoring different table {} at {}",
-                        table.name,
-                        m.name()
-                    );
-                }
-            }
-            crate::debug!("  Looking at {}", m.name());
-            if m.name() == from_migration.name() {
-                break;
-            }
-        }
-        let last_touch = last_touch.expect("Previous not found");
+        let from_mutation = migration_list
+            .iter()
+            .find(|&m| m.name() == from_migration.name())
+            .unwrap();
+        let from_existing_schema = from_mutation.info()?.existing_schema;
+        // In the previous migration, either the 'source' migration is in the
+        // pre-existing schema info, or the previous migration is the 'source'.
+        let migration_name = if let Some(migration_name) = from_existing_schema.get(&table.name) {
+            migration_name.to_string()
+        } else {
+            from_migration.name().to_string()
+        };
         let mut info = self.info()?;
-        crate::info!(
-            "  Adding existing_schema entry {} -> {}",
-            table.name.clone(),
-            last_touch.to_string()
-        );
         info.existing_schema
-            .insert(table.name.clone(), last_touch.to_string());
+            .insert(table.name.clone(), migration_name);
         self.write_info(&info)
     }
 

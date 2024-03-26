@@ -48,4 +48,4 @@ install :
 	cd butane_cli && $(CARGO) install --path .
 
 regenerate-example-migrations :
-	for dir in examples/*; do (cd $$dir; cargo +stable run -p butane_cli -- regenerate); done
+	for dir in examples/*; do (cd $$dir; cargo +stable run -p butane_cli --all-features -- regenerate); done

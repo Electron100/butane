@@ -359,6 +359,33 @@ pub fn remove_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Regenerate migrations.
+pub fn regenerate_migrations(base_dir: &Path) -> Result<()> {
+    let backends = load_latest_migration_backends(base_dir)?;
+
+    let mut migrations = get_migrations(base_dir)?;
+    let migration_list = migrations.all_migrations()?;
+
+    let mut from_migration_name: Option<String> = None;
+
+    for m in migration_list {
+        println!("Updating {}", m.name());
+        let to_db = m.db()?;
+        let mut from_migration = None;
+        if let Some(from_migration_name) = from_migration_name {
+            from_migration = migrations.get_migration(&from_migration_name);
+        }
+
+        migrations.create_migration_to(&backends, &m.name(), from_migration.as_ref(), to_db)?;
+
+        from_migration_name = Some(m.name().to_string());
+    }
+
+    update_embedded(base_dir)?;
+
+    Ok(())
+}
+
 /// Load the [`db::Backend`]s used in the latest migration.
 /// Error if there are no existing migrations.
 pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {

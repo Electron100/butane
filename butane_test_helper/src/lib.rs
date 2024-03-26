@@ -241,6 +241,7 @@ macro_rules! maketest {
                 log::info!("connecting to {}..", &$connstr);
                 let mut conn = backend.connect(&$connstr).expect("Could not connect backend");
                 butane_test_helper::setup_db(backend, &mut conn, $migrate);
+                log::info!("running test on {}..", &$connstr);
                 $fname(conn);
                 butane_test_helper::[<$backend _teardown>]($dataname);
             }

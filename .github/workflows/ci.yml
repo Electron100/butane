@@ -25,6 +25,9 @@ jobs:
           - macos-latest
           - windows-2019
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
     - uses: actions/checkout@v4
@@ -92,3 +95,9 @@ jobs:
       run: cd example && cargo +stable test --all-features
     - name: Test
       run: cd butane && cargo +stable test --all-features
+    - name: Check example migrations
+      run: |
+        set -ex
+        make regenerate-example-migrations
+        git add -A
+        git diff --exit-code

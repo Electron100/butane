@@ -18,7 +18,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL
 );
 INSERT INTO Post__butane_tmp SELECT id, title, body, published, blog, byline, likes FROM Post;
@@ -30,7 +30,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL
 );
 INSERT INTO Post__butane_tmp SELECT id, title, body, published, blog, byline, likes FROM Post;
@@ -42,7 +42,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL
 );
 INSERT INTO Post__butane_tmp SELECT id, title, body, published, blog, byline, likes FROM Post;
@@ -54,7 +54,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL
 );
 INSERT INTO Post__butane_tmp SELECT id, title, body, published, blog, byline, likes FROM Post;
@@ -66,7 +66,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL
 );
 INSERT INTO Post__butane_tmp SELECT id, title, body, published, blog, byline, likes FROM Post;
@@ -78,7 +78,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL
 );
 INSERT INTO Post__butane_tmp SELECT id, title, body, published, blog, byline, likes FROM Post;
@@ -90,7 +90,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published INTEGER NOT NULL,
 blog INTEGER NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL
 );
 INSERT INTO Post__butane_tmp SELECT id, title, body, published, blog, byline, likes FROM Post;

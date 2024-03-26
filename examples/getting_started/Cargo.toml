@@ -21,9 +21,10 @@ doc = false
 doc = false
 
 [features]
-default = ["pg", "sqlite"]
+default = ["pg", "sqlite", "sqlite-bundled"]
 pg = ["butane/pg"]
 sqlite = ["butane/sqlite"]
+sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
 butane.workspace = true

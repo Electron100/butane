@@ -25,6 +25,9 @@ jobs:
           - macos-latest
           - windows-2019
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
     - uses: actions/checkout@v4

@@ -1,5 +1,4 @@
 {
-  "from_name": null,
   "backends": [
     "sqlite",
     "pg"

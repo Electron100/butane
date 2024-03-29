@@ -75,10 +75,12 @@ enabled: you will want to enable `sqlite` and/or `pg`:
 * `json`: Support for storing structs as JSON, including using postgres' `JSONB` field type.
 * `log`: Log certain warnings to the [`log`](https://crates.io/crates/log) crate facade (target "butane").
 * `pg`: Support for PostgreSQL using [`postgres`](https://crates.io/crates/postgres) crate.
-* `r2d2`: Connection pooling using [`r2d2`](https://crates.io/crates/r2d2) support (See `butane::db::ConnectionManager`).
+* `r2d2`: Connection pooling using [`r2d2`](https://crates.io/crates/r2d2) support
+  (See `butane::db::ConnectionManager`).
 * `sqlite`: Support for SQLite using [`rusqlite`](https://crates.io/crates/rusqlite) crate.
 * `sqlite-bundled`: Bundles sqlite instead of using the system version.
-* `tls`: Support for TLS when using PostgreSQL, using [`postgres-native-tls`](https://crates.io/crates/postgres-native-tls) crate.
+* `tls`: Support for TLS when using PostgreSQL, using
+  [`postgres-native-tls`](https://crates.io/crates/postgres-native-tls) crate.
 * `uuid`: Support for UUIDs (using the [`uuid`](https://crates.io/crates/uuid) crate).
 
 ## Limitations

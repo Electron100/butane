@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.table": "json"
+    },
+    "makefile.buildBeforeLaunch": false,
+    "makefile.configureOnOpen": false
+}

@@ -125,7 +125,9 @@ fn parse_butane_type_args(args: TokenStream2) -> std::result::Result<TypeIdentif
             }
         });
     } else if tyid == "Custom" {
-        let customerr = quote!(compile_error!("Unexpected tokens custom in butane_type. Expected butane_type(Custom(name))."););
+        let customerr = quote!(
+            compile_error!("Unexpected tokens custom in butane_type. Expected butane_type(Custom(name)).");
+        );
         return match args.get(1) {
             Some(TokenTree::Group(g)) if !g.stream().is_empty() => {
                 let customid = g.stream().into_iter().nth(0).unwrap();

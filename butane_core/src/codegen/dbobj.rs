@@ -184,25 +184,26 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) ->
     };
 
     quote!(
-                impl butane::DataResult for #tyname {
-                        type DBO = #dbo;
-                        const COLUMNS: &'static [butane::db::Column] = &[
-                                #cols
-                        ];
-                        fn from_row(mut row: &dyn butane::db::BackendRow) -> butane::Result<Self> {
-                                if row.len() != #numdbfields {
-                                        return Err(butane::Error::BoundsError(
-                                                "Found unexpected number of columns in row for DataResult".to_string()));
-                                }
-                                #ctor
-                                #many_init
-                                Ok(obj)
-                        }
-                    fn query() -> butane::query::Query<Self> {
-                        use butane::prelude::DataObject;
-                        butane::query::Query::new(Self::DBO::TABLE)
-                    }
+        impl butane::DataResult for #tyname {
+            type DBO = #dbo;
+            const COLUMNS: &'static [butane::db::Column] = &[
+                #cols
+            ];
+            fn from_row(mut row: &dyn butane::db::BackendRow) -> butane::Result<Self> {
+                if row.len() != #numdbfields {
+                    return Err(butane::Error::BoundsError(
+                        "Found unexpected number of columns in row for DataResult".to_string()
+                    ));
                 }
+                #ctor
+                #many_init
+                Ok(obj)
+            }
+            fn query() -> butane::query::Query<Self> {
+                use butane::prelude::DataObject;
+                butane::query::Query::new(Self::DBO::TABLE)
+            }
+        }
     )
 }
 

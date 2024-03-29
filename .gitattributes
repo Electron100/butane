@@ -1,0 +1,10 @@
+# Auto detect text files and perform normalization
+# Source: https://github.com/gitattributes/gitattributes/blob/master/Rust.gitattributes
+*          text=auto
+
+*.rs       text diff=rust
+*.toml     text diff=toml
+Cargo.lock text diff=toml
+
+# Manual additions
+.table     text diff=JSON linguist-language=JSON linguist-generated

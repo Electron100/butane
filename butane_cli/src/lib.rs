@@ -14,6 +14,7 @@ use std::{
 };
 
 use butane::migrations::adb;
+use butane::migrations::adb::{diff, AColumn, ARef, Operation, ADB};
 use butane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
@@ -89,6 +90,125 @@ pub fn make_migration(base_dir: &Path, name: Option<&String>) -> Result<()> {
     } else {
         println!("No changes to migrate");
     }
+    Ok(())
+}
+
+/// Print a description of a column change indented by two spaces.
+pub fn print_column_diff(old: &AColumn, new: &AColumn) -> Result<()> {
+    if old.typeid()? != new.typeid()? {
+        println!("  type: {:?} -> {:?}", old.typeid()?, new.typeid()?);
+    }
+    if old.is_pk() != new.is_pk() {
+        println!("  pk: {} -> {}", old.is_pk(), new.is_pk());
+    }
+    if old.is_auto() != new.is_auto() {
+        println!("  auto: {} -> {}", old.is_auto(), new.is_auto());
+    }
+    if old.nullable() != new.nullable() {
+        println!("  nullable: {} -> {}", old.nullable(), new.nullable());
+    }
+    if old.unique() != new.unique() {
+        println!("  unique: {} -> {}", old.unique(), new.unique());
+    }
+    if old.default() != new.default() {
+        println!("  default: {:?} -> {:?}", old.default(), new.default());
+    }
+    if old.reference() != new.reference() {
+        let old = match old.reference() {
+            Some(ARef::Literal(reference)) => {
+                format!("{}.{}", reference.table_name(), reference.column_name())
+            }
+            None => "None".to_string(),
+            Some(ARef::Deferred(_)) => panic!(),
+        };
+        let new = match new.reference() {
+            Some(ARef::Literal(reference)) => {
+                format!("{}.{}", reference.table_name(), reference.column_name())
+            }
+            None => "None".to_string(),
+            Some(ARef::Deferred(_)) => panic!(),
+        };
+        println!("  references: {} -> {}", old, new);
+    }
+    Ok(())
+}
+
+/// Print description of a list of [`Operation`].
+pub fn print_ops(ops: Vec<Operation>) -> Result<()> {
+    if ops.is_empty() {
+        println!("No changes");
+        return Ok(());
+    }
+    for op in &ops {
+        use Operation::*;
+        match op {
+            AddTable(table) | AddTableIfNotExists(table) => {
+                println!("New table {}", table.name);
+                for column in &table.columns {
+                    println!("  {} -> {:?}", column.name(), column.typeid()?);
+                }
+            }
+            AddTableConstraints(_) => {}
+            RemoveTable(name) => {
+                println!("Remove table {}", name);
+            }
+            AddColumn(table_name, column) => {
+                println!("New column {table_name}.{}", column.name());
+            }
+            RemoveColumn(table_name, column_name) => {
+                println!("Remove column {table_name}.{column_name}");
+            }
+            ChangeColumn(table_name, old, new) => {
+                let column_name = old.name();
+                // Rename currently isn't supported.
+                // https://github.com/Electron100/butane/issues/89
+                assert_eq!(column_name, new.name());
+                println!("Change column {}.{column_name}", table_name);
+                print_column_diff(old, new)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Print a description of the current migration.
+pub fn describe_current_migration(base_dir: &Path) -> Result<()> {
+    let mut ms = get_migrations(base_dir)?;
+    let to_db = ms.current().db()?;
+    let mut from_db = ADB::new();
+    if let Some(latest) = ms.latest() {
+        from_db = latest.db()?;
+    }
+    print_ops(diff(&from_db, &to_db))?;
+    Ok(())
+}
+
+/// Describe a migration.
+/// Use name "current" to describe the changes that have been made in the code
+/// and will be included when a new migration is created.
+pub fn describe_migration(base_dir: &Path, name: &String) -> Result<()> {
+    if name == "current" {
+        return describe_current_migration(base_dir);
+    }
+    let ms = get_migrations(base_dir)?;
+    let migration = match ms.get_migration(name) {
+        Some(m) => m,
+        None => {
+            eprintln!("No such migration!");
+            std::process::exit(1);
+        }
+    };
+    let to_db = migration.db()?;
+    let from_db = match migration.migration_from()? {
+        None => ADB::new(),
+        Some(from_migration) => {
+            let from = ms
+                .get_migration(&from_migration)
+                .expect("Migration should exist");
+            from.db()?
+        }
+    };
+    print_ops(diff(&from_db, &to_db))?;
     Ok(())
 }
 
@@ -315,7 +435,7 @@ pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
     for mut m in migration_list {
         println!("Updating {}", m.name());
         let to_db = m.db()?;
-        let mut ops = adb::diff(&from_db, &to_db);
+        let mut ops = diff(&from_db, &to_db);
         assert!(!ops.is_empty());
 
         if from_db.tables().count() == 0 {
@@ -326,7 +446,7 @@ pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
         }
 
         let up_sql = backend.create_migration_sql(&from_db, ops)?;
-        let down_sql = backend.create_migration_sql(&to_db, adb::diff(&to_db, &from_db))?;
+        let down_sql = backend.create_migration_sql(&to_db, diff(&to_db, &from_db))?;
         m.add_sql(backend.name(), &up_sql, &down_sql)?;
 
         from_db = to_db;

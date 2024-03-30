@@ -9,6 +9,6 @@ fn embed() {
     let example_dir = std::env::current_dir()
         .unwrap()
         .join("../examples/getting_started/.butane");
-    assert!(example_dir.exists());
+    assert!(example_dir.is_dir());
     butane_cli::embed(&example_dir).unwrap();
 }

@@ -7,11 +7,11 @@ fn main() {
     // been compiled yet.
     let dir = ".butane/";
     println!("cargo:rerun-if-changed={dir}");
-    if std::path::Path::new(&dir).exists() {
+    if std::path::Path::new(&dir).is_dir() {
         std::fs::remove_dir_all(dir).unwrap();
     }
     let db = "db.sqlite";
-    if std::path::Path::new(&db).exists() {
+    if std::path::Path::new(&db).is_dir() {
         std::fs::remove_file(db).unwrap();
     }
 }

@@ -82,7 +82,7 @@ impl FsMigration {
     fn read_sql(&self, backend: &str, direction: &str) -> Result<Option<String>> {
         let path = self.sql_path(backend, direction);
         let mut buf = String::new();
-        if !path.exists() {
+        if !path.is_file() {
             return Ok(None);
         }
         self.fs.read(&path)?.read_to_string(&mut buf)?;
@@ -121,7 +121,7 @@ impl FsMigration {
 
     fn info(&self) -> Result<MigrationInfo> {
         let path = self.root.join("info.json");
-        if !path.exists() {
+        if !path.is_file() {
             return Ok(MigrationInfo::new());
         }
         let info: MigrationInfo = serde_json::from_reader(self.fs.read(&path)?)?;
@@ -348,7 +348,7 @@ impl Migrations for FsMigrations {
     fn get_migration(&self, name: &str) -> Option<Self::M> {
         let mut dir = self.root.clone();
         dir.push(name);
-        if dir.exists() {
+        if dir.is_dir() {
             Some(FsMigration {
                 fs: self.fs.clone(),
                 root: dir,

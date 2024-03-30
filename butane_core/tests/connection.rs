@@ -79,7 +79,7 @@ fn wont_load_connection_spec_from_missing_path() {
     let path = dir.path().to_owned();
     let path = std::path::Path::new(&path);
     assert!(dir.close().is_ok());
-    assert!(!path.exists());
+    assert!(!path.is_dir());
 
     // try to load a spec from the non-existent path
     let result = ConnectionSpec::load(path);
@@ -94,7 +94,7 @@ fn saves_invalid_connection_spec_to_missing_path() {
     let path = dir.path().to_owned();
     let path = std::path::Path::new(&path);
     assert!(dir.close().is_ok());
-    assert!(!path.exists());
+    assert!(!path.is_dir());
 
     // writes the json to that path
     let spec = ConnectionSpec::new("unknown_name", "foo://bar");

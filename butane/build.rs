@@ -7,7 +7,7 @@ fn main() {
     // been compiled yet.
     let dir = ".butane/";
     println!("cargo:rerun-if-changed={dir}");
-    if std::path::Path::new(&dir).exists() {
+    if std::path::Path::new(&dir).is_dir() {
         match std::fs::remove_dir_all(dir) {
             Ok(_) => {
                 // Re-create the directory. Only tests populate it and if it is left non-existent

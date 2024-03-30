@@ -224,7 +224,7 @@ pub fn rollback_latest(base_dir: &Path, mut conn: Connection) -> Result<()> {
 /// Create `src/butane_migrations.rs` containing the migrations metadata.
 pub fn embed(base_dir: &Path) -> Result<()> {
     let srcdir = base_dir.join("../src");
-    if !srcdir.exists() {
+    if !srcdir.is_dir() {
         eprintln!("src directory not found");
         std::process::exit(1);
     }
@@ -529,7 +529,7 @@ pub fn clean(base_dir: &Path) -> Result<()> {
 
 pub fn get_migrations(base_dir: &Path) -> Result<FsMigrations> {
     let root = base_dir.join("migrations");
-    if !root.exists() {
+    if !root.is_dir() {
         eprintln!("No butane migrations directory found. Add at least one model to your project and build.");
         std::process::exit(1);
     }
@@ -568,7 +568,7 @@ pub fn find_butane_workspace_member_paths() -> Result<Vec<PathBuf>> {
         let package_dir = extract_package_directory(&metadata.packages, member)?;
         let member_butane_dir = package_dir.join(".butane/");
 
-        if member_butane_dir.exists() {
+        if member_butane_dir.is_dir() {
             possible_directories.push(package_dir);
         }
     }
@@ -591,7 +591,7 @@ pub fn base_dir() -> PathBuf {
     let current_directory = working_dir_path();
     let local_butane_dir = current_directory.join(".butane/");
 
-    if !local_butane_dir.exists() {
+    if !local_butane_dir.is_dir() {
         if let Ok(member_dir) = get_butane_project_path() {
             println!("Using workspace member {:?}", member_dir);
             return member_dir;

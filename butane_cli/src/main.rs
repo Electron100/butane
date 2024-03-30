@@ -137,7 +137,9 @@ fn main() {
         .init();
 
     let mut base_dir = cli.path;
-    base_dir.push(".butane");
+    if !base_dir.ends_with(".butane") {
+        base_dir.push(".butane");
+    }
 
     // List any detached migrations.
     if let Ok(ms) = get_migrations(&base_dir) {

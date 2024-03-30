@@ -6,8 +6,8 @@ fn test_migrate_and_query() {
     let connspec = ".butane/connection.json";
 
     // These files should have been removed by build.rs
-    assert!(!std::path::Path::new(&db).exists());
-    assert!(!std::path::Path::new(&connspec).exists());
+    assert!(!std::path::Path::new(&db).is_file());
+    assert!(!std::path::Path::new(&connspec).is_file());
 
     // This ensures the binary exists if `example` is the first project tested
     Command::new("cargo")
@@ -22,8 +22,8 @@ fn test_migrate_and_query() {
         .success();
 
     // Verify the files have been created by "init", as they are needed by makemigration
-    assert!(std::path::Path::new(&db).exists());
-    assert!(std::path::Path::new(&connspec).exists());
+    assert!(std::path::Path::new(&db).is_file());
+    assert!(std::path::Path::new(&connspec).is_file());
 
     let result = Command::cargo_bin("butane")
         .unwrap()

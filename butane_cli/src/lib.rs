@@ -42,8 +42,8 @@ impl CliState {
 
     pub fn save(&self, base_dir: &Path) -> Result<()> {
         let path = base_dir.join("clistate.json");
-        let file = File::create(path)?;
-        serde_json::to_writer(file, &self)?;
+        let mut file = File::create(path)?;
+        file.write_all(serde_json::to_string_pretty(self)?.as_bytes())?;
         Ok(())
     }
 }
@@ -188,8 +188,10 @@ pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()
 
     let mut to_unapply = ms.migrations_since(&to_migration)?;
     if to_unapply.is_empty() {
-        eprintln!("That is the latest migration, not rolling back to anything. If you expected something to happen, try specifying the migration to rollback to.");
-        std::process::exit(1);
+        return Err(anyhow::anyhow!(
+            "That is the latest migration, not rolling back to anything.
+If you expected something to happen, try specifying the migration to rollback to."
+        ));
     }
 
     if *to_unapply.last().unwrap() != latest {

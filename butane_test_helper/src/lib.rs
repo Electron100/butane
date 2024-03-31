@@ -47,6 +47,10 @@ impl Drop for PgServerState {
         self.proc.kill().ok();
         let mut buf = String::new();
         self.stderr.read_to_string(&mut buf).unwrap();
+        if !buf.is_empty() {
+            log::warn!("pg shutdown error: {buf}");
+        }
+        log::info!("Deleting {}", self.dir.display());
         std::fs::remove_dir_all(&self.dir).unwrap();
     }
 }

@@ -371,6 +371,7 @@ impl MigrationsMut for FsMigrations {
         &mut self.current
     }
     fn clear_current(&mut self) -> Result<()> {
+        crate::info!("Deleting {}", self.current.root.display());
         std::fs::remove_dir_all(&self.current.root)?;
         Ok(())
     }
@@ -394,6 +395,10 @@ impl MigrationsMut for FsMigrations {
     }
 
     fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+        crate::info!(
+            "Deleting everything in {} except 'current'",
+            self.root.display()
+        );
         for entry in std::fs::read_dir(&self.root)? {
             let entry = entry?;
             if matches!(entry.path().file_name(), Some(name) if name == "current") {

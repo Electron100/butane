@@ -126,11 +126,20 @@ where
     /// details. Unnecessary when using `create_migration`.
     fn add_migration(&mut self, m: Self::M) -> Result<()>;
 
+    /// Deletes all migrations -- deleting them from this object (and
+    /// any storage backing it). The database schema is not modified,
+    /// nor is any other data removed. Use carefully.
+    fn delete_migrations(&mut self) -> Result<()>;
+
     /// Clears all migrations -- deleting them from this object (and
     /// any storage backing it) and deleting the record of their
     /// existence/application from the database. The database schema
     /// is not modified, nor is any other data removed. Use carefully.
-    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+        self.delete_migrations()?;
+        conn.delete_where(ButaneMigration::TABLE, query::BoolExpr::True)?;
+        Ok(())
+    }
 
     /// Get a pseudo-migration representing the current state as
     /// determined by the last build of models. This does not

@@ -80,7 +80,9 @@ jobs:
       with:
         toolchain: stable
     - name: Install Rust tools
-      run: cargo install typos-cli
+      uses: taiki-e/install-action@v2
+      with:
+        tool: typos
     - name: Build
       run: make build
     - name: Lint

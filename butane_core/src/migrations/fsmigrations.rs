@@ -273,6 +273,7 @@ pub struct FsMigrations {
     current: FsMigration,
 }
 impl FsMigrations {
+    /// Create a new instance.
     pub fn new(root: PathBuf) -> Self {
         let fs = Rc::new(OsFilesystem {});
         let current = FsMigration {

@@ -126,10 +126,9 @@ where
     /// details. Unnecessary when using `create_migration`.
     fn add_migration(&mut self, m: Self::M) -> Result<()>;
 
-    /// Clears all migrations -- deleting them from this object (and
-    /// any storage backing it) and deleting the record of their
-    /// existence/application from the database. The database schema
-    /// is not modified, nor is any other data removed. Use carefully.
+    /// Deletes all migrations -- deleting them from this object (and
+    /// any storage backing it). The database schema is not modified,
+    /// nor is any other data removed. Use carefully.
     fn delete_migrations(&mut self) -> Result<()>;
 
     /// Clears all migrations -- deleting them from this object (and

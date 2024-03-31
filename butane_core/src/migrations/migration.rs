@@ -92,13 +92,7 @@ pub trait MigrationMut: Migration {
     /// Marks a table as not modified in this migration.
     /// Use instead of `add_modified_table`.
     #[allow(unused_variables)]
-    fn add_unmodified_table(
-        &mut self,
-        table: &ATable,
-        from_migration: &impl Migration,
-    ) -> Result<()> {
-        self.add_modified_table(table)
-    }
+    fn add_unmodified_table(&mut self, table: &ATable, from_migration_name: &str) -> Result<()>;
 
     /// Delete the table with the given name. Note that simply
     /// deleting a table in code does not work -- it will remain with

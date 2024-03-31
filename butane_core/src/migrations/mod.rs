@@ -212,7 +212,9 @@ where
             if modified_tables.contains(&table.name) {
                 m.add_modified_table(table)?;
             } else {
-                m.add_unmodified_table(table, from.expect("unmodified requires a from"))?;
+                let from =
+                    from.ok_or(Error::MigrationError("unmodified requires a from".into()))?;
+                m.add_unmodified_table(table, &from.name())?;
             }
         }
 

@@ -27,7 +27,7 @@ struct MigrationInfo {
     /// last modified, and therefore where the last .table file for
     /// it exists.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    existing_schema: BTreeMap<String, String>,
+    table_bases: BTreeMap<String, String>,
     /// List of backends supported by this migration.
     backends: Vec<String>,
 }
@@ -35,7 +35,7 @@ impl MigrationInfo {
     fn new() -> Self {
         MigrationInfo {
             from_name: None,
-            existing_schema: BTreeMap::new(),
+            table_bases: BTreeMap::new(),
             backends: Vec::new(),
         }
     }
@@ -182,34 +182,30 @@ impl MigrationMut for FsMigration {
         )
     }
 
-    fn add_unmodified_table(
-        &mut self,
-        table: &ATable,
-        from_migration: &impl Migration,
-    ) -> Result<()> {
-        // It isnt possible to use from_migration.info() as that isn't part of `Migration` trait.
-        // So first step is to convert to FsMutation.
-        let migrations_dir = self.root.parent().unwrap();
+    fn add_unmodified_table(&mut self, table: &ATable, from_migration_name: &str) -> Result<()> {
+        // Fetches a FsMigration for the from_migration_name, and retrieves its MigrationInfo.
+        let migrations_dir = self
+            .root
+            .parent()
+            .ok_or(Error::MigrationError("Migrations fs not found".into()))?;
         let migrations = crate::migrations::from_root(migrations_dir);
         let migration_list = migrations.all_migrations()?;
-        let from_mutation = migration_list
+        let from_info = migration_list
             .iter()
-            .find(|&m| m.name() == from_migration.name())
-            .unwrap();
-        let from_info = from_mutation
-            .info()
-            .unwrap_or_else(|err| panic!("Failed to read info of {}: {err}", from_mutation.name()));
-        let from_existing_schema = from_info.existing_schema;
-        // In the previous migration, either the 'source' migration is in the
-        // pre-existing schema info, or the previous migration is the 'source'.
-        let migration_name = if let Some(migration_name) = from_existing_schema.get(&table.name) {
-            migration_name.to_string()
+            .find(|&m| m.name() == *from_migration_name)
+            .ok_or(Error::MigrationError("Migration not found".into()))?
+            .info()?;
+        let from_table_bases = from_info.table_bases;
+        // In the "from" migration, either the 'source' migration is in the `table_bases`,
+        // or the previous migration is the 'source'.
+        let migration_name = if let Some(migration_name) = from_table_bases.get(&table.name) {
+            migration_name
         } else {
-            from_migration.name().to_string()
+            from_migration_name
         };
         let mut info = self.info()?;
-        info.existing_schema
-            .insert(table.name.clone(), migration_name);
+        info.table_bases
+            .insert(table.name.clone(), migration_name.to_owned());
         self.write_info(&info)
     }
 
@@ -279,9 +275,13 @@ impl Migration for FsMigration {
         self.ensure_dir()?;
         let _lock = self.lock_shared()?;
         let mut db = ADB::new();
-        let existing_schema = self.info()?.existing_schema;
-        for (table_name, migration_name) in existing_schema {
-            let mut filename = PathBuf::from(self.root.parent().unwrap());
+        let table_bases = self.info()?.table_bases;
+        for (table_name, migration_name) in table_bases {
+            let mut filename = PathBuf::from(
+                self.root
+                    .parent()
+                    .ok_or(Error::MigrationError("Migrations fs not found".into()))?,
+            );
             filename.push(migration_name);
             filename.push(format!("{table_name}.table"));
             let table: ATable = serde_json::from_reader(self.fs.read(&filename)?)?;
@@ -407,7 +407,9 @@ impl FsMigrations {
         let mut detached_directory_names: Vec<String> = vec![];
         for entry in std::fs::read_dir(self.root.clone())? {
             let path = entry?.path();
-            let name = path.file_name().unwrap();
+            let name = path
+                .file_name()
+                .ok_or(Error::MigrationError("Migration name is missing".into()))?;
             if !path.is_dir() || name == "current" {
                 continue;
             }

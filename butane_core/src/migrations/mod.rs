@@ -185,6 +185,22 @@ where
             return Ok(false);
         }
 
+        let mut modified_tables: Vec<String> = Vec::new();
+
+        for op in &ops {
+            match op {
+                Operation::AddTable(table)
+                | Operation::AddTableConstraints(table)
+                | Operation::AddTableIfNotExists(table) => modified_tables.push(table.name.clone()),
+                Operation::AddColumn(table_name, _) => modified_tables.push(table_name.clone()),
+                Operation::RemoveColumn(table_name, _) => modified_tables.push(table_name.clone()),
+                Operation::ChangeColumn(table_name, _, _) => {
+                    modified_tables.push(table_name.clone())
+                }
+                Operation::RemoveTable(_) => {}
+            }
+        }
+
         if from_none {
             // This may be the first migration. Create the butane_migration table
             ops.push(Operation::AddTableIfNotExists(migrations_table()));
@@ -193,7 +209,13 @@ where
         let mut m = self.new_migration(name);
         // Save the DB for use by other migrations from this one
         for table in to_db.tables() {
-            m.write_table(table)?;
+            if modified_tables.contains(&table.name) {
+                m.add_modified_table(table)?;
+            } else {
+                let from =
+                    from.ok_or(Error::MigrationError("unmodified requires a from".into()))?;
+                m.add_unmodified_table(table, &from.name())?;
+            }
         }
 
         for backend in backends {
@@ -238,7 +260,7 @@ pub fn copy_migration(from: &impl Migration, to: &mut impl MigrationMut) -> Resu
     to.set_migration_from(from.migration_from()?.map(|s| s.to_string()))?;
     let db = from.db()?;
     for table in db.tables() {
-        to.write_table(table)?;
+        to.add_modified_table(table)?;
     }
     for (k, v) in db.types() {
         to.add_type(k.clone(), v.clone())?;

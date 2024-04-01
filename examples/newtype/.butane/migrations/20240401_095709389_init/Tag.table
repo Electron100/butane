@@ -1,0 +1,18 @@
+{
+  "name": "Tag",
+  "columns": [
+    {
+      "name": "tag",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": true,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

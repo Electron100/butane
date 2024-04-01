@@ -45,6 +45,7 @@ regex = { version = "1.5", features = ["std"] }
 rusqlite = { workspace = true, optional = true }
 serde = { features = ["derive"], workspace = true }
 serde_json = { workspace = true }
+strum = { version = "0.26", features = ["derive"] }
 sqlparser = { workspace = true }
 syn = { workspace = true }
 thiserror = "1.0"

@@ -327,7 +327,7 @@ impl ATable {
 }
 
 /// SqlType which may not yet be known.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum DeferredSqlType {
     Known(SqlType), // Kept for backwards deserialization compat, supplanted by KnownId
     KnownId(TypeIdentifier),
@@ -348,6 +348,32 @@ impl DeferredSqlType {
             DeferredSqlType::Known(_) => true,
             DeferredSqlType::KnownId(_) => true,
             DeferredSqlType::Deferred(_) => false,
+        }
+    }
+}
+/// Compare, with Known and KnownId being identical if they contain the same type.
+impl PartialEq<DeferredSqlType> for DeferredSqlType {
+    fn eq(&self, other: &DeferredSqlType) -> bool {
+        match self {
+            Self::Known(sqltype) => {
+                if let Self::Known(other_sqltype) = other {
+                    return *sqltype == *other_sqltype;
+                }
+                // Replace self with KnownId, and run .eq again
+                other.eq(&Self::KnownId(sqltype.clone().into()))
+            }
+            Self::KnownId(type_id) => {
+                if let Self::KnownId(other_type_id) = other {
+                    return *type_id == *other_type_id;
+                }
+                false
+            }
+            Self::Deferred(key) => {
+                if let Self::Deferred(other_key) = other {
+                    return *key == *other_key;
+                }
+                false
+            }
         }
     }
 }

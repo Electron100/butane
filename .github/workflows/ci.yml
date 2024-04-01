@@ -30,6 +30,11 @@ jobs:
         shell: bash
 
     steps:
+    - name: Setup git checkout linefeeds on Windows
+      if: runner.os == 'Windows'
+      run: |
+        git config --system core.autocrlf false
+        git config --system core.eol lf
     - uses: actions/checkout@v4
       # Postgresql setup adapted from Diesel CI
       # Disable ssl as server doesn't have a trusted cert
@@ -82,7 +87,9 @@ jobs:
     - name: Install Rust tools
       uses: taiki-e/install-action@v2
       with:
-        tool: typos
+        tool: editorconfig-checker,typos
+    - name: Run editorconfig-checker
+      run: editorconfig-checker
     - name: Build
       run: make build
     - name: Lint

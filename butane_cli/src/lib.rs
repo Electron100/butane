@@ -119,14 +119,14 @@ pub fn print_column_diff(old: &AColumn, new: &AColumn) -> Result<()> {
                 format!("{}.{}", reference.table_name(), reference.column_name())
             }
             None => "None".to_string(),
-            Some(ARef::Deferred(_)) => panic!(),
+            Some(ARef::Deferred(_)) => return Err(anyhow::anyhow!("ADB failed to resolve ARef.")),
         };
         let new = match new.reference() {
             Some(ARef::Literal(reference)) => {
                 format!("{}.{}", reference.table_name(), reference.column_name())
             }
             None => "None".to_string(),
-            Some(ARef::Deferred(_)) => panic!(),
+            Some(ARef::Deferred(_)) => return Err(anyhow::anyhow!("ADB failed to resolve ARef.")),
         };
         println!("  references: {} -> {}", old, new);
     }
@@ -145,7 +145,7 @@ pub fn print_ops(ops: Vec<Operation>) -> Result<()> {
             AddTable(table) | AddTableIfNotExists(table) => {
                 println!("New table {}", table.name);
                 for column in &table.columns {
-                    println!("  {} -> {:?}", column.name(), column.typeid()?);
+                    println!("  {}: {:?}", column.name(), column.typeid()?);
                 }
             }
             AddTableConstraints(_) => {}
@@ -153,7 +153,11 @@ pub fn print_ops(ops: Vec<Operation>) -> Result<()> {
                 println!("Remove table {}", name);
             }
             AddColumn(table_name, column) => {
-                println!("New column {table_name}.{}", column.name());
+                println!(
+                    "New column {table_name}.{}: {:?}",
+                    column.name(),
+                    column.typeid()?
+                );
             }
             RemoveColumn(table_name, column_name) => {
                 println!("Remove column {table_name}.{column_name}");
@@ -175,10 +179,11 @@ pub fn print_ops(ops: Vec<Operation>) -> Result<()> {
 pub fn describe_current_migration(base_dir: &Path) -> Result<()> {
     let mut ms = get_migrations(base_dir)?;
     let to_db = ms.current().db()?;
-    let mut from_db = ADB::new();
-    if let Some(latest) = ms.latest() {
-        from_db = latest.db()?;
-    }
+    let from_db = if let Some(latest) = ms.latest() {
+        latest.db()?
+    } else {
+        ADB::new()
+    };
     print_ops(diff(&from_db, &to_db))?;
     Ok(())
 }

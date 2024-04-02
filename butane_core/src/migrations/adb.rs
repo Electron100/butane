@@ -359,12 +359,17 @@ impl PartialEq<DeferredSqlType> for DeferredSqlType {
                 if let Self::Known(other_sqltype) = other {
                     return *sqltype == *other_sqltype;
                 }
-                // Replace self with KnownId, and run .eq again
-                other.eq(&Self::KnownId(sqltype.clone().into()))
+                if let Self::KnownId(other_type_id) = other {
+                    return *other_type_id == TypeIdentifier::Ty(sqltype.clone());
+                }
+                false
             }
             Self::KnownId(type_id) => {
                 if let Self::KnownId(other_type_id) = other {
                     return *type_id == *other_type_id;
+                }
+                if let Self::Known(other_sqltype) = other {
+                    return *type_id == TypeIdentifier::Ty(other_sqltype.clone());
                 }
                 false
             }

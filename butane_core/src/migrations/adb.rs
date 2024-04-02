@@ -382,6 +382,7 @@ impl PartialEq<DeferredSqlType> for DeferredSqlType {
         }
     }
 }
+impl Eq for DeferredSqlType {}
 impl From<TypeIdentifier> for DeferredSqlType {
     fn from(id: TypeIdentifier) -> Self {
         DeferredSqlType::KnownId(id)

@@ -5,8 +5,9 @@ use std::path::PathBuf;
 
 use butane_cli::{
     add_backend, base_dir, clean, clear_data, collapse_migrations, delete_table,
-    detach_latest_migration, embed, get_migrations, handle_error, init, list_backends,
-    list_migrations, make_migration, migrate, regenerate_migrations, remove_backend, rollback,
+    describe_migration, detach_latest_migration, embed, get_migrations, handle_error, init,
+    list_backends, list_migrations, make_migration, migrate, regenerate_migrations, remove_backend,
+    rollback,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
@@ -59,6 +60,10 @@ However if the migration has been manually edited, it will need to be manually r
     },
     /// Regenerate migrations in place.
     Regenerate,
+    DescribeMigration {
+        /// Name of migration to be described, or `current`.
+        name: String,
+    },
     /// List migrations.
     List,
     /// Replace all migrations with a single migration representing the current model state.
@@ -168,6 +173,7 @@ fn main() {
             BackendCommands::List => handle_error(list_backends(&base_dir)),
         },
         Commands::MakeMigration { name } => handle_error(make_migration(&base_dir, Some(name))),
+        Commands::DescribeMigration { name } => handle_error(describe_migration(&base_dir, name)),
         Commands::Regenerate => handle_error(regenerate_migrations(&base_dir)),
         Commands::DetachMigration => handle_error(detach_latest_migration(&base_dir)),
         Commands::Migrate { name } => handle_error(migrate(&base_dir, name.to_owned())),

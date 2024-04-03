@@ -327,7 +327,7 @@ impl ATable {
 }
 
 /// SqlType which may not yet be known.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Serialize)]
 pub enum DeferredSqlType {
     Known(SqlType), // Kept for backwards deserialization compat, supplanted by KnownId
     KnownId(TypeIdentifier),
@@ -354,35 +354,16 @@ impl DeferredSqlType {
 /// Compare, with Known and KnownId being identical if they contain the same type.
 impl PartialEq<DeferredSqlType> for DeferredSqlType {
     fn eq(&self, other: &DeferredSqlType) -> bool {
-        match self {
-            Self::Known(sqltype) => {
-                if let Self::Known(other_sqltype) = other {
-                    return *sqltype == *other_sqltype;
-                }
-                if let Self::KnownId(other_type_id) = other {
-                    return *other_type_id == TypeIdentifier::Ty(sqltype.clone());
-                }
-                false
-            }
-            Self::KnownId(type_id) => {
-                if let Self::KnownId(other_type_id) = other {
-                    return *type_id == *other_type_id;
-                }
-                if let Self::Known(other_sqltype) = other {
-                    return *type_id == TypeIdentifier::Ty(other_sqltype.clone());
-                }
-                false
-            }
-            Self::Deferred(key) => {
-                if let Self::Deferred(other_key) = other {
-                    return *key == *other_key;
-                }
-                false
-            }
-        }
+	match (self, other) {
+	    (Self::Known(sqltype), Self::Known(other_sqltype)) => *sqltype == *other_sqltype,
+	    (Self::KnownId(ty_id), Self::KnownId(other_ty_id)) => *ty_id == *other_ty_id,
+	    (Self::Known(sqltype), Self::KnownId(other_ty_id)) => TypeIdentifier::Ty(sqltype.clone()) == *other_ty_id,
+	    (Self::KnownId(ty_id), Self::Known(other_sqltype)) => *ty_id == TypeIdentifier::Ty(other_sqltype.clone()),
+	    (Self::Deferred(key), Self::Deferred(other_key)) => *key == *other_key,
+	    _ => false
+	}
     }
 }
-impl Eq for DeferredSqlType {}
 impl From<TypeIdentifier> for DeferredSqlType {
     fn from(id: TypeIdentifier) -> Self {
         DeferredSqlType::KnownId(id)

@@ -84,7 +84,7 @@ jobs:
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
         toolchain: stable
-    - name: Install Rust tools
+    - name: Install tool binaries
       uses: taiki-e/install-action@v2
       with:
         tool: editorconfig-checker,typos
@@ -93,7 +93,7 @@ jobs:
       run: |
         go install github.com/editorconfig-checker/editorconfig-checker/v2/cmd/editorconfig-checker@main
         `go env GOPATH`/bin/editorconfig-checker
-    - name: Run editorconfig-checker on linux/macOS
+    - name: Run editorconfig-checker on Linux/macOS
       if: runner.os != 'Windows'
       run: editorconfig-checker
     - name: Build

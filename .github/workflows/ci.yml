@@ -92,7 +92,10 @@ jobs:
       if: runner.os == 'Windows'
       run: go install github.com/editorconfig-checker/editorconfig-checker/v2/cmd/editorconfig-checker@latest
     - name: Run editorconfig-checker
-      run: editorconfig-checker
+      run: |
+        export PATH=`go env GOPATH`/bin:${PATH}
+        which editorconfig-checker
+        editorconfig-checker
     - name: Build
       run: make build
     - name: Lint

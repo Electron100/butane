@@ -87,7 +87,7 @@ jobs:
     - name: Install tool binaries
       uses: taiki-e/install-action@v2
       with:
-        tool: editorconfig-checker,typos
+        tool: cargo-deny,editorconfig-checker,typos
     - name: Install & run editorconfig-checker on Windows
       if: runner.os == 'Windows'
       run: |
@@ -100,6 +100,8 @@ jobs:
       run: make build
     - name: Lint
       run: make lint-ci
+    - name: Run cargo-deny
+      run: cargo deny check all
     - name: Test Core
       run: cd butane_core && cargo +stable test --all-features
     - name: Test Codegen

@@ -44,7 +44,9 @@ impl CliState {
     pub fn save(&self, base_dir: &Path) -> Result<()> {
         let path = base_dir.join("clistate.json");
         let mut file = File::create(path)?;
-        file.write_all(serde_json::to_string_pretty(self)?.as_bytes())?;
+        let mut contents = serde_json::to_string_pretty(self)?;
+        contents.push('\n');
+        file.write_all(contents.as_bytes())?;
         Ok(())
     }
 }

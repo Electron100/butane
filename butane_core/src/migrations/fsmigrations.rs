@@ -78,7 +78,9 @@ impl FsMigration {
     }
 
     fn write_info(&self, info: &MigrationInfo) -> Result<()> {
-        self.write_contents("info.json", serde_json::to_string_pretty(info)?.as_bytes())
+        let mut contents = serde_json::to_string_pretty(info)?;
+        contents.push('\n');
+        self.write_contents("info.json", contents.as_bytes())
     }
 
     fn write_sql(&self, name: &str, sql: &str) -> Result<()> {
@@ -380,8 +382,9 @@ impl FsMigrations {
         }
         let path = self.root.join("state.json");
         let mut f = self.fs.write(&path)?;
-        f.write_all(serde_json::to_string_pretty(state)?.as_bytes())
-            .map_err(|e| e.into())
+        let mut contents = serde_json::to_string_pretty(state)?;
+        contents.push('\n');
+        f.write_all(contents.as_bytes()).map_err(|e| e.into())
     }
     /// Detach the latest migration from the list of migrations,
     /// leaving the migration on the filesystem.

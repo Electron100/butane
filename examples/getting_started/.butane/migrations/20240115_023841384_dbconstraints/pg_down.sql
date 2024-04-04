@@ -100,6 +100,7 @@ CREATE TABLE Post_tags_Many__butane_tmp (
 owner INTEGER NOT NULL,
 has TEXT NOT NULL
 );
+ALTER TABLE Post_tags_Many__butane_tmp ADD FOREIGN KEY (owner) REFERENCES Post(id);
 INSERT INTO Post_tags_Many__butane_tmp SELECT owner, has FROM Post_tags_Many;
 DROP TABLE Post_tags_Many;
 ALTER TABLE Post_tags_Many__butane_tmp RENAME TO Post_tags_Many;

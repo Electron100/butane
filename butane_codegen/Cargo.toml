@@ -5,8 +5,8 @@ authors = ["James Oakley <james@electronstudio.org>"]
 edition.workspace = true
 description = "Macros for Butane. Do not use this crate directly -- use the butane crate."
 readme = "../README.md"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/Electron100/butane"
+license.workspace = true
+repository.workspace = true
 
 [features]
 datetime = ["butane_core/datetime"]

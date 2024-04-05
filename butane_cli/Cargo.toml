@@ -5,8 +5,8 @@ authors = ["James Oakley <james@electronstudio.org>"]
 edition.workspace = true
 description = "The CLI for the Butane ORM"
 readme = "../README.md"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/Electron100/butane"
+license.workspace = true
+repository.workspace = true
 documentation = "https://docs.rs/butane/"
 
 [lib]

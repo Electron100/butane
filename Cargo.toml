@@ -11,8 +11,10 @@ members = [
 ]
 
 [workspace.package]
-version = "0.6.1"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Electron100/butane"
+version = "0.6.1"
 
 [workspace.dependencies]
 butane = { version = "0.6", path = "butane" }

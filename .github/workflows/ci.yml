@@ -88,13 +88,7 @@ jobs:
       uses: taiki-e/install-action@v2
       with:
         tool: cargo-deny,editorconfig-checker,typos
-    - name: Install & run editorconfig-checker on Windows
-      if: runner.os == 'Windows'
-      run: |
-        go install github.com/editorconfig-checker/editorconfig-checker/v2/cmd/editorconfig-checker@main
-        `go env GOPATH`/bin/editorconfig-checker
-    - name: Run editorconfig-checker on Linux/macOS
-      if: runner.os != 'Windows'
+    - name: Run editorconfig-checker
       run: editorconfig-checker
     - name: Build
       run: make build

@@ -268,7 +268,7 @@ pub fn derive_field_type(input: TokenStream) -> TokenStream {
 }
 
 fn derive_field_type_for_newtype(ident: &Ident, sqltype: SqlType) -> TokenStream {
-    let sqltype_name: &'static str = sqltype.clone().into();
+    let sqltype_name = serde_variant::to_variant_name(&sqltype).unwrap();
     let sqltype_ident = syn::Ident::new(sqltype_name, proc_macro2::Span::call_site());
 
     let mut migrations = migrations_for_dir();

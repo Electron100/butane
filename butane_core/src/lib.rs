@@ -268,7 +268,7 @@ impl From<rusqlite::types::FromSqlError> for Error {
 /// Enumeration of the types a database value may take.
 ///
 /// See also [`SqlVal`].
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, strum::IntoStaticStr)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlType {
     /// Boolean
     Bool,

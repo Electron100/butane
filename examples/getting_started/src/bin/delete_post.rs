@@ -1,5 +1,6 @@
 use std::env::args;
 
+use butane::prelude::*;
 use butane::query;
 use getting_started::models::Post;
 use getting_started::*;

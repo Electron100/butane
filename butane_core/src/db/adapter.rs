@@ -233,7 +233,7 @@ impl<T> AsyncAdapter<T> {
         Self: Sized,
         F: FnOnce() -> Result<T> + Send,
     {
-        // TOOD execute the create context function on the thread
+        // TODO execute the create context function on the thread
         let context = create_context()?;
         Ok(Self {
             env: Arc::new(AsyncAdapterEnv::new()),

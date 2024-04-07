@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 
 use fallible_iterator::FallibleIterator;
 
+use crate::db::sync::ConnectionMethods as ConnectionMethodsSync;
 use crate::db::{BackendRows, ConnectionMethods, QueryResult};
 use crate::{DataResult, Result, SqlVal};
 
@@ -117,6 +118,7 @@ impl Column {
 }
 
 /// Representation of a database query.
+/// See [`QueryOpSync`] and [`QueryOpAsync`] for operations requiring a live database connection.
 #[derive(Clone, Debug)]
 pub struct Query<T: DataResult> {
     table: TblName,
@@ -181,41 +183,106 @@ impl<T: DataResult> Query<T> {
     pub fn order_desc(self, column: &'static str) -> Query<T> {
         self.order(column, OrderDirection::Descending)
     }
+}
 
-    async fn fetch(
-        self,
-        conn: &impl ConnectionMethods,
-        limit: Option<i32>,
-    ) -> Result<Box<dyn BackendRows + '_>> {
-        let sort = if self.sort.is_empty() {
-            None
-        } else {
-            Some(self.sort.as_slice())
-        };
-        conn.query(
-            &self.table,
-            T::COLUMNS,
-            self.filter,
-            limit,
-            self.offset,
-            sort,
-        )
-        .await
+mod private {
+    use super::*;
+
+    /// Internal QueryOp helpers
+    #[allow(async_fn_in_trait)] // Not truly a public trait
+    #[maybe_async_cfg::maybe(
+        idents(ConnectionMethods(sync = "ConnectionMethodsSync", async)),
+        sync(),
+        async()
+    )]
+    pub trait QueryOpInternal<T> {
+        async fn fetch(
+            self,
+            conn: &impl ConnectionMethods,
+            limit: Option<i32>,
+        ) -> Result<Box<dyn BackendRows + '_>>;
     }
+    #[maybe_async_cfg::maybe(
+        idents(
+            ConnectionMethods(sync = "ConnectionMethodsSync", async),
+            QueryOpInternal
+        ),
+        keep_self,
+        sync(),
+        async()
+    )]
+    impl<T: DataResult> QueryOpInternal<T> for Query<T> {
+        async fn fetch(
+            self,
+            conn: &impl ConnectionMethods,
+            limit: Option<i32>,
+        ) -> Result<Box<dyn BackendRows + '_>> {
+            let sort = if self.sort.is_empty() {
+                None
+            } else {
+                Some(self.sort.as_slice())
+            };
+            conn.query(
+                &self.table,
+                T::COLUMNS,
+                self.filter,
+                limit,
+                self.offset,
+                sort,
+            )
+            .await
+        }
+    }
+}
+use private::QueryOpInternalAsync;
+use private::QueryOpInternalSync;
 
+/// [`Query`] operations which require a `Connection`
+#[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
+#[maybe_async_cfg::maybe(
+    idents(
+        ConnectionMethods(sync = "ConnectionMethodsSync", async),
+        QueryOpInternal
+    ),
+    sync(),
+    async()
+)]
+pub trait QueryOp<T>: QueryOpInternal<T> {
     /// Executes the query against `conn` and returns the first result (if any).
-    pub async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        self.fetch(conn, Some(1)).await?.mapped(T::from_row).nth(0)
-    }
+    async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>>;
 
     /// Executes the query against `conn`.
-    pub async fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
-        let limit = self.limit.to_owned();
-        self.fetch(conn, limit).await?.mapped(T::from_row).collect()
-    }
+    async fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>>;
 
     /// Executes the query against `conn` and deletes all matching objects.
-    pub async fn delete(self, conn: &impl ConnectionMethods) -> Result<usize> {
+    async fn delete(self, conn: &impl ConnectionMethods) -> Result<usize>;
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        ConnectionMethods(sync = "ConnectionMethodsSync", async),
+        QueryOp,
+        QueryOpInternal
+    ),
+    keep_self,
+    sync(),
+    async()
+)]
+impl<T: DataResult> QueryOp<T> for Query<T> {
+    async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
+        QueryOpInternal::fetch(self, conn, Some(1))
+            .await?
+            .mapped(T::from_row)
+            .nth(0)
+    }
+    async fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
+        let limit = self.limit.to_owned();
+        QueryOpInternal::fetch(self, conn, limit)
+            .await?
+            .mapped(T::from_row)
+            .collect()
+    }
+    async fn delete(self, conn: &impl ConnectionMethods) -> Result<usize> {
         conn.delete_where(&self.table, self.filter.unwrap_or(BoolExpr::True))
             .await
     }

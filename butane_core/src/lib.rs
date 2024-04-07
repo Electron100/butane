@@ -90,6 +90,8 @@ pub trait DataObject: DataResult<DBO = Self> + Sync {
     where
         Self: Sized,
     {
+        // todo make sync and async variants
+        use crate::query::QueryOpAsync;
         Ok(<Self as DataResult>::query()
             .filter(query::BoolExpr::Eq(
                 Self::PKCOL,

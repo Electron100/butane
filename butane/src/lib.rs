@@ -163,9 +163,8 @@ macro_rules! colname {
 #[macro_export]
 macro_rules! find {
     ($dbobj:ident, $filter:expr, $conn:expr) => {
-        butane::query!($dbobj, $filter)
-            .limit(1)
-            .load($conn)
+        // todo sync version
+        butane::query::QueryOpAsync::load(butane::query!($dbobj, $filter).limit(1), $conn)
             .await
             .and_then(|mut results| results.pop().ok_or(butane::Error::NoSuchObject))
     };
@@ -183,6 +182,11 @@ pub mod prelude {
     pub use crate::DataObject;
     #[doc(no_inline)]
     pub use crate::DataResult;
+
+    // todo should it be sync or async in prelude
+    // (can't be both or call sites will give "multiple applicable items in scope"
+    pub use butane_core::many::ManyOpAsync;
+    pub use butane_core::query::QueryOpAsync;
 }
 
 pub mod internal {

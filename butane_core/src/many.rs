@@ -1,5 +1,6 @@
 //! Implementation of many-to-many relationships between models.
 #![deny(missing_docs)]
+use crate::db::sync::ConnectionMethods as ConnectionMethodsSync;
 use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr, OrderDirection, Query};
 use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
@@ -21,6 +22,8 @@ fn default_oc<T>() -> OnceCell<Vec<T>> {
 /// many-to-many relationship with U, owner type is T::PKType, has is
 /// U::PKType. Table name is T_foo_Many where foo is the name of
 /// the Many field
+///
+/// See [`ManyOpSync`] and [`ManyOpAsync`] for operations requiring a live database connection.
 //
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Many<T>
@@ -100,9 +103,141 @@ where
             .map(|v| v.iter())
     }
 
-    // todo support save and load for sync too
+    /// Query the values referred to by this many relationship from the
+    /// database if necessary and returns a reference to them.
+    fn query(&self) -> Result<Query<T>> {
+        let owner: &SqlVal = match &self.owner {
+            Some(o) => o,
+            None => return Err(Error::NotInitialized),
+        };
+        Ok(T::query().filter(BoolExpr::Subquery {
+            col: T::PKCOL,
+            tbl2: self.item_table.clone(),
+            tbl2_col: "has",
+            expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
+        }))
+    }
+
+    /// Describes the columns of the Many table
+    pub fn columns(&self) -> [Column; 2] {
+        [
+            Column::new("owner", self.owner_type.clone()),
+            Column::new("has", <T::PKType as FieldType>::SQLTYPE),
+        ]
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethodsSync", async), QueryOp),
+    sync(),
+    async()
+)]
+/// Loads the values referred to by this many relationship from a
+/// database query if necessary and returns a reference to them.
+async fn load_query_uncached<'a, T: DataObject>(
+    many: &'a Many<T>,
+    conn: &impl ConnectionMethods,
+    query: Query<T>,
+) -> Result<Vec<T>>
+where
+    T: 'a,
+{
+    use crate::query::QueryOp;
+    let mut vals: Vec<T> = query.load(conn).await?;
+    // Now add in the values for things not saved to the db yet
+    if !many.new_values.is_empty() {
+        vals.append(
+            &mut T::query()
+                .filter(BoolExpr::In(T::PKCOL, many.new_values.clone()))
+                .load(conn)
+                .await?,
+        );
+    }
+    Ok(vals)
+}
+
+/// Loads the values referred to by this many relationship from a
+/// database query if necessary and returns a reference to them.
+async fn load_query_async<'a, T: DataObject>(
+    many: &'a Many<T>,
+    conn: &impl ConnectionMethods,
+    query: Query<T>,
+) -> Result<impl Iterator<Item = &'a T>>
+where
+    T: 'a,
+{
+    many.all_values
+        .get_or_try_init(|| load_query_uncached_async(many, conn, query))
+        .await
+        .map(|v| v.iter())
+}
+
+/// Loads the values referred to by this many relationship from a
+/// database query if necessary and returns a reference to them.
+fn load_query_sync<'a, T: DataObject>(
+    many: &'a Many<T>,
+    conn: &impl ConnectionMethodsSync,
+    query: Query<T>,
+) -> Result<impl Iterator<Item = &'a T>>
+where
+    T: 'a,
+{
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let future = many
+        .all_values
+        .get_or_try_init(|| async { load_query_uncached_sync(many, conn, query) });
+    rt.block_on(future).map(|v| v.iter())
+}
+
+/// [`Many`] operations which require a `Connection`
+#[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethodsSync", async),),
+    sync(),
+    async()
+)]
+pub trait ManyOp<T: DataObject> {
     /// Used by macro-generated code. You do not need to call this directly.
-    pub async fn save(&mut self, conn: &impl crate::ConnectionMethods) -> Result<()> {
+    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+
+    /// Delete all references from the database, and any unsaved additions.
+    async fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+
+    /// Loads the values referred to by this many relationship from the
+    /// database if necessary and returns a reference to them.
+    async fn load<'a>(
+        &'a self,
+        conn: &impl ConnectionMethods,
+    ) -> Result<impl Iterator<Item = &'a T>>
+    where
+        T: 'a;
+
+    /// Loads and orders the values referred to by this many relationship from a
+    /// database if necessary and returns a reference to them.
+    async fn load_ordered<'a>(
+        &'a self,
+        conn: &impl ConnectionMethods,
+        order: OrderDirection,
+    ) -> Result<impl Iterator<Item = &'a T>>
+    where
+        T: 'a;
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        ConnectionMethods(sync = "ConnectionMethodsSync", async),
+        ManyOpInternal,
+        ManyOp,
+        load_query(sync = "load_query_sync", async = "load_query_async"),
+    ),
+    keep_self,
+    sync(),
+    async()
+)]
+impl<T: DataObject> ManyOp<T> for Many<T> {
+    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
         while !self.new_values.is_empty() {
             conn.insert_only(
@@ -126,8 +261,7 @@ where
         Ok(())
     }
 
-    /// Delete all references from the database, and any unsaved additions.
-    pub async fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    async fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
         conn.delete_where(
             &self.item_table,
@@ -141,88 +275,46 @@ where
         Ok(())
     }
 
-    /// Loads the values referred to by this many relationship from the
-    /// database if necessary and returns a reference to them.
-    pub async fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
+    async fn load<'a>(
+        &'a self,
+        conn: &impl ConnectionMethods,
+    ) -> Result<impl Iterator<Item = &'a T>>
+    where
+        T: 'a,
+    {
         let query = self.query();
         // If not initialised then there are no values
         let vals: Result<Vec<&T>> = if query.is_err() {
             Ok(Vec::new())
         } else {
-            Ok(self.load_query(conn, query.unwrap()).await?.collect())
+            Ok(load_query(self, conn, query.unwrap()).await?.collect())
         };
         vals.map(|v| v.into_iter())
     }
 
-    /// Query the values referred to by this many relationship from the
-    /// database if necessary and returns a reference to them.
-    fn query(&self) -> Result<Query<T>> {
-        let owner: &SqlVal = match &self.owner {
-            Some(o) => o,
-            None => return Err(Error::NotInitialized),
-        };
-        Ok(T::query().filter(BoolExpr::Subquery {
-            col: T::PKCOL,
-            tbl2: self.item_table.clone(),
-            tbl2_col: "has",
-            expr: Box::new(BoolExpr::Eq("owner", Expr::Val(owner.clone()))),
-        }))
-    }
-
-    /// Loads the values referred to by this many relationship from a
-    /// database query if necessary and returns a reference to them.
-    async fn load_query(
-        &self,
-        conn: &impl ConnectionMethods,
-        query: Query<T>,
-    ) -> Result<impl Iterator<Item = &T>> {
-        let vals: Result<&Vec<T>> = self
-            .all_values
-            .get_or_try_init(|| async {
-                let mut vals: Vec<T> = query.load(conn).await?;
-                // Now add in the values for things not saved to the db yet
-                if !self.new_values.is_empty() {
-                    vals.append(
-                        &mut T::query()
-                            .filter(BoolExpr::In(T::PKCOL, self.new_values.clone()))
-                            .load(conn)
-                            .await?,
-                    );
-                }
-                Ok(vals)
-            })
-            .await;
-        vals.map(|v| v.iter())
-    }
-
-    /// Loads and orders the values referred to by this many relationship from a
-    /// database if necessary and returns a reference to them.
-    pub async fn load_ordered(
-        &self,
+    async fn load_ordered<'a>(
+        &'a self,
         conn: &impl ConnectionMethods,
         order: OrderDirection,
-    ) -> Result<impl Iterator<Item = &T>> {
+    ) -> Result<impl Iterator<Item = &'a T>>
+    where
+        T: 'a,
+    {
         let query = self.query();
         // If not initialised then there are no values
         let vals: Result<Vec<&T>> = if query.is_err() {
             Ok(Vec::new())
         } else {
-            Ok(self
-                .load_query(conn, query.unwrap().order(T::PKCOL, order))
-                .await?
-                .collect())
+            Ok(
+                load_query(self, conn, query.unwrap().order(T::PKCOL, order))
+                    .await?
+                    .collect(),
+            )
         };
         vals.map(|v| v.into_iter())
     }
-
-    /// Describes the columns of the Many table
-    pub fn columns(&self) -> [Column; 2] {
-        [
-            Column::new("owner", self.owner_type.clone()),
-            Column::new("has", <T::PKType as FieldType>::SQLTYPE),
-        ]
-    }
 }
+
 impl<T: DataObject> PartialEq<Many<T>> for Many<T> {
     fn eq(&self, other: &Many<T>) -> bool {
         (self.owner == other.owner) && (self.item_table == other.item_table)

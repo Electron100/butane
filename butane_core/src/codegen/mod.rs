@@ -442,7 +442,7 @@ fn some_known(ty: SqlType) -> Option<DeferredSqlType> {
 }
 
 /// If the field refers to a primitive, return its SqlType
-fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
+pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
     if *ty == parse_quote!(bool) {
         return some_known(SqlType::Bool);
     } else if *ty == parse_quote!(u8)

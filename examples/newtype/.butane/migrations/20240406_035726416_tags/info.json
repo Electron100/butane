@@ -1,0 +1,10 @@
+{
+  "from_name": "20240401_095709389_init",
+  "table_bases": {
+    "Blog": "20240401_095709389_init"
+  },
+  "backends": [
+    "sqlite",
+    "pg"
+  ]
+}

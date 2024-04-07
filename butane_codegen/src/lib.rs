@@ -240,10 +240,69 @@ pub fn derive_field_type(input: TokenStream) -> TokenStream {
     let derive_input = syn::parse_macro_input!(input as syn::DeriveInput);
     let ident = &derive_input.ident;
     match derive_input.data {
-        syn::Data::Struct(_) => derive_field_type_with_json(ident),
+        syn::Data::Struct(syn::DataStruct {
+            fields: syn::Fields::Unnamed(syn::FieldsUnnamed { unnamed, .. }),
+            ..
+        }) => {
+            if unnamed.len() == 1 {
+                let field = unnamed.first().unwrap();
+                if let Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(sqltype))) =
+                    codegen::get_primitive_sql_type(&field.ty)
+                {
+                    return derive_field_type_for_newtype(ident, sqltype);
+                }
+            }
+            derive_field_type_with_json(ident)
+        }
+        syn::Data::Struct(syn::DataStruct {
+            fields: syn::Fields::Named { .. },
+            ..
+        })
+        | syn::Data::Struct(syn::DataStruct {
+            fields: syn::Fields::Unit { .. },
+            ..
+        }) => derive_field_type_with_json(ident),
         syn::Data::Enum(data_enum) => derive_field_type_for_enum(ident, data_enum),
         syn::Data::Union(_) => derive_field_type_with_json(ident),
     }
+}
+
+fn derive_field_type_for_newtype(ident: &Ident, sqltype: SqlType) -> TokenStream {
+    let sqltype_name = serde_variant::to_variant_name(&sqltype).unwrap();
+    let sqltype_ident = syn::Ident::new(sqltype_name, proc_macro2::Span::call_site());
+
+    let mut migrations = migrations_for_dir();
+    codegen::add_custom_type(
+        &mut migrations,
+        ident.to_string(),
+        DeferredSqlType::KnownId(TypeIdentifier::Ty(sqltype)),
+    )
+    .unwrap();
+
+    quote!(
+        impl butane::ToSql for #ident
+        {
+            fn to_sql(&self) -> butane::SqlVal {
+                self.0.to_sql()
+            }
+            fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                self.0.to_sql_ref()
+            }
+        }
+        impl butane::FromSql for #ident
+        {
+            fn from_sql_ref(val: butane::SqlValRef) -> std::result::Result<Self, butane::Error> {
+                let inner = butane::FromSql::from_sql_ref(val)?;
+                Ok(Self ( inner ))
+            }
+        }
+        impl butane::FieldType for #ident
+        {
+            type RefType = Self;
+            const SQLTYPE: butane::SqlType = butane::SqlType:: #sqltype_ident;
+        }
+    )
+    .into()
 }
 
 fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenStream {

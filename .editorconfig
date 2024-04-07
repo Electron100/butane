@@ -12,5 +12,8 @@ max_line_length = 400
 [butane_migrations.rs]
 max_line_length = unset
 
+[types.json]
+max_line_length = unset
+
 [README.md]
 max_line_length = 200

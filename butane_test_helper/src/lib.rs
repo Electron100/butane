@@ -1,4 +1,5 @@
 //! Test helpers to set up database connections.
+//! Macros depend on [`butane_core`], `env_logger` and [`log`].
 #![deny(missing_docs)]
 
 use butane_core::db::{connect, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec};
@@ -47,6 +48,10 @@ impl Drop for PgServerState {
         self.proc.kill().ok();
         let mut buf = String::new();
         self.stderr.read_to_string(&mut buf).unwrap();
+        if !buf.is_empty() {
+            log::warn!("pg shutdown error: {buf}");
+        }
+        log::info!("Deleting {}", self.dir.display());
         std::fs::remove_dir_all(&self.dir).unwrap();
     }
 }
@@ -108,18 +113,18 @@ pub fn create_tmp_server() -> PgServerState {
     loop {
         buf.clear();
         stderr.read_line(&mut buf).unwrap();
-        eprintln!("{buf}");
+        log::trace!("{buf}");
         if buf.contains("ready to accept connections") {
             break;
         }
         if proc.try_wait().unwrap().is_some() {
             buf.clear();
             stderr.read_to_string(&mut buf).unwrap();
-            eprint!("{buf}");
+            log::error!("{buf}");
             panic!("postgres process died");
         }
     }
-    eprintln!("created tmp server!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    log::info!("created tmp pg server.");
     unsafe {
         // Try to delete all the pg files when the process exits
         libc::atexit(proc_teardown);
@@ -141,7 +146,7 @@ static TMP_SERVER: Lazy<Mutex<Option<PgServerState>>> =
 
 /// Create a running empty postgres database named `butane_test_<uuid>`.
 pub async fn pg_setup() -> PgSetupData {
-    eprintln!("pg_setup");
+    log::trace!("starting pg_setup");
     // By default we set up a temporary, local postgres server just
     // for this test. This can be overridden by the environment
     // variable BUTANE_PG_CONNSTR
@@ -155,7 +160,7 @@ pub async fn pg_setup() -> PgSetupData {
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
-    eprintln!("new db is `{}`", &new_dbname);
+    log::info!("new db is `{}`", &new_dbname);
 
     let mut conn = connect(&ConnectionSpec::new("pg", &connstr)).await.unwrap();
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
@@ -182,7 +187,7 @@ pub async fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate:
     root.push(".butane/migrations");
     let mut disk_migrations = migrations::from_root(&root);
     let disk_current = disk_migrations.current();
-    eprintln!("{:?}", disk_current);
+    log::info!("Loading migrations from {:?}", disk_current);
     if !migrate {
         return;
     }
@@ -195,15 +200,20 @@ pub async fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate:
     migrations::copy_migration(disk_current, mem_current).unwrap();
 
     assert!(
+        disk_current.db().unwrap().tables().count() != 0,
+        "No tables to migrate"
+    );
+
+    assert!(
         mem_migrations
             .create_migration(&nonempty::nonempty![backend], "init", None)
             .expect("expected to create migration without error"),
         "expected to create migration"
     );
-    println!("created current migration");
+    log::info!("created current migration");
     let to_apply = mem_migrations.unapplied_migrations(conn).await.unwrap();
     for m in to_apply {
-        println!("Applying migration {}", m.name());
+        log::info!("Applying migration {}", m.name());
         m.apply(conn).await.unwrap();
     }
 }
@@ -234,9 +244,10 @@ macro_rules! maketest {
                 env_logger::try_init().ok();
                 let backend = butane_core::db::get_backend(&stringify!($backend)).expect("Could not find backend");
                 let $dataname = butane_test_helper::[<$backend _setup>]().await;
-                eprintln!("connecting to {}", &$connstr);
+                log::info!("connecting to {}..", &$connstr);
                 let mut conn = backend.connect(&$connstr).await.expect("Could not connect backend");
                 butane_test_helper::setup_db(backend, &mut conn, $migrate).await;
+                log::info!("running test on {}..", &$connstr);
                 $fname(conn).await;
                 butane_test_helper::[<$backend _teardown>]($dataname);
             }

@@ -14,8 +14,9 @@ build :
 lint :
 	$(CARGO) clippy --all-features -- -D warnings
 
+lint-ci : doclint lint spellcheck check-fmt
 
-check : build test doclint lint spellcheck
+check : build doclint lint spellcheck check-fmt test
 
 
 test :
@@ -24,6 +25,12 @@ test :
 clean :
 	$(CARGO) clean
 
+
+fmt :
+	$(CARGO_NIGHTLY) fmt
+
+check-fmt :
+	$(CARGO_NIGHTLY) fmt --check
 
 spellcheck :
 	typos
@@ -39,3 +46,9 @@ docview :
 
 install :
 	cd butane_cli && $(CARGO) install --path .
+
+regenerate-example-migrations :
+	for dir in examples/*; do \
+		(cd $$dir; cargo +stable run -p butane_cli --all-features -- regenerate; \
+		cargo +stable run -p butane_cli --all-features -- embed); \
+	done

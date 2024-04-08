@@ -2,10 +2,13 @@
 #![deny(missing_docs)]
 #![allow(clippy::iter_nth_zero)]
 #![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
+#![deny(missing_docs)]
+
 use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
+
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 use thiserror::Error as ThisError;
 
@@ -43,7 +46,7 @@ pub trait DataResult: Sized {
     /// Corresponding object type.
     type DBO: DataObject;
 
-    /// Metadata for eaCH column.
+    /// Metadata for each column.
     const COLUMNS: &'static [Column];
 
     /// Load an object from a database backend row.
@@ -55,12 +58,38 @@ pub trait DataResult: Sized {
     fn query() -> Query<Self>;
 }
 
+pub mod internal {
+    //! Internals called by Butane codegen. Semver exempt.
+
+    use super::*;
+
+    /// Methods implemented by Butane codegen and called by other
+    /// parts of Butane. You do not need to call these directly
+    /// WARNING: Semver exempt
+    #[async_trait(?Send)]
+    pub trait DataObjectInternal: DataResult<DBO = Self> {
+        /// Like [DataResult::COLUMNS] but omits [AutoPk].
+        const NON_AUTO_COLUMNS: &'static [Column];
+
+        /// Get the primary key as mutable. Used internally in the case of [AutoPk].
+        fn pk_mut(&mut self) -> &mut impl PrimaryKeyType;
+
+        /// Saves many-to-many relationships pointed to by fields on this model.
+        /// Performed automatically by `save`. You do not need to call this directly.
+        async fn save_many_to_many(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+
+        /// Returns the Sql values of all columns. Used internally. You are
+        /// unlikely to need to call this directly.
+        fn values(&self, include_pk: bool) -> Vec<SqlValRef>;
+    }
+}
+
 /// An object in the database.
 ///
 /// Rather than implementing this type manually, use the
 /// `#[model]` attribute.
 #[async_trait(?Send)]
-pub trait DataObject: DataResult<DBO = Self> + Sync {
+pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sync {
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
     /// Link to a generated struct providing query helpers for each field.
@@ -75,6 +104,7 @@ pub trait DataObject: DataResult<DBO = Self> + Sync {
 
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
+
     /// Find this object in the database based on primary key.
     /// Returns `Error::NoSuchObject` if the primary key does not exist.
     async fn get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Self>
@@ -105,7 +135,58 @@ pub trait DataObject: DataResult<DBO = Self> + Sync {
     }
 
     /// Save the object to the database.
-    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+        let pkcol = Column::new(Self::PKCOL, <Self::PKType as FieldType>::SQLTYPE);
+
+        if Self::AUTO_PK && <Self as DataResult>::COLUMNS.len() == 1 {
+            // Our only field is an AutoPk
+            if !self.pk().is_valid() {
+                let pk = conn
+                    .insert_returning_pk(Self::TABLE, &[], &pkcol, &[])
+                    .await?;
+                self.pk_mut().initialize(pk)?;
+            }
+        } else if Self::AUTO_PK {
+            // We have an AutoPk, but we also have other fields
+            // Since we expect our pk field to be invalid and to be created by the insert,
+            // we do a pure insert or update based on whether the AutoPk is already valid or not.
+            // Note that some database backends do support upsert with auto-incrementing primary
+            // keys, but butane isn't well set up to take advantage of that, including missing
+            // support for constraints and the `insert_or_update` method not providing a way to
+            // retrieve the pk.
+            if self.pk().is_valid() {
+                // pk is valid, do an update
+                conn.update(
+                    Self::TABLE,
+                    pkcol,
+                    self.pk().to_sql_ref(),
+                    Self::NON_AUTO_COLUMNS,
+                    &self.values(false),
+                )
+                .await?;
+            } else {
+                // invalid pk, do an insert
+                let pk = conn
+                    .insert_returning_pk(
+                        Self::TABLE,
+                        Self::NON_AUTO_COLUMNS,
+                        &pkcol,
+                        &self.values(true),
+                    )
+                    .await?;
+                self.pk_mut().initialize(pk)?;
+            };
+        } else {
+            // No AutoPk to worry about, do an upsert
+            conn.insert_or_replace(Self::TABLE, Self::COLUMNS, &pkcol, &self.values(true))
+                .await?;
+        }
+
+        self.save_many_to_many(conn).await?;
+
+        Ok(())
+    }
+
     /// Delete the object from the database.
     async fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
         conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
@@ -275,6 +356,8 @@ impl std::fmt::Display for SqlType {
 #[cfg(feature = "log")]
 pub use log::debug;
 #[cfg(feature = "log")]
+pub use log::info;
+#[cfg(feature = "log")]
 pub use log::warn;
 
 #[cfg(not(feature = "log"))]
@@ -284,6 +367,13 @@ mod btlog {
     /// Noop for when feature log is not enabled.
     #[macro_export]
     macro_rules! debug {
+        (target: $target:expr, $($arg:tt)+) => {};
+        ($($arg:tt)+) => {};
+    }
+
+    /// Noop for when feature log is not enabled.
+    #[macro_export]
+    macro_rules! info {
         (target: $target:expr, $($arg:tt)+) => {};
         ($($arg:tt)+) => {};
     }

@@ -298,6 +298,16 @@ pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync {
     fn is_valid(&self) -> bool {
         true
     }
+
+    /// Initialize an invalid primary key with a value.
+    /// No-op if `self.is_valid()` is true.
+    /// Only relevant for `AutoPk`
+    fn initialize(&mut self, value: SqlVal) -> Result<()> {
+        if !self.is_valid() {
+            *self = Self::from_sql(value)?;
+        }
+        Ok(())
+    }
 }
 
 /// Trait for referencing the primary key for a given model. Used to

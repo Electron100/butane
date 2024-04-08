@@ -152,7 +152,6 @@ mod internal {
 
         // Workaround for https://github.com/rust-lang/rfcs/issues/2765
         fn connection_methods(&self) -> &dyn ConnectionMethods;
-        fn connection_methods_mut(&mut self) -> &mut dyn ConnectionMethods;
     }
 
     /// Database transaction.
@@ -223,9 +222,6 @@ mod internal {
         fn connection_methods(&self) -> &dyn ConnectionMethods {
             self
         }
-        fn connection_methods_mut(&mut self) -> &mut dyn ConnectionMethods {
-            self
-        }
     }
 
     #[maybe_async_cfg::maybe(idents(Connection(sync = "ConnectionSync", async)), sync(), async())]
@@ -288,8 +284,9 @@ impl ConnectionSpec {
     pub fn save(&self, path: &Path) -> Result<()> {
         let path = conn_complete_if_dir(path);
         let mut f = fs::File::create(path)?;
-        f.write_all(serde_json::to_string_pretty(self)?.as_bytes())
-            .map_err(|e| e.into())
+        let mut contents = serde_json::to_string_pretty(self)?;
+        contents.push('\n');
+        f.write_all(contents.as_bytes()).map_err(|e| e.into())
     }
     /// Load a previously saved connection spec
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {

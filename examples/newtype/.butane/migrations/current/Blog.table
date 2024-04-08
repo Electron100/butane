@@ -4,22 +4,18 @@
     {
       "name": "id",
       "sqltype": {
-        "KnownId": {
-          "Ty": "BigInt"
-        }
+        "Deferred": "CT:BlogId"
       },
       "nullable": false,
       "pk": true,
-      "auto": true,
+      "auto": false,
       "unique": false,
       "default": null
     },
     {
       "name": "name",
       "sqltype": {
-        "KnownId": {
-          "Ty": "Text"
-        }
+        "Deferred": "CT:BlogName"
       },
       "nullable": false,
       "pk": false,

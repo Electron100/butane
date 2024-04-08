@@ -5,8 +5,9 @@ use std::path::PathBuf;
 
 use butane_cli::{
     add_backend, base_dir, clean, clear_data, collapse_migrations, delete_table,
-    detach_latest_migration, embed, get_migrations, handle_error, init, list_backends,
-    list_migrations, make_migration, migrate, remove_backend, rollback,
+    describe_migration, detach_latest_migration, embed, get_migrations, handle_error, init,
+    list_backends, list_migrations, make_migration, migrate, regenerate_migrations, remove_backend,
+    rollback,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
@@ -18,6 +19,8 @@ struct Cli {
     command: Commands,
     #[arg(short = 'p', long, default_value=base_dir().into_os_string())]
     path: PathBuf,
+    #[command(flatten)]
+    verbose: clap_verbosity_flag::Verbosity,
 }
 
 #[derive(Subcommand)]
@@ -54,6 +57,12 @@ However if the migration has been manually edited, it will need to be manually r
     Migrate {
         /// Migration to migrate to.
         name: Option<String>,
+    },
+    /// Regenerate migrations in place.
+    Regenerate,
+    DescribeMigration {
+        /// Name of migration to be described, or `current`.
+        name: String,
     },
     /// List migrations.
     List,
@@ -129,8 +138,14 @@ enum DeleteCommands {
 async fn main() {
     let cli = Cli::parse();
 
+    env_logger::Builder::new()
+        .filter_level(cli.verbose.log_level_filter())
+        .init();
+
     let mut base_dir = cli.path;
-    base_dir.push(".butane");
+    if !base_dir.ends_with(".butane") {
+        base_dir.push(".butane");
+    }
 
     // List any detached migrations.
     if let Ok(ms) = get_migrations(&base_dir) {
@@ -156,6 +171,8 @@ async fn main() {
             BackendCommands::List => handle_error(list_backends(&base_dir)),
         },
         Commands::MakeMigration { name } => handle_error(make_migration(&base_dir, Some(name))),
+        Commands::DescribeMigration { name } => handle_error(describe_migration(&base_dir, name)),
+        Commands::Regenerate => handle_error(regenerate_migrations(&base_dir)),
         Commands::DetachMigration => handle_error(detach_latest_migration(&base_dir).await),
         Commands::Migrate { name } => handle_error(migrate(&base_dir, name.to_owned()).await),
         Commands::Rollback { name } => handle_error(rollback(&base_dir, name.to_owned()).await),

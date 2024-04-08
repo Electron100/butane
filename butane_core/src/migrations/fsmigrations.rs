@@ -10,27 +10,37 @@ use serde::{Deserialize, Serialize};
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::fs::{Filesystem, OsFilesystem};
 use super::{Migration, MigrationMut, Migrations, MigrationsMut};
-use crate::{ConnectionMethods, DataObject, Error, Result};
+use crate::{Error, Result};
 
 type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 const TYPES_FILENAME: &str = "types.json";
 
-#[derive(Debug, Deserialize, Serialize)]
+/// Metadata stored in each migration in the filesystem.
+#[derive(Debug, Default, Deserialize, Serialize)]
 struct MigrationInfo {
     /// The migration this one is based on, or None if this is the
     /// first migration in the chain
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     from_name: Option<String>,
+    /// A mapping of table name to the prior migration where it was
+    /// last modified, and therefore where the last .table file for
+    /// it exists.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    table_bases: BTreeMap<String, String>,
+    /// List of backends supported by this migration.
     backends: Vec<String>,
 }
 impl MigrationInfo {
     fn new() -> Self {
         MigrationInfo {
             from_name: None,
+            table_bases: BTreeMap::new(),
             backends: Vec::new(),
         }
     }
 }
 
+/// Metadata about the migration series.
 #[derive(Debug, Deserialize, Serialize)]
 struct MigrationsState {
     latest: Option<String>,
@@ -41,7 +51,7 @@ impl MigrationsState {
     }
 }
 
-/// A migration stored in the filesystem
+/// A migration stored in the filesystem.
 #[derive(Clone, Debug)]
 pub struct FsMigration {
     fs: std::sync::Arc<dyn Filesystem + Send + Sync>,
@@ -67,7 +77,9 @@ impl FsMigration {
     }
 
     fn write_info(&self, info: &MigrationInfo) -> Result<()> {
-        self.write_contents("info.json", serde_json::to_string_pretty(info)?.as_bytes())
+        let mut contents = serde_json::to_string_pretty(info)?;
+        contents.push('\n');
+        self.write_contents("info.json", contents.as_bytes())
     }
 
     fn write_sql(&self, name: &str, sql: &str) -> Result<()> {
@@ -81,7 +93,7 @@ impl FsMigration {
     fn read_sql(&self, backend: &str, direction: &str) -> Result<Option<String>> {
         let path = self.sql_path(backend, direction);
         let mut buf = String::new();
-        if !path.exists() {
+        if !path.is_file() {
             return Ok(None);
         }
         self.fs.read(&path)?.read_to_string(&mut buf)?;
@@ -120,7 +132,7 @@ impl FsMigration {
 
     fn info(&self) -> Result<MigrationInfo> {
         let path = self.root.join("info.json");
-        if !path.exists() {
+        if !path.is_file() {
             return Ok(MigrationInfo::new());
         }
         let info: MigrationInfo = serde_json::from_reader(self.fs.read(&path)?)?;
@@ -134,14 +146,68 @@ impl FsMigration {
     fn lock_shared(&self) -> Result<MigrationLock> {
         MigrationLock::new_shared(&self.root.join("lock"))
     }
+
+    /// Delete all of the files except info.json which is recreated
+    /// with only `from_name` set to allow migration series traversal.
+    pub fn delete_db(&self) -> Result<()> {
+        let entries = self.fs.list_dir(&self.root)?;
+        for entry in entries {
+            match entry.file_name() {
+                None => continue,
+                Some(name) => {
+                    let name = name.to_string_lossy();
+                    if name == "info.json" {
+                        // Re-create info.json using the minimum required to allow
+                        // `all_migrations` to traverse the list.
+                        let info = self.info()?;
+                        let info = MigrationInfo {
+                            from_name: info.from_name,
+                            ..Default::default()
+                        };
+                        self.write_info(&info)?;
+                    } else {
+                        self.fs.delete(&entry)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl MigrationMut for FsMigration {
-    fn write_table(&mut self, table: &ATable) -> Result<()> {
+    fn add_modified_table(&mut self, table: &ATable) -> Result<()> {
         self.write_contents(
             &format!("{}.table", table.name),
             serde_json::to_string_pretty(table)?.as_bytes(),
         )
+    }
+
+    fn add_unmodified_table(&mut self, table: &ATable, from_migration_name: &str) -> Result<()> {
+        // Fetches a FsMigration for the from_migration_name, and retrieves its MigrationInfo.
+        let migrations_dir = self
+            .root
+            .parent()
+            .ok_or(Error::MigrationError("Migrations fs not found".into()))?;
+        let migrations = crate::migrations::from_root(migrations_dir);
+        let migration_list = migrations.all_migrations()?;
+        let from_info = migration_list
+            .iter()
+            .find(|&m| m.name() == *from_migration_name)
+            .ok_or(Error::MigrationError("Migration not found".into()))?
+            .info()?;
+        let from_table_bases = from_info.table_bases;
+        // In the "from" migration, either the 'source' migration is in the `table_bases`,
+        // or the previous migration is the 'source'.
+        let migration_name = if let Some(migration_name) = from_table_bases.get(&table.name) {
+            migration_name
+        } else {
+            from_migration_name
+        };
+        let mut info = self.info()?;
+        info.table_bases
+            .insert(table.name.clone(), migration_name.to_owned());
+        self.write_info(&info)
     }
 
     fn delete_table(&mut self, table: &str) -> Result<()> {
@@ -156,8 +222,11 @@ impl MigrationMut for FsMigration {
         self.write_sql(&format!("{backend_name}_up"), up_sql)?;
         self.write_sql(&format!("{backend_name}_down"), down_sql)?;
         let mut info = self.info()?;
-        info.backends.push(backend_name.to_string());
-        self.write_info(&info)?;
+        let backend_name = backend_name.to_string();
+        if !info.backends.contains(&backend_name) {
+            info.backends.push(backend_name.to_string());
+            self.write_info(&info)?;
+        }
         Ok(())
     }
 
@@ -204,9 +273,21 @@ impl MigrationMut for FsMigration {
 
 impl Migration for FsMigration {
     fn db(&self) -> Result<ADB> {
+        self.ensure_dir()?;
         let _lock = self.lock_shared()?;
         let mut db = ADB::new();
-        self.ensure_dir()?;
+        let table_bases = self.info()?.table_bases;
+        for (table_name, migration_name) in table_bases {
+            let mut filename = PathBuf::from(
+                self.root
+                    .parent()
+                    .ok_or(Error::MigrationError("Migrations fs not found".into()))?,
+            );
+            filename.push(migration_name);
+            filename.push(format!("{table_name}.table"));
+            let table: ATable = serde_json::from_reader(self.fs.read(&filename)?)?;
+            db.replace_table(table)
+        }
         let entries = self.fs.list_dir(&self.root)?;
         for entry in entries {
             match entry.file_name() {
@@ -269,6 +350,7 @@ pub struct FsMigrations {
     current: FsMigration,
 }
 impl FsMigrations {
+    /// Create a new instance.
     pub fn new(root: PathBuf) -> Self {
         let fs = std::sync::Arc::new(OsFilesystem {});
         let current = FsMigration {
@@ -299,8 +381,9 @@ impl FsMigrations {
         }
         let path = self.root.join("state.json");
         let mut f = self.fs.write(&path)?;
-        f.write_all(serde_json::to_string_pretty(state)?.as_bytes())
-            .map_err(|e| e.into())
+        let mut contents = serde_json::to_string_pretty(state)?;
+        contents.push('\n');
+        f.write_all(contents.as_bytes()).map_err(|e| e.into())
     }
     /// Detach the latest migration from the list of migrations,
     /// leaving the migration on the filesystem.
@@ -326,7 +409,9 @@ impl FsMigrations {
         let mut detached_directory_names: Vec<String> = vec![];
         for entry in std::fs::read_dir(self.root.clone())? {
             let path = entry?.path();
-            let name = path.file_name().unwrap();
+            let name = path
+                .file_name()
+                .ok_or(Error::MigrationError("Migration name is missing".into()))?;
             if !path.is_dir() || name == "current" {
                 continue;
             }
@@ -344,7 +429,7 @@ impl Migrations for FsMigrations {
     fn get_migration(&self, name: &str) -> Option<Self::M> {
         let mut dir = self.root.clone();
         dir.push(name);
-        if dir.exists() {
+        if dir.is_dir() {
             Some(FsMigration {
                 fs: self.fs.clone(),
                 root: dir,
@@ -368,6 +453,7 @@ impl MigrationsMut for FsMigrations {
         &mut self.current
     }
     fn clear_current(&mut self) -> Result<()> {
+        crate::info!("Deleting {}", self.current.root.display());
         std::fs::remove_dir_all(&self.current.root)?;
         Ok(())
     }
@@ -390,7 +476,11 @@ impl MigrationsMut for FsMigrations {
         Ok(())
     }
 
-    async fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    fn delete_migrations(&mut self) -> Result<()> {
+        crate::info!(
+            "Deleting everything in {} except 'current'",
+            self.root.display()
+        );
         for entry in std::fs::read_dir(&self.root)? {
             let entry = entry?;
             if matches!(entry.path().file_name(), Some(name) if name == "current") {
@@ -402,8 +492,6 @@ impl MigrationsMut for FsMigrations {
                 std::fs::remove_file(entry.path())?;
             }
         }
-        conn.delete_where(super::ButaneMigration::TABLE, crate::query::BoolExpr::True)
-            .await?;
         Ok(())
     }
 }
@@ -430,6 +518,7 @@ impl MigrationLock {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(path)?)
     }
 }

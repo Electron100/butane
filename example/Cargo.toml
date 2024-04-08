@@ -2,6 +2,7 @@
 name = "example"
 version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
+license.workspace = true
 edition.workspace = true
 publish = false
 build = "build.rs"

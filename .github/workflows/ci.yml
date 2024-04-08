@@ -9,6 +9,10 @@ on:
     branches:
       - master
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -21,9 +25,17 @@ jobs:
           - macos-latest
           - windows-2019
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Setup git checkout linefeeds on Windows
+      if: runner.os == 'Windows'
+      run: |
+        git config --system core.autocrlf false
+        git config --system core.eol lf
+    - uses: actions/checkout@v4
       # Postgresql setup adapted from Diesel CI
       # Disable ssl as server doesn't have a trusted cert
     - name: Setup postgres on Linux
@@ -63,19 +75,40 @@ jobs:
         echo "C:\ProgramData\chocolatey\lib\SQLite\tools" >> $GITHUB_PATH
         echo "SQLITE3_LIB_DIR=C:\ProgramData\chocolatey\lib\SQLite\tools" >> $GITHUB_ENV
 
-    - name: Install Rust tools
-      run: cargo install typos-cli
+    - name: Add Rust nightly toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: nightly
+        components: rustfmt
+    - name: Add Rust nightly toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+    - name: Install tool binaries
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-deny,editorconfig-checker,typos
+    - name: Run editorconfig-checker
+      run: editorconfig-checker
     - name: Build
       run: make build
     - name: Lint
-      run: make lint
+      run: make lint-ci
+    - name: Run cargo-deny
+      run: cargo deny check all
     - name: Test Core
-      run: cd butane_core && cargo test --all-features
+      run: cd butane_core && cargo +stable test --all-features
     - name: Test Codegen
-      run: cd butane_codegen && cargo test --all-features
+      run: cd butane_codegen && cargo +stable test --all-features
     - name: Test CLI
-      run: cd butane_cli && cargo test --all-features
+      run: cd butane_cli && cargo +stable test --all-features
     - name: Run example cli tests
-      run: cd example && cargo test --all-features
+      run: cd example && cargo +stable test --all-features
     - name: Test
-      run: cd butane && cargo test --all-features
+      run: cd butane && cargo +stable test --all-features
+    - name: Check example migrations
+      run: |
+        set -ex
+        make regenerate-example-migrations
+        git add -A
+        git diff --exit-code

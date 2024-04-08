@@ -1,0 +1,43 @@
+{
+  "name": "Post_tags_Many",
+  "columns": [
+    {
+      "name": "owner",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Blob"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null,
+      "reference": {
+        "Literal": {
+          "table_name": "Post",
+          "column_name": "id"
+        }
+      }
+    },
+    {
+      "name": "has",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null,
+      "reference": {
+        "Literal": {
+          "table_name": "Tag",
+          "column_name": "tag"
+        }
+      }
+    }
+  ]
+}

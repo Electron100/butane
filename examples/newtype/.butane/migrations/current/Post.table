@@ -1,0 +1,108 @@
+{
+  "name": "Post",
+  "columns": [
+    {
+      "name": "id",
+      "sqltype": {
+        "Deferred": "CT:PostId"
+      },
+      "nullable": false,
+      "pk": true,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "title",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "body",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "published",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Bool"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "tags",
+      "sqltype": {
+        "Deferred": "CT:Tags"
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "blog",
+      "sqltype": {
+        "Deferred": "PK:Blog"
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null,
+      "reference": {
+        "Deferred": {
+          "Deferred": "PK:Blog"
+        }
+      }
+    },
+    {
+      "name": "byline",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": true,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "likes",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Int"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

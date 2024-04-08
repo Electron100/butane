@@ -1,1 +1,0 @@
-{"name":"Tag","columns":[{"name":"tag","sqltype":{"Known":"Text"},"nullable":false,"pk":true,"auto":false,"default":null}]}

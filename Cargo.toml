@@ -7,16 +7,19 @@ members = [
   "butane_core",
   "butane_test_helper",
   "example",
-  "examples/getting_started",
+  "examples/*",
 ]
 
 [workspace.package]
-version = "0.6.1"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Electron100/butane"
+version = "0.6.1"
 
 [workspace.dependencies]
 async-trait = "0.1"
 butane = { version = "0.6", path = "butane" }
+butane_cli = { version = "0.6", path = "butane_cli" }
 butane_core = { version = "0.6", path = "butane_core" }
 butane_codegen = { version = "0.6", path = "butane_codegen" }
 butane_test_helper = { path = "butane_test_helper" }

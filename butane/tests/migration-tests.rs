@@ -186,8 +186,11 @@ async fn migration_add_field_sqlite() {
         // getting sane looking downgrade sql and a test failure if it
         // changes. If the change is innocuous, this test should just
         // be updated.
-        "CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
-    ).await;
+        "CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
+INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;
+ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
+    )
+    .await;
 }
 
 #[cfg(feature = "pg")]

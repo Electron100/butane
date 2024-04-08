@@ -201,7 +201,6 @@ where
         if cfg!(feature = "log") {
             debug!("query sql {}", sqlquery);
         }
-        eprintln!("query sql {sqlquery}");
 
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
         let future = self.client()?.prepare_typed(&sqlquery, types.as_ref());
@@ -399,9 +398,6 @@ impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
     }
     // Workaround for https://github.com/rust-lang/rfcs/issues/2765
     fn connection_methods(&self) -> &dyn ConnectionMethods {
-        self
-    }
-    fn connection_methods_mut(&mut self) -> &mut dyn ConnectionMethods {
         self
     }
 }
@@ -609,7 +605,7 @@ fn create_table_constraints(table: &ATable) -> String {
         .columns
         .iter()
         .filter(|column| column.reference().is_some())
-        .map(|column| define_constraint(table, column))
+        .map(|column| define_constraint(&table.name, column))
         .collect::<Vec<String>>()
         .join("\n")
 }
@@ -633,7 +629,7 @@ fn define_column(col: &AColumn) -> Result<String> {
     ))
 }
 
-fn define_constraint(table: &ATable, column: &AColumn) -> String {
+fn define_constraint(table_name: &str, column: &AColumn) -> String {
     let reference = column
         .reference()
         .as_ref()
@@ -642,7 +638,7 @@ fn define_constraint(table: &ATable, column: &AColumn) -> String {
         ARef::Literal(literal) => {
             format!(
                 "ALTER TABLE {} ADD FOREIGN KEY ({}) REFERENCES {}({});",
-                helper::quote_reserved_word(&table.name),
+                helper::quote_reserved_word(table_name),
                 helper::quote_reserved_word(column.name()),
                 helper::quote_reserved_word(literal.table_name()),
                 helper::quote_reserved_word(literal.column_name()),
@@ -689,12 +685,17 @@ fn drop_table(name: &str) -> String {
 
 fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     let default: SqlVal = helper::column_default(col)?;
-    Ok(format!(
+    let mut stmts = vec![format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         helper::quote_reserved_word(tbl_name),
         define_column(col)?,
         helper::sql_literal_value(default)?
-    ))
+    )];
+    if col.reference().is_some() {
+        stmts.push(define_constraint(tbl_name, col));
+    }
+    let result = stmts.join("\n");
+    Ok(result)
 }
 
 fn remove_column(tbl_name: &str, name: &str) -> String {
@@ -746,16 +747,18 @@ fn change_column(
         Some(col) => new_table.replace_column(col.clone()),
         None => new_table.remove_column(old.name()),
     }
-    let stmts: [&str; 4] = [
-        &create_table(&new_table, false)?,
-        &copy_table(old_table, &new_table),
-        &drop_table(&old_table.name),
-        &format!(
+    let mut stmts: Vec<String> = vec![
+        create_table(&new_table, false)?,
+        create_table_constraints(&new_table),
+        copy_table(old_table, &new_table),
+        drop_table(&old_table.name),
+        format!(
             "ALTER TABLE {} RENAME TO {};",
             helper::quote_reserved_word(&new_table.name),
             helper::quote_reserved_word(tbl_name)
         ),
     ];
+    stmts.retain(|stmt| !stmt.is_empty());
     let result = stmts.join("\n");
     new_table.name.clone_from(&old_table.name);
     current.replace_table(new_table);

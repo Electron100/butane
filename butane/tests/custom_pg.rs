@@ -1,8 +1,6 @@
 // We wrap everything in an inner module just so it's easier to have the feature gate in one place
 #[cfg(feature = "pg")]
 mod custom_pg {
-    use std::result::Result;
-
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
     use butane::prelude::*;
     use butane::{butane_type, db::Connection, model};

@@ -1,10 +1,8 @@
 //! R2D2 support for Butane.
-use std::ops::Deref;
 
 pub use r2d2::ManageConnection;
 
 use crate::connection_method_wrapper;
-use crate::db::connmethods::ConnectionMethodWrapper;
 use crate::db::{
     BackendConnection, Column, Connection, ConnectionMethods, ConnectionSpec, RawQueryResult,
 };
@@ -35,13 +33,6 @@ impl ManageConnection for ConnectionManager {
 
     fn has_broken(&self, conn: &mut Self::Connection) -> bool {
         conn.is_closed()
-    }
-}
-
-impl ConnectionMethodWrapper for r2d2::PooledConnection<ConnectionManager> {
-    type Wrapped = Connection;
-    fn wrapped_connection_methods(&self) -> Result<&Connection> {
-        Ok(self.deref())
     }
 }
 

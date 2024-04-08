@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
-use super::{ButaneMigration, Migration, MigrationMut, Migrations, MigrationsMut};
-use crate::query::BoolExpr;
-use crate::{ConnectionMethods, DataObject, Result};
+use super::{Migration, MigrationMut, Migrations, MigrationsMut};
+
+use crate::Result;
 
 /// A migration stored in memory.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -66,10 +66,14 @@ impl PartialEq for MemMigration {
 impl Eq for MemMigration {}
 
 impl MigrationMut for MemMigration {
-    fn write_table(&mut self, table: &ATable) -> Result<()> {
+    fn add_modified_table(&mut self, table: &ATable) -> Result<()> {
         self.db.replace_table(table.clone());
         self.db.resolve_types()?;
         Ok(())
+    }
+    #[allow(unused_variables)]
+    fn add_unmodified_table(&mut self, table: &ATable, from_migration_name: &str) -> Result<()> {
+        self.add_modified_table(table)
     }
     fn delete_table(&mut self, table: &str) -> Result<()> {
         self.db.remove_table(table);
@@ -125,7 +129,7 @@ impl Default for MemMigrations {
 impl Migrations for MemMigrations {
     type M = MemMigration;
     fn get_migration(&self, name: &str) -> Option<Self::M> {
-        self.migrations.get(name).map(MemMigration::clone)
+        self.migrations.get(name).cloned()
     }
     fn latest(&self) -> Option<Self::M> {
         match &self.latest {
@@ -165,11 +169,9 @@ impl MigrationsMut for MemMigrations {
         Ok(())
     }
 
-    async fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    fn delete_migrations(&mut self) -> Result<()> {
         self.migrations.clear();
         self.latest = None;
-        conn.delete_where(ButaneMigration::TABLE, BoolExpr::True)
-            .await?;
         Ok(())
     }
 }

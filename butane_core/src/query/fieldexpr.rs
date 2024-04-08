@@ -21,16 +21,6 @@ macro_rules! binary_op {
 }
 
 /// Marker trait to determine whether values can be compared.
-///
-/// Unlike `PartialEq`, handles `Option`, which we need for nullable
-/// types. We would like to automatically implement it if PartialEq
-/// is implemented, but we can't do that without specialization or
-/// negative trait bounds.
-pub trait DataEq<Rhs> {}
-impl<T> DataEq<T> for Option<T> where T: PartialEq<T> + FieldType {}
-impl<T> DataEq<T> for T where T: PartialEq<T> + FieldType {}
-
-/// Marker trait to determine whether values can be compared.
 /// Unlike `PartialOrd`, handles `Option`, which we need for nullable types.
 pub trait DataOrd<Rhs> {}
 impl<T> DataOrd<T> for Option<T> where T: PartialOrd<T> + FieldType {}

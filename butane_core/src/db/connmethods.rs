@@ -70,11 +70,6 @@ mod internal {
 
 pub use internal::ConnectionMethodsAsync as ConnectionMethods;
 
-pub trait ConnectionMethodWrapper {
-    type Wrapped: ConnectionMethods;
-    fn wrapped_connection_methods(&self) -> Result<&Self::Wrapped>;
-}
-
 pub mod sync {
     pub use super::internal::ConnectionMethodsSync as ConnectionMethods;
 }

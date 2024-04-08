@@ -1,1 +1,27 @@
-{"name":"Post_tags_Many","columns":[{"name":"owner","sqltype":{"Known":"Int"},"nullable":false,"pk":false,"auto":false,"default":null},{"name":"has","sqltype":{"Known":"Text"},"nullable":false,"pk":false,"auto":false,"default":null}]}
+{
+  "name": "Post_tags_Many",
+  "columns": [
+    {
+      "name": "owner",
+      "sqltype": {
+        "Known": "Int"
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "has",
+      "sqltype": {
+        "Known": "Text"
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

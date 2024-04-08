@@ -2,6 +2,7 @@
 name = "getting_started"
 version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
+license.workspace = true
 edition.workspace = true
 publish = false
 
@@ -20,9 +21,24 @@ doc = false
 [lib]
 doc = false
 
+[features]
+default = ["pg", "sqlite", "sqlite-bundled"]
+pg = ["butane/pg"]
+sqlite = ["butane/sqlite"]
+sqlite-bundled = ["butane/sqlite-bundled"]
+
 [dependencies]
-butane = { features = ["pg", "sqlite"], workspace = true }
+butane.workspace = true
 tokio = { workspace = true, features = ["macros"] }
+
+[dev-dependencies]
+butane_cli.workspace = true
+butane_core.workspace = true
+butane_test_helper.workspace = true
+cfg-if.workspace = true
+env_logger.workspace = true
+log.workspace = true
+paste.workspace = true
 
 [package.metadata.release]
 release = false

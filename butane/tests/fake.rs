@@ -1,6 +1,6 @@
 use butane::db::Connection;
 use butane::prelude::*;
-use butane::{find, DataObject, ForeignKey};
+use butane::{find, ForeignKey};
 use butane_test_helper::*;
 use fake::{Fake, Faker};
 

@@ -9,13 +9,15 @@
 pub use butane_codegen::{butane_type, dataresult, model, FieldType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
-pub use butane_core::many::Many;
+pub use butane_core::many::{Many, ManyOpAsync, ManyOpSync};
 pub use butane_core::migrations;
 pub use butane_core::query;
 pub use butane_core::{
     AsPrimaryKey, AutoPk, DataObject, DataResult, Error, FieldType, FromSql, PrimaryKeyType,
     Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
+// todo put ops in a separate package?
+pub use butane_core::{DataObjectOpAsync, DataObjectOpSync};
 
 pub mod db {
     //! Database helpers
@@ -69,7 +71,7 @@ pub mod db {
 ///   rank: i32,
 ///   nationality: String
 /// }
-/// # tokio_test::block_on(async {
+/// # tokio_test::block_opn(async {
 ///   let e: BoolExpr = filter!(Contestant, nationality == "US" && rank < 42);
 ///   let first_place = 1;
 ///   let e2 = filter!(Contestant, rank == { first_place });
@@ -187,6 +189,7 @@ pub mod prelude {
     // (can't be both or call sites will give "multiple applicable items in scope"
     pub use butane_core::many::ManyOpAsync;
     pub use butane_core::query::QueryOpAsync;
+    pub use butane_core::DataObjectOpAsync;
 }
 
 pub mod internal {

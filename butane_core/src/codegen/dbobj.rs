@@ -37,24 +37,8 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
     let insert_cols = columns(ast_struct, |f| !is_auto(f));
 
-    let many_save: TokenStream2 = fields(ast_struct)
-        .filter(|f| is_many_to_many(f))
-        .map(|f| {
-            let ident = f.ident.clone().expect("Fields must be named for butane");
-            let many_table_lit = many_table_lit(ast_struct, f, config);
-            let pksqltype =
-                quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
-            // Save needs to ensure_initialized
-            quote!(
-                self.#ident.ensure_init(
-                    #many_table_lit,
-                    butane::ToSql::to_sql(self.pk()),
-                    #pksqltype,
-                );
-                self.#ident.save(conn).await?;
-            )
-        })
-        .collect();
+    let many_save_async = impl_many_save(ast_struct, config, true);
+    let many_save_sync = impl_many_save(ast_struct, config, false);
 
     let dataresult = impl_dataresult(ast_struct, tyname, config);
     // Note the many impls following DataObject can not be generic because they implement for T and &T,
@@ -63,7 +47,6 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     quote!(
         #dataresult
 
-        #[butane::internal::async_trait(?Send)]
         impl butane::internal::DataObjectInternal for #tyname {
             const NON_AUTO_COLUMNS: &'static [butane::db::Column] = &[
                 #insert_cols
@@ -72,8 +55,12 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             fn pk_mut(&mut self) -> &mut impl butane::PrimaryKeyType {
                 &mut self.#pkident
             }
-            async fn save_many_to_many(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
-                #many_save
+            async fn save_many_to_many_async(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
+                #many_save_async
+                Ok(())
+            }
+            fn save_many_to_many_sync(&mut self, conn: &impl butane::db::sync::ConnectionMethods) -> butane::Result<()> {
+                #many_save_sync
                 Ok(())
             }
             fn values(&self, include_pk: bool) -> Vec<butane::SqlValRef> {
@@ -421,4 +408,32 @@ where
             }
         })
         .collect()
+}
+
+fn impl_many_save(ast_struct: &ItemStruct, config: &Config, is_async: bool) -> TokenStream2 {
+    return fields(ast_struct)
+        .filter(|f| is_many_to_many(f))
+        .map(|f| {
+            let ident = f.ident.clone().expect("Fields must be named for butane");
+            let many_table_lit = many_table_lit(ast_struct, f, config);
+            let pksqltype =
+                quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
+
+            let save_with_conn = if is_async {
+                quote!(butane::ManyOpAsync::save(&mut self.#ident, conn).await?;)
+            } else {
+                quote!(butane::ManyOpSync::save(&mut self.#ident, conn)?;)
+            };
+
+            // Save needs to ensure_initialized
+            quote!(
+                self.#ident.ensure_init(
+                    #many_table_lit,
+                    butane::ToSql::to_sql(self.pk()),
+                    #pksqltype,
+                );
+                #save_with_conn
+            )
+        })
+        .collect();
 }

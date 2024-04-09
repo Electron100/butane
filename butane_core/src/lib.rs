@@ -7,7 +7,6 @@
 use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use thiserror::Error as ThisError;
@@ -27,6 +26,7 @@ pub mod uuid;
 mod autopk;
 pub use autopk::AutoPk;
 use custom::SqlTypeCustom;
+use db::sync::ConnectionMethods as ConnectionMethodsSync;
 use db::{BackendRow, Column, ConnectionMethods};
 pub use query::Query;
 pub use sqlval::{AsPrimaryKey, FieldType, FromSql, PrimaryKeyType, SqlVal, SqlValRef, ToSql};
@@ -41,7 +41,6 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 /// object type. The purpose of a result type which is not also an
 /// object type is to allow a query to retrieve a subset of an
 /// object's columns.
-#[async_trait]
 pub trait DataResult: Sized {
     /// Corresponding object type.
     type DBO: DataObject;
@@ -66,7 +65,7 @@ pub mod internal {
     /// Methods implemented by Butane codegen and called by other
     /// parts of Butane. You do not need to call these directly
     /// WARNING: Semver exempt
-    #[async_trait(?Send)]
+    #[allow(async_fn_in_trait)] // Not really a public trait
     pub trait DataObjectInternal: DataResult<DBO = Self> {
         /// Like [DataResult::COLUMNS] but omits [AutoPk].
         const NON_AUTO_COLUMNS: &'static [Column];
@@ -76,7 +75,11 @@ pub mod internal {
 
         /// Saves many-to-many relationships pointed to by fields on this model.
         /// Performed automatically by `save`. You do not need to call this directly.
-        async fn save_many_to_many(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+        async fn save_many_to_many_async(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+
+        /// Saves many-to-many relationships pointed to by fields on this model.
+        /// Performed automatically by `save`. You do not need to call this directly.
+        fn save_many_to_many_sync(&mut self, conn: &impl ConnectionMethodsSync) -> Result<()>;
 
         /// Returns the Sql values of all columns. Used internally. You are
         /// unlikely to need to call this directly.
@@ -88,7 +91,7 @@ pub mod internal {
 ///
 /// Rather than implementing this type manually, use the
 /// `#[model]` attribute.
-#[async_trait(?Send)]
+#[allow(async_fn_in_trait)] // Implementation is intended to be through procmacro
 pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sync {
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
@@ -133,9 +136,24 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
             .into_iter()
             .nth(0))
     }
+}
 
+/// [`DataObject`] operations that require a live database connection.
+#[allow(async_fn_in_trait)] // Implementation is intended to be through procmacro
+#[maybe_async_cfg::maybe(
+    idents(
+        ConnectionMethods(sync = "ConnectionMethodsSync", async),
+        save_many_to_many(sync = "save_many_to_many_sync", async = "save_many_to_many_async")
+    ),
+    sync(),
+    async()
+)]
+pub trait DataObjectOp<T: DataObject> {
     /// Save the object to the database.
-    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>
+    where
+        Self: DataObject,
+    {
         let pkcol = Column::new(Self::PKCOL, <Self::PKType as FieldType>::SQLTYPE);
 
         if Self::AUTO_PK && <Self as DataResult>::COLUMNS.len() == 1 {
@@ -182,17 +200,22 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
                 .await?;
         }
 
-        self.save_many_to_many(conn).await?;
+        Self::save_many_to_many(self, conn).await?;
 
         Ok(())
     }
 
     /// Delete the object from the database.
-    async fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
-        conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
-            .await
+    async fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>
+    where
+        Self: DataObject,
+    {
+        conn.delete(T::TABLE, T::PKCOL, self.pk().to_sql()).await
     }
 }
+
+impl<T> DataObjectOpSync<T> for T where T: DataObject {}
+impl<T> DataObjectOpAsync<T> for T where T: DataObject {}
 
 /// ASYNC TODO is this still necessary
 pub trait ModelTyped {

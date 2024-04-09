@@ -1,6 +1,6 @@
 use butane::db::{BackendConnection, Connection};
 use butane::migrations::{Migration, Migrations};
-use butane::DataObject;
+use butane::DataObjectOpAsync;
 use butane_test_helper::*;
 
 use newtype::models::{Blog, Post, Tags};

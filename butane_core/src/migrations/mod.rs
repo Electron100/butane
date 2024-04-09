@@ -308,7 +308,6 @@ impl DataResult for ButaneMigration {
     }
 }
 
-#[async_trait(?Send)]
 impl DataObject for ButaneMigration {
     type PKType = String;
     type Fields = (); // we don't need Fields as we never filter
@@ -318,13 +317,8 @@ impl DataObject for ButaneMigration {
     fn pk(&self) -> &String {
         &self.name
     }
-    async fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
-        conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
-            .await
-    }
 }
 
-#[async_trait(?Send)]
 impl crate::internal::DataObjectInternal for ButaneMigration {
     const NON_AUTO_COLUMNS: &'static [Column] = Self::COLUMNS;
     fn pk_mut(&mut self) -> &mut impl PrimaryKeyType {
@@ -337,7 +331,13 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
         }
         values
     }
-    async fn save_many_to_many(&mut self, _conn: &impl ConnectionMethods) -> Result<()> {
+    async fn save_many_to_many_async(&mut self, _conn: &impl ConnectionMethods) -> Result<()> {
+        Ok(()) // no-op
+    }
+    fn save_many_to_many_sync(
+        &mut self,
+        _conn: &impl crate::db::sync::ConnectionMethods,
+    ) -> Result<()> {
         Ok(()) // no-op
     }
 }

@@ -57,7 +57,7 @@ pub trait ConnectionMethods {
 
 /// Represents a database column. Most users do not need to use this
 /// directly.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Column {
     name: &'static str,
     ty: SqlType,

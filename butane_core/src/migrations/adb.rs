@@ -131,7 +131,7 @@ impl Ord for TypeKey {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct TypeResolver {
     // The types of some columns may not be known right away
     types: HashMap<TypeKey, TypeIdentifier>,

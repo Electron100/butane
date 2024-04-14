@@ -17,7 +17,7 @@ type SqlTypeMap = BTreeMap<TypeKey, DeferredSqlType>;
 const TYPES_FILENAME: &str = "types.json";
 
 /// Metadata stored in each migration in the filesystem.
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct MigrationInfo {
     /// The migration this one is based on, or None if this is the
     /// first migration in the chain
@@ -42,7 +42,7 @@ impl MigrationInfo {
 }
 
 /// Metadata about the migration series.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct MigrationsState {
     latest: Option<String>,
 }
@@ -344,7 +344,7 @@ impl PartialEq for FsMigration {
 impl Eq for FsMigration {}
 
 /// A collection of migrations stored in the filesystem.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FsMigrations {
     fs: Rc<dyn Filesystem>,
     root: PathBuf,

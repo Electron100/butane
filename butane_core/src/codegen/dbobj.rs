@@ -56,6 +56,34 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         })
         .collect();
 
+    let conn_arg_name = if many_save.is_empty() {
+        syn::Ident::new("_conn", Span::call_site())
+    } else {
+        syn::Ident::new("conn", Span::call_site())
+    };
+
+    let non_auto_values_fn = if values.is_empty() {
+        quote!(
+            fn non_auto_values(&self, _include_pk: bool) -> Vec<butane::SqlValRef> {
+                return vec![];
+            }
+        )
+    } else {
+        quote!(
+            fn non_auto_values(&self, include_pk: bool) -> Vec<butane::SqlValRef> {
+                let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(
+                    <Self as butane::DataResult>::COLUMNS.len()
+                );
+                if include_pk {
+                    #(#values)*
+                } else {
+                    #(#values_no_pk)*
+                }
+                values
+            }
+        )
+    };
+
     let dataresult = impl_dataresult(ast_struct, tyname, config);
     // Note the many impls following DataObject can not be generic because they implement for T and &T,
     // which become conflicting types as &T is included in T.
@@ -71,21 +99,11 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             fn pk_mut(&mut self) -> &mut impl butane::PrimaryKeyType {
                 &mut self.#pkident
             }
-            fn save_many_to_many(&mut self, conn: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
+            fn save_many_to_many(&mut self, #conn_arg_name: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
                 #many_save
                 Ok(())
             }
-            fn values(&self, include_pk: bool) -> Vec<butane::SqlValRef> {
-                let mut values: Vec<butane::SqlValRef> = Vec::with_capacity(
-                    <Self as butane::DataResult>::COLUMNS.len()
-                );
-                if (include_pk) {
-                    #(#values)*
-                } else {
-                    #(#values_no_pk)*
-                }
-                values
-            }
+            #non_auto_values_fn
         }
 
         impl butane::DataObject for #tyname {
@@ -101,20 +119,24 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         }
         impl butane::ToSql for #tyname {
             fn to_sql(&self) -> butane::SqlVal {
+                #[allow(unused_imports)]
                 use butane::DataObject;
                 butane::ToSql::to_sql(self.pk())
             }
             fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                #[allow(unused_imports)]
                 use butane::DataObject;
                 butane::ToSql::to_sql_ref(self.pk())
             }
         }
         impl butane::ToSql for &#tyname {
             fn to_sql(&self) -> butane::SqlVal {
+                #[allow(unused_imports)]
                 use butane::DataObject;
                 butane::ToSql::to_sql(self.pk())
             }
             fn to_sql_ref(&self) -> butane::SqlValRef<'_> {
+                #[allow(unused_imports)]
                 use butane::DataObject;
                 butane::ToSql::to_sql_ref(self.pk())
             }
@@ -131,12 +153,14 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
         }
         impl butane::AsPrimaryKey<#tyname> for #tyname {
             fn as_pk(&self) -> std::borrow::Cow<<Self as butane::DataObject>::PKType> {
+                #[allow(unused_imports)]
                 use butane::DataObject;
                 std::borrow::Cow::Borrowed(self.pk())
             }
         }
         impl butane::AsPrimaryKey<#tyname> for &#tyname {
             fn as_pk(&self) -> std::borrow::Cow<<#tyname as butane::DataObject>::PKType> {
+                #[allow(unused_imports)]
                 use butane::DataObject;
                 std::borrow::Cow::Borrowed(self.pk())
             }
@@ -168,18 +192,19 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) ->
         })
         .collect();
 
-    let dbo_is_self = dbo == tyname;
-    let ctor = if dbo_is_self {
+    let from_row_body = if many_init.is_empty() {
         quote!(
-            let mut obj = #tyname {
-                                #(#rows),*
-                        };
+            Ok(#tyname {
+                #(#rows),*
+            })
         )
     } else {
         quote!(
             let mut obj = #tyname {
                 #(#rows),*
             };
+            #many_init
+            Ok(obj)
         )
     };
 
@@ -189,18 +214,17 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) ->
             const COLUMNS: &'static [butane::db::Column] = &[
                 #cols
             ];
-            fn from_row(mut row: &dyn butane::db::BackendRow) -> butane::Result<Self> {
+            fn from_row(row: &dyn butane::db::BackendRow) -> butane::Result<Self> {
                 if row.len() != #numdbfields {
                     return Err(butane::Error::BoundsError(
                         "Found unexpected number of columns in row for DataResult".to_string()
                     ));
                 }
-                #ctor
-                #many_init
-                Ok(obj)
+                #from_row_body
             }
             fn query() -> butane::query::Query<Self> {
-                use butane::prelude::DataObject;
+                #[allow(unused_imports)]
+                use butane::DataObject;
                 butane::query::Query::new(Self::DBO::TABLE)
             }
         }
@@ -322,8 +346,9 @@ fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
             if is_row_field(f) {
                 let fty = &f.ty;
                 let ret = quote!(
-                        #ident: butane::FromSql::from_sql_ref(
-                                row.get(#i, <#fty as butane::FieldType>::SQLTYPE)?)?
+                    #ident: butane::FromSql::from_sql_ref(
+                        row.get(#i, <#fty as butane::FieldType>::SQLTYPE)?
+                    )?
                 );
                 i += 1;
                 ret
@@ -398,26 +423,16 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
 }
 
 /// Builds code for pushing SqlVals for each column satisfying predicate into a vec called `values`
+/// that excludes any auto values.
 fn push_values<P>(ast_struct: &ItemStruct, mut predicate: P) -> Vec<TokenStream2>
 where
     P: FnMut(&Field) -> bool,
 {
     fields(ast_struct)
-        .filter(|f| is_row_field(f) && predicate(f))
+        .filter(|f| is_row_field(f) && !is_auto(f) && predicate(f))
         .map(|f| {
             let ident = f.ident.clone().unwrap();
-            if is_row_field(f) {
-                if !is_auto(f) {
-                    quote!(values.push(butane::ToSql::to_sql_ref(&self.#ident));)
-                } else {
-                    quote!()
-                }
-            } else if is_many_to_many(f) {
-                // No-op
-                quote!()
-            } else {
-                make_compile_error!(f.span()=> "Unexpected struct field")
-            }
+            quote!(values.push(butane::ToSql::to_sql_ref(&self.#ident));)
         })
         .collect()
 }

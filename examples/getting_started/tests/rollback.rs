@@ -50,16 +50,6 @@ fn migrate_and_rollback(mut connection: Connection) {
 
     // Rollback migrations.
     for migration in to_apply.iter().rev() {
-        if connection.backend_name() == "pg"
-            && migration.name() == "20240115_023841384_dbconstraints"
-        {
-            // migration 20240115_023841384_dbconstraints failed: Postgres error db error:
-            // ERROR: cannot drop table post because other objects depend on it
-            // DETAIL: constraint post_tags_many__butane_tmp_owner_fkey on table post_tags_many depends on table post
-            let err = migration.apply(&mut connection).unwrap_err();
-            eprintln!("Migration {} failed: {err:?}", migration.name());
-            return;
-        }
         migration
             .downgrade(&mut connection)
             .unwrap_or_else(|err| panic!("rollback of {} failed: {err}", migration.name()));

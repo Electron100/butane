@@ -293,7 +293,7 @@ fn sql_column(col: query::Column, w: &mut impl Write) {
     .unwrap()
 }
 
-pub fn sql_literal_value(val: SqlVal) -> Result<String> {
+pub fn sql_literal_value(val: &SqlVal) -> Result<String> {
     use SqlVal::*;
     match val {
         SqlVal::Null => Ok("NULL".to_string()),
@@ -307,6 +307,6 @@ pub fn sql_literal_value(val: SqlVal) -> Result<String> {
         Json(val) => Ok(format!("{val}")),
         #[cfg(feature = "datetime")]
         Timestamp(ndt) => Ok(ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string()),
-        Custom(val) => Err(Error::LiteralForCustomUnsupported((*val).clone())),
+        Custom(val) => Err(Error::LiteralForCustomUnsupported(*(*val).clone())),
     }
 }

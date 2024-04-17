@@ -45,17 +45,15 @@ Create `src/models.rs` with a `BlogId` and `PostId` struct wrapping a `uuid`.
 use butane::{FieldType, PrimaryKeyType};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, FieldType, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, FieldType, PartialEq, PrimaryKeyType, Serialize)]
 pub struct BlogId(pub uuid::Uuid);
-impl PrimaryKeyType for BlogId {}
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, FieldType, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, FieldType, PartialEq, PrimaryKeyType, Serialize)]
 pub struct PostId(pub uuid::Uuid);
-impl PrimaryKeyType for PostId {}
 ```
 
-For each, `FieldType` is derived, and they implement the marker trait `PrimaryKeyType`
-to allow their use as a primary key.
+For each, `FieldType` is derived to generate code to describe how the field will be stored, and
+the marker trait `PrimaryKeyType` is derived to allow their use as a primary key.
 
 As Butane natively supports `uuid`, these newtypes will be stored in the butane metadata as
 "Blob" type, which is stored in the database using an appropriate column type based on the

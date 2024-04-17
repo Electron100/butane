@@ -6,7 +6,7 @@
 
 #![deny(missing_docs)]
 
-pub use butane_codegen::{butane_type, dataresult, model, FieldType};
+pub use butane_codegen::{butane_type, dataresult, model, FieldType, PrimaryKeyType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
 pub use butane_core::internal;

@@ -710,10 +710,10 @@ fn change_column(
     if old.typeid()? != new.typeid()? {
         // column type change
         stmts.push(format!(
-            "ALTER TABLE {} ALTER COLUMN {} TYPE {};",
+            "ALTER TABLE {} ALTER COLUMN {} SET DATA TYPE {};",
             quote_reserved_word(tbl_name),
             quote_reserved_word(old.name()),
-            col_sqltype(new)?
+            col_sqltype(new)?,
         ));
     }
     if old.nullable() != new.nullable() {
@@ -721,7 +721,7 @@ fn change_column(
             "ALTER TABLE {} ALTER COLUMN {} {} NOT NULL;",
             quote_reserved_word(tbl_name),
             quote_reserved_word(old.name()),
-            if new.nullable() { "SET" } else { "DROP" }
+            if new.nullable() { "DROP" } else { "SET" }
         ));
     }
     if old.is_pk() != new.is_pk() {
@@ -739,9 +739,9 @@ fn change_column(
 
             // add the new primary key
             stmts.push(format!(
-                "ALTER TABLE {} ADD PRIMARY KEY {};",
+                "ALTER TABLE {} ADD PRIMARY KEY ({});",
                 quote_reserved_word(tbl_name),
-                quote_reserved_word(old.name())
+                quote_reserved_word(new.name())
             ));
         } else {
             // this field is no longer the primary key. Butane requires a single primary key,
@@ -754,7 +754,7 @@ fn change_column(
             stmts.push(format!(
                 "ALTER TABLE {} ADD UNIQUE ({});",
                 quote_reserved_word(tbl_name),
-                quote_reserved_word(old.name())
+                quote_reserved_word(new.name())
             ));
         } else {
             // Standard constraint naming scheme
@@ -796,10 +796,6 @@ fn change_column(
         if new.reference().is_some() {
             stmts.push(define_constraint(tbl_name, new));
         }
-    }
-
-    if stmts.is_empty() {
-        return Err(crate::Error::PgChangedColumnNotProcessed);
     }
 
     let result = stmts.join("\n");

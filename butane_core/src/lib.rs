@@ -229,8 +229,6 @@ pub enum Error {
     LiteralForCustomUnsupported(custom::SqlValCustom),
     #[error("This DataObject doesn't support determining whether it has been saved.")]
     SaveDeterminationNotSupported,
-    #[error("No column changes found for changed column. Bug in pg backend.")]
-    PgChangedColumnNotProcessed,
     #[error("(De)serialization error {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("IO error {0}")]

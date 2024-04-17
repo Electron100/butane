@@ -1,7 +1,6 @@
 //! Implementation of foreign key relationships between models.
 #![deny(missing_docs)]
 use std::borrow::Cow;
-use std::fmt::{Debug, Formatter};
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
@@ -28,6 +27,7 @@ use crate::{
 ///   blog: ForeignKey<Blog>,
 ///   ...
 /// }
+#[derive(Clone, Debug)]
 pub struct ForeignKey<T>
 where
     T: DataObject,
@@ -105,17 +105,6 @@ impl<T: DataObject> From<&T> for ForeignKey<T> {
         Self::from_pk(obj.pk().clone())
     }
 }
-impl<T: DataObject> Clone for ForeignKey<T> {
-    fn clone(&self) -> Self {
-        // Once specialization lands, it would be nice to clone val if
-        // it's clone-able. Then we wouldn't have to ensure the pk
-        self.ensure_valpk();
-        ForeignKey {
-            val: OnceCell::new(),
-            valpk: self.valpk.clone(),
-        }
-    }
-}
 
 impl<T> AsPrimaryKey<T> for ForeignKey<T>
 where
@@ -127,11 +116,6 @@ where
 }
 
 impl<T: DataObject> Eq for ForeignKey<T> {}
-impl<T: DataObject> Debug for ForeignKey<T> {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        self.ensure_valpk().fmt(f)
-    }
-}
 
 impl<T> ToSql for ForeignKey<T>
 where

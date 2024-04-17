@@ -346,7 +346,6 @@ fn test_migrate(
     let mut to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);
     for m in &to_apply {
-        eprintln!("{}", m.up_sql(backends[0].name()).unwrap().unwrap());
         m.apply(conn).unwrap();
     }
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);

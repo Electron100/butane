@@ -5,14 +5,16 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 
 /// Blog identifier.
-#[derive(Clone, Debug, Default, Deserialize, Eq, FieldType, PartialEq, Serialize)]
+#[derive(
+    Clone, Debug, Default, Deserialize, Eq, FieldType, PartialEq, PrimaryKeyType, Serialize,
+)]
 pub struct BlogId(pub uuid::Uuid);
-impl PrimaryKeyType for BlogId {}
 
 /// Post identifier.
-#[derive(Clone, Debug, Default, Deserialize, Eq, FieldType, PartialEq, Serialize)]
+#[derive(
+    Clone, Debug, Default, Deserialize, Eq, FieldType, PartialEq, PrimaryKeyType, Serialize,
+)]
 pub struct PostId(pub uuid::Uuid);
-impl PrimaryKeyType for PostId {}
 
 /// Blog name.
 #[derive(Clone, Debug, Default, Deserialize, Eq, FieldType, PartialEq, Serialize, Validate)]

@@ -553,7 +553,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::RemoveTable(name) => Ok(drop_table(name)),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
         Operation::RemoveColumn(tbl, name) => Ok(remove_column(tbl, name)),
-        Operation::ChangeColumn(tbl, old, new) => change_column(current, tbl, old, Some(new)),
+        Operation::ChangeColumn(tbl, old, new) => change_column(current, tbl, old, new),
     }
 }
 
@@ -662,7 +662,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         helper::quote_reserved_word(tbl_name),
         define_column(col)?,
-        helper::sql_literal_value(default)?
+        helper::sql_literal_value(&default)?
     )];
     if col.reference().is_some() {
         stmts.push(define_constraint(tbl_name, col));
@@ -679,31 +679,13 @@ fn remove_column(tbl_name: &str, name: &str) -> String {
     )
 }
 
-fn copy_table(old: &ATable, new: &ATable) -> String {
-    let column_names = new
-        .columns
-        .iter()
-        .map(|col| helper::quote_reserved_word(col.name()))
-        .collect::<Vec<Cow<str>>>()
-        .join(", ");
-    format!(
-        "INSERT INTO {} SELECT {} FROM {};",
-        helper::quote_reserved_word(&new.name),
-        column_names,
-        helper::quote_reserved_word(&old.name)
-    )
-}
-
-fn tmp_table_name(name: &str) -> String {
-    format!("{name}__butane_tmp")
-}
-
 fn change_column(
     current: &mut ADB,
     tbl_name: &str,
     old: &AColumn,
-    new: Option<&AColumn>,
+    new: &AColumn,
 ) -> Result<String> {
+    use helper::quote_reserved_word;
     let table = current.get_table(tbl_name);
     if table.is_none() {
         crate::warn!(
@@ -713,28 +695,110 @@ fn change_column(
         );
         return Ok(String::new());
     }
-    let old_table = table.unwrap();
-    let mut new_table = old_table.clone();
-    new_table.name = tmp_table_name(&new_table.name);
-    match new {
-        Some(col) => new_table.replace_column(col.clone()),
-        None => new_table.remove_column(old.name()),
+
+    // Let's figure out what changed about the column
+    let mut stmts: Vec<String> = Vec::new();
+    if old.name() != new.name() {
+        // column rename
+        stmts.push(format!(
+            "ALTER TABLE {} RENAME COLUMN {} TO {};",
+            quote_reserved_word(tbl_name),
+            quote_reserved_word(old.name()),
+            quote_reserved_word(new.name())
+        ));
     }
-    let mut stmts: Vec<String> = vec![
-        create_table(&new_table, false)?,
-        create_table_constraints(&new_table),
-        copy_table(old_table, &new_table),
-        drop_table(&old_table.name),
-        format!(
-            "ALTER TABLE {} RENAME TO {};",
-            helper::quote_reserved_word(&new_table.name),
-            helper::quote_reserved_word(tbl_name)
-        ),
-    ];
-    stmts.retain(|stmt| !stmt.is_empty());
+    if old.typeid()? != new.typeid()? {
+        // column type change
+        stmts.push(format!(
+            "ALTER TABLE {} ALTER COLUMN {} SET DATA TYPE {};",
+            quote_reserved_word(tbl_name),
+            quote_reserved_word(old.name()),
+            col_sqltype(new)?,
+        ));
+    }
+    if old.nullable() != new.nullable() {
+        stmts.push(format!(
+            "ALTER TABLE {} ALTER COLUMN {} {} NOT NULL;",
+            quote_reserved_word(tbl_name),
+            quote_reserved_word(old.name()),
+            if new.nullable() { "DROP" } else { "SET" }
+        ));
+    }
+    if old.is_pk() != new.is_pk() {
+        // Change to primary key
+        // Either way, drop the previous primary key
+        // Butane does not currently support composite primary keys
+
+        if new.is_pk() {
+            // Drop the old primary key
+            stmts.push(format!(
+                "ALTER TABLE {} DROP CONSTRAINT IF EXISTS {}_pkey;",
+                quote_reserved_word(tbl_name),
+                tbl_name
+            ));
+
+            // add the new primary key
+            stmts.push(format!(
+                "ALTER TABLE {} ADD PRIMARY KEY ({});",
+                quote_reserved_word(tbl_name),
+                quote_reserved_word(new.name())
+            ));
+        } else {
+            // this field is no longer the primary key. Butane requires a single primary key,
+            // so some other column must be the primary key now. It will drop the constraint when processed.
+        }
+    }
+    if old.unique() != new.unique() {
+        // Changed uniqueness constraint
+        if new.unique() {
+            stmts.push(format!(
+                "ALTER TABLE {} ADD UNIQUE ({});",
+                quote_reserved_word(tbl_name),
+                quote_reserved_word(new.name())
+            ));
+        } else {
+            // Standard constraint naming scheme
+            stmts.push(format!(
+                "ALTER TABLE {} DROP CONSTRAINT {}_{}_key;",
+                quote_reserved_word(tbl_name),
+                tbl_name,
+                &old.name()
+            ));
+        }
+    }
+
+    if old.default() != new.default() {
+        stmts.push(match new.default() {
+            None => format!(
+                "ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT;",
+                quote_reserved_word(tbl_name),
+                quote_reserved_word(old.name())
+            ),
+            Some(val) => format!(
+                "ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {};",
+                quote_reserved_word(tbl_name),
+                quote_reserved_word(old.name()),
+                helper::sql_literal_value(val)?
+            ),
+        });
+    }
+
+    if old.reference() != new.reference() {
+        if old.reference().is_some() {
+            // Drop the old reference
+            stmts.push(format!(
+                "ALTER TABLE {} DROP CONSTRAINT {}_{}_fkey;",
+                quote_reserved_word(tbl_name),
+                tbl_name,
+                old.name()
+            ));
+        }
+        if new.reference().is_some() {
+            stmts.push(define_constraint(tbl_name, new));
+        }
+    }
+
     let result = stmts.join("\n");
-    new_table.name.clone_from(&old_table.name);
-    current.replace_table(new_table);
     Ok(result)
 }
 

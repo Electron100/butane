@@ -621,7 +621,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         helper::quote_reserved_word(tbl_name),
         define_column(col),
-        helper::sql_literal_value(default)?
+        helper::sql_literal_value(&default)?
     ))
 }
 

@@ -227,6 +227,50 @@ fn migration_add_field_with_default_pg() {
     );
 }
 
+#[cfg(feature = "pg")]
+#[test]
+fn migration_modify_field_pg() {
+    let (mut conn, _data) = pg_connection();
+    // Not verifying rename right now because we don't detect it
+    // https://github.com/Electron100/butane/issues/89
+
+    migration_modify_field_type_change(
+        &mut conn,
+        "ALTER TABLE Foo ALTER COLUMN bar SET DATA TYPE BIGINT;",
+        "ALTER TABLE Foo ALTER COLUMN bar SET DATA TYPE INTEGER;",
+    );
+
+    migration_modify_field_nullability_change(
+        &mut conn,
+        "ALTER TABLE Foo ALTER COLUMN bar DROP NOT NULL;",
+        "ALTER TABLE Foo ALTER COLUMN bar SET NOT NULL;",
+    );
+
+    migration_modify_field_pkey_change(
+        &mut conn,
+        "ALTER TABLE Foo DROP CONSTRAINT IF EXISTS Foo_pkey;\nALTER TABLE Foo ADD PRIMARY KEY (baz);",
+        "ALTER TABLE Foo DROP CONSTRAINT IF EXISTS Foo_pkey;\nALTER TABLE Foo ADD PRIMARY KEY (bar);",
+    );
+
+    migration_modify_field_uniqueness_change(
+        &mut conn,
+        "ALTER TABLE Foo ADD UNIQUE (bar);",
+        "ALTER TABLE Foo DROP CONSTRAINT Foo_bar_key;",
+    );
+
+    migration_modify_field_default_added(
+        &mut conn,
+        "ALTER TABLE Foo ALTER COLUMN bar SET DEFAULT 42;",
+        "ALTER TABLE Foo ALTER COLUMN bar DROP DEFAULT;",
+    );
+
+    migration_modify_field_different_default(
+        &mut conn,
+        "ALTER TABLE Foo ALTER COLUMN bar SET DEFAULT 42;",
+        "ALTER TABLE Foo ALTER COLUMN bar SET DEFAULT 41;",
+    );
+}
+
 #[cfg(feature = "sqlite")]
 #[test]
 fn migration_add_and_remove_field_sqlite() {
@@ -366,6 +410,114 @@ fn migration_add_field_with_default(conn: &mut Connection, up_sql: &str, down_sq
             bar: String,
             #[default=42]
             baz: u32,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql);
+}
+
+fn migration_modify_field_type_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: i32,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            bar: i64,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql);
+}
+
+fn migration_modify_field_nullability_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: i32,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            bar: Option<i32>,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql);
+}
+
+fn migration_modify_field_uniqueness_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: i32,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            #[unique]
+            bar: i32,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql);
+}
+
+fn migration_modify_field_pkey_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            #[pk]
+            bar: i64,
+            baz: i32,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            bar: i64,
+            #[pk]
+            baz: i32
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql);
+}
+
+fn migration_modify_field_default_added(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: String,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            #[default=42]
+            bar: String,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql);
+}
+
+fn migration_modify_field_different_default(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            #[default=41]
+            bar: String,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            #[default=42]
+            bar: String,
         }
     };
     test_migrate(conn, init, v2, up_sql, down_sql);

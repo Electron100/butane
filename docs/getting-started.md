@@ -337,8 +337,7 @@ fn main() {
         println!("{}", post.title);
         println!("----------\n");
         println!("{}", post.body);
- 
- }
+    }
 }
 ```
 

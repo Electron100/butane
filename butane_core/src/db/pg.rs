@@ -594,6 +594,13 @@ fn define_column(col: &AColumn) -> Result<String> {
     if col.unique() {
         constraints.push("UNIQUE".to_string());
     }
+    if constraints.is_empty() {
+        return Ok(format!(
+            "{} {}",
+            helper::quote_reserved_word(col.name()),
+            col_sqltype(col)?,
+        ));
+    }
     Ok(format!(
         "{} {} {}",
         helper::quote_reserved_word(col.name()),

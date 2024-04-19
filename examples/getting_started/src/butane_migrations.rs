@@ -156,7 +156,7 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       },
       "from": null,
       "up": {
-        "pg": "CREATE TABLE Blog (\nid BIGSERIAL NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL\n);\nCREATE TABLE Post (\nid SERIAL NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished BOOLEAN NOT NULL,\nblog BIGINT NOT NULL,\nbyline TEXT \n);\nCREATE TABLE Post_tags_Many (\nowner INTEGER NOT NULL,\nhas TEXT NOT NULL\n);\nCREATE TABLE Tag (\ntag TEXT NOT NULL PRIMARY KEY\n);\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n);\n",
+        "pg": "CREATE TABLE Blog (\nid BIGSERIAL NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL\n);\nCREATE TABLE Post (\nid SERIAL NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished BOOLEAN NOT NULL,\nblog BIGINT NOT NULL,\nbyline TEXT\n);\nCREATE TABLE Post_tags_Many (\nowner INTEGER NOT NULL,\nhas TEXT NOT NULL\n);\nCREATE TABLE Tag (\ntag TEXT NOT NULL PRIMARY KEY\n);\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n);\n",
         "sqlite": "CREATE TABLE Blog (\nid INTEGER NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL\n);\nCREATE TABLE Post (\nid INTEGER NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished INTEGER NOT NULL,\nblog INTEGER NOT NULL,\nbyline TEXT\n);\nCREATE TABLE Post_tags_Many (\nowner INTEGER NOT NULL,\nhas TEXT NOT NULL\n);\nCREATE TABLE Tag (\ntag TEXT NOT NULL PRIMARY KEY\n);\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n);\n"
       },
       "down": {

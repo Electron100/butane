@@ -50,8 +50,9 @@ pub trait BackendConnection: ConnectionMethods + Debug + Send + 'static {
     /// Begin a database transaction. The transaction object must be
     /// used in place of this connection until it is committed and aborted.
     fn transaction(&mut self) -> Result<Transaction>;
-    /// Retrieve the backend backend this connection
+    /// Retrieve the backend for this connection.
     fn backend(&self) -> Box<dyn Backend>;
+    /// Retrieve the backend name for this connection.
     fn backend_name(&self) -> &'static str;
     /// Tests if the connection has been closed. Backends which do not
     /// support this check should return false.

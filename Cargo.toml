@@ -7,7 +7,8 @@ members = [
   "butane_core",
   "butane_test_helper",
   "example",
-  "examples/*",
+  "examples/newtype",
+  "examples/getting_started",
 ]
 
 [workspace.package]

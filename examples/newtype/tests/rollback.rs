@@ -1,5 +1,5 @@
 use butane::db::{BackendConnection, Connection};
-use butane::migrations::{Migration, Migrations};
+use butane::migrations::Migrations;
 use butane::DataObject;
 use butane_test_helper::*;
 
@@ -31,27 +31,12 @@ fn migrate_and_rollback(mut connection: Connection) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
-    let to_apply = migrations.unapplied_migrations(&connection).unwrap();
 
     migrations.migrate(&mut connection).unwrap();
 
     insert_data(&connection);
 
     // Rollback migrations.
-    for migration in to_apply.iter().rev() {
-        if connection.backend_name() == "pg" && migration.name() == "20240401_095709389_init" {
-            // Postgres error db error: ERROR: cannot drop table blog because other objects depend on it
-            // DETAIL: constraint post_blog_fkey on table post depends on table blog
-            // HINT: Use DROP ... CASCADE to drop the dependent objects too.
-            let err = migration.downgrade(&mut connection).unwrap_err();
-            eprintln!("Rolled back {} failed: {err:?}", migration.name());
-            return;
-        }
-
-        migration
-            .downgrade(&mut connection)
-            .unwrap_or_else(|err| panic!("rollback of {} failed: {err}", migration.name()));
-        eprintln!("Rolled back {}", migration.name());
-    }
+    migrations.unmigrate(&mut connection).unwrap();
 }
 testall_no_migrate!(migrate_and_rollback);

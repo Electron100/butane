@@ -505,11 +505,11 @@ to use these migrations:
 
 ``` rust
 pub fn establish_connection() -> Connection {
-    use butane::migrations;
+    use butane::migrations::Migrations;
 
     let mut connection = butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap();
     let migrations = butane_migrations::get_migrations().unwrap();
-    migrations::migrate(&mut connection, &migrations).unwrap();
+    migrations.migrate(&mut connection).unwrap();
     connection
 }
 ```

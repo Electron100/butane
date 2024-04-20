@@ -33,7 +33,7 @@ fn migrate_and_rollback(mut connection: Connection) {
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
     let to_apply = migrations.unapplied_migrations(&connection).unwrap();
 
-    migrations::migrate(&mut connection, &migrations).unwrap();
+    migrations.migrate(&mut connection).unwrap();
 
     insert_data(&connection);
 

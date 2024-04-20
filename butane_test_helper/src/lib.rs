@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 use block_id::{Alphabet, BlockId};
 use butane_core::db::{connect, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec};
-use butane_core::migrations::{self, MemMigrations, Migration, MigrationsMut};
+use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 
@@ -209,7 +209,7 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
         "expected to create migration"
     );
     log::info!("created current migration");
-    migrations::migrate(conn, &mem_migrations).unwrap();
+    mem_migrations.migrate(conn).unwrap();
 }
 
 /// Create a sqlite [`Connection`].

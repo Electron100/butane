@@ -1,5 +1,5 @@
 use butane::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
-use butane::migrations::{self, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
+use butane::migrations::{MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
 use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
 #[cfg(feature = "pg")]
@@ -344,7 +344,7 @@ fn test_migrate(
     let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);
 
-    migrations::migrate(conn, &ms).unwrap();
+    ms.migrate(conn).unwrap();
 
     let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 0);
@@ -352,7 +352,7 @@ fn test_migrate(
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
-    migrations::rollback(conn, &ms).unwrap();
+    ms.unmigrate(conn).unwrap();
 
     let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);
@@ -563,7 +563,7 @@ fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected
     let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);
 
-    migrations::migrate(conn, &ms).unwrap();
+    ms.migrate(conn).unwrap();
 
     let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 0);
@@ -571,7 +571,7 @@ fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
-    migrations::rollback(conn, &ms).unwrap();
+    ms.unmigrate(conn).unwrap();
 
     let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);

@@ -8,7 +8,7 @@ use std::path::Path;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
-use crate::db::BackendRows;
+use crate::db::{BackendConnection, BackendRows};
 use crate::db::{Column, ConnectionMethods};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
@@ -108,6 +108,34 @@ pub trait Migrations {
                 .and_then(|name| self.get_migration(&name))
         }
         Ok(None)
+    }
+
+    /// Migrate connection forward.
+    fn migrate(&self, connection: &mut impl BackendConnection) -> Result<()> {
+        let to_apply = self.unapplied_migrations(connection)?;
+        for migration in &to_apply {
+            crate::info!("Applying migration {}", migration.name());
+            migration.apply(connection)?;
+        }
+        Ok(())
+    }
+
+    /// Remove all applied migrations.
+    fn unmigrate(&self, connection: &mut impl BackendConnection) -> Result<()> {
+        let mut migration = match self.last_applied_migration(connection)? {
+            Some(migration) => migration,
+            None => return Ok(()),
+        };
+        migration.downgrade(connection)?;
+
+        while let Ok(Some(migration_name)) = migration.migration_from() {
+            migration = self
+                .get_migration(&migration_name)
+                .ok_or(Error::MigrationError("Migration not in chain".to_string()))?;
+            crate::info!("Rolling back migration {}", migration.name());
+            migration.downgrade(connection)?;
+        }
+        Ok(())
     }
 }
 
@@ -325,38 +353,4 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
     fn save_many_to_many(&mut self, _conn: &impl ConnectionMethods) -> Result<()> {
         Ok(()) // no-op
     }
-}
-
-/// Migrate connection forward.
-pub fn migrate<M: Migration>(
-    connection: &mut impl crate::db::BackendConnection,
-    migrations: &impl Migrations<M = M>,
-) -> Result<()> {
-    let to_apply = migrations.unapplied_migrations(connection)?;
-    for migration in &to_apply {
-        crate::info!("Applying migration {}", migration.name());
-        migration.apply(connection)?;
-    }
-    Ok(())
-}
-
-/// Rollback all applied migrations.
-pub fn rollback<M: Migration>(
-    connection: &mut impl crate::db::BackendConnection,
-    migrations: &impl Migrations<M = M>,
-) -> Result<()> {
-    let mut migration = match migrations.last_applied_migration(connection)? {
-        Some(migration) => migration,
-        None => return Ok(()),
-    };
-    migration.downgrade(connection)?;
-
-    while let Ok(Some(migration_name)) = migration.migration_from() {
-        migration = migrations
-            .get_migration(&migration_name)
-            .ok_or(Error::MigrationError("Migration not in chain".to_string()))?;
-        crate::info!("Rolling back migration {}", migration.name());
-        migration.downgrade(connection)?;
-    }
-    Ok(())
 }

@@ -1,9 +1,8 @@
-use butane::migrations::{
-    adb::DeferredSqlType, adb::TypeIdentifier, adb::TypeKey, MemMigrations, Migration,
-    MigrationMut, Migrations, MigrationsMut,
-};
-use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
+use butane_core::db::{BackendConnection, Connection};
+use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
+use butane_core::migrations::{MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
+use butane_core::{SqlType, SqlVal};
 #[cfg(feature = "pg")]
 use butane_test_helper::pg_connection;
 #[cfg(feature = "sqlite")]
@@ -343,18 +342,21 @@ fn test_migrate(
         .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let mut to_apply = ms.unapplied_migrations(conn).unwrap();
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);
-    for m in &to_apply {
-        m.apply(conn).unwrap();
-    }
+
+    ms.migrate(conn).unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
+    assert_eq!(to_apply.len(), 0);
+
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
-    to_apply.reverse();
-    for m in to_apply {
-        m.downgrade(conn).unwrap();
-    }
+    ms.unmigrate(conn).unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
+    assert_eq!(to_apply.len(), 2);
 }
 
 fn verify_sql(
@@ -559,16 +561,19 @@ fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected
         .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let mut to_apply = ms.unapplied_migrations(conn).unwrap();
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);
-    for m in &to_apply {
-        m.apply(conn).unwrap();
-    }
+
+    ms.migrate(conn).unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
+    assert_eq!(to_apply.len(), 0);
+
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
-    to_apply.reverse();
-    for m in to_apply {
-        m.downgrade(conn).unwrap();
-    }
+    ms.unmigrate(conn).unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
+    assert_eq!(to_apply.len(), 2);
 }

@@ -209,11 +209,7 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
         "expected to create migration"
     );
     log::info!("created current migration");
-    let to_apply = mem_migrations.unapplied_migrations(conn).unwrap();
-    for m in to_apply {
-        log::info!("Applying migration {}", m.name());
-        m.apply(conn).unwrap();
-    }
+    mem_migrations.migrate(conn).unwrap();
 }
 
 /// Create a sqlite [`Connection`].

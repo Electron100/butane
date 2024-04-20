@@ -102,13 +102,18 @@ jobs:
       run: cd butane_codegen && cargo +stable test --all-features
     - name: Test CLI
       run: cd butane_cli && cargo +stable test --all-features
-    - name: Run example cli tests
-      run: cd example && cargo +stable test --all-features
     - name: Test
       run: cd butane && cargo +stable test --all-features
-    - name: Check example migrations
+    - name: Check example migrations have been updated
       run: |
         set -ex
         make regenerate-example-migrations
         git add -A
         git diff --exit-code
+    - name: Run tests in examples
+      run: |
+        cargo +stable test -p example --all-features
+        cd examples
+        for dir in *; do
+          cargo +stable test -p $dir --all-features
+        done

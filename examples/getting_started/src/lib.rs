@@ -6,7 +6,7 @@ pub mod butane_migrations;
 pub mod models;
 
 use butane::db::{Connection, ConnectionSpec};
-use butane::migrations::{Migration, Migrations};
+use butane::migrations::Migrations;
 use butane::prelude::*;
 use models::{Blog, Post};
 
@@ -15,10 +15,7 @@ pub fn establish_connection() -> Connection {
     let mut connection =
         butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap();
     let migrations = butane_migrations::get_migrations().unwrap();
-    let to_apply = migrations.unapplied_migrations(&connection).unwrap();
-    for migration in to_apply {
-        migration.apply(&mut connection).unwrap();
-    }
+    migrations.migrate(&mut connection).unwrap();
     connection
 }
 

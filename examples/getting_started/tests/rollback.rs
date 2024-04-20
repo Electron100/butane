@@ -1,5 +1,5 @@
 use butane::db::{BackendConnection, Connection};
-use butane::migrations::{Migration, Migrations};
+use butane::migrations::Migrations;
 use butane::DataObject;
 use butane_test_helper::*;
 
@@ -38,22 +38,12 @@ fn migrate_and_rollback(mut connection: Connection) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
-    let to_apply = migrations.unapplied_migrations(&connection).unwrap();
-    for migration in &to_apply {
-        migration
-            .apply(&mut connection)
-            .unwrap_or_else(|err| panic!("migration {} failed: {err}", migration.name()));
-        eprintln!("Applied {}", migration.name());
-    }
+
+    migrations.migrate(&mut connection).unwrap();
 
     insert_data(&connection);
 
     // Rollback migrations.
-    for migration in to_apply.iter().rev() {
-        migration
-            .downgrade(&mut connection)
-            .unwrap_or_else(|err| panic!("rollback of {} failed: {err}", migration.name()));
-        eprintln!("Rolled back {}", migration.name());
-    }
+    migrations.unmigrate(&mut connection).unwrap();
 }
 testall_no_migrate!(migrate_and_rollback);

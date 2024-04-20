@@ -548,10 +548,10 @@ where
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
         Operation::AddTable(table) => Ok(create_table(table, false)?),
-        Operation::AddTableConstraints(table) => Ok(create_table_constraints(table)),
+        Operation::AddTableConstraints(table) => Ok(create_table_fkey_constraints(table)),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)?),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
-        Operation::RemoveTableConstraints(table) => remove_table_constraints(table),
+        Operation::RemoveTableConstraints(table) => remove_table_fkey_constraints(table),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
         Operation::RemoveColumn(tbl, name) => Ok(remove_column(tbl, name)),
         Operation::ChangeColumn(tbl, old, new) => {
@@ -586,22 +586,22 @@ fn create_table(table: &ATable, allow_exists: bool) -> Result<String> {
     ))
 }
 
-fn create_table_constraints(table: &ATable) -> String {
+fn create_table_fkey_constraints(table: &ATable) -> String {
     table
         .columns
         .iter()
         .filter(|column| column.reference().is_some())
-        .map(|column| define_constraint(&table.name, column))
+        .map(|column| define_fkey_constraint(&table.name, column))
         .collect::<Vec<String>>()
         .join("\n")
 }
 
-fn remove_table_constraints(table: &ATable) -> Result<String> {
+fn remove_table_fkey_constraints(table: &ATable) -> Result<String> {
     Ok(table
         .columns
         .iter()
         .filter(|column| column.reference().is_some())
-        .map(|column| drop_fk_constraints(table, column))
+        .map(|column| drop_fkey_constraints(table, column))
         .collect::<Result<Vec<String>>>()?
         .join("\n"))
 }
@@ -632,7 +632,7 @@ fn define_column(col: &AColumn) -> Result<String> {
     ))
 }
 
-fn define_constraint(table_name: &str, column: &AColumn) -> String {
+fn define_fkey_constraint(table_name: &str, column: &AColumn) -> String {
     let reference = column
         .reference()
         .as_ref()
@@ -651,7 +651,7 @@ fn define_constraint(table_name: &str, column: &AColumn) -> String {
     }
 }
 
-fn drop_fk_constraints(table: &ATable, column: &AColumn) -> Result<String> {
+fn drop_fkey_constraints(table: &ATable, column: &AColumn) -> Result<String> {
     let mut modified_column = column.clone();
     modified_column.remove_reference();
     change_column(table, column, &modified_column)
@@ -700,7 +700,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
         helper::sql_literal_value(&default)?
     )];
     if col.reference().is_some() {
-        stmts.push(define_constraint(tbl_name, col));
+        stmts.push(define_fkey_constraint(tbl_name, col));
     }
     let result = stmts.join("\n");
     Ok(result)
@@ -816,7 +816,7 @@ fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String>
             ));
         }
         if new.reference().is_some() {
-            stmts.push(define_constraint(tbl_name, new));
+            stmts.push(define_fkey_constraint(tbl_name, new));
         }
     }
 

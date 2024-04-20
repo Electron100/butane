@@ -486,7 +486,7 @@ impl AColumn {
     }
     /// Remove the column that this column refers to.
     pub fn remove_reference(&mut self) {
-        self.reference = None
+        self.reference = None;
     }
     /// Get the type identifier.
     pub fn typeid(&self) -> Result<TypeIdentifier> {
@@ -578,13 +578,12 @@ pub fn create_many_table(
 }
 
 /// Individual operation use to apply a migration.
+/// The order of operations in a diff roughly follows this enum order.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum Operation {
     //future improvement: support column renames
     /// Add a table.
     AddTable(ATable),
-    /// Add table constraints referring to other tables, if the backend supports it.
-    AddTableConstraints(ATable),
     /// Add a table, if it doesnt already exist.
     AddTableIfNotExists(ATable),
     /// Remove table constraints referring to other tables, if the backend supports it.
@@ -597,6 +596,8 @@ pub enum Operation {
     RemoveColumn(String, String),
     /// Change a table columns type.
     ChangeColumn(String, AColumn, AColumn),
+    /// Add table constraints referring to other tables, if the backend supports it.
+    AddTableConstraints(ATable),
 }
 
 /// Determine the operations necessary to move the database schema from `old` to `new`.

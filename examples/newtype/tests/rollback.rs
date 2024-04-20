@@ -1,5 +1,5 @@
 use butane::db::{BackendConnection, Connection};
-use butane::migrations::{self, Migration, Migrations};
+use butane::migrations::{Migration, Migrations};
 use butane::DataObject;
 use butane_test_helper::*;
 

@@ -150,7 +150,7 @@ pub fn print_ops(ops: Vec<Operation>) -> Result<()> {
                     println!("  {}: {:?}", column.name(), column.typeid()?);
                 }
             }
-            AddTableConstraints(_) => {}
+            AddTableConstraints(_) | RemoveTableConstraints(_) => {}
             RemoveTable(name) => {
                 println!("Remove table {}", name);
             }

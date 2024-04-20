@@ -197,7 +197,7 @@ where
                 Operation::ChangeColumn(table_name, _, _) => {
                     modified_tables.push(table_name.clone())
                 }
-                Operation::RemoveTable(_) => {}
+                Operation::RemoveTable(_) | Operation::RemoveTableConstraints(_) => {}
             }
         }
 

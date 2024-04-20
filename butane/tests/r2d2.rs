@@ -19,11 +19,7 @@ fn r2d2_sqlite() {
         let mut conn1 = pool.get().unwrap();
         assert_eq!(pool.state().connections, 3);
         assert_eq!(pool.state().idle_connections, 2);
-        setup_db(
-            Box::new(butane::db::sqlite::SQLiteBackend::new()),
-            &mut conn1,
-            true,
-        );
+        setup_db(&mut conn1);
 
         let _conn2 = pool.get().unwrap();
         assert_eq!(pool.state().idle_connections, 1);
@@ -42,7 +38,7 @@ fn r2d2_pq() {
         let mut conn1 = pool.get().unwrap();
         assert_eq!(pool.state().connections, 3);
         assert_eq!(pool.state().idle_connections, 2);
-        setup_db(Box::new(butane::db::pg::PgBackend::new()), &mut conn1, true);
+        setup_db(&mut conn1);
 
         let _conn2 = pool.get().unwrap();
         assert_eq!(pool.state().idle_connections, 1);

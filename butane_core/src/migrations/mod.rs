@@ -326,3 +326,37 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
         Ok(()) // no-op
     }
 }
+
+/// Migrate connection forward.
+pub fn migrate<M: Migration>(
+    connection: &mut impl crate::db::BackendConnection,
+    migrations: &impl Migrations<M = M>,
+) -> Result<()> {
+    let to_apply = migrations.unapplied_migrations(connection)?;
+    for migration in &to_apply {
+        crate::info!("Applying migration {}", migration.name());
+        migration.apply(connection)?;
+    }
+    Ok(())
+}
+
+/// Rollback all applied migrations.
+pub fn rollback<M: Migration>(
+    connection: &mut impl crate::db::BackendConnection,
+    migrations: &impl Migrations<M = M>,
+) -> Result<()> {
+    let mut migration = match migrations.last_applied_migration(connection)? {
+        Some(migration) => migration,
+        None => return Ok(()),
+    };
+    migration.downgrade(connection)?;
+
+    while let Ok(Some(migration_name)) = migration.migration_from() {
+        migration = migrations
+            .get_migration(&migration_name)
+            .ok_or(Error::MigrationError("Migration not in chain".to_string()))?;
+        crate::info!("Rolling back migration {}", migration.name());
+        migration.downgrade(connection)?;
+    }
+    Ok(())
+}

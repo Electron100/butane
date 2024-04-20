@@ -1,7 +1,5 @@
-use butane::migrations::{
-    adb::DeferredSqlType, adb::TypeIdentifier, adb::TypeKey, MemMigrations, Migration,
-    MigrationMut, Migrations, MigrationsMut,
-};
+use butane::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
+use butane::migrations::{self, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
 use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
 #[cfg(feature = "pg")]
@@ -343,18 +341,21 @@ fn test_migrate(
         .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let mut to_apply = ms.unapplied_migrations(conn).unwrap();
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);
-    for m in &to_apply {
-        m.apply(conn).unwrap();
-    }
+
+    migrations::migrate(conn, &ms).unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
+    assert_eq!(to_apply.len(), 0);
+
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
-    to_apply.reverse();
-    for m in to_apply {
-        m.downgrade(conn).unwrap();
-    }
+    migrations::rollback(conn, &ms).unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
+    assert_eq!(to_apply.len(), 2);
 }
 
 fn verify_sql(
@@ -559,16 +560,19 @@ fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected
         .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let mut to_apply = ms.unapplied_migrations(conn).unwrap();
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);
-    for m in &to_apply {
-        m.apply(conn).unwrap();
-    }
+
+    migrations::migrate(conn, &ms).unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
+    assert_eq!(to_apply.len(), 0);
+
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
-    to_apply.reverse();
-    for m in to_apply {
-        m.downgrade(conn).unwrap();
-    }
+    migrations::rollback(conn, &ms).unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).unwrap();
+    assert_eq!(to_apply.len(), 2);
 }

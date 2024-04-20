@@ -273,6 +273,7 @@ impl ADB {
                 self.tables.insert(table.name.clone(), table);
             }
             RemoveTable(name) => self.remove_table(&name),
+            RemoveTableConstraints(_) => {}
             AddColumn(table, col) => {
                 if let Some(t) = self.tables.get_mut(&table) {
                     t.add_column(col);
@@ -483,6 +484,11 @@ impl AColumn {
     pub fn add_reference(&mut self, reference: &ARef) {
         self.reference = Some(reference.clone())
     }
+    /// Remove the column that this column refers to.
+    pub fn remove_reference(&mut self) {
+        self.reference = None
+    }
+    /// Get the type identifier.
     pub fn typeid(&self) -> Result<TypeIdentifier> {
         match &self.sqltype {
             DeferredSqlType::KnownId(t) => Ok(t.clone()),
@@ -581,6 +587,8 @@ pub enum Operation {
     AddTableConstraints(ATable),
     /// Add a table, if it doesnt already exist.
     AddTableIfNotExists(ATable),
+    /// Remove table constraints referring to other tables, if the backend supports it.
+    RemoveTableConstraints(ATable),
     /// Remove named table.
     RemoveTable(String),
     /// Add a table column.
@@ -607,7 +615,13 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     }
 
     // Remove tables
-    for removed in old_names.difference(&new_names) {
+    let removed_tables = old_names.difference(&new_names);
+    for removed in removed_tables.clone() {
+        let removed: &str = removed.as_ref();
+        let table = old.tables.get(removed).expect("no table").clone();
+        ops.push(Operation::RemoveTableConstraints(table));
+    }
+    for removed in removed_tables {
         ops.push(Operation::RemoveTable((*removed).to_string()));
     }
 

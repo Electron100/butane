@@ -551,9 +551,22 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::AddTableConstraints(table) => Ok(create_table_constraints(table)),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)?),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
+        Operation::RemoveTableConstraints(table) => remove_table_constraints(table),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
         Operation::RemoveColumn(tbl, name) => Ok(remove_column(tbl, name)),
-        Operation::ChangeColumn(tbl, old, new) => change_column(current, tbl, old, new),
+        Operation::ChangeColumn(tbl, old, new) => {
+            let table = current.get_table(tbl);
+            if let Some(table) = table {
+                change_column(table, old, new)
+            } else {
+                crate::warn!(
+                    "Cannot alter column {} from table {} that does not exist",
+                    &old.name(),
+                    tbl
+                );
+                Ok(String::new())
+            }
+        }
     }
 }
 
@@ -581,6 +594,16 @@ fn create_table_constraints(table: &ATable) -> String {
         .map(|column| define_constraint(&table.name, column))
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+fn remove_table_constraints(table: &ATable) -> Result<String> {
+    Ok(table
+        .columns
+        .iter()
+        .filter(|column| column.reference().is_some())
+        .map(|column| drop_fk_constraints(table, column))
+        .collect::<Result<Vec<String>>>()?
+        .join("\n"))
 }
 
 fn define_column(col: &AColumn) -> Result<String> {
@@ -628,6 +651,11 @@ fn define_constraint(table_name: &str, column: &AColumn) -> String {
     }
 }
 
+fn drop_fk_constraints(table: &ATable, column: &AColumn) -> Result<String> {
+    let mut modified_column = column.clone();
+    modified_column.remove_reference();
+    change_column(table, column, &modified_column)
+}
 fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
     match col.typeid()? {
         TypeIdentifier::Name(name) => Ok(Cow::Owned(name)),
@@ -686,22 +714,9 @@ fn remove_column(tbl_name: &str, name: &str) -> String {
     )
 }
 
-fn change_column(
-    current: &mut ADB,
-    tbl_name: &str,
-    old: &AColumn,
-    new: &AColumn,
-) -> Result<String> {
+fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String> {
     use helper::quote_reserved_word;
-    let table = current.get_table(tbl_name);
-    if table.is_none() {
-        crate::warn!(
-            "Cannot alter column {} from table {} that does not exist",
-            &old.name(),
-            tbl_name
-        );
-        return Ok(String::new());
-    }
+    let tbl_name = &table.name;
 
     // Let's figure out what changed about the column
     let mut stmts: Vec<String> = Vec::new();

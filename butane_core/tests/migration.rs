@@ -42,8 +42,11 @@ fn remove_table() {
 
     let ops = diff(&old, &new);
 
-    let expected_op = Operation::RemoveTable("a".to_owned());
-    assert_eq!(ops, vec![expected_op]);
+    let expected_ops = vec![
+        Operation::RemoveTableConstraints(table),
+        Operation::RemoveTable("a".to_owned()),
+    ];
+    assert_eq!(ops, expected_ops);
 }
 
 #[test]

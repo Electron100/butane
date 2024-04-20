@@ -501,6 +501,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::AddTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
+        Operation::RemoveTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
         Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, tbl, name)),
         Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new))),

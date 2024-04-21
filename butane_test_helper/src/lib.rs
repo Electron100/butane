@@ -9,7 +9,9 @@ use std::process::{ChildStderr, Command, Stdio};
 use std::sync::Mutex;
 
 use block_id::{Alphabet, BlockId};
-use butane_core::db::{connect, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec};
+use butane_core::db::{
+    connect, get_backend, pg, sqlite, Backend, BackendConnection, Connection, ConnectionSpec,
+};
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
 use uuid::Uuid;
@@ -179,16 +181,15 @@ pub fn pg_connstr(data: &PgSetupData) -> String {
     data.connstr.clone()
 }
 
-/// Populate the database schema.
-pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool) {
+/// Create a [`MemMigrations`]` for the "current" migration.
+pub fn create_current_migrations(connection: &Connection) -> MemMigrations {
+    let backend = connection.backend();
+
     let mut root = std::env::current_dir().unwrap();
     root.push(".butane/migrations");
     let mut disk_migrations = migrations::from_root(&root);
     let disk_current = disk_migrations.current();
     log::info!("Loading migrations from {:?}", disk_current);
-    if !migrate {
-        return;
-    }
     // Create an in-memory Migrations and write only to that. This
     // allows concurrent tests to avoid stomping on each other and is
     // also faster than real disk writes.
@@ -208,6 +209,12 @@ pub fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool)
             .expect("expected to create migration without error"),
         "expected to create migration"
     );
+    mem_migrations
+}
+
+/// Populate the database schema.
+pub fn setup_db(conn: &mut Connection) {
+    let mem_migrations = create_current_migrations(conn);
     log::info!("created current migration");
     mem_migrations.migrate(conn).unwrap();
 }
@@ -240,7 +247,9 @@ macro_rules! maketest {
                 let $dataname = butane_test_helper::[<$backend _setup>]();
                 log::info!("connecting to {}..", &$connstr);
                 let mut conn = backend.connect(&$connstr).expect("Could not connect backend");
-                butane_test_helper::setup_db(backend, &mut conn, $migrate);
+                if $migrate {
+                    butane_test_helper::setup_db(&mut conn);
+                }
                 log::info!("running test on {}..", &$connstr);
                 $fname(conn);
                 butane_test_helper::[<$backend _teardown>]($dataname);

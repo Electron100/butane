@@ -1,7 +1,7 @@
 version = 1
 test_patterns = [
-  "butane/tests/**", 
-  "butane_core/tests/**", 
+  "butane/tests/**",
+  "butane_core/tests/**",
   "example/tests/**",
 ]
 

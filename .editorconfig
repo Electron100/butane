@@ -37,3 +37,6 @@ indent_size = unset
 
 [LICENSE-APACHE.txt]
 indent_size = unset
+
+[deepsource.yml]
+max_line_length = 140

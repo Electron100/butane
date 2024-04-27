@@ -43,11 +43,12 @@ impl Backend for PgBackend {
 
     fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {
         let mut current: ADB = (*current).clone();
-        Ok(ops
+        let mut lines = ops
             .iter()
             .map(|o| sql_for_op(&mut current, o))
-            .collect::<Result<Vec<String>>>()?
-            .join("\n"))
+            .collect::<Result<Vec<String>>>()?;
+        lines.retain(|s| !s.is_empty());
+        Ok(lines.join("\n"))
     }
 
     fn connect(&self, path: &str) -> Result<Connection> {

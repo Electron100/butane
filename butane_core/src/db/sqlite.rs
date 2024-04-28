@@ -70,15 +70,16 @@ impl Backend for SQLiteBackend {
 
     fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {
         let mut current: ADB = (*current).clone();
-        Ok(ops
+        let mut lines = ops
             .into_iter()
             .map(|o| {
                 let sql = sql_for_op(&mut current, &o);
                 current.transform_with(o);
                 sql
             })
-            .collect::<Result<Vec<String>>>()?
-            .join("\n"))
+            .collect::<Result<Vec<String>>>()?;
+        lines.retain(|s| !s.is_empty());
+        Ok(lines.join("\n"))
     }
 
     fn connect(&self, path: &str) -> Result<Connection> {

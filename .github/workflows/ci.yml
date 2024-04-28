@@ -109,7 +109,7 @@ jobs:
         set -ex
         make regenerate-example-migrations
         git add -A
-        git diff --exit-code
+        git diff --cached --exit-code
     - name: Run tests in examples
       run: |
         cargo +stable test -p example --all-features

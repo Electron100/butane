@@ -309,14 +309,14 @@ pub fn unmigrate_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<(
         });
 
     if to_migration == latest {
-        eprintln!("That is the latest migration. Not schema change required.");
+        eprintln!("That is the latest migration. No schema change required.");
         std::process::exit(1);
     }
 
     let mut to_unapply = ms.migrations_since(&to_migration)?;
     if to_unapply.is_empty() {
         return Err(anyhow::anyhow!(
-            "That is the latest migration. Not schema change required."
+            "That is the latest migration. No schema change required."
         ));
     }
 

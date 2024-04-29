@@ -3,15 +3,24 @@ use butane::migrations::Migrations;
 use butane::DataObject;
 use butane_test_helper::*;
 
-use newtype::models::{Blog, Post, Tags};
+use getting_started::models::{Blog, Post, Tag};
+
+fn create_tag(connection: &Connection, name: &str) -> Tag {
+    let mut tag = Tag::new(name);
+    tag.save(connection).unwrap();
+    tag
+}
 
 fn insert_data(connection: &Connection) {
     if connection.backend_name() == "sqlite" {
         // https://github.com/Electron100/butane/issues/226
         return;
     }
-    let mut cats_blog = Blog::new("Cats").unwrap();
+    let mut cats_blog = Blog::new("Cats");
     cats_blog.save(connection).unwrap();
+
+    let tag_asia = create_tag(connection, "asia");
+    let tag_danger = create_tag(connection, "danger");
 
     let mut post = Post::new(
         &cats_blog,
@@ -20,14 +29,12 @@ fn insert_data(connection: &Connection) {
     );
     post.published = true;
     post.likes = 4;
-    post.tags = Tags(std::collections::HashSet::from([
-        "asia".to_string(),
-        "danger".to_string(),
-    ]));
+    post.tags.add(&tag_danger).unwrap();
+    post.tags.add(&tag_asia).unwrap();
     post.save(connection).unwrap();
 }
 
-fn migrate_and_rollback(mut connection: Connection) {
+fn migrate_and_unmigrate(mut connection: Connection) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
@@ -36,7 +43,7 @@ fn migrate_and_rollback(mut connection: Connection) {
 
     insert_data(&connection);
 
-    // Rollback migrations.
+    // Undo migrations.
     migrations.unmigrate(&mut connection).unwrap();
 }
-testall_no_migrate!(migrate_and_rollback);
+testall_no_migrate!(migrate_and_unmigrate);

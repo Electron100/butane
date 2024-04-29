@@ -277,17 +277,17 @@ pub fn migrate(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
     Ok(())
 }
 
-pub fn rollback(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
+pub fn unmigrate(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
     let spec = load_connspec(base_dir)?;
     let conn = butane::db::connect(&spec)?;
 
     match name {
-        Some(to) => rollback_to(base_dir, conn, &to),
-        None => rollback_latest(base_dir, conn),
+        Some(to) => unmigrate_to(base_dir, conn, &to),
+        None => unmigrate_latest(base_dir, conn),
     }
 }
 
-pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()> {
+pub fn unmigrate_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()> {
     let ms = get_migrations(base_dir)?;
     let to_migration = match ms.get_migration(to) {
         Some(m) => m,
@@ -309,15 +309,14 @@ pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()
         });
 
     if to_migration == latest {
-        eprintln!("That is the latest applied migration, not rolling back to anything.");
+        eprintln!("That is the latest migration. No schema change required.");
         std::process::exit(1);
     }
 
     let mut to_unapply = ms.migrations_since(&to_migration)?;
     if to_unapply.is_empty() {
         return Err(anyhow::anyhow!(
-            "That is the latest migration, not rolling back to anything.
-If you expected something to happen, try specifying the migration to rollback to."
+            "That is the latest migration. No schema change required."
         ));
     }
 
@@ -336,7 +335,7 @@ If you expected something to happen, try specifying the migration to rollback to
     Ok(())
 }
 
-pub fn rollback_latest(base_dir: &Path, mut conn: Connection) -> Result<()> {
+pub fn unmigrate_latest(base_dir: &Path, mut conn: Connection) -> Result<()> {
     match get_migrations(base_dir)?.last_applied_migration(&conn)? {
         Some(m) => {
             println!("Rolling back migration {}", m.name());

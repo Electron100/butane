@@ -2,7 +2,9 @@
 //! Macros depend on [`butane_core`], `env_logger` and [`log`].
 #![deny(missing_docs)]
 
-use butane_core::db::{connect, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec};
+use butane_core::db::{
+    connect, get_backend, pg, sqlite, Backend, BackendConnection, Connection, ConnectionSpec,
+};
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
 
@@ -181,16 +183,15 @@ pub fn pg_connstr(data: &PgSetupData) -> String {
     data.connstr.clone()
 }
 
-/// Populate the database schema.
-pub async fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate: bool) {
+/// Create a [`MemMigrations`]` for the "current" migration.
+pub fn create_current_migrations(connection: &Connection) -> MemMigrations {
+    let backend = connection.backend();
+
     let mut root = std::env::current_dir().unwrap();
     root.push(".butane/migrations");
     let mut disk_migrations = migrations::from_root(&root);
     let disk_current = disk_migrations.current();
     log::info!("Loading migrations from {:?}", disk_current);
-    if !migrate {
-        return;
-    }
     // Create an in-memory Migrations and write only to that. This
     // allows concurrent tests to avoid stomping on each other and is
     // also faster than real disk writes.
@@ -210,12 +211,14 @@ pub async fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate:
             .expect("expected to create migration without error"),
         "expected to create migration"
     );
+    mem_migrations
+}
+
+/// Populate the database schema.
+pub async fn setup_db(conn: &mut Connection) {
+    let mem_migrations = create_current_migrations(conn);
     log::info!("created current migration");
-    let to_apply = mem_migrations.unapplied_migrations(conn).await.unwrap();
-    for m in to_apply {
-        log::info!("Applying migration {}", m.name());
-        m.apply(conn).await.unwrap();
-    }
+    mem_migrations.migrate(conn).await.unwrap();
 }
 
 /// Create a sqlite [`Connection`].
@@ -246,7 +249,9 @@ macro_rules! maketest {
                 let $dataname = butane_test_helper::[<$backend _setup>]().await;
                 log::info!("connecting to {}..", &$connstr);
                 let mut conn = backend.connect(&$connstr).await.expect("Could not connect backend");
-                butane_test_helper::setup_db(backend, &mut conn, $migrate).await;
+                if $migrate {
+                    butane_test_helper::setup_db(&mut conn).await;
+                }
                 log::info!("running test on {}..", &$connstr);
                 $fname(conn).await;
                 butane_test_helper::[<$backend _teardown>]($dataname);

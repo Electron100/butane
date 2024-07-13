@@ -673,13 +673,13 @@ mod tests {
     #[test]
     fn test_is_foreign_key() {
         let tokens = quote::quote! {
-           foos: butane::ForeignKey<Foo>
+            foos: butane::ForeignKey<Foo>
         };
         let field = syn::Field::parse_named.parse2(tokens).unwrap();
         assert!(is_foreign_key(&field));
 
         let tokens = quote::quote! {
-           foos: Option<butane::ForeignKey<Foo>>
+            foos: Option<butane::ForeignKey<Foo>>
         };
         let field = syn::Field::parse_named.parse2(tokens).unwrap();
         assert!(is_foreign_key(&field));
@@ -697,7 +697,7 @@ mod tests {
         assert!(!is_foreign_key(&field));
 
         let tokens = quote::quote! {
-           foos: Option<SomethingElse>
+            foos: Option<SomethingElse>
         };
         let field = syn::Field::parse_named.parse2(tokens).unwrap();
         assert!(!is_foreign_key(&field));

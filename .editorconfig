@@ -3,13 +3,21 @@ root = true
 # Unix-style newlines with a newline ending every file
 [*]
 end_of_line = lf
+indent_size = 4
+indent_style = space
 insert_final_newline = true
 max_line_length = 120
+trim_trailing_whitespace = true
+
+[*.{json,table,toml,yml}]
+indent_size = 2
+indent_style = space
 
 [butane_cli/src/main.rs]
 max_line_length = 400
 
 [butane_migrations.rs]
+indent_size = unset
 max_line_length = unset
 
 [types.json]
@@ -17,3 +25,15 @@ max_line_length = unset
 
 [README.md]
 max_line_length = 200
+
+[Makefile]
+indent_style = tab
+
+[notes.org]
+indent_size = unset
+
+[*.md]
+indent_size = unset
+
+[LICENSE-APACHE.txt]
+indent_size = unset

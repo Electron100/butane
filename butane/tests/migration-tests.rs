@@ -1,9 +1,8 @@
-use butane::migrations::{
-    adb::DeferredSqlType, adb::TypeIdentifier, adb::TypeKey, MemMigrations, Migration,
-    MigrationMut, Migrations, MigrationsMut,
-};
-use butane::{db::Connection, prelude::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
+use butane_core::db::{BackendConnection, Connection};
+use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
+use butane_core::migrations::{MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
+use butane_core::{SqlType, SqlVal};
 #[cfg(feature = "pg")]
 use butane_test_helper::pg_connection;
 #[cfg(feature = "sqlite")]
@@ -231,6 +230,55 @@ async fn migration_add_field_with_default_pg() {
     .await;
 }
 
+#[cfg(feature = "pg")]
+#[tokio::test]
+async fn migration_modify_field_pg() {
+    let (mut conn, _data) = pg_connection().await;
+    // Not verifying rename right now because we don't detect it
+    // https://github.com/Electron100/butane/issues/89
+
+    migration_modify_field_type_change(
+        &mut conn,
+        "ALTER TABLE Foo ALTER COLUMN bar SET DATA TYPE BIGINT;",
+        "ALTER TABLE Foo ALTER COLUMN bar SET DATA TYPE INTEGER;",
+    )
+    .await;
+
+    migration_modify_field_nullability_change(
+        &mut conn,
+        "ALTER TABLE Foo ALTER COLUMN bar DROP NOT NULL;",
+        "ALTER TABLE Foo ALTER COLUMN bar SET NOT NULL;",
+    )
+    .await;
+
+    migration_modify_field_pkey_change(
+        &mut conn,
+        "ALTER TABLE Foo DROP CONSTRAINT IF EXISTS Foo_pkey;\nALTER TABLE Foo ADD PRIMARY KEY (baz);",
+        "ALTER TABLE Foo DROP CONSTRAINT IF EXISTS Foo_pkey;\nALTER TABLE Foo ADD PRIMARY KEY (bar);",
+    ).await;
+
+    migration_modify_field_uniqueness_change(
+        &mut conn,
+        "ALTER TABLE Foo ADD UNIQUE (bar);",
+        "ALTER TABLE Foo DROP CONSTRAINT Foo_bar_key;",
+    )
+    .await;
+
+    migration_modify_field_default_added(
+        &mut conn,
+        "ALTER TABLE Foo ALTER COLUMN bar SET DEFAULT 42;",
+        "ALTER TABLE Foo ALTER COLUMN bar DROP DEFAULT;",
+    )
+    .await;
+
+    migration_modify_field_different_default(
+        &mut conn,
+        "ALTER TABLE Foo ALTER COLUMN bar SET DEFAULT 42;",
+        "ALTER TABLE Foo ALTER COLUMN bar SET DEFAULT 41;",
+    )
+    .await;
+}
+
 #[cfg(feature = "sqlite")]
 #[tokio::test]
 async fn migration_add_and_remove_field_sqlite() {
@@ -243,9 +291,9 @@ async fn migration_add_and_remove_field_sqlite() {
         // changes. If the change is innocuous, this test should just
         // be updated.
         r#"ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;
-           CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL);
-           INSERT INTO Foo__butane_tmp SELECT id, baz FROM Foo;
-           DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
+            CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL);
+            INSERT INTO Foo__butane_tmp SELECT id, baz FROM Foo;
+            DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
         r#"ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';
            CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
            INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;
@@ -307,18 +355,21 @@ async fn test_migrate(
         .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let mut to_apply = ms.unapplied_migrations(conn).await.unwrap();
+    let to_apply = ms.unapplied_migrations(conn).await.unwrap();
     assert_eq!(to_apply.len(), 2);
-    for m in &to_apply {
-        m.apply(conn).await.unwrap();
-    }
+
+    ms.migrate(conn).await.unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).await.unwrap();
+    assert_eq!(to_apply.len(), 0);
+
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
-    to_apply.reverse();
-    for m in to_apply {
-        m.downgrade(conn).await.unwrap();
-    }
+    ms.unmigrate(conn).await.unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).await.unwrap();
+    assert_eq!(to_apply.len(), 2);
 }
 
 fn verify_sql(
@@ -379,6 +430,126 @@ async fn migration_add_field_with_default(conn: &mut Connection, up_sql: &str, d
     test_migrate(conn, init, v2, up_sql, down_sql).await;
 }
 
+async fn migration_modify_field_type_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: i32,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            bar: i64,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql).await;
+}
+
+async fn migration_modify_field_nullability_change(
+    conn: &mut Connection,
+    up_sql: &str,
+    down_sql: &str,
+) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: i32,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            bar: Option<i32>,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql).await;
+}
+
+async fn migration_modify_field_uniqueness_change(
+    conn: &mut Connection,
+    up_sql: &str,
+    down_sql: &str,
+) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: i32,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            #[unique]
+            bar: i32,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql).await;
+}
+
+async fn migration_modify_field_pkey_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            #[pk]
+            bar: i64,
+            baz: i32,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            bar: i64,
+            #[pk]
+            baz: i32
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql).await;
+}
+
+async fn migration_modify_field_default_added(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            bar: String,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            #[default=42]
+            bar: String,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql).await;
+}
+
+async fn migration_modify_field_different_default(
+    conn: &mut Connection,
+    up_sql: &str,
+    down_sql: &str,
+) {
+    let init = quote! {
+        struct Foo {
+            id: i64,
+            #[default=41]
+            bar: String,
+        }
+    };
+
+    let v2 = quote! {
+        struct Foo {
+            id: i64,
+            #[default=42]
+            bar: String,
+        }
+    };
+    test_migrate(conn, init, v2, up_sql, down_sql).await;
+}
+
 async fn migration_add_and_remove_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
     let init = quote! {
         struct Foo {
@@ -419,16 +590,19 @@ async fn migration_delete_table(
         .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let mut to_apply = ms.unapplied_migrations(conn).await.unwrap();
+    let to_apply = ms.unapplied_migrations(conn).await.unwrap();
     assert_eq!(to_apply.len(), 2);
-    for m in &to_apply {
-        m.apply(conn).await.unwrap();
-    }
+
+    ms.migrate(conn).await.unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).await.unwrap();
+    assert_eq!(to_apply.len(), 0);
+
     verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
 
     // Now downgrade, just to make sure we can
-    to_apply.reverse();
-    for m in to_apply {
-        m.downgrade(conn).await.unwrap();
-    }
+    ms.unmigrate(conn).await.unwrap();
+
+    let to_apply = ms.unapplied_migrations(conn).await.unwrap();
+    assert_eq!(to_apply.len(), 2);
 }

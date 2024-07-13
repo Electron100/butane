@@ -1,5 +1,5 @@
-use butane::prelude::*;
-use butane::{dataresult, model};
+//! Helpers for several tests.
+use butane::{dataresult, model, DataObject, DataObjectOpAsync};
 use butane::{db::Connection, ForeignKey, Many};
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc};

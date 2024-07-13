@@ -8,7 +8,7 @@ use std::path::Path;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
-use crate::db::BackendRows;
+use crate::db::{BackendConnection, BackendRows};
 use crate::db::{Column, ConnectionMethods};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
@@ -115,6 +115,34 @@ pub trait Migrations {
         }
         Ok(None)
     }
+
+    /// Migrate connection forward.
+    async fn migrate(&self, connection: &mut impl BackendConnection) -> Result<()> {
+        let to_apply = self.unapplied_migrations(connection).await?;
+        for migration in &to_apply {
+            crate::info!("Applying migration {}", migration.name());
+            migration.apply(connection).await?;
+        }
+        Ok(())
+    }
+
+    /// Remove all applied migrations.
+    async fn unmigrate(&self, connection: &mut impl BackendConnection) -> Result<()> {
+        let mut migration = match self.last_applied_migration(connection).await? {
+            Some(migration) => migration,
+            None => return Ok(()),
+        };
+        migration.downgrade(connection).await?;
+
+        while let Ok(Some(migration_name)) = migration.migration_from() {
+            migration = self
+                .get_migration(&migration_name)
+                .ok_or(Error::MigrationError("Migration not in chain".to_string()))?;
+            crate::info!("Rolling back migration {}", migration.name());
+            migration.downgrade(connection).await?;
+        }
+        Ok(())
+    }
 }
 
 /// Extension of [`Migrations`] to modify the series of migrations.
@@ -205,7 +233,7 @@ where
                 Operation::ChangeColumn(table_name, _, _) => {
                     modified_tables.push(table_name.clone())
                 }
-                Operation::RemoveTable(_) => {}
+                Operation::RemoveTable(_) | Operation::RemoveTableConstraints(_) => {}
             }
         }
 
@@ -283,7 +311,7 @@ pub fn copy_migration(from: &impl Migration, to: &mut impl MigrationMut) -> Resu
     Ok(())
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct ButaneMigration {
     name: String,
 }
@@ -324,7 +352,7 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
     fn pk_mut(&mut self) -> &mut impl PrimaryKeyType {
         &mut self.name
     }
-    fn values(&self, include_pk: bool) -> Vec<SqlValRef> {
+    fn non_auto_values(&self, include_pk: bool) -> Vec<SqlValRef> {
         let mut values: Vec<SqlValRef<'_>> = Vec::with_capacity(2usize);
         if include_pk {
             values.push(self.name.to_sql_ref());

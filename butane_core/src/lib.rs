@@ -107,27 +107,40 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
 
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
+}
 
+/// [`DataObject`] operations that require a live database connection.
+#[allow(async_fn_in_trait)] // Implementation is intended to be through procmacro
+#[maybe_async_cfg::maybe(
+    idents(
+        ConnectionMethods(sync = "ConnectionMethodsSync", async),
+        save_many_to_many(sync = "save_many_to_many_sync", async = "save_many_to_many_async"),
+        QueryOp,
+    ),
+    sync(),
+    async()
+)]
+pub trait DataObjectOp<T: DataObject> {
     /// Find this object in the database based on primary key.
     /// Returns `Error::NoSuchObject` if the primary key does not exist.
     async fn get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Self>
     where
-        Self: Sized,
+        Self: DataObject + Sized,
         Self::PKType: Sync,
     {
         Self::try_get(conn, id).await?.ok_or(Error::NoSuchObject)
     }
+
     /// Find this object in the database based on primary key.
     /// Returns `None` if the primary key does not exist.
     async fn try_get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Option<Self>>
     where
-        Self: Sized,
+        Self: DataObject + Sized,
     {
-        // todo make sync and async variants
-        use crate::query::QueryOpAsync;
+        use crate::query::QueryOp;
         Ok(<Self as DataResult>::query()
             .filter(query::BoolExpr::Eq(
-                Self::PKCOL,
+                T::PKCOL,
                 query::Expr::Val(id.borrow().to_sql()),
             ))
             .limit(1)
@@ -136,19 +149,7 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
             .into_iter()
             .nth(0))
     }
-}
 
-/// [`DataObject`] operations that require a live database connection.
-#[allow(async_fn_in_trait)] // Implementation is intended to be through procmacro
-#[maybe_async_cfg::maybe(
-    idents(
-        ConnectionMethods(sync = "ConnectionMethodsSync", async),
-        save_many_to_many(sync = "save_many_to_many_sync", async = "save_many_to_many_async")
-    ),
-    sync(),
-    async()
-)]
-pub trait DataObjectOp<T: DataObject> {
     /// Save the object to the database.
     async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>
     where

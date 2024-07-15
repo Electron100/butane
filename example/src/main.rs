@@ -1,6 +1,6 @@
 //! Simple example with all code in a single file.
 use butane::db::{Connection, ConnectionSpec};
-use butane::prelude::*;
+use butane::prelude_async::*;
 use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};
 
 type Result<T> = std::result::Result<T, Error>;

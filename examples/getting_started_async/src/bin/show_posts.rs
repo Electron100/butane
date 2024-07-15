@@ -1,4 +1,4 @@
-use butane::prelude::*;
+use butane::prelude_async::*;
 use butane::query;
 use getting_started_async::models::Post;
 use getting_started_async::*;

@@ -8,7 +8,8 @@ use std::path::Path;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
-use crate::db::{BackendRows, Column, ConnectionMethods};
+use crate::db::sync::Backend;
+use crate::db::{BackendRows, Column};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
 
@@ -189,7 +190,7 @@ where
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration(
         &mut self,
-        backends: &NonEmpty<Box<dyn db::Backend>>,
+        backends: &NonEmpty<Box<dyn Backend>>,
         name: &str,
         from: Option<&Self::M>,
     ) -> Result<bool> {
@@ -202,7 +203,7 @@ where
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration_to(
         &mut self,
-        backends: &NonEmpty<Box<dyn db::Backend>>,
+        backends: &NonEmpty<Box<dyn Backend>>,
         name: &str,
         from: Option<&Self::M>,
         to_db: ADB,
@@ -353,7 +354,10 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
         }
         values
     }
-    async fn save_many_to_many_async(&mut self, _conn: &impl ConnectionMethods) -> Result<()> {
+    async fn save_many_to_many_async(
+        &mut self,
+        _conn: &impl crate::db::ConnectionMethods,
+    ) -> Result<()> {
         Ok(()) // no-op
     }
     fn save_many_to_many_sync(

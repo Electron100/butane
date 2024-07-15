@@ -172,21 +172,34 @@ macro_rules! find {
     };
 }
 
-pub mod prelude {
-    //! Prelude module to improve ergonomics.
-    //!
-    //! Its use is recommended, but not required. If not used, the use
-    //! of butane's macros may require some of its re-exports to be
-    //! used manually.
-    pub use butane_core::db::BackendConnection;
-
+mod prelude_common {
     #[doc(no_inline)]
     pub use crate::DataObject;
     #[doc(no_inline)]
     pub use crate::DataResult;
+}
 
-    // todo should it be sync or async in prelude
-    // (can't be both or call sites will give "multiple applicable items in scope"
+pub mod prelude {
+    //! Prelude module to improve ergonomics. Brings certain traits into scope.
+    //! This module is for sync operation. For asynchronous, see [`prelude_async`].
+    //!
+    //! Its use is recommended, but not required.
+
+    pub use super::prelude_common::*;
+
+    pub use butane_core::db::sync::BackendConnection;
+    pub use butane_core::many::ManyOpSync;
+    pub use butane_core::query::QueryOpSync;
+    pub use butane_core::DataObjectOpSync;
+}
+
+pub mod prelude_async {
+    //! Prelude module to improve ergonomics in async operation. Brings certain traits into scope.
+    //!
+    //! Its use is recommended, but not required.
+    pub use super::prelude_common::*;
+
+    pub use butane_core::db::BackendConnection;
     pub use butane_core::many::ManyOpAsync;
     pub use butane_core::query::QueryOpAsync;
     pub use butane_core::DataObjectOpAsync;

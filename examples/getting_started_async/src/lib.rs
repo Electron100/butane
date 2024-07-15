@@ -7,7 +7,7 @@ pub mod models;
 
 use butane::db::{Connection, ConnectionSpec};
 use butane::migrations;
-use butane::prelude::*;
+use butane::prelude_async::*;
 use models::{Blog, Post};
 
 /// Load a [Connection].

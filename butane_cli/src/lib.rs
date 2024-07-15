@@ -13,13 +13,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use butane::db::sync::{Backend, Connection, ConnectionMethods};
 use butane::migrations::adb;
 use butane::migrations::adb::{diff, AColumn, ARef, Operation, ADB};
 use butane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
 use butane::query::BoolExpr;
-use butane::{db, db::Connection, db::ConnectionMethods, migrations};
+use butane::{db, migrations};
 use cargo_metadata::MetadataCommand;
 use chrono::Utc;
 use nonempty::NonEmpty;
@@ -55,7 +56,7 @@ pub fn default_name() -> String {
     Utc::now().format("%Y%m%d_%H%M%S%3f").to_string()
 }
 
-pub async fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) -> Result<()> {
+pub fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) -> Result<()> {
     if db::get_async_backend(name).is_none() {
         eprintln!("Unknown backend {name}");
         std::process::exit(1);
@@ -63,7 +64,7 @@ pub async fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) 
 
     let spec = db::ConnectionSpec::new(name, connstr);
     if connect {
-        db::connect_async(&spec).await?;
+        db::connect(&spec)?;
     }
     std::fs::create_dir_all(base_dir)?;
     spec.save(base_dir)?;
@@ -259,16 +260,14 @@ pub fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub async fn migrate(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
+pub fn migrate(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
     let spec = load_connspec(base_dir)?;
-    let mut conn = db::connect_async(&spec).await?;
-    let to_apply = get_migrations(base_dir)?
-        .unapplied_migrations(&conn)
-        .await?;
+    let mut conn = db::connect(&spec)?;
+    let to_apply = get_migrations(base_dir)?.unapplied_migrations(&conn)?;
     println!("{} migrations to apply", to_apply.len());
     for m in to_apply {
         println!("Applying migration {}", m.name());
-        m.apply(&mut conn).await?;
+        m.apply(&mut conn)?;
         if let Some(ref name) = name {
             if name == &m.name().to_string() {
                 println!("Finishing at migration {}", m.name());
@@ -279,17 +278,17 @@ pub async fn migrate(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
     Ok(())
 }
 
-pub async fn rollback(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
+pub fn rollback(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
     let spec = load_connspec(base_dir)?;
-    let conn = butane::db::connect_async(&spec).await?;
+    let conn = butane::db::connect(&spec)?;
 
     match name {
-        Some(to) => rollback_to(base_dir, conn, &to).await,
-        None => rollback_latest(base_dir, conn).await,
+        Some(to) => rollback_to(base_dir, conn, &to),
+        None => rollback_latest(base_dir, conn),
     }
 }
 
-pub async fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()> {
+pub fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Result<()> {
     let ms = get_migrations(base_dir)?;
     let to_migration = match ms.get_migration(to) {
         Some(m) => m,
@@ -301,7 +300,6 @@ pub async fn rollback_to(base_dir: &Path, mut conn: Connection, to: &str) -> Res
 
     let latest = ms
         .last_applied_migration(&conn)
-        .await
         .unwrap_or_else(|err| {
             eprintln!("Err: {err}");
             std::process::exit(1);
@@ -334,19 +332,16 @@ If you expected something to happen, try specifying the migration to rollback to
 
     for m in to_unapply.into_iter().rev() {
         println!("Rolling back migration {}", m.name());
-        m.downgrade(&mut conn).await?;
+        m.downgrade(&mut conn)?;
     }
     Ok(())
 }
 
-pub async fn rollback_latest(base_dir: &Path, mut conn: Connection) -> Result<()> {
-    match get_migrations(base_dir)?
-        .last_applied_migration(&conn)
-        .await?
-    {
+pub fn rollback_latest(base_dir: &Path, mut conn: Connection) -> Result<()> {
+    match get_migrations(base_dir)?.last_applied_migration(&conn)? {
         Some(m) => {
             println!("Rolling back migration {}", m.name());
-            m.downgrade(&mut conn).await?;
+            m.downgrade(&mut conn)?;
         }
         None => {
             eprintln!("No migrations applied!");
@@ -529,7 +524,7 @@ pub fn regenerate_migrations(base_dir: &Path) -> Result<()> {
 
 /// Load the [`db::Backend`]s used in the latest migration.
 /// Error if there are no existing migrations.
-pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {
+pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn Backend>>> {
     if let Ok(ms) = get_migrations(base_dir) {
         if let Some(latest_migration) = ms.latest() {
             let backend_names = latest_migration.sql_backends()?;
@@ -539,16 +534,16 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
                 backend_names.join(", ")
             );
 
-            let mut backends: Vec<Box<dyn db::Backend>> = vec![];
+            let mut backends: Vec<Box<dyn Backend>> = vec![];
 
             for backend_name in backend_names {
                 backends.push(
-                    db::get_async_backend(&backend_name)
+                    db::get_sync_backend(&backend_name)
                         .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?,
                 );
             }
 
-            return Ok(NonEmpty::<Box<dyn db::Backend>>::from_vec(backends).unwrap());
+            return Ok(NonEmpty::<Box<dyn Backend>>::from_vec(backends).unwrap());
         }
     }
     Err(anyhow::anyhow!("There are no exiting migrations."))
@@ -556,7 +551,7 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
 
 /// Load [`db::Backend`]s selected in the latest migration, or when there are no migrations,
 /// fallback to the backend named in the connection.
-pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {
+pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::sync::Backend>>> {
     // Try to use the same backends as the latest migration.
     let backends = load_latest_migration_backends(base_dir);
     if backends.is_ok() {
@@ -565,7 +560,7 @@ pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> 
 
     // Otherwise use the backend used during `init`.
     if let Ok(spec) = db::ConnectionSpec::load(base_dir) {
-        return Ok(nonempty::nonempty![spec.get_backend().unwrap()]);
+        return Ok(nonempty::nonempty![spec.get_sync_backend().unwrap()]);
     }
 
     Err(anyhow::anyhow!(
@@ -573,11 +568,11 @@ pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> 
     ))
 }
 
-pub async fn list_migrations(base_dir: &PathBuf) -> Result<()> {
+pub fn list_migrations(base_dir: &PathBuf) -> Result<()> {
     let spec = load_connspec(base_dir)?;
-    let conn = db::connect(&spec).await?;
+    let conn = db::connect(&spec)?;
     let ms = get_migrations(base_dir)?;
-    let unapplied = ms.unapplied_migrations(&conn).await?;
+    let unapplied = ms.unapplied_migrations(&conn)?;
     let all = ms.all_migrations()?;
     for m in all {
         let m_state = if unapplied.contains(&m) {
@@ -591,10 +586,7 @@ pub async fn list_migrations(base_dir: &PathBuf) -> Result<()> {
 }
 
 /// Collapse multiple applied migrations into a new migration.
-pub async fn collapse_migrations(
-    base_dir: &PathBuf,
-    new_initial_name: Option<&String>,
-) -> Result<()> {
+pub fn collapse_migrations(base_dir: &PathBuf, new_initial_name: Option<&String>) -> Result<()> {
     let name = match new_initial_name {
         Some(name) => format!("{}_{}", default_name(), name),
         None => default_name(),
@@ -622,18 +614,18 @@ pub async fn collapse_migrations(
     // TODO: it should also be possible to collapse migrations on the filesystem
     // when the database hasnt been migrated at all.
     let spec = load_connspec(base_dir)?;
-    let conn = db::connect(&spec).await?;
-    let latest = ms.last_applied_migration(&conn).await?;
+    let conn = db::connect(&spec)?;
+    let latest = ms.last_applied_migration(&conn)?;
     if latest.is_none() {
         eprintln!("There are no applied migrations to collapse");
         std::process::exit(1);
     }
 
     let latest_db = latest.unwrap().db()?;
-    ms.clear_migrations(&conn).await?;
+    ms.clear_migrations(&conn)?;
     ms.create_migration_to(&backends, &name, None, latest_db)?;
     let new_migration = ms.latest().unwrap();
-    new_migration.mark_applied(&conn).await?;
+    new_migration.mark_applied(&conn)?;
 
     update_embedded(base_dir)?;
 
@@ -648,13 +640,10 @@ pub fn delete_table(base_dir: &Path, name: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn clear_data(base_dir: &PathBuf) -> Result<()> {
+pub fn clear_data(base_dir: &PathBuf) -> Result<()> {
     let spec = load_connspec(base_dir)?;
-    let conn = db::connect(&spec).await?;
-    let latest = match get_migrations(base_dir)?
-        .last_applied_migration(&conn)
-        .await?
-    {
+    let conn = db::connect(&spec)?;
+    let latest = match get_migrations(base_dir)?.last_applied_migration(&conn)? {
         Some(m) => m,
         None => {
             eprintln!("No migrations have been applied, so no data is recognized.");
@@ -663,7 +652,7 @@ pub async fn clear_data(base_dir: &PathBuf) -> Result<()> {
     };
     for table in latest.db()?.tables() {
         println!("Deleting data from {}", &table.name);
-        conn.delete_where(&table.name, BoolExpr::True).await?;
+        conn.delete_where(&table.name, BoolExpr::True)?;
     }
     Ok(())
 }

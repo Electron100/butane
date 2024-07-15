@@ -1,7 +1,7 @@
 #![allow(clippy::expect_fun_call)]
 use std::env::args;
 
-use butane::prelude::*;
+use butane::prelude_async::*;
 use getting_started_async::models::Post;
 use getting_started_async::*;
 

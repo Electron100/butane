@@ -2,8 +2,10 @@
 //! Macros depend on [`butane_core`], `env_logger` and [`log`].
 #![deny(missing_docs)]
 
-use butane_core::db::{connect, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec};
-use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
+use butane_core::db::{
+    connect_async, get_async_backend, pg, sqlite, Backend, Connection, ConnectionSpec,
+};
+use butane_core::migrations::{self, MemMigrations, Migration, MigrationsMut};
 use once_cell::sync::Lazy;
 
 use std::io::{BufRead, BufReader, Read, Write};
@@ -17,7 +19,7 @@ use uuid::Uuid;
 
 /// Create a postgres [`Connection`].
 pub async fn pg_connection() -> (Connection, PgSetupData) {
-    let backend = get_backend(pg::BACKEND_NAME).unwrap();
+    let backend = get_async_backend(pg::BACKEND_NAME).unwrap();
     let data = pg_setup().await;
     (backend.connect(&pg_connstr(&data)).await.unwrap(), data)
 }
@@ -162,7 +164,9 @@ pub async fn pg_setup() -> PgSetupData {
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     log::info!("new db is `{}`", &new_dbname);
 
-    let mut conn = connect(&ConnectionSpec::new("pg", &connstr)).await.unwrap();
+    let mut conn = connect_async(&ConnectionSpec::new("pg", &connstr))
+        .await
+        .unwrap();
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .await
         .unwrap();
@@ -211,16 +215,14 @@ pub async fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate:
         "expected to create migration"
     );
     log::info!("created current migration");
-    let to_apply = mem_migrations.unapplied_migrations(conn).await.unwrap();
-    for m in to_apply {
-        log::info!("Applying migration {}", m.name());
-        m.apply(conn).await.unwrap();
-    }
+    migrations::apply_unapplied_migrations_async(mem_migrations.clone(), conn)
+        .await
+        .unwrap();
 }
 
 /// Create a sqlite [`Connection`].
 pub async fn sqlite_connection() -> Connection {
-    let backend = get_backend(sqlite::BACKEND_NAME).unwrap();
+    let backend = get_async_backend(sqlite::BACKEND_NAME).unwrap();
     backend.connect(":memory:").await.unwrap()
 }
 

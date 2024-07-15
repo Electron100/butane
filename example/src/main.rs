@@ -94,7 +94,7 @@ async fn establish_connection() -> Result<Connection> {
     let mut cwd = std::env::current_dir()?;
     cwd.push(".butane");
     let spec = ConnectionSpec::load(cwd)?;
-    let conn = butane::db::connect(&spec).await?;
+    let conn = butane::db::connect_async(&spec).await?;
     Ok(conn)
 }
 

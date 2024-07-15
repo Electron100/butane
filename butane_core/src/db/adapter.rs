@@ -1,4 +1,8 @@
 //! Adapter between sync and async connections
+//! Allows implementing an async trait in terms of synchronous
+//! operations without blocking the task. It accomplishes this by
+//! running the blocking operations on a dedicated thread and communicating
+//! between threads.
 
 use super::*;
 use crate::query::Order;
@@ -374,6 +378,17 @@ where
     }
 }
 
+impl<T> AsyncAdapter<T>
+where
+    T: sync::BackendConnection + 'static,
+{
+    pub fn into_connection(self) -> Connection {
+        Connection {
+            conn: Box::new(self),
+        }
+    }
+}
+
 #[async_trait(?Send)]
 impl<T, 'c> BackendTransaction<'c> for AsyncAdapter<T>
 where
@@ -418,10 +433,7 @@ impl<T: sync::Backend + Clone + 'static> Backend for BackendAdapter<T> {
         tokio::task::spawn_blocking(move || {
             let connmethods_async =
                 adapter::AsyncAdapter::new(|| sync_backend.connect(&conn_str2))?;
-            let conn = Connection {
-                conn: Box::new(connmethods_async),
-            };
-            Ok(conn)
+            Ok(connmethods_async.into_connection())
         })
         .await?
     }

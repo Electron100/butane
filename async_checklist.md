@@ -7,4 +7,6 @@
 * [ ] Ensure sqlite works in async (might already be done)
 * [ ] Re-enable R2D2 for sync and find async alternative (deadpool)
 * [ ] Fix `#[async_trait(?Send)]` to set up Send bound again as it's required for e.g. `tokio::spawn`
+* [ ] Separate sync and async examples
+* [ ] Should async_adapter be under a separate feature? Do we need it for migrations?
 

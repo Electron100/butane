@@ -20,10 +20,10 @@ pub mod migrations;
 pub mod query;
 pub mod sqlval;
 
+mod autopk;
 #[cfg(feature = "uuid")]
 pub mod uuid;
 
-mod autopk;
 pub use autopk::AutoPk;
 use custom::SqlTypeCustom;
 use db::sync::ConnectionMethods as ConnectionMethodsSync;
@@ -271,6 +271,8 @@ pub enum Error {
     LiteralForCustomUnsupported(custom::SqlValCustom),
     #[error("This DataObject doesn't support determining whether it has been saved.")]
     SaveDeterminationNotSupported,
+    #[error("This is a dummy poisoned connection.")]
+    PoisonedConnection,
     #[error("(De)serialization error {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("IO error {0}")]

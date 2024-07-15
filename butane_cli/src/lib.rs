@@ -56,14 +56,14 @@ pub fn default_name() -> String {
 }
 
 pub async fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) -> Result<()> {
-    if db::get_backend(name).is_none() {
+    if db::get_async_backend(name).is_none() {
         eprintln!("Unknown backend {name}");
         std::process::exit(1);
     };
 
     let spec = db::ConnectionSpec::new(name, connstr);
     if connect {
-        db::connect(&spec).await?;
+        db::connect_async(&spec).await?;
     }
     std::fs::create_dir_all(base_dir)?;
     spec.save(base_dir)?;
@@ -221,7 +221,7 @@ pub fn describe_migration(base_dir: &Path, name: &String) -> Result<()> {
 
 /// Detach the latest migration from the list of migrations,
 /// leaving the migration on the filesystem.
-pub async fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
+pub fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
     let mut ms = get_migrations(base_dir)?;
     let all_migrations = ms.all_migrations().unwrap_or_else(|e| {
         eprintln!("Error: {e}");
@@ -237,8 +237,8 @@ pub async fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
         std::process::exit(1);
     }
     if let Ok(spec) = db::ConnectionSpec::load(base_dir) {
-        let conn = db::connect(&spec).await?;
-        if let Some(top_applied_migration) = ms.last_applied_migration(&conn).await? {
+        let conn = db::connect(&spec)?;
+        if let Some(top_applied_migration) = ms.last_applied_migration(&conn)? {
             if top_applied_migration == top_migration {
                 eprintln!("Can not detach an applied migration");
                 std::process::exit(1);
@@ -261,7 +261,7 @@ pub async fn detach_latest_migration(base_dir: &PathBuf) -> Result<()> {
 
 pub async fn migrate(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
     let spec = load_connspec(base_dir)?;
-    let mut conn = db::connect(&spec).await?;
+    let mut conn = db::connect_async(&spec).await?;
     let to_apply = get_migrations(base_dir)?
         .unapplied_migrations(&conn)
         .await?;
@@ -281,7 +281,7 @@ pub async fn migrate(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
 
 pub async fn rollback(base_dir: &PathBuf, name: Option<String>) -> Result<()> {
     let spec = load_connspec(base_dir)?;
-    let conn = butane::db::connect(&spec).await?;
+    let conn = butane::db::connect_async(&spec).await?;
 
     match name {
         Some(to) => rollback_to(base_dir, conn, &to).await,
@@ -439,8 +439,8 @@ pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
         }
     }
 
-    let backend =
-        db::get_backend(backend_name).ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
+    let backend = db::get_async_backend(backend_name)
+        .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
 
     let migrations = get_migrations(base_dir)?;
     let migration_list = migrations.all_migrations()?;
@@ -478,8 +478,8 @@ pub fn remove_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
         return Err(anyhow::anyhow!("Can not remove the last backend."));
     }
 
-    let backend =
-        db::get_backend(backend_name).ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
+    let backend = db::get_async_backend(backend_name)
+        .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
 
     let migrations = get_migrations(base_dir)?;
     let migration_list = migrations.all_migrations()?;
@@ -543,7 +543,7 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
 
             for backend_name in backend_names {
                 backends.push(
-                    db::get_backend(&backend_name)
+                    db::get_async_backend(&backend_name)
                         .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?,
                 );
             }

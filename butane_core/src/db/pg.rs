@@ -144,7 +144,7 @@ fn sqlvalref_for_pg_query<'a>(v: &'a SqlValRef<'a>) -> &'a dyn postgres::types::
 
 /// Shared functionality between connection and
 /// transaction. Implementation detail. Semver exempt.
-pub trait PgConnectionLike {
+trait PgConnectionLike {
     type Client: postgres::GenericClient + Send;
     fn client(&self) -> Result<&Self::Client>;
 }

@@ -8,8 +8,7 @@ use std::path::Path;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
-use crate::db::BackendRows;
-use crate::db::{Column, ConnectionMethods};
+use crate::db::{BackendRows, Column, ConnectionMethods};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
 
@@ -28,7 +27,6 @@ use async_trait::async_trait;
 pub use memmigrations::{MemMigration, MemMigrations};
 
 /// A collection of migrations.
-#[async_trait(?Send)]
 pub trait Migrations {
     type M: Migration;
 
@@ -73,8 +71,11 @@ pub trait Migrations {
     }
 
     /// Get migrations which have not yet been applied to the database
-    async fn unapplied_migrations(&self, conn: &impl ConnectionMethods) -> Result<Vec<Self::M>> {
-        match self.last_applied_migration(conn).await? {
+    fn unapplied_migrations(
+        &self,
+        conn: &impl crate::db::sync::ConnectionMethods,
+    ) -> Result<Vec<Self::M>> {
+        match self.last_applied_migration(conn)? {
             None => self.all_migrations(),
             Some(m) => self.migrations_since(&m),
         }
@@ -82,11 +83,11 @@ pub trait Migrations {
 
     /// Get the last migration that has been applied to the database or None
     /// if no migrations have been applied
-    async fn last_applied_migration(
+    fn last_applied_migration(
         &self,
-        conn: &impl ConnectionMethods,
+        conn: &impl crate::db::sync::ConnectionMethods,
     ) -> Result<Option<Self::M>> {
-        if !conn.has_table(ButaneMigration::TABLE).await? {
+        if !conn.has_table(ButaneMigration::TABLE)? {
             return Ok(None);
         }
         let migrations: Vec<ButaneMigration> = conn
@@ -97,8 +98,7 @@ pub trait Migrations {
                 None,
                 None,
                 None,
-            )
-            .await?
+            )?
             .mapped(ButaneMigration::from_row)
             .collect()?;
 
@@ -117,8 +117,31 @@ pub trait Migrations {
     }
 }
 
+pub fn apply_unapplied_migrations(
+    migrations: &impl Migrations,
+    conn: &mut impl crate::db::sync::BackendConnection,
+) -> Result<()> {
+    let to_apply = migrations.unapplied_migrations(conn)?;
+    for migration in to_apply {
+        crate::info!("Applying migration {}", migration.name());
+        migration.apply(conn)?;
+    }
+    Ok(())
+}
+
+pub async fn apply_unapplied_migrations_async<M: Migrations + Send + 'static>(
+    migrations: M,
+    conn: &mut crate::db::Connection,
+) -> Result<()> {
+    conn.with_sync(|conn| {
+        let m2 = migrations; // temp variable to force pass-by-value into the closure to satisfy Send
+        apply_unapplied_migrations(&m2, conn)?;
+        Ok(())
+    })
+    .await
+}
+
 /// Extension of [`Migrations`] to modify the series of migrations.
-#[async_trait(?Send)]
 pub trait MigrationsMut: Migrations
 where
     Self::M: MigrationMut,
@@ -142,10 +165,9 @@ where
     /// any storage backing it) and deleting the record of their
     /// existence/application from the database. The database schema
     /// is not modified, nor is any other data removed. Use carefully.
-    async fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    fn clear_migrations(&mut self, conn: &impl crate::db::sync::ConnectionMethods) -> Result<()> {
         self.delete_migrations()?;
-        conn.delete_where(ButaneMigration::TABLE, query::BoolExpr::True)
-            .await?;
+        conn.delete_where(ButaneMigration::TABLE, query::BoolExpr::True)?;
         Ok(())
     }
 

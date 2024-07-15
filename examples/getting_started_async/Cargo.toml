@@ -1,5 +1,5 @@
 [package]
-name = "getting_started"
+name = "getting_started_async"
 version = "0.1.0"
 authors = ["James Oakley <james@electronstudio.org>"]
 license.workspace = true
@@ -29,6 +29,7 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
 butane.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 
 [dev-dependencies]
 butane_cli.workspace = true

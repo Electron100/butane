@@ -1,4 +1,6 @@
 //! Helpers for several tests.
+#![allow(dead_code)] // not all parts used in all tests
+
 use butane::{dataresult, model, DataObject};
 use butane::{db::Connection, ForeignKey, Many};
 #[cfg(feature = "datetime")]

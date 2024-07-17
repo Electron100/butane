@@ -11,7 +11,7 @@ fn main() {
         std::fs::remove_dir_all(dir).unwrap();
     }
     let db = "db.sqlite";
-    if std::path::Path::new(&db).is_dir() {
+    if std::path::Path::new(&db).is_file() {
         std::fs::remove_file(db).unwrap();
     }
 }

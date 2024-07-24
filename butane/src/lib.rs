@@ -181,7 +181,7 @@ mod prelude_common {
 
 pub mod prelude {
     //! Prelude module to improve ergonomics. Brings certain traits into scope.
-    //! This module is for sync operation. For asynchronous, see [`prelude_async`].
+    //! This module is for sync operation. For asynchronous, see [`super::prelude_async`].
     //!
     //! Its use is recommended, but not required.
 

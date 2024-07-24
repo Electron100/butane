@@ -134,13 +134,13 @@ where
 )]
 /// Loads the values referred to by this many relationship from a
 /// database query if necessary and returns a reference to them.
-async fn load_query_uncached<'a, T: DataObject>(
+async fn load_query_uncached<'a, T>(
     many: &'a Many<T>,
     conn: &impl ConnectionMethods,
     query: Query<T>,
 ) -> Result<Vec<T>>
 where
-    T: 'a,
+    T: DataObject + 'a,
 {
     use crate::query::QueryOp;
     let mut vals: Vec<T> = query.load(conn).await?;
@@ -158,13 +158,13 @@ where
 
 /// Loads the values referred to by this many relationship from a
 /// database query if necessary and returns a reference to them.
-async fn load_query_async<'a, T: DataObject>(
+async fn load_query_async<'a, T>(
     many: &'a Many<T>,
     conn: &impl ConnectionMethods,
     query: Query<T>,
 ) -> Result<impl Iterator<Item = &'a T>>
 where
-    T: 'a,
+    T: DataObject + 'a,
 {
     many.all_values
         .get_or_try_init(|| load_query_uncached_async(many, conn, query))
@@ -174,13 +174,13 @@ where
 
 /// Loads the values referred to by this many relationship from a
 /// database query if necessary and returns a reference to them.
-fn load_query_sync<'a, T: DataObject>(
+fn load_query_sync<'a, T>(
     many: &'a Many<T>,
     conn: &impl ConnectionMethodsSync,
     query: Query<T>,
 ) -> Result<impl Iterator<Item = &'a T>>
 where
-    T: 'a,
+    T: DataObject + 'a,
 {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()

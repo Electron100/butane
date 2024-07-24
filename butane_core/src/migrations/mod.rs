@@ -8,8 +8,7 @@ use std::path::Path;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
-use crate::db::sync::Backend;
-use crate::db::{BackendRows, Column};
+use crate::db::{Backend, BackendRows, Column};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
 

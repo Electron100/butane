@@ -1,6 +1,6 @@
 // Tests deriving FieldType for an enum
 use butane::db::Connection;
-use butane::prelude::*;
+use butane::prelude_async::*;
 use butane::{model, query};
 use butane::{FieldType, FromSql, SqlVal, ToSql};
 use butane_test_helper::*;

@@ -38,7 +38,7 @@ async fn migrate_and_rollback(mut connection: Connection) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
-    let to_apply = migrations.unapplied_migrations(&connection).await.unwrap();
+    let to_apply = migrations.unapplied_migrations(&connection).unwrap();
     for migration in &to_apply {
         if connection.backend_name() == "pg"
             && migration.name() == "20240115_023841384_dbconstraints"

@@ -2,7 +2,7 @@ use butane::migrations::{
     adb::DeferredSqlType, adb::TypeIdentifier, adb::TypeKey, MemMigrations, Migration,
     MigrationMut, Migrations, MigrationsMut,
 };
-use butane::{db::Connection, prelude::*, SqlType, SqlVal};
+use butane::{db::Connection, prelude_async::*, SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
 #[cfg(feature = "pg")]
 use butane_test_helper::pg_connection;
@@ -175,10 +175,10 @@ fn current_migration_custom_type() {
 }
 
 #[cfg(feature = "sqlite")]
-#[tokio::test]
-async fn migration_add_field_sqlite() {
+#[test]
+fn migration_add_field_sqlite() {
     migration_add_field(
-        &mut butane_test_helper::sqlite_connection().await,
+        &mut butane_test_helper::sqlite_connection(),
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;",
         // The exact details of futzing a DROP COLUMN in sqlite aren't
         // important (e.g. the temp table naming is certainly not part
@@ -201,8 +201,7 @@ async fn migration_add_field_pg() {
         &mut conn,
         "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;",
         "ALTER TABLE Foo DROP COLUMN baz;",
-    )
-    .await;
+    );
 }
 
 #[cfg(feature = "sqlite")]
@@ -267,10 +266,9 @@ async fn migration_add_and_remove_field_pg() {
 }
 
 #[cfg(feature = "sqlite")]
-#[tokio::test]
 async fn migration_delete_table_sqlite() {
     migration_delete_table(
-        &mut sqlite_connection().await,
+        &mut sqlite_connection(),
         "DROP TABLE Foo;",
         "CREATE TABLE Foo (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
     )
@@ -280,7 +278,7 @@ async fn migration_delete_table_sqlite() {
 #[cfg(feature = "pg")]
 #[tokio::test]
 async fn migration_delete_table_pg() {
-    let (mut conn, _data) = pg_connection().await;
+    let (mut conn, _data) = pg_connection();
     migration_delete_table(
         &mut conn,
         "DROP TABLE Foo;",
@@ -289,7 +287,7 @@ async fn migration_delete_table_pg() {
     .await;
 }
 
-async fn test_migrate(
+fn test_migrate(
     conn: &mut Connection,
     init_tokens: TokenStream,
     v2_tokens: TokenStream,
@@ -307,7 +305,7 @@ async fn test_migrate(
         .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let mut to_apply = ms.unapplied_migrations(conn).await.unwrap();
+    let mut to_apply = ms.unapplied_migrations(conn).unwrap();
     assert_eq!(to_apply.len(), 2);
     for m in &to_apply {
         m.apply(conn).await.unwrap();
@@ -342,7 +340,7 @@ fn verify_sql(
     assert_eq!(actual_down_ast, expected_down_ast);
 }
 
-async fn migration_add_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+fn migration_add_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
     let init = quote! {
         struct Foo {
             id: i64,

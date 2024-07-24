@@ -1,4 +1,5 @@
 //! SQLite database backend
+use async_trait::async_trait;
 use std::borrow::Cow;
 use std::fmt::{Debug, Write};
 use std::ops::Deref;
@@ -8,9 +9,9 @@ use std::pin::Pin;
 use std::sync::Once;
 
 use super::sync::{
-    Backend, BackendConnection, BackendTransaction, Connection, ConnectionMethods, Transaction,
+    BackendConnection, BackendTransaction, Connection, ConnectionMethods, Transaction,
 };
-use super::{helper, BackendRow, Column, RawQueryResult};
+use super::{helper, Backend, BackendRow, Column, RawQueryResult};
 use crate::db::connmethods::BackendRows;
 use crate::migrations::adb::ARef;
 use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
@@ -60,6 +61,8 @@ impl SQLiteBackend {
         Ok(connection)
     }
 }
+
+#[async_trait]
 impl Backend for SQLiteBackend {
     fn name(&self) -> &'static str {
         BACKEND_NAME
@@ -82,6 +85,9 @@ impl Backend for SQLiteBackend {
         Ok(Connection {
             conn: Box::new(self.connect(path)?),
         })
+    }
+    async fn connect_async(&self, path: &str) -> Result<super::Connection> {
+        super::adapter::connect_async_via_sync(self, path).await
     }
 }
 

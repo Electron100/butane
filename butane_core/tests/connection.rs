@@ -1,4 +1,4 @@
-use butane_core::db::{connect, BackendConnection, Connection, ConnectionSpec};
+use butane_core::db::{connect_async, BackendConnection, Connection, ConnectionSpec};
 use butane_test_helper::*;
 
 async fn connection_not_closed(conn: Connection) {
@@ -27,7 +27,7 @@ async fn invalid_pg_connection() {
     assert_eq!(spec.backend_name, "pg".to_string());
     assert_eq!(spec.conn_str, "does_not_parse".to_string());
 
-    let result = connect(&spec).await;
+    let result = connect_async(&spec).await;
     assert!(matches!(result, Err(butane_core::Error::Postgres(_))));
     match result {
         Err(butane_core::Error::Postgres(e)) => {
@@ -47,7 +47,7 @@ async fn unreachable_pg_connection() {
         "host=does_not_exist user=does_not_exist".to_string()
     );
 
-    let result = connect(&spec).await;
+    let result = connect_async(&spec).await;
     assert!(matches!(result, Err(butane_core::Error::Postgres(_))));
     match result {
         Err(butane_core::Error::Postgres(e)) => {

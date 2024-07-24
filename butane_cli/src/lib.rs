@@ -13,7 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use butane::db::sync::{Backend, Connection, ConnectionMethods};
+use butane::db::sync::{Connection, ConnectionMethods};
+use butane::db::Backend;
 use butane::migrations::adb;
 use butane::migrations::adb::{diff, AColumn, ARef, Operation, ADB};
 use butane::migrations::{
@@ -57,7 +58,7 @@ pub fn default_name() -> String {
 }
 
 pub fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) -> Result<()> {
-    if db::get_async_backend(name).is_none() {
+    if db::get_backend(name).is_none() {
         eprintln!("Unknown backend {name}");
         std::process::exit(1);
     };
@@ -434,8 +435,8 @@ pub fn add_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
         }
     }
 
-    let backend = db::get_async_backend(backend_name)
-        .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
+    let backend =
+        db::get_backend(backend_name).ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
 
     let migrations = get_migrations(base_dir)?;
     let migration_list = migrations.all_migrations()?;
@@ -473,8 +474,8 @@ pub fn remove_backend(base_dir: &Path, backend_name: &str) -> Result<()> {
         return Err(anyhow::anyhow!("Can not remove the last backend."));
     }
 
-    let backend = db::get_async_backend(backend_name)
-        .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
+    let backend =
+        db::get_backend(backend_name).ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?;
 
     let migrations = get_migrations(base_dir)?;
     let migration_list = migrations.all_migrations()?;
@@ -538,7 +539,7 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
 
             for backend_name in backend_names {
                 backends.push(
-                    db::get_sync_backend(&backend_name)
+                    db::get_backend(&backend_name)
                         .ok_or(anyhow::anyhow!("Backend {backend_name} not found"))?,
                 );
             }
@@ -551,7 +552,7 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
 
 /// Load [`db::Backend`]s selected in the latest migration, or when there are no migrations,
 /// fallback to the backend named in the connection.
-pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::sync::Backend>>> {
+pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn Backend>>> {
     // Try to use the same backends as the latest migration.
     let backends = load_latest_migration_backends(base_dir);
     if backends.is_ok() {
@@ -560,7 +561,7 @@ pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::sync::Backe
 
     // Otherwise use the backend used during `init`.
     if let Ok(spec) = db::ConnectionSpec::load(base_dir) {
-        return Ok(nonempty::nonempty![spec.get_sync_backend().unwrap()]);
+        return Ok(nonempty::nonempty![spec.get_backend().unwrap()]);
     }
 
     Err(anyhow::anyhow!(

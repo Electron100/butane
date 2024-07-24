@@ -2,7 +2,6 @@
 #![deny(missing_docs)]
 #![allow(clippy::iter_nth_zero)]
 #![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
-#![deny(missing_docs)]
 
 use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};

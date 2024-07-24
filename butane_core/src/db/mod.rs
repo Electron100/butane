@@ -75,7 +75,6 @@ mod internal {
     #[maybe_async_cfg::maybe(
         idents(
             AsyncRequiresSend,
-            Backend,
             ConnectionMethods(sync = "ConnectionMethodsSync", async),
             Transaction(sync = "TransactionSync", async),
         ),
@@ -96,7 +95,7 @@ mod internal {
     }
 
     #[maybe_async_cfg::maybe(
-        idents(Backend, BackendConnection, Connection, Transaction),
+        idents(BackendConnection, Connection, Transaction),
         keep_self,
         sync(),
         async()
@@ -256,11 +255,7 @@ mod internal {
         }
     }
 
-    #[maybe_async_cfg::maybe(
-        idents(Backend, BackendConnection, Connection, Transaction),
-        sync(),
-        async()
-    )]
+    #[maybe_async_cfg::maybe(idents(BackendConnection, Connection, Transaction), sync(), async())]
     #[async_trait(?Send)]
     impl BackendConnection for Connection {
         async fn transaction(&mut self) -> Result<Transaction> {
@@ -466,26 +461,8 @@ mod internal {
             self.deref().has_table(table).await
         }
     }
-
-    #[maybe_async_cfg::maybe(idents(Connection(sync = "ConnectionSync", async)), sync(), async())]
-    /// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
-    // todo do we really need two versions of this? Can we give it two connect methods instead?
-    #[async_trait]
-    pub trait Backend: Send + Sync + DynClone {
-        fn name(&self) -> &'static str;
-        fn create_migration_sql(
-            &self,
-            current: &adb::ADB,
-            ops: Vec<adb::Operation>,
-        ) -> Result<String>;
-        async fn connect(&self, conn_str: &str) -> Result<Connection>;
-    }
-
-    dyn_clone::clone_trait_object!(BackendAsync);
-    dyn_clone::clone_trait_object!(BackendSync);
 }
 
-pub use internal::BackendAsync as Backend;
 pub use internal::BackendConnectionAsync as BackendConnection;
 pub use internal::ConnectionAsync as Connection;
 pub use internal::TransactionAsync as Transaction;
@@ -500,7 +477,6 @@ pub mod sync {
 
     pub use super::connmethods::sync::ConnectionMethods;
     pub use super::internal::BackendConnectionSync as BackendConnection;
-    pub use super::internal::BackendSync as Backend;
     pub use super::internal::ConnectionSync as Connection;
     pub use super::internal::TransactionSync as Transaction;
 
@@ -508,6 +484,17 @@ pub mod sync {
     #[allow(unused)]
     pub(crate) use super::internal::BackendTransactionSync as BackendTransaction;
 }
+
+/// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
+#[async_trait]
+pub trait Backend: Send + Sync + DynClone {
+    fn name(&self) -> &'static str;
+    fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
+    fn connect(&self, conn_str: &str) -> Result<sync::Connection>;
+    async fn connect_async(&self, conn_str: &str) -> Result<Connection>;
+}
+
+dyn_clone::clone_trait_object!(Backend);
 
 /// Connection specification. Contains the name of a database backend
 /// and the backend-specific connection string. See [`connect`]
@@ -537,14 +524,8 @@ impl ConnectionSpec {
         let path = conn_complete_if_dir(path.as_ref());
         serde_json::from_reader(fs::File::open(path)?).map_err(|e| e.into())
     }
-    pub fn get_sync_backend(&self) -> Result<Box<dyn sync::Backend>> {
-        match get_sync_backend(&self.backend_name) {
-            Some(backend) => Ok(backend),
-            None => Err(crate::Error::UnknownBackend(self.backend_name.clone())),
-        }
-    }
-    pub fn get_async_backend(&self) -> Result<Box<dyn Backend>> {
-        match get_async_backend(&self.backend_name) {
+    pub fn get_backend(&self) -> Result<Box<dyn Backend>> {
+        match get_backend(&self.backend_name) {
             Some(backend) => Ok(backend),
             None => Err(crate::Error::UnknownBackend(self.backend_name.clone())),
         }
@@ -568,42 +549,21 @@ impl Backend for Box<dyn Backend> {
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         self.deref().create_migration_sql(current, ops)
     }
-    async fn connect(&self, conn_str: &str) -> Result<Connection> {
-        self.deref().connect(conn_str).await
-    }
-}
-
-impl sync::Backend for Box<dyn sync::Backend> {
-    fn name(&self) -> &'static str {
-        self.deref().name()
-    }
-    fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
-        self.deref().create_migration_sql(current, ops)
-    }
     fn connect(&self, conn_str: &str) -> Result<sync::Connection> {
         self.deref().connect(conn_str)
     }
-}
-
-/// Find a backend by name.
-pub fn get_async_backend(name: &str) -> Option<Box<dyn Backend>> {
-    match name {
-        #[cfg(feature = "sqlite")]
-        sqlite::BACKEND_NAME => Some(Box::new(adapter::BackendAdapter::new(
-            sqlite::SQLiteBackend::new(),
-        ))),
-        #[cfg(feature = "pg")]
-        pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
-        _ => None,
+    async fn connect_async(&self, conn_str: &str) -> Result<Connection> {
+        self.deref().connect_async(conn_str).await
     }
 }
 
 /// Find a backend by name.
-pub fn get_sync_backend(name: &str) -> Option<Box<dyn sync::Backend>> {
+pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
         #[cfg(feature = "sqlite")]
         sqlite::BACKEND_NAME => Some(Box::new(sqlite::SQLiteBackend::new())),
-        // todo wrap PG
+        #[cfg(feature = "pg")]
+        pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         _ => None,
     }
 }
@@ -611,7 +571,7 @@ pub fn get_sync_backend(name: &str) -> Option<Box<dyn sync::Backend>> {
 /// Connect to a database. For non-boxed connections, see individual
 /// [`Backend`] implementations.
 pub fn connect(spec: &ConnectionSpec) -> Result<sync::Connection> {
-    get_sync_backend(&spec.backend_name)
+    get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
         .connect(&spec.conn_str)
 }
@@ -619,8 +579,8 @@ pub fn connect(spec: &ConnectionSpec) -> Result<sync::Connection> {
 /// Connect to a database. For non-boxed connections, see individual
 /// [`Backend`] implementations.
 pub async fn connect_async(spec: &ConnectionSpec) -> Result<Connection> {
-    get_async_backend(&spec.backend_name)
+    get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
-        .connect(&spec.conn_str)
+        .connect_async(&spec.conn_str)
         .await
 }

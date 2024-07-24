@@ -12,7 +12,7 @@ use super::helper;
 use crate::custom::{SqlTypeCustom, SqlValRefCustom};
 use crate::db::{
     Backend, BackendConnection, BackendRow, BackendTransaction, Column, Connection,
-    ConnectionMethods, RawQueryResult, Transaction,
+    ConnectionMethods, RawQueryResult, SyncAdapter, Transaction,
 };
 use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
 use crate::query::{BoolExpr, Expr};
@@ -53,7 +53,11 @@ impl Backend for PgBackend {
             .join("\n"))
     }
 
-    async fn connect(&self, path: &str) -> Result<Connection> {
+    fn connect(&self, path: &str) -> Result<super::sync::Connection> {
+        SyncAdapter::new(self.clone())?.connect(path)
+    }
+
+    async fn connect_async(&self, path: &str) -> Result<Connection> {
         Ok(Connection {
             conn: Box::new(self.connect(path).await?),
         })

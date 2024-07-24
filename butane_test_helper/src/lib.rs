@@ -2,8 +2,9 @@
 //! Macros depend on [`butane_core`], `env_logger` and [`log`].
 #![deny(missing_docs)]
 
+use butane_core::db::sync::Connection as ConnectionSync;
 use butane_core::db::{
-    connect_async, get_async_backend, pg, sqlite, Backend, Connection, ConnectionSpec,
+    connect_async, get_backend, pg, sqlite, Backend, Connection, ConnectionSpec,
 };
 use butane_core::migrations::{self, MemMigrations, Migration, MigrationsMut};
 use once_cell::sync::Lazy;
@@ -18,10 +19,10 @@ use block_id::{Alphabet, BlockId};
 use uuid::Uuid;
 
 /// Create a postgres [`Connection`].
-pub async fn pg_connection() -> (Connection, PgSetupData) {
-    let backend = get_async_backend(pg::BACKEND_NAME).unwrap();
+pub async fn pg_connection() -> (ConnectionSync, PgSetupData) {
+    let backend = get_backend(pg::BACKEND_NAME).unwrap();
     let data = pg_setup().await;
-    (backend.connect(&pg_connstr(&data)).await.unwrap(), data)
+    (backend.connect(&pg_connstr(&data)).unwrap(), data)
 }
 
 /// Create a postgres [`ConnectionSpec`].
@@ -221,9 +222,9 @@ pub async fn setup_db(backend: Box<dyn Backend>, conn: &mut Connection, migrate:
 }
 
 /// Create a sqlite [`Connection`].
-pub async fn sqlite_connection() -> Connection {
-    let backend = get_async_backend(sqlite::BACKEND_NAME).unwrap();
-    backend.connect(":memory:").await.unwrap()
+pub fn sqlite_connection() -> ConnectionSync {
+    let backend = get_backend(sqlite::BACKEND_NAME).unwrap();
+    backend.connect(":memory:").unwrap()
 }
 
 /// Create a sqlite [`ConnectionSpec`].
@@ -247,7 +248,7 @@ macro_rules! maketest {
                 let backend = butane_core::db::get_backend(&stringify!($backend)).expect("Could not find backend");
                 let $dataname = butane_test_helper::[<$backend _setup>]().await;
                 log::info!("connecting to {}..", &$connstr);
-                let mut conn = backend.connect(&$connstr).await.expect("Could not connect backend");
+                let mut conn = backend.connect_async(&$connstr).await.expect("Could not connect backend");
                 butane_test_helper::setup_db(backend, &mut conn, $migrate).await;
                 log::info!("running test on {}..", &$connstr);
                 $fname(conn).await;

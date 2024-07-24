@@ -1,7 +1,8 @@
-use crate::db::RawQueryResult;
+use crate::db::{Backend, RawQueryResult};
 use crate::migrations::adb;
 use crate::query::{BoolExpr, Order};
 use crate::{Column, Result, SqlVal, SqlValRef};
+use async_trait::async_trait;
 
 use std::future::Future;
 
@@ -132,8 +133,8 @@ where
             transaction_adapter,
         )))
     }
-    fn backend(&self) -> Box<dyn crate::db::sync::Backend> {
-        Box::new(SyncAdapter::new(self.inner.backend()).unwrap())
+    fn backend(&self) -> Box<dyn crate::db::Backend> {
+        self.inner.backend()
     }
     fn backend_name(&self) -> &'static str {
         self.inner.backend_name()
@@ -167,9 +168,10 @@ where
     }
 }
 
-impl<T> crate::db::sync::Backend for SyncAdapter<T>
+#[async_trait]
+impl<T> Backend for SyncAdapter<T>
 where
-    T: crate::db::Backend + Clone,
+    T: Backend + Clone,
 {
     fn name(&self) -> &'static str {
         self.inner.name()
@@ -178,9 +180,12 @@ where
         self.inner.create_migration_sql(current, ops)
     }
     fn connect(&self, conn_str: &str) -> Result<crate::db::sync::Connection> {
-        let conn_async = self.block_on(self.inner.connect(conn_str))?;
+        let conn_async = self.block_on(self.inner.connect_async(conn_str))?;
         Ok(crate::db::sync::Connection {
             conn: Box::new(SyncAdapter::new(conn_async.conn)?),
         })
+    }
+    async fn connect_async(&self, conn_str: &str) -> Result<crate::db::Connection> {
+        self.inner.connect_async(conn_str).await
     }
 }

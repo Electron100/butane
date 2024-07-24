@@ -357,13 +357,8 @@ where
     }
 
     fn backend(&self) -> Box<dyn Backend> {
-        // no sync-to-async translation needed but we still have to
-        // dispatch to our worker thread because only that thread owns
-        // the BackendConnection object.
         // todo clean up unwrap
-        Box::new(BackendAdapter::new(
-            self.invoke_blocking(|conn| Ok(conn.backend())).unwrap(),
-        ))
+        self.invoke_blocking(|conn| Ok(conn.backend())).unwrap()
     }
     fn backend_name(&self) -> &'static str {
         // todo clean up unwrap
@@ -405,36 +400,19 @@ where
     }
 }
 
-#[derive(Clone)]
-pub(super) struct BackendAdapter<T>
+/// Create an async connection using the synchronous `connect` method of `backend`. Use this when authoring
+/// a backend which doesn't natively support async.
+#[cfg(feature = "sqlite")] // todo expose this publicly for out-of-tree backends
+pub async fn connect_async_via_sync<B>(backend: &B, conn_str: &str) -> Result<Connection>
 where
-    T: sync::Backend + Clone,
+    B: Backend + Clone + 'static,
 {
-    inner: T,
-}
-impl<T: sync::Backend + Clone> BackendAdapter<T> {
-    pub(super) fn new(inner: T) -> Self {
-        BackendAdapter { inner }
-    }
-}
-
-#[async_trait]
-impl<T: sync::Backend + Clone + 'static> Backend for BackendAdapter<T> {
-    fn name(&self) -> &'static str {
-        self.inner.name()
-    }
-    fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
-        self.inner.create_migration_sql(current, ops)
-    }
-    async fn connect(&self, conn_str: &str) -> Result<Connection> {
-        // create a copy of the backend that can be moved into the closure
-        let sync_backend: T = self.inner.clone();
-        let conn_str2 = conn_str.to_string();
-        tokio::task::spawn_blocking(move || {
-            let connmethods_async =
-                adapter::AsyncAdapter::new(|| sync_backend.connect(&conn_str2))?;
-            Ok(connmethods_async.into_connection())
-        })
-        .await?
-    }
+    // create a copy of the backend that can be moved into the closure
+    let backend2 = backend.clone();
+    let conn_str2 = conn_str.to_string();
+    tokio::task::spawn_blocking(move || {
+        let connmethods_async = adapter::AsyncAdapter::new(|| backend2.connect(&conn_str2))?;
+        Ok(connmethods_async.into_connection())
+    })
+    .await?
 }

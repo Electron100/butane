@@ -4,7 +4,6 @@
 use async_trait::async_trait;
 
 use super::connmethods::sync::ConnectionMethods as ConnectionMethodsSync;
-use super::sync::Backend as BackendSync;
 use super::sync::BackendConnection as BackendConnectionSync;
 use super::sync::Connection as ConnectionSync;
 use super::sync::Transaction as TransactionSync;
@@ -21,15 +20,6 @@ use BackendConnection as BackendConnectionAsync;
 #[derive(Clone, Debug)]
 struct DummyBackend {}
 
-#[maybe_async_cfg::maybe(
-    idents(
-        Backend(sync = "BackendSync", async),
-        Connection(sync = "ConnectionSync", async)
-    ),
-    keep_self,
-    sync(),
-    async()
-)]
 #[async_trait]
 impl Backend for DummyBackend {
     fn name(&self) -> &'static str {
@@ -38,7 +28,10 @@ impl Backend for DummyBackend {
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         Err(Error::PoisonedConnection)
     }
-    async fn connect(&self, conn_str: &str) -> Result<Connection> {
+    fn connect(&self, conn_str: &str) -> Result<ConnectionSync> {
+        Err(Error::PoisonedConnection)
+    }
+    async fn connect_async(&self, conn_str: &str) -> Result<Connection> {
         Err(Error::PoisonedConnection)
     }
 }
@@ -117,12 +110,7 @@ impl ConnectionMethods for DummyConnection {
     }
 }
 
-#[maybe_async_cfg::maybe(
-    idents(Backend(sync = "BackendSync", async), BackendConnection, Transaction),
-    keep_self,
-    sync(),
-    async()
-)]
+#[maybe_async_cfg::maybe(idents(BackendConnection, Transaction), keep_self, sync(), async())]
 #[async_trait(?Send)]
 impl BackendConnection for DummyConnection {
     async fn transaction(&mut self) -> Result<Transaction<'_>> {

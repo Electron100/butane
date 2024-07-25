@@ -7,7 +7,7 @@ use butane_cli::{
     add_backend, base_dir, clean, clear_data, collapse_migrations, delete_table,
     describe_migration, detach_latest_migration, embed, get_migrations, handle_error, init,
     list_backends, list_migrations, make_migration, migrate, regenerate_migrations, remove_backend,
-    rollback,
+    unmigrate,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
@@ -73,8 +73,9 @@ However if the migration has been manually edited, it will need to be manually r
     },
     /// Embed migrations in the source code.
     Embed,
-    /// Rollback migrations. With no arguments, undoes the latest migration. If the name of a migration is specified, rolls back until that migration is the latest applied migration.
-    Rollback {
+    /// Undo migrations. With no arguments, undoes the latest migration. If the name of a migration is specified, rolls back until that migration is the latest applied migration.
+    #[command(alias = "rollback")]
+    Unmigrate {
         /// Migration to roll back to.
         name: Option<String>,
     },
@@ -178,7 +179,7 @@ async fn main() {
         Commands::Regenerate => handle_error(regenerate_migrations(&base_dir)),
         Commands::DetachMigration => handle_error(detach_latest_migration(&base_dir)),
         Commands::Migrate { name } => handle_error(migrate(&base_dir, name.to_owned())),
-        Commands::Rollback { name } => handle_error(rollback(&base_dir, name.to_owned())),
+        Commands::Unmigrate { name } => handle_error(unmigrate(&base_dir, name.to_owned())),
         Commands::Embed => handle_error(embed(&base_dir)),
         Commands::List => handle_error(list_migrations(&base_dir)),
         Commands::Collapse { name } => handle_error(collapse_migrations(&base_dir, Some(name))),

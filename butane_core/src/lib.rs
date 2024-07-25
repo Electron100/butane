@@ -80,9 +80,9 @@ pub mod internal {
         /// Performed automatically by `save`. You do not need to call this directly.
         fn save_many_to_many_sync(&mut self, conn: &impl ConnectionMethodsSync) -> Result<()>;
 
-        /// Returns the Sql values of all columns. Used internally. You are
-        /// unlikely to need to call this directly.
-        fn values(&self, include_pk: bool) -> Vec<SqlValRef>;
+        /// Returns the Sql values of all columns except not any auto columns.
+        /// Used internally. You are unlikely to need to call this directly.
+        fn non_auto_values(&self, include_pk: bool) -> Vec<SqlValRef>;
     }
 }
 
@@ -179,7 +179,7 @@ pub trait DataObjectOp<T: DataObject> {
                     pkcol,
                     self.pk().to_sql_ref(),
                     Self::NON_AUTO_COLUMNS,
-                    &self.values(false),
+                    &self.non_auto_values(false),
                 )
                 .await?;
             } else {
@@ -189,15 +189,20 @@ pub trait DataObjectOp<T: DataObject> {
                         Self::TABLE,
                         Self::NON_AUTO_COLUMNS,
                         &pkcol,
-                        &self.values(true),
+                        &self.non_auto_values(true),
                     )
                     .await?;
                 self.pk_mut().initialize(pk)?;
             };
         } else {
             // No AutoPk to worry about, do an upsert
-            conn.insert_or_replace(Self::TABLE, Self::COLUMNS, &pkcol, &self.values(true))
-                .await?;
+            conn.insert_or_replace(
+                Self::TABLE,
+                Self::COLUMNS,
+                &pkcol,
+                &self.non_auto_values(true),
+            )
+            .await?;
         }
 
         Self::save_many_to_many(self, conn).await?;

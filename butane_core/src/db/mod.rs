@@ -86,8 +86,9 @@ mod internal {
         /// Begin a database transaction. The transaction object must be
         /// used in place of this connection until it is committed or aborted.
         async fn transaction(&mut self) -> Result<Transaction<'_>>;
-        /// Retrieve the backend backend this connection
+        /// Retrieve the backend for this connection
         fn backend(&self) -> Box<dyn Backend>;
+        /// Retrieve the backend name for this connection.
         fn backend_name(&self) -> &'static str;
         /// Tests if the connection has been closed. Backends which do not
         /// support this check should return false.

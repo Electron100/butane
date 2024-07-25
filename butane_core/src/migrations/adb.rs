@@ -131,7 +131,7 @@ impl Ord for TypeKey {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct TypeResolver {
     // The types of some columns may not be known right away
     types: HashMap<TypeKey, TypeIdentifier>,
@@ -273,6 +273,7 @@ impl ADB {
                 self.tables.insert(table.name.clone(), table);
             }
             RemoveTable(name) => self.remove_table(&name),
+            RemoveTableConstraints(_) => {}
             AddColumn(table, col) => {
                 if let Some(t) = self.tables.get_mut(&table) {
                     t.add_column(col);
@@ -483,6 +484,11 @@ impl AColumn {
     pub fn add_reference(&mut self, reference: &ARef) {
         self.reference = Some(reference.clone())
     }
+    /// Remove the column that this column refers to.
+    pub fn remove_reference(&mut self) {
+        self.reference = None;
+    }
+    /// Get the type identifier.
     pub fn typeid(&self) -> Result<TypeIdentifier> {
         match &self.sqltype {
             DeferredSqlType::KnownId(t) => Ok(t.clone()),
@@ -572,15 +578,16 @@ pub fn create_many_table(
 }
 
 /// Individual operation use to apply a migration.
+/// The order of operations in a diff roughly follows this enum order.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum Operation {
     //future improvement: support column renames
     /// Add a table.
     AddTable(ATable),
-    /// Add table constraints referring to other tables, if the backend supports it.
-    AddTableConstraints(ATable),
     /// Add a table, if it doesnt already exist.
     AddTableIfNotExists(ATable),
+    /// Remove table constraints referring to other tables, if the backend supports it.
+    RemoveTableConstraints(ATable),
     /// Remove named table.
     RemoveTable(String),
     /// Add a table column.
@@ -589,6 +596,8 @@ pub enum Operation {
     RemoveColumn(String, String),
     /// Change a table columns type.
     ChangeColumn(String, AColumn, AColumn),
+    /// Add table constraints referring to other tables, if the backend supports it.
+    AddTableConstraints(ATable),
 }
 
 /// Determine the operations necessary to move the database schema from `old` to `new`.
@@ -607,7 +616,13 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     }
 
     // Remove tables
-    for removed in old_names.difference(&new_names) {
+    let removed_tables = old_names.difference(&new_names);
+    for removed in removed_tables.clone() {
+        let removed: &str = removed.as_ref();
+        let table = old.tables.get(removed).expect("no table").clone();
+        ops.push(Operation::RemoveTableConstraints(table));
+    }
+    for removed in removed_tables {
         ops.push(Operation::RemoveTable((*removed).to_string()));
     }
 

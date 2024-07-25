@@ -46,11 +46,12 @@ impl Backend for PgBackend {
 
     fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {
         let mut current: ADB = (*current).clone();
-        Ok(ops
+        let mut lines = ops
             .iter()
             .map(|o| sql_for_op(&mut current, o))
-            .collect::<Result<Vec<String>>>()?
-            .join("\n"))
+            .collect::<Result<Vec<String>>>()?;
+        lines.retain(|s| !s.is_empty());
+        Ok(lines.join("\n"))
     }
 
     fn connect(&self, path: &str) -> Result<super::sync::Connection> {
@@ -579,12 +580,25 @@ where
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
         Operation::AddTable(table) => Ok(create_table(table, false)?),
-        Operation::AddTableConstraints(table) => Ok(create_table_constraints(table)),
+        Operation::AddTableConstraints(table) => Ok(create_table_fkey_constraints(table)),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)?),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
+        Operation::RemoveTableConstraints(table) => remove_table_fkey_constraints(table),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
         Operation::RemoveColumn(tbl, name) => Ok(remove_column(tbl, name)),
-        Operation::ChangeColumn(tbl, old, new) => change_column(current, tbl, old, Some(new)),
+        Operation::ChangeColumn(tbl, old, new) => {
+            let table = current.get_table(tbl);
+            if let Some(table) = table {
+                change_column(table, old, new)
+            } else {
+                crate::warn!(
+                    "Cannot alter column {} from table {} that does not exist",
+                    &old.name(),
+                    tbl
+                );
+                Ok(String::new())
+            }
+        }
     }
 }
 
@@ -604,14 +618,24 @@ fn create_table(table: &ATable, allow_exists: bool) -> Result<String> {
     ))
 }
 
-fn create_table_constraints(table: &ATable) -> String {
+fn create_table_fkey_constraints(table: &ATable) -> String {
     table
         .columns
         .iter()
         .filter(|column| column.reference().is_some())
-        .map(|column| define_constraint(&table.name, column))
+        .map(|column| define_fkey_constraint(&table.name, column))
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+fn remove_table_fkey_constraints(table: &ATable) -> Result<String> {
+    Ok(table
+        .columns
+        .iter()
+        .filter(|column| column.reference().is_some())
+        .map(|column| drop_fkey_constraints(table, column))
+        .collect::<Result<Vec<String>>>()?
+        .join("\n"))
 }
 
 fn define_column(col: &AColumn) -> Result<String> {
@@ -625,6 +649,13 @@ fn define_column(col: &AColumn) -> Result<String> {
     if col.unique() {
         constraints.push("UNIQUE".to_string());
     }
+    if constraints.is_empty() {
+        return Ok(format!(
+            "{} {}",
+            helper::quote_reserved_word(col.name()),
+            col_sqltype(col)?,
+        ));
+    }
     Ok(format!(
         "{} {} {}",
         helper::quote_reserved_word(col.name()),
@@ -633,7 +664,7 @@ fn define_column(col: &AColumn) -> Result<String> {
     ))
 }
 
-fn define_constraint(table_name: &str, column: &AColumn) -> String {
+fn define_fkey_constraint(table_name: &str, column: &AColumn) -> String {
     let reference = column
         .reference()
         .as_ref()
@@ -652,6 +683,11 @@ fn define_constraint(table_name: &str, column: &AColumn) -> String {
     }
 }
 
+fn drop_fkey_constraints(table: &ATable, column: &AColumn) -> Result<String> {
+    let mut modified_column = column.clone();
+    modified_column.remove_reference();
+    change_column(table, column, &modified_column)
+}
 fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
     match col.typeid()? {
         TypeIdentifier::Name(name) => Ok(Cow::Owned(name)),
@@ -693,10 +729,10 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         helper::quote_reserved_word(tbl_name),
         define_column(col)?,
-        helper::sql_literal_value(default)?
+        helper::sql_literal_value(&default)?
     )];
     if col.reference().is_some() {
-        stmts.push(define_constraint(tbl_name, col));
+        stmts.push(define_fkey_constraint(tbl_name, col));
     }
     let result = stmts.join("\n");
     Ok(result)
@@ -710,62 +746,113 @@ fn remove_column(tbl_name: &str, name: &str) -> String {
     )
 }
 
-fn copy_table(old: &ATable, new: &ATable) -> String {
-    let column_names = new
-        .columns
-        .iter()
-        .map(|col| helper::quote_reserved_word(col.name()))
-        .collect::<Vec<Cow<str>>>()
-        .join(", ");
-    format!(
-        "INSERT INTO {} SELECT {} FROM {};",
-        helper::quote_reserved_word(&new.name),
-        column_names,
-        helper::quote_reserved_word(&old.name)
-    )
-}
+fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String> {
+    use helper::quote_reserved_word;
+    let tbl_name = &table.name;
 
-fn tmp_table_name(name: &str) -> String {
-    format!("{name}__butane_tmp")
-}
+    // Let's figure out what changed about the column
+    let mut stmts: Vec<String> = Vec::new();
+    if old.name() != new.name() {
+        // column rename
+        stmts.push(format!(
+            "ALTER TABLE {} RENAME COLUMN {} TO {};",
+            quote_reserved_word(tbl_name),
+            quote_reserved_word(old.name()),
+            quote_reserved_word(new.name())
+        ));
+    }
+    if old.typeid()? != new.typeid()? {
+        // column type change
+        stmts.push(format!(
+            "ALTER TABLE {} ALTER COLUMN {} SET DATA TYPE {};",
+            quote_reserved_word(tbl_name),
+            quote_reserved_word(old.name()),
+            col_sqltype(new)?,
+        ));
+    }
+    if old.nullable() != new.nullable() {
+        stmts.push(format!(
+            "ALTER TABLE {} ALTER COLUMN {} {} NOT NULL;",
+            quote_reserved_word(tbl_name),
+            quote_reserved_word(old.name()),
+            if new.nullable() { "DROP" } else { "SET" }
+        ));
+    }
+    if old.is_pk() != new.is_pk() {
+        // Change to primary key
+        // Either way, drop the previous primary key
+        // Butane does not currently support composite primary keys
 
-fn change_column(
-    current: &mut ADB,
-    tbl_name: &str,
-    old: &AColumn,
-    new: Option<&AColumn>,
-) -> Result<String> {
-    let table = current.get_table(tbl_name);
-    if table.is_none() {
-        crate::warn!(
-            "Cannot alter column {} from table {} that does not exist",
-            &old.name(),
-            tbl_name
-        );
-        return Ok(String::new());
+        if new.is_pk() {
+            // Drop the old primary key
+            stmts.push(format!(
+                "ALTER TABLE {} DROP CONSTRAINT IF EXISTS {}_pkey;",
+                quote_reserved_word(tbl_name),
+                tbl_name
+            ));
+
+            // add the new primary key
+            stmts.push(format!(
+                "ALTER TABLE {} ADD PRIMARY KEY ({});",
+                quote_reserved_word(tbl_name),
+                quote_reserved_word(new.name())
+            ));
+        } else {
+            // this field is no longer the primary key. Butane requires a single primary key,
+            // so some other column must be the primary key now. It will drop the constraint when processed.
+        }
     }
-    let old_table = table.unwrap();
-    let mut new_table = old_table.clone();
-    new_table.name = tmp_table_name(&new_table.name);
-    match new {
-        Some(col) => new_table.replace_column(col.clone()),
-        None => new_table.remove_column(old.name()),
+    if old.unique() != new.unique() {
+        // Changed uniqueness constraint
+        if new.unique() {
+            stmts.push(format!(
+                "ALTER TABLE {} ADD UNIQUE ({});",
+                quote_reserved_word(tbl_name),
+                quote_reserved_word(new.name())
+            ));
+        } else {
+            // Standard constraint naming scheme
+            stmts.push(format!(
+                "ALTER TABLE {} DROP CONSTRAINT {}_{}_key;",
+                quote_reserved_word(tbl_name),
+                tbl_name,
+                &old.name()
+            ));
+        }
     }
-    let mut stmts: Vec<String> = vec![
-        create_table(&new_table, false)?,
-        create_table_constraints(&new_table),
-        copy_table(old_table, &new_table),
-        drop_table(&old_table.name),
-        format!(
-            "ALTER TABLE {} RENAME TO {};",
-            helper::quote_reserved_word(&new_table.name),
-            helper::quote_reserved_word(tbl_name)
-        ),
-    ];
-    stmts.retain(|stmt| !stmt.is_empty());
+
+    if old.default() != new.default() {
+        stmts.push(match new.default() {
+            None => format!(
+                "ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT;",
+                quote_reserved_word(tbl_name),
+                quote_reserved_word(old.name())
+            ),
+            Some(val) => format!(
+                "ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {};",
+                quote_reserved_word(tbl_name),
+                quote_reserved_word(old.name()),
+                helper::sql_literal_value(val)?
+            ),
+        });
+    }
+
+    if old.reference() != new.reference() {
+        if old.reference().is_some() {
+            // Drop the old reference
+            stmts.push(format!(
+                "ALTER TABLE {} DROP CONSTRAINT {}_{}_fkey;",
+                quote_reserved_word(tbl_name),
+                tbl_name,
+                old.name()
+            ));
+        }
+        if new.reference().is_some() {
+            stmts.push(define_fkey_constraint(tbl_name, new));
+        }
+    }
+
     let result = stmts.join("\n");
-    new_table.name.clone_from(&old_table.name);
-    current.replace_table(new_table);
     Ok(result)
 }
 

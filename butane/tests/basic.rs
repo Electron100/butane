@@ -2,7 +2,7 @@
 
 use butane::db::Connection;
 use butane::{butane_type, find, model, query, AutoPk, ForeignKey};
-use butane::{colname, prelude::*};
+use butane::{colname, prelude_async::*};
 use butane_test_helper::*;
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};

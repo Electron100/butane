@@ -8,7 +8,7 @@ use std::path::Path;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
-use crate::db::{Backend, BackendRows, Column};
+use crate::db::{sync::BackendConnection, Backend, BackendRows, Column};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
 
@@ -27,7 +27,8 @@ use async_trait::async_trait;
 pub use memmigrations::{MemMigration, MemMigrations};
 
 /// A collection of migrations.
-pub trait Migrations {
+#[async_trait]
+pub trait Migrations: Clone {
     type M: Migration;
 
     /// Gets the migration with the given name, if it exists
@@ -115,6 +116,42 @@ pub trait Migrations {
         }
         Ok(None)
     }
+
+    /// Migrate connection forward.
+    fn migrate(&self, connection: &mut impl BackendConnection) -> Result<()> {
+        let to_apply = self.unapplied_migrations(connection)?;
+        for migration in &to_apply {
+            crate::info!("Applying migration {}", migration.name());
+            migration.apply(connection)?;
+        }
+        Ok(())
+    }
+
+    /// Migrate connection forward.
+    async fn migrate_async(&self, conn: &mut crate::db::Connection) -> Result<()>
+    where
+        Self: Send + 'static,
+    {
+        apply_unapplied_migrations_async(self.clone(), conn).await
+    }
+
+    /// Remove all applied migrations.
+    fn unmigrate(&self, connection: &mut impl BackendConnection) -> Result<()> {
+        let mut migration = match self.last_applied_migration(connection)? {
+            Some(migration) => migration,
+            None => return Ok(()),
+        };
+        migration.downgrade(connection)?;
+
+        while let Ok(Some(migration_name)) = migration.migration_from() {
+            migration = self
+                .get_migration(&migration_name)
+                .ok_or(Error::MigrationError("Migration not in chain".to_string()))?;
+            crate::info!("Rolling back migration {}", migration.name());
+            migration.downgrade(connection)?;
+        }
+        Ok(())
+    }
 }
 
 pub fn apply_unapplied_migrations(
@@ -129,7 +166,7 @@ pub fn apply_unapplied_migrations(
     Ok(())
 }
 
-pub async fn apply_unapplied_migrations_async<M: Migrations + Send + 'static>(
+async fn apply_unapplied_migrations_async<M: Migrations + Send + 'static>(
     migrations: M,
     conn: &mut crate::db::Connection,
 ) -> Result<()> {
@@ -227,7 +264,7 @@ where
                 Operation::ChangeColumn(table_name, _, _) => {
                     modified_tables.push(table_name.clone())
                 }
-                Operation::RemoveTable(_) => {}
+                Operation::RemoveTable(_) | Operation::RemoveTableConstraints(_) => {}
             }
         }
 
@@ -305,7 +342,7 @@ pub fn copy_migration(from: &impl Migration, to: &mut impl MigrationMut) -> Resu
     Ok(())
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct ButaneMigration {
     name: String,
 }
@@ -346,7 +383,7 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
     fn pk_mut(&mut self) -> &mut impl PrimaryKeyType {
         &mut self.name
     }
-    fn values(&self, include_pk: bool) -> Vec<SqlValRef> {
+    fn non_auto_values(&self, include_pk: bool) -> Vec<SqlValRef> {
         let mut values: Vec<SqlValRef<'_>> = Vec::with_capacity(2usize);
         if include_pk {
             values.push(self.name.to_sql_ref());

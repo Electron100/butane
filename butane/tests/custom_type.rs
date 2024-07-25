@@ -1,5 +1,5 @@
 use butane::db::Connection;
-use butane::prelude::*;
+use butane::prelude_async::*;
 use butane::{butane_type, model, query};
 use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
 use butane_test_helper::*;

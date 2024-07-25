@@ -8,7 +8,7 @@ title TEXT NOT NULL,
 body TEXT NOT NULL,
 published BOOLEAN NOT NULL,
 blog BYTEA NOT NULL,
-byline TEXT ,
+byline TEXT,
 likes INTEGER NOT NULL
 );
 CREATE TABLE Post_tags_Many (

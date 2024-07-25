@@ -6,7 +6,7 @@ pub mod butane_migrations;
 pub mod models;
 
 use butane::db::{Connection, ConnectionSpec};
-use butane::migrations;
+use butane::migrations::Migrations;
 use butane::prelude_async::*;
 use models::{Blog, Post};
 
@@ -19,9 +19,7 @@ pub async fn establish_connection() -> Connection {
             .await
             .unwrap();
     let migrations = butane_migrations::get_migrations().unwrap();
-    migrations::apply_unapplied_migrations_async(migrations, &mut connection)
-        .await
-        .unwrap();
+    migrations.migrate_async(&mut connection).await.unwrap();
     connection
 }
 

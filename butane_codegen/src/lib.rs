@@ -433,3 +433,19 @@ fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream {
 fn derive_field_type_with_json(_struct_name: &Ident) -> TokenStream {
     panic!("Feature 'json' is required to derive FieldType")
 }
+
+/// Derive macro for marker trait `PrimaryKeyType`.
+/// E.g.
+/// ```ignore
+/// #[derive(FieldType, PrimaryKeyType)]
+/// pub struct PostId(pub uuid::Uuid);
+/// ```
+#[proc_macro_derive(PrimaryKeyType)]
+pub fn derive_primary_key_type(input: TokenStream) -> TokenStream {
+    let derive_input = syn::parse_macro_input!(input as syn::DeriveInput);
+    let ident = &derive_input.ident;
+    quote!(
+        impl butane::PrimaryKeyType for #ident {}
+    )
+    .into()
+}

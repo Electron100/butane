@@ -337,8 +337,7 @@ fn main() {
         println!("{}", post.title);
         println!("----------\n");
         println!("{}", post.body);
- 
- }
+    }
 }
 ```
 
@@ -506,14 +505,11 @@ to use these migrations:
 
 ``` rust
 pub fn establish_connection() -> Connection {
-    use butane::migrations::{Migration, Migrations};
+    use butane::migrations::Migrations;
 
     let mut connection = butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap();
     let migrations = butane_migrations::get_migrations().unwrap();
-    let to_apply = migrations.unapplied_migrations(&connection).unwrap();
-    for migration in to_apply {
-        migration.apply(&mut connection).unwrap();
-    }
+    migrations.migrate(&mut connection).unwrap();
     connection
 }
 ```

@@ -70,15 +70,16 @@ impl Backend for SQLiteBackend {
 
     fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {
         let mut current: ADB = (*current).clone();
-        Ok(ops
+        let mut lines = ops
             .into_iter()
             .map(|o| {
                 let sql = sql_for_op(&mut current, &o);
                 current.transform_with(o);
                 sql
             })
-            .collect::<Result<Vec<String>>>()?
-            .join("\n"))
+            .collect::<Result<Vec<String>>>()?;
+        lines.retain(|s| !s.is_empty());
+        Ok(lines.join("\n"))
     }
 
     fn connect(&self, path: &str) -> Result<Connection> {
@@ -625,6 +626,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::AddTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
+        Operation::RemoveTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
         Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, tbl, name)),
         Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new))),
@@ -745,7 +747,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
         helper::quote_reserved_word(tbl_name),
         define_column(col),
-        helper::sql_literal_value(default)?
+        helper::sql_literal_value(&default)?
     ))
 }
 

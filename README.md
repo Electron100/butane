@@ -19,7 +19,7 @@ implementation detail to the API consumer.
 * Ability to embed migrations in Rust code (so that a library may easily bundle its migrations)
 * SQLite and PostgreSQL backends
 * Write entirely or nearly entirely the same code regardless of database backend
-  
+
 ## Getting Started
 
 _Models_, declared with struct attributes define the database

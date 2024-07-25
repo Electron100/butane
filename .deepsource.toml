@@ -1,6 +1,6 @@
 version = 1
-test_patterns = [  
-  "butane/tests/**", 
+test_patterns = [
+  "butane/tests/**",
 ]
 
 [[analyzers]]

@@ -32,11 +32,6 @@ impl PgBackend {
         PgBackend {}
     }
 }
-impl PgBackend {
-    async fn connect(&self, params: &str) -> Result<PgConnection> {
-        PgConnection::open(params).await
-    }
-}
 
 #[async_trait]
 impl Backend for PgBackend {
@@ -55,12 +50,14 @@ impl Backend for PgBackend {
     }
 
     fn connect(&self, path: &str) -> Result<super::sync::Connection> {
-        SyncAdapter::new(self.clone())?.connect(path)
+        debug!("connecting via sync adapter");
+        let conn = SyncAdapter::new(self.clone())?.connect(path)?;
+        Ok(conn)
     }
 
     async fn connect_async(&self, path: &str) -> Result<Connection> {
         Ok(Connection {
-            conn: Box::new(self.connect(path).await?),
+            conn: Box::new(PgConnection::open(path).await?),
         })
     }
 }

@@ -132,7 +132,12 @@ pub trait Migrations: Clone {
     where
         Self: Send + 'static,
     {
-        apply_unapplied_migrations_async(self.clone(), conn).await
+        let m2 = self.clone();
+        conn.with_sync(move |conn| {
+            m2.migrate(conn)?;
+            Ok(())
+        })
+        .await
     }
 
     /// Remove all applied migrations.
@@ -152,30 +157,19 @@ pub trait Migrations: Clone {
         }
         Ok(())
     }
-}
 
-pub fn apply_unapplied_migrations(
-    migrations: &impl Migrations,
-    conn: &mut impl crate::db::sync::BackendConnection,
-) -> Result<()> {
-    let to_apply = migrations.unapplied_migrations(conn)?;
-    for migration in to_apply {
-        crate::info!("Applying migration {}", migration.name());
-        migration.apply(conn)?;
+    /// Remove all applied migrations.
+    async fn unmigrate_async(&self, conn: &mut crate::db::Connection) -> Result<()>
+    where
+        Self: Send + 'static,
+    {
+        let m2 = self.clone();
+        conn.with_sync(move |conn| {
+            m2.unmigrate(conn)?;
+            Ok(())
+        })
+        .await
     }
-    Ok(())
-}
-
-async fn apply_unapplied_migrations_async<M: Migrations + Send + 'static>(
-    migrations: M,
-    conn: &mut crate::db::Connection,
-) -> Result<()> {
-    conn.with_sync(|conn| {
-        let m2 = migrations; // temp variable to force pass-by-value into the closure to satisfy Send
-        apply_unapplied_migrations(&m2, conn)?;
-        Ok(())
-    })
-    .await
 }
 
 /// Extension of [`Migrations`] to modify the series of migrations.

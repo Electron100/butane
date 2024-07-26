@@ -32,11 +32,11 @@ async fn migrate_and_unmigrate(mut connection: Connection) {
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
 
-    migrations.migrate(&mut connection).await.unwrap();
+    migrations.migrate_async(&mut connection).await.unwrap();
 
     insert_data(&connection).await;
 
     // Undo migrations.
-    migrations.unmigrate(&mut connection).await.unwrap();
+    migrations.unmigrate_async(&mut connection).await.unwrap();
 }
 testall_no_migrate!(migrate_and_unmigrate);

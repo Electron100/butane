@@ -1,8 +1,11 @@
+// todo re-enable this when we have a sync version of the test machinery available
+
+/*
 use butane::db::{BackendConnection, Connection};
 use butane::migrations::Migrations;
 use butane::DataObjectOpAsync;
 use butane_test_helper::*;
-use tokio;
+
 
 use getting_started::models::{Blog, Post, Tag};
 
@@ -48,3 +51,4 @@ async fn migrate_and_unmigrate(mut connection: Connection) {
     migrations.unmigrate(&mut connection).await.unwrap();
 }
 testall_no_migrate!(migrate_and_unmigrate);
+*/

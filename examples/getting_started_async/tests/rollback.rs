@@ -1,5 +1,5 @@
 use butane::db::{BackendConnection, Connection};
-use butane::migrations::{Migration, Migrations};
+use butane::migrations::Migrations;
 use butane::DataObjectOpAsync;
 use butane_test_helper::*;
 
@@ -34,38 +34,16 @@ async fn insert_data(connection: &Connection) {
     post.save(connection).await.unwrap();
 }
 
-async fn migrate_and_rollback(mut connection: Connection) {
+async fn migrate_and_unmigrate(mut connection: Connection) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
-    let to_apply = migrations.unapplied_migrations(&connection).await.unwrap();
-    for migration in &to_apply {
-        if connection.backend_name() == "pg"
-            && migration.name() == "20240115_023841384_dbconstraints"
-        {
-            // migration 20240115_023841384_dbconstraints failed: Postgres error db error:
-            // ERROR: cannot drop table tag because other objects depend on it
-            // DETAIL: constraint post_tags_many__butane_tmp_has_fkey1 on table post_tags_many depends on table tag
-            let err = migration.apply(&mut connection).await.unwrap_err();
-            eprintln!("Migration {} failed: {err:?}", migration.name());
-            return;
-        }
-        migration
-            .apply(&mut connection)
-            .await
-            .unwrap_or_else(|err| panic!("migration {} failed: {err}", migration.name()));
-        eprintln!("Applied {}", migration.name());
-    }
+
+    migrations.migrate(&mut connection).await.unwrap();
 
     insert_data(&connection).await;
 
-    // Rollback migrations.
-    for migration in to_apply.iter().rev() {
-        migration
-            .downgrade(&mut connection)
-            .await
-            .unwrap_or_else(|err| panic!("rollback of {} failed: {err}", migration.name()));
-        eprintln!("Rolled back {}", migration.name());
-    }
+    // Undo migrations.
+    migrations.unmigrate(&mut connection).await.unwrap();
 }
-testall_no_migrate!(migrate_and_rollback);
+testall_no_migrate!(migrate_and_unmigrate);

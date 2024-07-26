@@ -1,41 +1,54 @@
 use crate::db::{Backend, RawQueryResult};
 use crate::migrations::adb;
 use crate::query::{BoolExpr, Order};
-use crate::{Column, Result, SqlVal, SqlValRef};
+use crate::{debug, Column, Result, SqlVal, SqlValRef};
 use async_trait::async_trait;
 
 use std::future::Future;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct SyncAdapter<T> {
     runtime_handle: tokio::runtime::Handle,
-    _runtime: Option<tokio::runtime::Runtime>,
+    _runtime: Option<Arc<tokio::runtime::Runtime>>,
     inner: T,
 }
 
 impl<T> SyncAdapter<T> {
-    // TODO needs an inner new that preserves the handle
     pub fn new(inner: T) -> Result<Self> {
         // TODO needs to check that the existing runtime isn't a current_thread
         // if it is, handle.block_on can't drive IO.
         // We can create a new runtime in that case, but not on the same thread.
         match tokio::runtime::Handle::try_current() {
-            Ok(handle) => Ok(Self {
-                runtime_handle: handle,
-                _runtime: None,
-                inner,
-            }),
+            Ok(handle) => {
+                debug!("Using existing tokio runtime");
+                Ok(Self {
+                    runtime_handle: handle,
+                    _runtime: None,
+                    inner,
+                })
+            }
             Err(_) => {
+                debug!("Creating new tokio runtime");
                 let runtime = tokio::runtime::Builder::new_multi_thread()
                     .worker_threads(1)
                     .enable_all()
                     .build()?;
                 Ok(Self {
                     runtime_handle: runtime.handle().clone(),
-                    _runtime: Some(runtime),
+                    _runtime: Some(Arc::new(runtime)),
                     inner,
                 })
             }
+        }
+    }
+
+    /// Creates a new SyncAdapater for a different type, using the same runtime
+    fn chain<S>(&self, inner: S) -> SyncAdapter<S> {
+        SyncAdapter {
+            runtime_handle: self.runtime_handle.clone(),
+            _runtime: self._runtime.as_ref().map(|r| r.clone()),
+            inner,
         }
     }
 
@@ -126,9 +139,17 @@ where
     T: crate::db::BackendConnection,
 {
     fn transaction(&mut self) -> Result<crate::db::sync::Transaction<'_>> {
+        // We can't use chain because of the lifetimes and mutable borrows below,
+        // so set up these runtime clones now.
+        let runtime_handle = self.runtime_handle.clone();
+        let runtime = self._runtime.as_ref().map(|r| r.clone());
         let transaction: crate::db::Transaction =
             self.runtime_handle.block_on(self.inner.transaction())?;
-        let transaction_adapter = SyncAdapter::new(transaction.trans)?;
+        let transaction_adapter = SyncAdapter {
+            runtime_handle,
+            _runtime: runtime,
+            inner: transaction.trans,
+        };
         Ok(crate::db::sync::Transaction::new(Box::new(
             transaction_adapter,
         )))
@@ -181,9 +202,10 @@ where
     }
     fn connect(&self, conn_str: &str) -> Result<crate::db::sync::Connection> {
         let conn_async = self.block_on(self.inner.connect_async(conn_str))?;
-        Ok(crate::db::sync::Connection {
-            conn: Box::new(SyncAdapter::new(conn_async.conn)?),
-        })
+        let conn = crate::db::sync::Connection {
+            conn: Box::new(self.chain(conn_async.conn)),
+        };
+        Ok(conn)
     }
     async fn connect_async(&self, conn_str: &str) -> Result<crate::db::Connection> {
         self.inner.connect_async(conn_str).await

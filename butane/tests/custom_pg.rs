@@ -2,7 +2,7 @@
 #[cfg(feature = "pg")]
 mod custom_pg {
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
-    use butane::prelude::*;
+    use butane::prelude_async::*;
     use butane::{butane_type, db::Connection, model};
     use butane::{AutoPk, FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
     use butane_test_helper::{maketest, maketest_pg};

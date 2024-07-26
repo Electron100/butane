@@ -1,6 +1,6 @@
 use butane::db::Connection;
 use butane::model;
-use butane::prelude::*;
+use butane::prelude_async::*;
 use butane_test_helper::*;
 use uuid_for_test::Uuid;
 

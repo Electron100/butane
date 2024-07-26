@@ -372,6 +372,7 @@ dependencies = [
  "butane_core",
  "libc",
  "log",
+ "maybe-async-cfg",
  "nonempty",
  "once_cell",
  "rand",

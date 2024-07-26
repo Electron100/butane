@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use butane::model;
-use butane::prelude::*;
+use butane::prelude_async::*;
 use butane::{db::Connection, FieldType};
 use butane_test_helper::*;
 use serde::{Deserialize, Serialize};

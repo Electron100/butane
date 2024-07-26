@@ -2,9 +2,11 @@
 //! Macros depend on [`butane_core`], `env_logger` and [`log`].
 #![deny(missing_docs)]
 
+use butane_core::db::sync::BackendConnection as BackendConnectionSync;
 use butane_core::db::sync::Connection as ConnectionSync;
 use butane_core::db::{
-    connect_async, get_backend, pg, sqlite, Backend, BackendConnection, Connection, ConnectionSpec,
+    connect, connect_async, get_backend, pg, sqlite, Backend, BackendConnection, Connection,
+    ConnectionSpec,
 };
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
@@ -19,9 +21,9 @@ use block_id::{Alphabet, BlockId};
 use uuid::Uuid;
 
 /// Create a postgres [`Connection`].
-pub async fn pg_connection() -> (ConnectionSync, PgSetupData) {
+pub fn pg_connection() -> (ConnectionSync, PgSetupData) {
     let backend = get_backend(pg::BACKEND_NAME).unwrap();
-    let data = pg_setup().await;
+    let data = pg_setup_sync();
     (backend.connect(&pg_connstr(&data)).unwrap(), data)
 }
 
@@ -148,6 +150,33 @@ static TMP_SERVER: Lazy<Mutex<Option<PgServerState>>> =
     Lazy::new(|| Mutex::new(Some(create_tmp_server())));
 
 /// Create a running empty postgres database named `butane_test_<uuid>`.
+pub fn pg_setup_sync() -> PgSetupData {
+    log::trace!("starting pg_setup");
+    // By default we set up a temporary, local postgres server just
+    // for this test. This can be overridden by the environment
+    // variable BUTANE_PG_CONNSTR
+    let connstr = match std::env::var("BUTANE_PG_CONNSTR") {
+        Ok(connstr) => connstr,
+        Err(_) => {
+            let server_mguard = &TMP_SERVER.deref().lock().unwrap();
+            let server: &PgServerState = server_mguard.as_ref().unwrap();
+            let host = server.sockdir.path().to_str().unwrap();
+            format!("host={host} user=postgres")
+        }
+    };
+    let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
+    log::info!("new db is `{}`", &new_dbname);
+
+    let mut conn = connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
+    log::debug!("closed is {}", BackendConnectionSync::is_closed(&conn));
+    conn.execute(format!("CREATE DATABASE {new_dbname};"))
+        .unwrap();
+
+    let connstr = format!("{connstr} dbname={new_dbname}");
+    PgSetupData { connstr }
+}
+
+/// Create a running empty postgres database named `butane_test_<uuid>`.
 pub async fn pg_setup() -> PgSetupData {
     log::trace!("starting pg_setup");
     // By default we set up a temporary, local postgres server just
@@ -168,6 +197,7 @@ pub async fn pg_setup() -> PgSetupData {
     let mut conn = connect_async(&ConnectionSpec::new("pg", &connstr))
         .await
         .unwrap();
+    log::debug!("[async]closed is {}", BackendConnection::is_closed(&conn));
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .await
         .unwrap();

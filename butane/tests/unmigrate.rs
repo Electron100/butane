@@ -9,15 +9,16 @@ async fn unmigrate(mut connection: Connection) {
     let mem_migrations = create_current_migrations(&connection);
 
     connection
-        .with_sync(|conn| {
-            let migrations = mem_migrations.unapplied_migrations(&connection).unwrap();
+        .with_sync(move |conn| {
+            let migrations = mem_migrations.unapplied_migrations(conn).unwrap();
             assert_eq!(migrations.len(), 0);
 
             let migration = mem_migrations.latest().unwrap();
-            migration.downgrade(&mut connection).unwrap();
+            migration.downgrade(conn).unwrap();
 
-            let migrations = mem_migrations.unapplied_migrations(&connection).unwrap();
+            let migrations = mem_migrations.unapplied_migrations(conn).unwrap();
             assert_eq!(migrations.len(), 1);
+            Ok(())
         })
         .await
         .unwrap();

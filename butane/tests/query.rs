@@ -1,5 +1,5 @@
 use butane::db::Connection;
-use butane::prelude::*;
+use butane::prelude_async::*;
 use butane::query::BoolExpr;
 use butane::{colname, filter, find, query, Many};
 use butane_test_helper::*;

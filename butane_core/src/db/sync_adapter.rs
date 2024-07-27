@@ -43,7 +43,7 @@ impl<T> SyncAdapter<T> {
         }
     }
 
-    /// Creates a new SyncAdapater for a different type, using the same runtime
+    /// Creates a new SyncAdapter for a different type, using the same runtime
     fn chain<S>(&self, inner: S) -> SyncAdapter<S> {
         SyncAdapter {
             runtime_handle: self.runtime_handle.clone(),

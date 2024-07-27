@@ -217,9 +217,7 @@ pub fn pg_connstr(data: &PgSetupData) -> String {
 }
 
 /// Create a [`MemMigrations`]` for the "current" migration.
-pub fn create_current_migrations(connection: &Connection) -> MemMigrations {
-    let backend = connection.backend();
-
+pub fn create_current_migrations(backend: Box<dyn Backend>) -> MemMigrations {
     let mut root = std::env::current_dir().unwrap();
     root.push(".butane/migrations");
     let mut disk_migrations = migrations::from_root(&root);
@@ -248,10 +246,17 @@ pub fn create_current_migrations(connection: &Connection) -> MemMigrations {
 }
 
 /// Populate the database schema.
-pub async fn setup_db(conn: &mut Connection) {
-    let mem_migrations = create_current_migrations(conn);
+pub async fn setup_db_async(conn: &mut Connection) {
+    let mem_migrations = create_current_migrations(conn.backend());
     log::info!("created current migration");
     mem_migrations.migrate_async(conn).await.unwrap();
+}
+
+/// Populate the database schema.
+pub fn setup_db(conn: &mut ConnectionSync) {
+    let mem_migrations = create_current_migrations(conn.backend());
+    log::info!("created current migration");
+    mem_migrations.migrate(conn).unwrap();
 }
 
 /// Create a sqlite [`Connection`].
@@ -283,7 +288,7 @@ macro_rules! maketest {
                 log::info!("connecting to {}..", &$connstr);
                 let mut conn = backend.connect_async(&$connstr).await.expect("Could not connect backend");
                 if $migrate {
-                    butane_test_helper::setup_db(&mut conn).await;
+                    butane_test_helper::setup_db_async(&mut conn).await;
                 }
                 log::info!("running test on {}..", &$connstr);
                 $fname(conn).await;

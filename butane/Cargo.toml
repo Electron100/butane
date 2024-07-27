@@ -22,8 +22,7 @@ pg = ["butane_core/pg"]
 datetime = ["butane_codegen/datetime", "butane_core/datetime"]
 debug = ["butane_core/debug"]
 log = ["butane_core/log"]
-# todo re-enable r2d2
-#r2d2 = ["butane_core/r2d2"]
+r2d2 = ["butane_core/r2d2"]
 tls = ["butane_core/tls"]
 uuid = ["butane_codegen/uuid", "butane_core/uuid"]
 

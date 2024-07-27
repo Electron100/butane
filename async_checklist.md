@@ -3,7 +3,8 @@
 * [ ] Establish soundness for unsafe sections of AsyncAdapter
 * [ ] Consider publishing `AsyncAdapter` into its own crate
 * [ ] Ensure Postgres works in sync
-* [ ] Re-enable R2D2 for sync and find async alternative (deadpool)
+* [x] Re-enable R2D2 for sync
+* [x] Integrate deadpool or bb8 for async connection poll
 * [ ] Fix `#[async_trait(?Send)]` to set up Send bound again as it's required for e.g. `tokio::spawn`
 * [ ] Separate sync and async examples
 * [ ] Should async_adapter be under a separate feature? Do we need it for migrations?

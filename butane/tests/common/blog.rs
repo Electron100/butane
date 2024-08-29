@@ -1,6 +1,6 @@
 //! Helpers for several tests.
 use butane::{dataresult, model, DataObject, DataObjectOpAsync};
-use butane::{db::Connection, ForeignKey, Many};
+use butane::{db::ConnectionAsync, ForeignKey, Many};
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc};
 #[cfg(feature = "fake")]
@@ -100,7 +100,7 @@ impl Tag {
     }
 }
 
-pub async fn create_tag(conn: &Connection, name: &str) -> Tag {
+pub async fn create_tag(conn: &ConnectionAsync, name: &str) -> Tag {
     let mut tag = Tag::new(name);
     tag.save(conn).await.unwrap();
     tag
@@ -110,7 +110,7 @@ pub async fn create_tag(conn: &Connection, name: &str) -> Tag {
 /// 1. "Cats"
 /// 2. "Mountains"
 #[allow(dead_code)] // only used by some test files
-pub async fn setup_blog(conn: &Connection) {
+pub async fn setup_blog(conn: &ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(conn).await.unwrap();
     let mut mountains_blog = Blog::new(2, "Mountains");

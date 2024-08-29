@@ -2,7 +2,7 @@
 
 pub use r2d2::ManageConnection;
 
-use crate::db::sync::{BackendConnection, Connection, ConnectionMethods};
+use crate::db::{BackendConnection, Connection, ConnectionMethods};
 use crate::db::{Column, ConnectionSpec, RawQueryResult};
 use crate::{query::BoolExpr, query::Order, Result, SqlVal, SqlValRef};
 

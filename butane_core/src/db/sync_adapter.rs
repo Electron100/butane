@@ -1,4 +1,8 @@
-use crate::db::{Backend, RawQueryResult};
+use crate::db::{
+    Backend, BackendConnection, BackendConnectionAsync, BackendTransaction,
+    BackendTransactionAsync, Connection, ConnectionAsync, ConnectionMethods, RawQueryResult,
+    Transaction, TransactionAsync,
+};
 use crate::migrations::adb;
 use crate::query::{BoolExpr, Order};
 use crate::{debug, Column, Result, SqlVal, SqlValRef};
@@ -74,9 +78,9 @@ where
     }
 }
 
-impl<T> crate::db::sync::ConnectionMethods for SyncAdapter<T>
+impl<T> crate::db::ConnectionMethods for SyncAdapter<T>
 where
-    T: crate::db::ConnectionMethods,
+    T: crate::db::ConnectionMethodsAsync,
 {
     fn execute(&self, sql: &str) -> Result<()> {
         self.block_on(self.inner.execute(sql))
@@ -134,25 +138,23 @@ where
     }
 }
 
-impl<T> crate::db::sync::BackendConnection for SyncAdapter<T>
+impl<T> BackendConnection for SyncAdapter<T>
 where
-    T: crate::db::BackendConnection,
+    T: BackendConnectionAsync,
 {
-    fn transaction(&mut self) -> Result<crate::db::sync::Transaction<'_>> {
+    fn transaction(&mut self) -> Result<Transaction<'_>> {
         // We can't use chain because of the lifetimes and mutable borrows below,
         // so set up these runtime clones now.
         let runtime_handle = self.runtime_handle.clone();
         let runtime = self._runtime.as_ref().map(|r| r.clone());
-        let transaction: crate::db::Transaction =
+        let transaction: TransactionAsync =
             self.runtime_handle.block_on(self.inner.transaction())?;
         let transaction_adapter = SyncAdapter {
             runtime_handle,
             _runtime: runtime,
             inner: transaction.trans,
         };
-        Ok(crate::db::sync::Transaction::new(Box::new(
-            transaction_adapter,
-        )))
+        Ok(Transaction::new(Box::new(transaction_adapter)))
     }
     fn backend(&self) -> Box<dyn crate::db::Backend> {
         self.inner.backend()
@@ -167,16 +169,16 @@ where
 
 impl<T> SyncAdapter<T>
 where
-    T: crate::db::BackendConnection + 'static,
+    T: BackendConnectionAsync + 'static,
 {
-    pub fn into_connection(self) -> crate::db::sync::Connection {
-        crate::db::sync::Connection::new(Box::new(self))
+    pub fn into_connection(self) -> Connection {
+        Connection::new(Box::new(self))
     }
 }
 
-impl<'c, T> crate::db::sync::BackendTransaction<'c> for SyncAdapter<T>
+impl<'c, T> BackendTransaction<'c> for SyncAdapter<T>
 where
-    T: crate::db::BackendTransaction<'c>,
+    T: BackendTransactionAsync<'c>,
 {
     fn commit(&mut self) -> Result<()> {
         self.runtime_handle.block_on(self.inner.commit())
@@ -184,7 +186,7 @@ where
     fn rollback(&mut self) -> Result<()> {
         self.runtime_handle.block_on(self.inner.rollback())
     }
-    fn connection_methods(&self) -> &dyn crate::db::sync::ConnectionMethods {
+    fn connection_methods(&self) -> &dyn ConnectionMethods {
         self
     }
 }
@@ -200,14 +202,14 @@ where
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         self.inner.create_migration_sql(current, ops)
     }
-    fn connect(&self, conn_str: &str) -> Result<crate::db::sync::Connection> {
+    fn connect(&self, conn_str: &str) -> Result<Connection> {
         let conn_async = self.block_on(self.inner.connect_async(conn_str))?;
-        let conn = crate::db::sync::Connection {
+        let conn = Connection {
             conn: Box::new(self.chain(conn_async.conn)),
         };
         Ok(conn)
     }
-    async fn connect_async(&self, conn_str: &str) -> Result<crate::db::Connection> {
+    async fn connect_async(&self, conn_str: &str) -> Result<ConnectionAsync> {
         self.inner.connect_async(conn_str).await
     }
 }

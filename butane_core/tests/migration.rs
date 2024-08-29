@@ -1,4 +1,4 @@
-use butane_core::db::{BackendConnection, Connection, ConnectionMethods};
+use butane_core::db::{BackendConnectionAsync, ConnectionAsync, ConnectionMethodsAsync};
 use butane_core::migrations::adb::*;
 use butane_core::SqlType;
 use butane_test_helper::*;
@@ -211,7 +211,7 @@ fn add_table_fkey() {
 
 /// This is the same as test "add_table_fkey", except that it
 /// runs the DDL on a database, and then deletes the column.
-async fn add_table_fkey_delete_column(conn: Connection) {
+async fn add_table_fkey_delete_column(conn: ConnectionAsync) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
     let old = ADB::default();
@@ -298,7 +298,7 @@ testall_no_migrate!(add_table_fkey_delete_column);
 /// This is the same as test "add_table_fkey", except that it
 /// intentionally links a column on table a to table b, and
 /// it runs the DDL on a database.
-async fn add_table_fkey_back_reference(conn: Connection) {
+async fn add_table_fkey_back_reference(conn: ConnectionAsync) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
     let old = ADB::default();
@@ -388,7 +388,7 @@ testall_no_migrate!(add_table_fkey_back_reference);
 
 /// This is the same as test "add_table_fkey", except that it
 /// creates a table with multiple fkey constraints.
-async fn add_table_fkey_multiple(conn: Connection) {
+async fn add_table_fkey_multiple(conn: ConnectionAsync) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
     let old = ADB::default();

@@ -3,19 +3,10 @@
 
 use async_trait::async_trait;
 
-use super::connmethods::sync::ConnectionMethods as ConnectionMethodsSync;
-use super::sync::BackendConnection as BackendConnectionSync;
-use super::sync::Connection as ConnectionSync;
-use super::sync::Transaction as TransactionSync;
-use super::Transaction as TransactionAsync;
-use super::{
-    connmethods::Column, Backend, BackendConnection, Connection, ConnectionMethods, RawQueryResult,
-    Transaction,
-};
+use super::*;
 use crate::migrations::adb;
 use crate::query::{BoolExpr, Order};
 use crate::{Error, Result, SqlVal, SqlValRef};
-use BackendConnection as BackendConnectionAsync;
 
 #[derive(Clone, Debug)]
 struct DummyBackend {}
@@ -28,10 +19,10 @@ impl Backend for DummyBackend {
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         Err(Error::PoisonedConnection)
     }
-    fn connect(&self, conn_str: &str) -> Result<ConnectionSync> {
+    fn connect(&self, conn_str: &str) -> Result<Connection> {
         Err(Error::PoisonedConnection)
     }
-    async fn connect_async(&self, conn_str: &str) -> Result<Connection> {
+    async fn connect_async(&self, conn_str: &str) -> Result<ConnectionAsync> {
         Err(Error::PoisonedConnection)
     }
 }
@@ -45,7 +36,7 @@ impl DummyConnection {
 }
 
 #[maybe_async_cfg::maybe(
-    idents(ConnectionMethods(sync = "ConnectionMethodsSync", async)),
+    idents(ConnectionMethods(sync = "ConnectionMethods", async = "ConnectionMethodsAsync")),
     keep_self,
     sync(),
     async()
@@ -110,7 +101,15 @@ impl ConnectionMethods for DummyConnection {
     }
 }
 
-#[maybe_async_cfg::maybe(idents(BackendConnection, Transaction), keep_self, sync(), async())]
+#[maybe_async_cfg::maybe(
+    idents(
+        BackendConnection(sync = "BackendConnection"),
+        Transaction(sync = "Transaction")
+    ),
+    keep_self,
+    sync(),
+    async()
+)]
 #[async_trait(?Send)]
 impl BackendConnection for DummyConnection {
     async fn transaction(&mut self) -> Result<Transaction<'_>> {

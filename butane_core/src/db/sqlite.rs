@@ -8,10 +8,11 @@ use std::pin::Pin;
 #[cfg(feature = "log")]
 use std::sync::Once;
 
-use super::sync::{
-    BackendConnection, BackendTransaction, Connection, ConnectionMethods, Transaction,
-};
 use super::{helper, Backend, BackendRow, Column, RawQueryResult};
+use super::{
+    BackendConnection, BackendTransaction, Connection, ConnectionAsync, ConnectionMethods,
+    Transaction,
+};
 use crate::db::connmethods::BackendRows;
 use crate::migrations::adb::ARef;
 use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
@@ -87,7 +88,7 @@ impl Backend for SQLiteBackend {
             conn: Box::new(self.connect(path)?),
         })
     }
-    async fn connect_async(&self, path: &str) -> Result<super::Connection> {
+    async fn connect_async(&self, path: &str) -> Result<ConnectionAsync> {
         super::adapter::connect_async_via_sync(self, path).await
     }
 }

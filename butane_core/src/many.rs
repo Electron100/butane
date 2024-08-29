@@ -1,7 +1,6 @@
 //! Implementation of many-to-many relationships between models.
 #![deny(missing_docs)]
-use crate::db::sync::ConnectionMethods as ConnectionMethodsSync;
-use crate::db::{Column, ConnectionMethods};
+use crate::db::{Column, ConnectionMethods, ConnectionMethodsAsync};
 use crate::query::{BoolExpr, Expr, OrderDirection, Query};
 use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use serde::{Deserialize, Serialize};
@@ -128,7 +127,7 @@ where
 }
 
 #[maybe_async_cfg::maybe(
-    idents(ConnectionMethods(sync = "ConnectionMethodsSync", async), QueryOp),
+    idents(ConnectionMethods(sync, async = "ConnectionMethodsAsync"), QueryOp),
     sync(),
     async()
 )]
@@ -160,7 +159,7 @@ where
 /// database query if necessary and returns a reference to them.
 async fn load_query_async<'a, T>(
     many: &'a Many<T>,
-    conn: &impl ConnectionMethods,
+    conn: &impl ConnectionMethodsAsync,
     query: Query<T>,
 ) -> Result<impl Iterator<Item = &'a T>>
 where
@@ -176,7 +175,7 @@ where
 /// database query if necessary and returns a reference to them.
 fn load_query_sync<'a, T>(
     many: &'a Many<T>,
-    conn: &impl ConnectionMethodsSync,
+    conn: &impl ConnectionMethods,
     query: Query<T>,
 ) -> Result<impl Iterator<Item = &'a T>>
 where
@@ -194,7 +193,7 @@ where
 /// [`Many`] operations which require a `Connection`
 #[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
 #[maybe_async_cfg::maybe(
-    idents(ConnectionMethods(sync = "ConnectionMethodsSync", async),),
+    idents(ConnectionMethods(sync = "ConnectionMethods"),),
     sync(),
     async()
 )]
@@ -227,7 +226,7 @@ pub trait ManyOp<T: DataObject> {
 
 #[maybe_async_cfg::maybe(
     idents(
-        ConnectionMethods(sync = "ConnectionMethodsSync", async),
+        ConnectionMethods(sync = "ConnectionMethods"),
         ManyOpInternal,
         ManyOp,
         load_query(sync = "load_query_sync", async = "load_query_async"),

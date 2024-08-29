@@ -13,8 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use butane::db::sync::{Connection, ConnectionMethods};
 use butane::db::Backend;
+use butane::db::{Connection, ConnectionMethods};
 use butane::migrations::adb;
 use butane::migrations::adb::{diff, AColumn, ARef, Operation, ADB};
 use butane::migrations::{

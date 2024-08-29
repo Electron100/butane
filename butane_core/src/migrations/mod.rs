@@ -8,7 +8,10 @@ use std::path::Path;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
-use crate::db::{sync::BackendConnection, Backend, BackendRows, Column};
+use crate::db::{
+    Backend, BackendConnection, BackendRows, Column, ConnectionAsync, ConnectionMethods,
+    ConnectionMethodsAsync,
+};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
 
@@ -72,10 +75,7 @@ pub trait Migrations: Clone {
     }
 
     /// Get migrations which have not yet been applied to the database
-    fn unapplied_migrations(
-        &self,
-        conn: &impl crate::db::sync::ConnectionMethods,
-    ) -> Result<Vec<Self::M>> {
+    fn unapplied_migrations(&self, conn: &impl ConnectionMethods) -> Result<Vec<Self::M>> {
         match self.last_applied_migration(conn)? {
             None => self.all_migrations(),
             Some(m) => self.migrations_since(&m),
@@ -84,10 +84,7 @@ pub trait Migrations: Clone {
 
     /// Get the last migration that has been applied to the database or None
     /// if no migrations have been applied
-    fn last_applied_migration(
-        &self,
-        conn: &impl crate::db::sync::ConnectionMethods,
-    ) -> Result<Option<Self::M>> {
+    fn last_applied_migration(&self, conn: &impl ConnectionMethods) -> Result<Option<Self::M>> {
         if !conn.has_table(ButaneMigration::TABLE)? {
             return Ok(None);
         }
@@ -128,7 +125,7 @@ pub trait Migrations: Clone {
     }
 
     /// Migrate connection forward.
-    async fn migrate_async(&self, conn: &mut crate::db::Connection) -> Result<()>
+    async fn migrate_async(&self, conn: &mut ConnectionAsync) -> Result<()>
     where
         Self: Send + 'static,
     {
@@ -159,7 +156,7 @@ pub trait Migrations: Clone {
     }
 
     /// Remove all applied migrations.
-    async fn unmigrate_async(&self, conn: &mut crate::db::Connection) -> Result<()>
+    async fn unmigrate_async(&self, conn: &mut ConnectionAsync) -> Result<()>
     where
         Self: Send + 'static,
     {
@@ -196,7 +193,7 @@ where
     /// any storage backing it) and deleting the record of their
     /// existence/application from the database. The database schema
     /// is not modified, nor is any other data removed. Use carefully.
-    fn clear_migrations(&mut self, conn: &impl crate::db::sync::ConnectionMethods) -> Result<()> {
+    fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         self.delete_migrations()?;
         conn.delete_where(ButaneMigration::TABLE, query::BoolExpr::True)?;
         Ok(())
@@ -384,16 +381,10 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
         }
         values
     }
-    async fn save_many_to_many_async(
-        &mut self,
-        _conn: &impl crate::db::ConnectionMethods,
-    ) -> Result<()> {
+    async fn save_many_to_many_async(&mut self, _conn: &impl ConnectionMethodsAsync) -> Result<()> {
         Ok(()) // no-op
     }
-    fn save_many_to_many_sync(
-        &mut self,
-        _conn: &impl crate::db::sync::ConnectionMethods,
-    ) -> Result<()> {
+    fn save_many_to_many_sync(&mut self, _conn: &impl ConnectionMethods) -> Result<()> {
         Ok(()) // no-op
     }
 }

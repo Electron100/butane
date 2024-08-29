@@ -260,9 +260,9 @@ impl<T: ?Sized> Drop for AsyncAdapter<T> {
 }
 
 #[async_trait(?Send)]
-impl<T> ConnectionMethods for AsyncAdapter<T>
+impl<T> ConnectionMethodsAsync for AsyncAdapter<T>
 where
-    T: sync::ConnectionMethods + ?Sized,
+    T: ConnectionMethods + ?Sized,
 {
     async fn execute(&self, sql: &str) -> Result<()> {
         self.invoke(|conn| conn.execute(sql)).await
@@ -339,21 +339,20 @@ where
 }
 
 #[async_trait(?Send)]
-impl<T> BackendConnection for AsyncAdapter<T>
+impl<T> BackendConnectionAsync for AsyncAdapter<T>
 where
-    T: sync::BackendConnection,
+    T: BackendConnection,
 {
-    async fn transaction<'c>(&'c mut self) -> Result<Transaction<'c>> {
-        let transaction_ptr: SyncSendPtrMut<dyn sync::BackendTransaction> = self
+    async fn transaction<'c>(&'c mut self) -> Result<TransactionAsync<'c>> {
+        let transaction_ptr: SyncSendPtrMut<dyn BackendTransaction> = self
             .invoke_mut(|conn| {
-                let transaction: sync::Transaction = conn.transaction()?;
-                let transaction_ptr: *mut dyn sync::BackendTransaction =
-                    Box::into_raw(transaction.trans);
+                let transaction: Transaction = conn.transaction()?;
+                let transaction_ptr: *mut dyn BackendTransaction = Box::into_raw(transaction.trans);
                 Ok(SyncSendPtrMut::new(transaction_ptr))
             })
             .await?;
         let transaction_adapter = self.new_internal(transaction_ptr);
-        Ok(Transaction::new(Box::new(transaction_adapter)))
+        Ok(TransactionAsync::new(Box::new(transaction_adapter)))
     }
 
     fn backend(&self) -> Box<dyn Backend> {
@@ -375,19 +374,19 @@ where
 
 impl<T> AsyncAdapter<T>
 where
-    T: sync::BackendConnection + 'static,
+    T: BackendConnection + 'static,
 {
-    pub fn into_connection(self) -> Connection {
-        Connection {
+    pub fn into_connection(self) -> ConnectionAsync {
+        ConnectionAsync {
             conn: Box::new(self),
         }
     }
 }
 
 #[async_trait(?Send)]
-impl<T, 'c> BackendTransaction<'c> for AsyncAdapter<T>
+impl<T, 'c> BackendTransactionAsync<'c> for AsyncAdapter<T>
 where
-    T: sync::BackendTransaction<'c> + ?Sized,
+    T: BackendTransaction<'c> + ?Sized,
 {
     async fn commit(&mut self) -> Result<()> {
         self.invoke_mut(|conn| conn.commit()).await
@@ -395,7 +394,7 @@ where
     async fn rollback(&mut self) -> Result<()> {
         self.invoke_mut(|conn| conn.rollback()).await
     }
-    fn connection_methods(&self) -> &dyn ConnectionMethods {
+    fn connection_methods(&self) -> &dyn ConnectionMethodsAsync {
         self
     }
 }
@@ -403,7 +402,7 @@ where
 /// Create an async connection using the synchronous `connect` method of `backend`. Use this when authoring
 /// a backend which doesn't natively support async.
 #[cfg(feature = "sqlite")] // todo expose this publicly for out-of-tree backends
-pub async fn connect_async_via_sync<B>(backend: &B, conn_str: &str) -> Result<Connection>
+pub async fn connect_async_via_sync<B>(backend: &B, conn_str: &str) -> Result<ConnectionAsync>
 where
     B: Backend + Clone + 'static,
 {

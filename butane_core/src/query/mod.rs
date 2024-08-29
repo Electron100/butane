@@ -9,8 +9,7 @@ use std::marker::PhantomData;
 
 use fallible_iterator::FallibleIterator;
 
-use crate::db::sync::ConnectionMethods as ConnectionMethodsSync;
-use crate::db::{BackendRows, ConnectionMethods, QueryResult};
+use crate::db::{BackendRows, ConnectionMethods, ConnectionMethodsAsync, QueryResult};
 use crate::{DataResult, Result, SqlVal};
 
 mod fieldexpr;
@@ -191,7 +190,7 @@ mod private {
     /// Internal QueryOp helpers
     #[allow(async_fn_in_trait)] // Not truly a public trait
     #[maybe_async_cfg::maybe(
-        idents(ConnectionMethods(sync = "ConnectionMethodsSync", async)),
+        idents(ConnectionMethods(sync = "ConnectionMethods")),
         sync(),
         async()
     )]
@@ -203,10 +202,7 @@ mod private {
         ) -> Result<Box<dyn BackendRows + '_>>;
     }
     #[maybe_async_cfg::maybe(
-        idents(
-            ConnectionMethods(sync = "ConnectionMethodsSync", async),
-            QueryOpInternal
-        ),
+        idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpInternal),
         keep_self,
         sync(),
         async()
@@ -240,10 +236,7 @@ use private::QueryOpInternalSync;
 /// [`Query`] operations which require a `Connection`
 #[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
 #[maybe_async_cfg::maybe(
-    idents(
-        ConnectionMethods(sync = "ConnectionMethodsSync", async),
-        QueryOpInternal
-    ),
+    idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpInternal),
     sync(),
     async()
 )]
@@ -260,7 +253,7 @@ pub trait QueryOp<T>: QueryOpInternal<T> {
 
 #[maybe_async_cfg::maybe(
     idents(
-        ConnectionMethods(sync = "ConnectionMethodsSync", async),
+        ConnectionMethods(sync = "ConnectionMethods"),
         QueryOp,
         QueryOpInternal
     ),

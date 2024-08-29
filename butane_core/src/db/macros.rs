@@ -2,8 +2,12 @@
 macro_rules! connection_method_wrapper {
     ($ty:path) => {
         #[maybe_async_cfg::maybe(
-            idents(ConnectionMethods(sync = "ConnectionMethodsSync", async)),
-            sync(),
+            idents(
+                Connection(sync = "Connection"),
+                ConnectionMethods(sync = "ConnectionMethods"),
+                Transaction(sync = "Transaction")
+            ),
+            sync(keep_self),
             async()
         )]
         #[async_trait::async_trait(?Send)]

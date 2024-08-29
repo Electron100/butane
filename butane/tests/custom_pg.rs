@@ -3,7 +3,7 @@
 mod custom_pg {
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
     use butane::prelude_async::*;
-    use butane::{butane_type, db::Connection, model};
+    use butane::{butane_type, db::ConnectionAsync, model};
     use butane::{AutoPk, FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
     use butane_test_helper::{maketest, maketest_pg};
     use geo_types;
@@ -58,7 +58,7 @@ mod custom_pg {
         pt_to: Point,
     }
 
-    async fn roundtrip_custom(conn: Connection) {
+    async fn roundtrip_custom(conn: ConnectionAsync) {
         let mut trip = Trip {
             id: AutoPk::uninitialized(),
             pt_from: Point::new(0.0, 0.0),

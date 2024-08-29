@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use butane::model;
 use butane::prelude_async::*;
-use butane::{db::Connection, FieldType};
+use butane::{db::ConnectionAsync, FieldType};
 use butane_test_helper::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -26,7 +26,7 @@ impl FooJJ {
     }
 }
 
-async fn json_null(conn: Connection) {
+async fn json_null(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooJJ::new(id);
@@ -44,7 +44,7 @@ async fn json_null(conn: Connection) {
 }
 testall!(json_null);
 
-async fn basic_json(conn: Connection) {
+async fn basic_json(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooJJ::new(id);
@@ -89,7 +89,7 @@ impl FooHH {
         }
     }
 }
-async fn basic_hashmap(conn: Connection) {
+async fn basic_hashmap(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooHH::new(id);
@@ -127,7 +127,7 @@ impl FooFullPrefixHashMap {
         }
     }
 }
-async fn basic_hashmap_full_prefix(conn: Connection) {
+async fn basic_hashmap_full_prefix(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooFullPrefixHashMap::new(id);
@@ -165,7 +165,7 @@ impl FooBTreeMap {
         }
     }
 }
-async fn basic_btreemap(conn: Connection) {
+async fn basic_btreemap(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooBTreeMap::new(id);
@@ -209,7 +209,7 @@ impl FooHHO {
         }
     }
 }
-async fn hashmap_with_object_values(conn: Connection) {
+async fn hashmap_with_object_values(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooHHO::new(id);
@@ -255,7 +255,7 @@ impl OuterFoo {
     }
 }
 
-async fn inline_json(conn: Connection) {
+async fn inline_json(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = OuterFoo::new(id, InlineFoo::new(4, 8));

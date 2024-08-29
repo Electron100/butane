@@ -1,4 +1,4 @@
-use butane::db::Connection;
+use butane::db::ConnectionAsync;
 use butane::prelude_async::*;
 use butane::{butane_type, model, query};
 use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
@@ -60,7 +60,7 @@ impl HasCustomField {
     }
 }
 
-async fn roundtrip_custom_type(conn: Connection) {
+async fn roundtrip_custom_type(conn: ConnectionAsync) {
     //create
     let mut obj = HasCustomField::new(1, Frobnozzle::Foo);
     obj.save(&conn).await.unwrap();
@@ -71,7 +71,7 @@ async fn roundtrip_custom_type(conn: Connection) {
 }
 testall!(roundtrip_custom_type);
 
-async fn query_custom_type(conn: Connection) {
+async fn query_custom_type(conn: ConnectionAsync) {
     //create
     let mut obj_foo = HasCustomField::new(1, Frobnozzle::Foo);
     obj_foo.save(&conn).await.unwrap();

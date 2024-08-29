@@ -83,11 +83,11 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             fn pk_mut(&mut self) -> &mut impl butane::PrimaryKeyType {
                 &mut self.#pkident
             }
-            async fn save_many_to_many_async(&mut self, #conn_arg_name: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
+            async fn save_many_to_many_async(&mut self, #conn_arg_name: &impl butane::db::ConnectionMethodsAsync) -> butane::Result<()> {
                 #many_save_async
                 Ok(())
             }
-            fn save_many_to_many_sync(&mut self, #conn_arg_name: &impl butane::db::sync::ConnectionMethods) -> butane::Result<()> {
+            fn save_many_to_many_sync(&mut self, #conn_arg_name: &impl butane::db::ConnectionMethods) -> butane::Result<()> {
                 #many_save_sync
                 Ok(())
             }

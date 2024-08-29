@@ -1,4 +1,4 @@
-use butane::db::Connection;
+use butane::db::ConnectionAsync;
 use butane::prelude_async::*;
 use butane::{find, ForeignKey};
 use butane_test_helper::*;
@@ -7,7 +7,7 @@ use fake::{Fake, Faker};
 mod common;
 use common::blog::{Blog, Post, Tag};
 
-async fn fake_blog_post(conn: Connection) {
+async fn fake_blog_post(conn: ConnectionAsync) {
     let mut fake_blog: Blog = Faker.fake();
     fake_blog.save(&conn).await.unwrap();
 

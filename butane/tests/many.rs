@@ -1,4 +1,4 @@
-use butane::db::Connection;
+use butane::db::ConnectionAsync;
 use butane::prelude_async::*;
 use butane::{model, query::OrderDirection, AutoPk, Many};
 use butane_test_helper::testall;
@@ -47,7 +47,7 @@ struct AutoItem {
     val: String,
 }
 
-async fn load_sorted_from_many(conn: Connection) {
+async fn load_sorted_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
     let mut post = Post::new(
@@ -87,7 +87,7 @@ async fn load_sorted_from_many(conn: Connection) {
 }
 testall!(load_sorted_from_many);
 
-async fn remove_one_from_many(conn: Connection) {
+async fn remove_one_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
     let mut post = Post::new(
@@ -114,7 +114,7 @@ async fn remove_one_from_many(conn: Connection) {
 }
 testall!(remove_one_from_many);
 
-async fn remove_multiple_from_many(conn: Connection) {
+async fn remove_multiple_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
     let mut post = Post::new(
@@ -144,7 +144,7 @@ async fn remove_multiple_from_many(conn: Connection) {
 }
 testall!(remove_multiple_from_many);
 
-async fn delete_all_from_many(conn: Connection) {
+async fn delete_all_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
     let mut post = Post::new(
@@ -171,7 +171,7 @@ async fn delete_all_from_many(conn: Connection) {
 }
 testall!(delete_all_from_many);
 
-async fn can_add_to_many_before_save(conn: Connection) {
+async fn can_add_to_many_before_save(conn: ConnectionAsync) {
     // Verify that for an object with an auto-pk, we can add items to a Many field before we actually
     // save the original object (and thus get the actual pk);
     let mut obj = AutoPkWithMany::new();
@@ -185,7 +185,7 @@ async fn can_add_to_many_before_save(conn: Connection) {
 }
 testall!(can_add_to_many_before_save);
 
-async fn cant_add_unsaved_to_many(_conn: Connection) {
+async fn cant_add_unsaved_to_many(_conn: ConnectionAsync) {
     let unsaved_item = AutoItem {
         id: AutoPk::uninitialized(),
         val: "shiny".to_string(),
@@ -199,7 +199,7 @@ async fn cant_add_unsaved_to_many(_conn: Connection) {
 }
 testall!(cant_add_unsaved_to_many);
 
-async fn can_add_to_many_with_custom_table_name(conn: Connection) {
+async fn can_add_to_many_with_custom_table_name(conn: ConnectionAsync) {
     let mut obj = RenamedAutoPkWithMany::new();
     obj.tags.add(&create_tag(&conn, "blue").await).unwrap();
     obj.tags.add(&create_tag(&conn, "red").await).unwrap();

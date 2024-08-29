@@ -187,7 +187,7 @@ pub mod prelude {
 
     pub use super::prelude_common::*;
 
-    pub use butane_core::db::sync::BackendConnection;
+    pub use butane_core::db::BackendConnection;
     pub use butane_core::many::ManyOpSync;
     pub use butane_core::query::QueryOpSync;
     pub use butane_core::DataObjectOpSync;
@@ -199,7 +199,7 @@ pub mod prelude_async {
     //! Its use is recommended, but not required.
     pub use super::prelude_common::*;
 
-    pub use butane_core::db::BackendConnection;
+    pub use butane_core::db::BackendConnectionAsync;
     pub use butane_core::many::ManyOpAsync;
     pub use butane_core::query::QueryOpAsync;
     pub use butane_core::DataObjectOpAsync;

@@ -2,11 +2,9 @@
 //! Macros depend on [`butane_core`], `env_logger` and [`log`].
 #![deny(missing_docs)]
 
-use butane_core::db::sync::BackendConnection as BackendConnectionSync;
-use butane_core::db::sync::Connection as ConnectionSync;
 use butane_core::db::{
-    connect, connect_async, get_backend, pg, sqlite, Backend, BackendConnection, Connection,
-    ConnectionSpec,
+    connect, connect_async, get_backend, pg, sqlite, Backend, BackendConnection,
+    BackendConnectionAsync, Connection, ConnectionAsync, ConnectionSpec,
 };
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
@@ -21,7 +19,7 @@ use block_id::{Alphabet, BlockId};
 use uuid::Uuid;
 
 /// Create a postgres [`Connection`].
-pub fn pg_connection() -> (ConnectionSync, PgSetupData) {
+pub fn pg_connection() -> (Connection, PgSetupData) {
     let backend = get_backend(pg::BACKEND_NAME).unwrap();
     let data = pg_setup_sync();
     (backend.connect(&pg_connstr(&data)).unwrap(), data)
@@ -168,7 +166,7 @@ pub fn pg_setup_sync() -> PgSetupData {
     log::info!("new db is `{}`", &new_dbname);
 
     let mut conn = connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
-    log::debug!("closed is {}", BackendConnectionSync::is_closed(&conn));
+    log::debug!("closed is {}", BackendConnection::is_closed(&conn));
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .unwrap();
 
@@ -197,7 +195,10 @@ pub async fn pg_setup() -> PgSetupData {
     let mut conn = connect_async(&ConnectionSpec::new("pg", &connstr))
         .await
         .unwrap();
-    log::debug!("[async]closed is {}", BackendConnection::is_closed(&conn));
+    log::debug!(
+        "[async]closed is {}",
+        BackendConnectionAsync::is_closed(&conn)
+    );
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .await
         .unwrap();
@@ -246,21 +247,21 @@ pub fn create_current_migrations(backend: Box<dyn Backend>) -> MemMigrations {
 }
 
 /// Populate the database schema.
-pub async fn setup_db_async(conn: &mut Connection) {
+pub async fn setup_db_async(conn: &mut ConnectionAsync) {
     let mem_migrations = create_current_migrations(conn.backend());
     log::info!("created current migration");
     mem_migrations.migrate_async(conn).await.unwrap();
 }
 
 /// Populate the database schema.
-pub fn setup_db(conn: &mut ConnectionSync) {
+pub fn setup_db(conn: &mut Connection) {
     let mem_migrations = create_current_migrations(conn.backend());
     log::info!("created current migration");
     mem_migrations.migrate(conn).unwrap();
 }
 
 /// Create a sqlite [`Connection`].
-pub fn sqlite_connection() -> ConnectionSync {
+pub fn sqlite_connection() -> Connection {
     let backend = get_backend(sqlite::BACKEND_NAME).unwrap();
     backend.connect(":memory:").unwrap()
 }

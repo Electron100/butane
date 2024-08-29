@@ -25,8 +25,7 @@ pub mod uuid;
 
 pub use autopk::AutoPk;
 use custom::SqlTypeCustom;
-use db::sync::ConnectionMethods as ConnectionMethodsSync;
-use db::{BackendRow, Column, ConnectionMethods};
+use db::{BackendRow, Column, ConnectionMethods, ConnectionMethodsAsync};
 pub use query::Query;
 pub use sqlval::{AsPrimaryKey, FieldType, FromSql, PrimaryKeyType, SqlVal, SqlValRef, ToSql};
 
@@ -74,11 +73,14 @@ pub mod internal {
 
         /// Saves many-to-many relationships pointed to by fields on this model.
         /// Performed automatically by `save`. You do not need to call this directly.
-        async fn save_many_to_many_async(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+        async fn save_many_to_many_async(
+            &mut self,
+            conn: &impl ConnectionMethodsAsync,
+        ) -> Result<()>;
 
         /// Saves many-to-many relationships pointed to by fields on this model.
         /// Performed automatically by `save`. You do not need to call this directly.
-        fn save_many_to_many_sync(&mut self, conn: &impl ConnectionMethodsSync) -> Result<()>;
+        fn save_many_to_many_sync(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
         /// Returns the Sql values of all columns except not any auto columns.
         /// Used internally. You are unlikely to need to call this directly.
@@ -112,7 +114,7 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
 #[allow(async_fn_in_trait)] // Implementation is intended to be through procmacro
 #[maybe_async_cfg::maybe(
     idents(
-        ConnectionMethods(sync = "ConnectionMethodsSync", async),
+        ConnectionMethods(sync = "ConnectionMethods"),
         save_many_to_many(sync = "save_many_to_many_sync", async = "save_many_to_many_async"),
         QueryOp,
     ),

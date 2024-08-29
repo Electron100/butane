@@ -1,11 +1,11 @@
-use butane::db::{BackendConnection, Connection};
+use butane::db::{BackendConnectionAsync, ConnectionAsync};
 use butane::migrations::Migrations;
 use butane::DataObjectOpAsync;
 use butane_test_helper::*;
 
 use newtype::models::{Blog, Post, Tags};
 
-async fn insert_data(connection: &Connection) {
+async fn insert_data(connection: &ConnectionAsync) {
     if connection.backend_name() == "sqlite" {
         // https://github.com/Electron100/butane/issues/226
         return;
@@ -27,7 +27,7 @@ async fn insert_data(connection: &Connection) {
     post.save(connection).await.unwrap();
 }
 
-async fn migrate_and_unmigrate(mut connection: Connection) {
+async fn migrate_and_unmigrate(mut connection: ConnectionAsync) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();

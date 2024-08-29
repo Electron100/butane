@@ -1,4 +1,4 @@
-use butane::db::Connection;
+use butane::db::ConnectionAsync;
 use butane::model;
 use butane::prelude_async::*;
 use butane_test_helper::*;
@@ -16,7 +16,7 @@ impl FooUU {
     }
 }
 
-async fn basic_uuid(conn: Connection) {
+async fn basic_uuid(conn: ConnectionAsync) {
     //create
     let id = Uuid::new_v4();
     #[allow(clippy::disallowed_names)]

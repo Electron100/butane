@@ -1,4 +1,4 @@
-use butane::db::Connection;
+use butane::db::ConnectionAsync;
 use butane::prelude_async::*;
 use butane::query::BoolExpr;
 use butane::{colname, filter, find, query, Many};
@@ -10,7 +10,7 @@ mod common;
 use common::blog;
 use common::blog::{Blog, Post, PostMetadata, Tag};
 
-async fn equality(conn: Connection) {
+async fn equality(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, published == true).load(&conn).await.unwrap();
     assert_eq!(posts.len(), 3);
@@ -21,7 +21,7 @@ async fn equality(conn: Connection) {
 }
 testall!(equality);
 
-async fn equality_separate_dataresult(conn: Connection) {
+async fn equality_separate_dataresult(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(PostMetadata, published == true)
         .load(&conn)
@@ -35,7 +35,7 @@ async fn equality_separate_dataresult(conn: Connection) {
 }
 testall!(equality_separate_dataresult);
 
-async fn ordered(conn: Connection) {
+async fn ordered(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = query!(Post, published == true)
         .order_asc(colname!(Post, title))
@@ -49,7 +49,7 @@ async fn ordered(conn: Connection) {
 }
 testall!(ordered);
 
-async fn comparison(conn: Connection) {
+async fn comparison(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, likes < 5).load(&conn).await.unwrap();
     assert_eq!(posts.len(), 2);
@@ -59,7 +59,7 @@ async fn comparison(conn: Connection) {
 }
 testall!(comparison);
 
-async fn like(conn: Connection) {
+async fn like(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, title.like("M%")).load(&conn).await.unwrap();
     assert_eq!(posts.len(), 2);
@@ -69,7 +69,7 @@ async fn like(conn: Connection) {
 }
 testall!(like);
 
-async fn combination(conn: Connection) {
+async fn combination(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = query!(Post, published == true && likes < 5)
         .load(&conn)
@@ -80,7 +80,7 @@ async fn combination(conn: Connection) {
 }
 testall!(combination);
 
-async fn combination_allof(conn: Connection) {
+async fn combination_allof(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = Post::query()
         .filter(BoolExpr::AllOf(vec![
@@ -96,7 +96,7 @@ async fn combination_allof(conn: Connection) {
 }
 testall!(combination_allof);
 
-async fn not_found(conn: Connection) {
+async fn not_found(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = query!(Post, published == false && likes > 5)
         .load(&conn)
@@ -106,7 +106,7 @@ async fn not_found(conn: Connection) {
 }
 testall!(not_found);
 
-async fn rustval(conn: Connection) {
+async fn rustval(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     // We don't need to escape into rust for this, but we can
     let post = find!(Post, title == { "The Tiger" }, &conn).unwrap();
@@ -119,7 +119,7 @@ async fn rustval(conn: Connection) {
 }
 testall!(rustval);
 
-async fn fkey_match(conn: Connection) {
+async fn fkey_match(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let blog: Blog = find!(Blog, name == "Cats", &conn).unwrap();
     let mut posts = query!(Post, blog == { &blog }).load(&conn).await.unwrap();
@@ -141,7 +141,7 @@ async fn fkey_match(conn: Connection) {
 }
 testall!(fkey_match);
 
-async fn many_load(conn: Connection) {
+async fn many_load(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let post: Post = find!(Post, title == "The Tiger", &conn).unwrap();
     let tags = post.tags.load(&conn).await.unwrap();
@@ -152,7 +152,7 @@ async fn many_load(conn: Connection) {
 }
 testall!(many_load);
 
-async fn many_serialize(conn: Connection) {
+async fn many_serialize(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let post: Post = find!(Post, title == "The Tiger", &conn).unwrap();
     let tags_json: String = serde_json::to_string(&post.tags).unwrap();
@@ -165,7 +165,7 @@ async fn many_serialize(conn: Connection) {
 }
 testall!(many_serialize);
 
-async fn many_objects_with_tag(conn: Connection) {
+async fn many_objects_with_tag(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, tags.contains("danger"))
         .load(&conn)
@@ -178,7 +178,7 @@ async fn many_objects_with_tag(conn: Connection) {
 }
 testall!(many_objects_with_tag);
 
-async fn many_objects_with_tag_explicit(conn: Connection) {
+async fn many_objects_with_tag_explicit(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, tags.contains(tag == "danger"))
         .load(&conn)
@@ -192,7 +192,7 @@ async fn many_objects_with_tag_explicit(conn: Connection) {
 testall!(many_objects_with_tag_explicit);
 
 #[cfg(feature = "datetime")]
-async fn by_timestamp(conn: Connection) {
+async fn by_timestamp(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut post = find!(Post, title == "Sir Charles", &conn).unwrap();
     // Pretend this post was published in 1970
@@ -234,7 +234,7 @@ async fn by_timestamp(conn: Connection) {
 #[cfg(feature = "datetime")]
 testall!(by_timestamp);
 
-async fn limit(conn: Connection) {
+async fn limit(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = Post::query()
         .order_asc(colname!(Post, title))
@@ -248,7 +248,7 @@ async fn limit(conn: Connection) {
 }
 testall!(limit);
 
-async fn offset(conn: Connection) {
+async fn offset(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     // Now get the more posts after the two we got in the limit test above
     let posts = Post::query()

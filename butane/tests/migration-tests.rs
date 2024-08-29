@@ -1,4 +1,4 @@
-use butane::db::sync::{BackendConnection, Connection};
+use butane::db::{BackendConnection, Connection};
 use butane::migrations::{MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
 use butane::{SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};

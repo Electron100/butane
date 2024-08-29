@@ -11,8 +11,10 @@ use super::connmethods::VecRows;
 use super::helper;
 use crate::custom::{SqlTypeCustom, SqlValRefCustom};
 use crate::db::{
-    Backend, BackendConnection, BackendRow, BackendTransaction, Column, Connection,
-    ConnectionMethods, RawQueryResult, SyncAdapter, Transaction,
+    Backend, BackendConnectionAsync as BackendConnection, BackendRow,
+    BackendTransactionAsync as BackendTransaction, Column, Connection, ConnectionAsync,
+    ConnectionMethodsAsync as ConnectionMethods, RawQueryResult, SyncAdapter,
+    TransactionAsync as Transaction,
 };
 use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
 use crate::query::{BoolExpr, Expr};
@@ -49,14 +51,14 @@ impl Backend for PgBackend {
         Ok(lines.join("\n"))
     }
 
-    fn connect(&self, path: &str) -> Result<super::sync::Connection> {
+    fn connect(&self, path: &str) -> Result<Connection> {
         debug!("connecting via sync adapter");
         let conn = SyncAdapter::new(self.clone())?.connect(path)?;
         Ok(conn)
     }
 
-    async fn connect_async(&self, path: &str) -> Result<Connection> {
-        Ok(Connection {
+    async fn connect_async(&self, path: &str) -> Result<ConnectionAsync> {
+        Ok(ConnectionAsync {
             conn: Box::new(PgConnection::open(path).await?),
         })
     }

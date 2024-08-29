@@ -1,5 +1,5 @@
 // Tests deriving FieldType for an enum
-use butane::db::Connection;
+use butane::db::ConnectionAsync;
 use butane::prelude_async::*;
 use butane::{model, query};
 use butane::{FieldType, FromSql, SqlVal, ToSql};
@@ -24,7 +24,7 @@ impl HasCustomField2 {
     }
 }
 
-async fn roundtrip_custom_type(conn: Connection) {
+async fn roundtrip_custom_type(conn: ConnectionAsync) {
     //create
     let mut obj = HasCustomField2::new(1, Whatsit::Foo);
     obj.save(&conn).await.unwrap();
@@ -35,7 +35,7 @@ async fn roundtrip_custom_type(conn: Connection) {
 }
 testall!(roundtrip_custom_type);
 
-async fn query_custom_type(conn: Connection) {
+async fn query_custom_type(conn: ConnectionAsync) {
     //create
     let mut obj_foo = HasCustomField2::new(1, Whatsit::Foo);
     obj_foo.save(&conn).await.unwrap();

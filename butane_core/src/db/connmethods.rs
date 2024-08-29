@@ -7,71 +7,61 @@ use std::ops::{Deref, DerefMut};
 use crate::query::{BoolExpr, Expr, Order};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
 
-mod internal {
-    use super::*;
-
-    /// Methods available on a database connection. Most users do not need
-    /// to call these methods directly and will instead use methods on
-    /// [DataObject][crate::DataObject] or the `query!` macro. This trait is
-    /// implemented by both database connections and transactions.
-    #[maybe_async_cfg::maybe(sync(), async())]
-    #[async_trait(?Send)]
-    pub trait ConnectionMethods {
-        async fn execute(&self, sql: &str) -> Result<()>;
-        async fn query<'c>(
-            &'c self,
-            table: &str,
-            columns: &[Column],
-            expr: Option<BoolExpr>,
-            limit: Option<i32>,
-            offset: Option<i32>,
-            sort: Option<&[Order]>,
-        ) -> Result<RawQueryResult<'c>>;
-        async fn insert_returning_pk(
-            &self,
-            table: &str,
-            columns: &[Column],
-            pkcol: &Column,
-            values: &[SqlValRef<'_>],
-        ) -> Result<SqlVal>;
-        /// Like `insert_returning_pk` but with no return value
-        async fn insert_only(
-            &self,
-            table: &str,
-            columns: &[Column],
-            values: &[SqlValRef<'_>],
-        ) -> Result<()>;
-        /// Insert unless there's a conflict on the primary key column, in which case update
-        async fn insert_or_replace(
-            &self,
-            table: &str,
-            columns: &[Column],
-            pkcol: &Column,
-            values: &[SqlValRef<'_>],
-        ) -> Result<()>;
-        async fn update(
-            &self,
-            table: &str,
-            pkcol: Column,
-            pk: SqlValRef<'_>,
-            columns: &[Column],
-            values: &[SqlValRef<'_>],
-        ) -> Result<()>;
-        async fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
-            self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))
-                .await?;
-            Ok(())
-        }
-        async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize>;
-        /// Tests if a table exists in the database.
-        async fn has_table(&self, table: &str) -> Result<bool>;
+/// Methods available on a database connection. Most users do not need
+/// to call these methods directly and will instead use methods on
+/// [DataObject][crate::DataObject] or the `query!` macro. This trait is
+/// implemented by both database connections and transactions.
+#[maybe_async_cfg::maybe(sync(keep_self), async(self = "ConnectionMethodsAsync"))]
+#[async_trait(?Send)]
+pub trait ConnectionMethods {
+    async fn execute(&self, sql: &str) -> Result<()>;
+    async fn query<'c>(
+        &'c self,
+        table: &str,
+        columns: &[Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+        offset: Option<i32>,
+        sort: Option<&[Order]>,
+    ) -> Result<RawQueryResult<'c>>;
+    async fn insert_returning_pk(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<SqlVal>;
+    /// Like `insert_returning_pk` but with no return value
+    async fn insert_only(
+        &self,
+        table: &str,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()>;
+    /// Insert unless there's a conflict on the primary key column, in which case update
+    async fn insert_or_replace(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<()>;
+    async fn update(
+        &self,
+        table: &str,
+        pkcol: Column,
+        pk: SqlValRef<'_>,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()>;
+    async fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
+        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))
+            .await?;
+        Ok(())
     }
-}
-
-pub use internal::ConnectionMethodsAsync as ConnectionMethods;
-
-pub mod sync {
-    pub use super::internal::ConnectionMethodsSync as ConnectionMethods;
+    async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize>;
+    /// Tests if a table exists in the database.
+    async fn has_table(&self, table: &str) -> Result<bool>;
 }
 
 /// Represents a database column. Most users do not need to use this

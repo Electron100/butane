@@ -1,7 +1,7 @@
-use butane_core::db::{connect_async, BackendConnection, Connection, ConnectionSpec};
+use butane_core::db::{connect_async, BackendConnectionAsync, ConnectionAsync, ConnectionSpec};
 use butane_test_helper::*;
 
-async fn connection_not_closed(conn: Connection) {
+async fn connection_not_closed(conn: ConnectionAsync) {
     assert!(!conn.is_closed());
 }
 testall_no_migrate!(connection_not_closed);
@@ -61,7 +61,7 @@ async fn unreachable_pg_connection() {
     }
 }
 
-async fn debug_connection(conn: Connection) {
+async fn debug_connection(conn: ConnectionAsync) {
     let backend_name = conn.backend_name();
 
     let debug_str = format!("{:?}", conn);

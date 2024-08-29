@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_names)]
 
-use butane::db::Connection;
+use butane::db::ConnectionAsync;
 use butane::{butane_type, find, model, query, AutoPk, ForeignKey};
 use butane::{colname, prelude_async::*};
 use butane_test_helper::*;
@@ -109,7 +109,7 @@ struct TimeHolder {
     pub when: chrono::DateTime<Utc>,
 }
 
-async fn basic_crud(conn: Connection) {
+async fn basic_crud(conn: ConnectionAsync) {
     //create
     let mut foo = Foo::new(1);
     foo.bam = 0.1;
@@ -143,7 +143,7 @@ async fn basic_crud(conn: Connection) {
 }
 testall!(basic_crud);
 
-async fn basic_find(conn: Connection) {
+async fn basic_find(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
@@ -160,7 +160,7 @@ async fn basic_find(conn: Connection) {
 }
 testall!(basic_find);
 
-async fn basic_query(conn: Connection) {
+async fn basic_query(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
@@ -182,7 +182,7 @@ async fn basic_query(conn: Connection) {
 }
 testall!(basic_query);
 
-async fn basic_query_delete(conn: Connection) {
+async fn basic_query_delete(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
@@ -210,7 +210,7 @@ async fn basic_query_delete(conn: Connection) {
 }
 testall!(basic_query_delete);
 
-async fn string_pk(conn: Connection) {
+async fn string_pk(conn: ConnectionAsync) {
     let mut foo = Foo::new(1);
     foo.save(&conn).await.unwrap();
     let mut bar = Bar::new("tarzan", foo);
@@ -221,7 +221,7 @@ async fn string_pk(conn: Connection) {
 }
 testall!(string_pk);
 
-async fn foreign_key(conn: Connection) {
+async fn foreign_key(conn: ConnectionAsync) {
     let mut foo = Foo::new(1);
     foo.save(&conn).await.unwrap();
     let mut bar = Bar::new("tarzan", foo.clone());
@@ -236,7 +236,7 @@ async fn foreign_key(conn: Connection) {
 }
 testall!(foreign_key);
 
-async fn auto_pk(conn: Connection) {
+async fn auto_pk(conn: ConnectionAsync) {
     let mut baz1 = Baz::new("baz1");
     baz1.save(&conn).await.unwrap();
     let mut baz2 = Baz::new("baz2");
@@ -248,7 +248,7 @@ async fn auto_pk(conn: Connection) {
 }
 testall!(auto_pk);
 
-async fn only_pk(conn: Connection) {
+async fn only_pk(conn: ConnectionAsync) {
     let mut obj = HasOnlyPk::new(1);
     obj.save(&conn).await.unwrap();
     assert_eq!(obj.id, 1);
@@ -260,7 +260,7 @@ async fn only_pk(conn: Connection) {
 }
 testall!(only_pk);
 
-async fn only_auto_pk(conn: Connection) {
+async fn only_auto_pk(conn: ConnectionAsync) {
     let mut obj = HasOnlyAutoPk::default();
     obj.save(&conn).await.unwrap();
     let pk = obj.id;
@@ -272,7 +272,7 @@ async fn only_auto_pk(conn: Connection) {
 }
 testall!(only_auto_pk);
 
-async fn basic_committed_transaction(mut conn: Connection) {
+async fn basic_committed_transaction(mut conn: ConnectionAsync) {
     let tr = conn.transaction().await.unwrap();
 
     // Create an object with a transaction and commit it
@@ -287,7 +287,7 @@ async fn basic_committed_transaction(mut conn: Connection) {
 }
 testall!(basic_committed_transaction);
 
-async fn basic_dropped_transaction(mut conn: Connection) {
+async fn basic_dropped_transaction(mut conn: ConnectionAsync) {
     // Create an object with a transaction but never commit it
     {
         let tr = conn.transaction().await.unwrap();
@@ -305,7 +305,7 @@ async fn basic_dropped_transaction(mut conn: Connection) {
 }
 testall!(basic_dropped_transaction);
 
-async fn basic_rollback_transaction(mut conn: Connection) {
+async fn basic_rollback_transaction(mut conn: ConnectionAsync) {
     let tr = conn.transaction().await.unwrap();
 
     // Create an object with a transaction but then roll back the transaction
@@ -323,7 +323,7 @@ async fn basic_rollback_transaction(mut conn: Connection) {
 }
 testall!(basic_rollback_transaction);
 
-async fn basic_unique_field_error_on_non_unique(conn: Connection) {
+async fn basic_unique_field_error_on_non_unique(conn: ConnectionAsync) {
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
     foo1.save(&conn).await.unwrap();
@@ -347,7 +347,7 @@ async fn basic_unique_field_error_on_non_unique(conn: Connection) {
 }
 testall!(basic_unique_field_error_on_non_unique);
 
-async fn fkey_same_type(conn: Connection) {
+async fn fkey_same_type(conn: ConnectionAsync) {
     let mut o1 = SelfReferential::new(1);
     let mut o2 = SelfReferential::new(2);
     o2.save(&conn).await.unwrap();
@@ -362,7 +362,7 @@ async fn fkey_same_type(conn: Connection) {
 }
 testall!(fkey_same_type);
 
-async fn cant_save_unsaved_fkey(conn: Connection) {
+async fn cant_save_unsaved_fkey(conn: ConnectionAsync) {
     let foo = Foo::new(1);
     let mut bar = Bar::new("tarzan", foo);
     assert!(bar.save(&conn).await.is_err());
@@ -370,7 +370,7 @@ async fn cant_save_unsaved_fkey(conn: Connection) {
 testall!(cant_save_unsaved_fkey);
 
 #[cfg(feature = "datetime")]
-async fn basic_time(conn: Connection) {
+async fn basic_time(conn: ConnectionAsync) {
     let now = Utc::now();
     let mut time = TimeHolder {
         id: 1,
@@ -388,7 +388,7 @@ async fn basic_time(conn: Connection) {
 #[cfg(feature = "datetime")]
 testall!(basic_time);
 
-async fn basic_load_first(conn: Connection) {
+async fn basic_load_first(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
@@ -409,7 +409,7 @@ async fn basic_load_first(conn: Connection) {
 }
 testall!(basic_load_first);
 
-async fn basic_load_first_ordered(conn: Connection) {
+async fn basic_load_first_ordered(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
@@ -440,7 +440,7 @@ async fn basic_load_first_ordered(conn: Connection) {
 }
 testall!(basic_load_first_ordered);
 
-async fn save_upserts_by_default(conn: Connection) {
+async fn save_upserts_by_default(conn: ConnectionAsync) {
     let mut foo = Foo::new(1);
     foo.bar = 42;
     foo.save(&conn).await.unwrap();

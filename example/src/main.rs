@@ -1,5 +1,5 @@
 //! Simple example with all code in a single file.
-use butane::db::{Connection, ConnectionSpec};
+use butane::db::{ConnectionAsync, ConnectionSpec};
 use butane::prelude_async::*;
 use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};
 
@@ -90,7 +90,7 @@ async fn query() -> Result<()> {
     Ok(())
 }
 
-async fn establish_connection() -> Result<Connection> {
+async fn establish_connection() -> Result<ConnectionAsync> {
     let mut cwd = std::env::current_dir()?;
     cwd.push(".butane");
     let spec = ConnectionSpec::load(cwd)?;

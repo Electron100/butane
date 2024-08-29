@@ -1,4 +1,4 @@
-use butane::db::Connection;
+use butane::db::ConnectionAsync;
 use butane::prelude_async::*;
 use butane::{model, query};
 use butane_test_helper::*;
@@ -15,7 +15,7 @@ impl WithNullable {
     }
 }
 
-async fn basic_optional(conn: Connection) {
+async fn basic_optional(conn: ConnectionAsync) {
     let mut with_none = WithNullable::new(1);
     with_none.save(&conn).await.unwrap();
 
@@ -31,7 +31,7 @@ async fn basic_optional(conn: Connection) {
 }
 testall!(basic_optional);
 
-async fn query_optional_with_some(conn: Connection) {
+async fn query_optional_with_some(conn: ConnectionAsync) {
     let mut obj = WithNullable::new(1);
     obj.save(&conn).await.unwrap();
 
@@ -55,7 +55,7 @@ async fn query_optional_with_some(conn: Connection) {
 }
 testall!(query_optional_with_some);
 
-async fn query_optional_with_none(conn: Connection) {
+async fn query_optional_with_none(conn: ConnectionAsync) {
     let mut obj = WithNullable::new(1);
     obj.save(&conn).await.unwrap();
 

@@ -86,7 +86,7 @@ impl<T: DataObject> ForeignKey<T> {
 impl<T: DataObject + Send> ForeignKey<T> {
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to it.
-    pub async fn load(&self, conn: &impl crate::ConnectionMethods) -> Result<&T> {
+    pub async fn load(&self, conn: &impl crate::ConnectionMethodsAsync) -> Result<&T> {
         use crate::DataObjectOpAsync;
         self.val
             .get_or_try_init(|| async {

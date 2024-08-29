@@ -1,11 +1,11 @@
 //! Test the "current" migration created by the butane_test_helper due to
 //! all of the other tests in the butane/tests directory.
 #![cfg(test)]
-use butane::db::{BackendConnection, Connection};
+use butane::db::{BackendConnectionAsync, ConnectionAsync};
 use butane::migrations::{Migration, Migrations};
 use butane_test_helper::*;
 
-async fn unmigrate(mut connection: Connection) {
+async fn unmigrate(mut connection: ConnectionAsync) {
     let mem_migrations = create_current_migrations(connection.backend());
 
     connection

@@ -165,6 +165,15 @@ macro_rules! colname {
 #[macro_export]
 macro_rules! find {
     ($dbobj:ident, $filter:expr, $conn:expr) => {
+        butane::query::QueryOpSync::load(butane::query!($dbobj, $filter).limit(1), $conn)
+            .and_then(|mut results| results.pop().ok_or(butane::Error::NoSuchObject))
+    };
+}
+
+/// Like [`find`], but for async
+#[macro_export]
+macro_rules! find_async {
+    ($dbobj:ident, $filter:expr, $conn:expr) => {
         // todo sync version
         butane::query::QueryOpAsync::load(butane::query!($dbobj, $filter).limit(1), $conn)
             .await
@@ -188,6 +197,7 @@ pub mod prelude {
     pub use super::prelude_common::*;
 
     pub use butane_core::db::BackendConnection;
+    pub use butane_core::fkey::ForeignKeyOpSync;
     pub use butane_core::many::ManyOpSync;
     pub use butane_core::query::QueryOpSync;
     pub use butane_core::DataObjectOpSync;
@@ -200,6 +210,7 @@ pub mod prelude_async {
     pub use super::prelude_common::*;
 
     pub use butane_core::db::BackendConnectionAsync;
+    pub use butane_core::fkey::ForeignKeyOpAsync;
     pub use butane_core::many::ManyOpAsync;
     pub use butane_core::query::QueryOpAsync;
     pub use butane_core::DataObjectOpAsync;

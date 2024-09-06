@@ -9,12 +9,15 @@ use fake::{Dummy, Faker};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
-    AsPrimaryKey, DataObject, Error, FieldType, FromSql, Result, SqlType, SqlVal, SqlValRef, ToSql,
+    AsPrimaryKey, ConnectionMethods, ConnectionMethodsAsync, DataObject, Error, FieldType, FromSql,
+    Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
 
 /// Used to implement a relationship between models.
 ///
 /// Initialize using `From` or `from_pk`
+///
+/// See [`ForeignKeyOpSync`] and [`ForeignKeyOpAsync`] for operations requiring a live database connection.
 ///
 /// # Examples
 /// ```ignore
@@ -82,11 +85,26 @@ impl<T: DataObject> ForeignKey<T> {
     }
 }
 
-//todo support sync load with ForeignKey too
-impl<T: DataObject + Send> ForeignKey<T> {
+/// [`Many`] operations which require a `Connection`
+#[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethods"),),
+    sync(),
+    async()
+)]
+pub trait ForeignKeyOp<T: DataObject> {
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to it.
-    pub async fn load(&self, conn: &impl crate::ConnectionMethodsAsync) -> Result<&T> {
+    async fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&T>
+    where
+        T: 'a;
+}
+
+impl<T: DataObject> ForeignKeyOpAsync<T> for ForeignKey<T> {
+    async fn load<'a>(&'a self, conn: &impl ConnectionMethodsAsync) -> Result<&T>
+    where
+        T: 'a,
+    {
         use crate::DataObjectOpAsync;
         self.val
             .get_or_try_init(|| async {
@@ -97,6 +115,20 @@ impl<T: DataObject + Send> ForeignKey<T> {
             })
             .await
             .map(|v| v.as_ref())
+    }
+}
+
+impl<T: DataObject> ForeignKeyOpSync<T> for ForeignKey<T> {
+    fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&T>
+    where
+        T: 'a,
+    {
+        use crate::DataObjectOpSync;
+        get_or_try_init_tokio_once_cell_sync(&self.val, || {
+            let pk = self.valpk.get().unwrap();
+            T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
+        })
+        .map(|v| v.as_ref())
     }
 }
 
@@ -196,6 +228,28 @@ where
         D: Deserializer<'de>,
     {
         Ok(Self::from_pk(T::PKType::deserialize(deserializer)?))
+    }
+}
+
+/// Wrapper around tokio's OnceCell get_or_try_init method
+/// This is a sync version which provides the same semantics with a spinlock, as simultaneous initialization should be very rare.
+fn get_or_try_init_tokio_once_cell_sync<'a, T, F>(cell: &'a OnceCell<T>, f: F) -> Result<&'a T>
+where
+    F: Fn() -> Result<T>,
+{
+    match cell.get() {
+        Some(val) => Ok(val),
+        None => {
+            loop {
+                match cell.set(f()?) {
+                    Ok(()) => break,
+                    Err(tokio::sync::SetError::AlreadyInitializedError(_)) => break,
+                    Err(tokio::sync::SetError::InitializingError(_)) => continue, // spinlock
+                }
+            }
+            // Error should be impossible here, we should have already ensured init (or returned error).
+            cell.get().ok_or(Error::NotInitialized)
+        }
     }
 }
 

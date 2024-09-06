@@ -118,7 +118,7 @@ impl Column {
 
 /// Representation of a database query.
 /// See [`QueryOpSync`] and [`QueryOpAsync`] for operations requiring a live database connection.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Query<T: DataResult> {
     table: TblName,
     filter: Option<BoolExpr>,
@@ -181,6 +181,20 @@ impl<T: DataResult> Query<T> {
     /// Shorthand for `order(column, OrderDirection::Descending)`
     pub fn order_desc(self, column: &'static str) -> Query<T> {
         self.order(column, OrderDirection::Descending)
+    }
+}
+
+// Explicit impl so that Clone is implemented even if T is not Clone
+impl<T: DataResult> Clone for Query<T> {
+    fn clone(&self) -> Self {
+        Query {
+            table: self.table.clone(),
+            filter: self.filter.clone(),
+            limit: self.limit.clone(),
+            offset: self.offset.clone(),
+            sort: self.sort.clone(),
+            phantom: PhantomData,
+        }
     }
 }
 

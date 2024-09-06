@@ -153,10 +153,8 @@ macro_rules! colname {
 ///   nationality: String
 /// }
 ///
-/// # tokio_test::block_on(async {
-/// let conn = butane::db::connect_async(&ConnectionSpec::new("sqlite", "foo.db")).await.unwrap();
+/// let conn = butane::db::connect(&ConnectionSpec::new("sqlite", "foo.db")).unwrap();
 /// let alice: Result<Contestant, butane::Error> = find!(Contestant, name == "Alice", &conn);
-/// # })
 ///```
 ///
 /// [`filter]: crate::filter

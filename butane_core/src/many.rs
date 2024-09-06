@@ -181,13 +181,11 @@ fn load_query_sync<'a, T>(
 where
     T: DataObject + 'a,
 {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-    let future = many
-        .all_values
-        .get_or_try_init(|| async { load_query_uncached_sync(many, conn, query) });
-    rt.block_on(future).map(|v| v.iter())
+    crate::sync::get_or_try_init_tokio_once_cell_sync(&many.all_values, || {
+        // TODO it would be nice to avoid this clone
+        load_query_uncached_sync(many, conn, query.clone())
+    })
+    .map(|v| v.iter())
 }
 
 /// [`Many`] operations which require a `Connection`

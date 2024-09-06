@@ -19,9 +19,11 @@ pub mod migrations;
 pub mod query;
 pub mod sqlval;
 
-mod autopk;
 #[cfg(feature = "uuid")]
 pub mod uuid;
+
+mod autopk;
+mod sync;
 
 pub use autopk::AutoPk;
 use custom::SqlTypeCustom;

@@ -124,7 +124,7 @@ impl<T: DataObject> ForeignKeyOpSync<T> for ForeignKey<T> {
         T: 'a,
     {
         use crate::DataObjectOpSync;
-        get_or_try_init_tokio_once_cell_sync(&self.val, || {
+        crate::sync::get_or_try_init_tokio_once_cell_sync(&self.val, || {
             let pk = self.valpk.get().unwrap();
             T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
         })
@@ -228,28 +228,6 @@ where
         D: Deserializer<'de>,
     {
         Ok(Self::from_pk(T::PKType::deserialize(deserializer)?))
-    }
-}
-
-/// Wrapper around tokio's OnceCell get_or_try_init method
-/// This is a sync version which provides the same semantics with a spinlock, as simultaneous initialization should be very rare.
-fn get_or_try_init_tokio_once_cell_sync<'a, T, F>(cell: &'a OnceCell<T>, f: F) -> Result<&'a T>
-where
-    F: Fn() -> Result<T>,
-{
-    match cell.get() {
-        Some(val) => Ok(val),
-        None => {
-            loop {
-                match cell.set(f()?) {
-                    Ok(()) => break,
-                    Err(tokio::sync::SetError::AlreadyInitializedError(_)) => break,
-                    Err(tokio::sync::SetError::InitializingError(_)) => continue, // spinlock
-                }
-            }
-            // Error should be impossible here, we should have already ensured init (or returned error).
-            cell.get().ok_or(Error::NotInitialized)
-        }
     }
 }
 

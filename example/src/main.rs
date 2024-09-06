@@ -1,7 +1,7 @@
 //! Simple example with all code in a single file.
 use butane::db::{ConnectionAsync, ConnectionSpec};
 use butane::prelude_async::*;
-use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};
+use butane::{find_async, model, query, AutoPk, Error, ForeignKey, Many};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -78,7 +78,7 @@ async fn query() -> Result<()> {
         .load(&conn)
         .await?;
     assert!(!tagged_posts.is_empty());
-    let blog: Blog = find!(Blog, name == "Bears", &conn).unwrap();
+    let blog: Blog = find_async!(Blog, name == "Bears", &conn).unwrap();
     let posts_in_blog = query!(Post, blog == { &blog }).load(&conn).await?;
     assert!(!posts_in_blog.is_empty());
     let posts_in_blog = query!(Post, blog == { blog }).load(&conn).await?;

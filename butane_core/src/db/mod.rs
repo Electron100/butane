@@ -213,7 +213,7 @@ impl Connection {
     pub fn new(conn: Box<dyn BackendConnection>) -> Self {
         Self { conn }
     }
-    pub async fn execute(&mut self, sql: impl AsRef<str>) -> Result<()> {
+    pub async fn execute(&self, sql: impl AsRef<str>) -> Result<()> {
         self.conn.execute(sql.as_ref()).await
     }
     // For use with connection_method_wrapper macro

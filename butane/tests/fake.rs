@@ -1,12 +1,13 @@
-use butane::db::ConnectionAsync;
-use butane::prelude_async::*;
-use butane::{find, ForeignKey};
+use butane::db::{Connection, ConnectionAsync};
+use butane::{find, find_async, ForeignKey};
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 use fake::{Fake, Faker};
 
 mod common;
 use common::blog::{Blog, Post, Tag};
 
+#[butane_test]
 async fn fake_blog_post(conn: ConnectionAsync) {
     let mut fake_blog: Blog = Faker.fake();
     fake_blog.save(&conn).await.unwrap();
@@ -26,8 +27,7 @@ async fn fake_blog_post(conn: ConnectionAsync) {
     post.tags.add(&tag_3).unwrap();
     post.save(&conn).await.unwrap();
 
-    let post_from_db = find!(Post, id == { post.id }, &conn).unwrap();
+    let post_from_db = find_async!(Post, id == { post.id }, &conn).unwrap();
     assert_eq!(post_from_db.title, post.title);
     assert_eq!(post_from_db.tags.load(&conn).await.unwrap().count(), 3);
 }
-testall!(fake_blog_post);

@@ -266,6 +266,7 @@ dependencies = [
  "butane_codegen",
  "butane_core",
  "butane_test_helper",
+ "butane_test_macros",
  "cfg-if",
  "chrono",
  "env_logger",
@@ -273,6 +274,7 @@ dependencies = [
  "fake",
  "geo-types",
  "log",
+ "maybe-async-cfg",
  "nonempty",
  "once_cell",
  "paste",
@@ -328,6 +330,7 @@ dependencies = [
  "async-trait",
  "butane_core",
  "butane_test_helper",
+ "butane_test_macros",
  "bytes",
  "cfg-if",
  "chrono",
@@ -371,6 +374,7 @@ version = "0.6.1"
 dependencies = [
  "block-id",
  "butane_core",
+ "env_logger",
  "libc",
  "log",
  "maybe-async-cfg",
@@ -380,6 +384,15 @@ dependencies = [
  "tempfile",
  "tokio-postgres",
  "uuid",
+]
+
+[[package]]
+name = "butane_test_macros"
+version = "0.6.1"
+dependencies = [
+ "proc-macro2 1.0.79",
+ "quote 1.0.35",
+ "syn 2.0.58",
 ]
 
 [[package]]
@@ -976,6 +989,7 @@ dependencies = [
  "butane_cli",
  "butane_core",
  "butane_test_helper",
+ "butane_test_macros",
  "cfg-if",
  "env_logger",
  "log",
@@ -1210,6 +1224,7 @@ dependencies = [
  "butane_cli",
  "butane_core",
  "butane_test_helper",
+ "butane_test_macros",
  "cfg-if",
  "env_logger",
  "fake",

@@ -3,9 +3,12 @@
 use std::collections::{BTreeMap, HashMap};
 
 use butane::model;
-use butane::prelude_async::*;
-use butane::{db::ConnectionAsync, FieldType};
+use butane::{
+    db::{Connection, ConnectionAsync},
+    FieldType,
+};
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -26,6 +29,7 @@ impl FooJJ {
     }
 }
 
+#[butane_test]
 async fn json_null(conn: ConnectionAsync) {
     // create
     let id = 4;
@@ -42,8 +46,8 @@ async fn json_null(conn: ConnectionAsync) {
     let foo3 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(json_null);
 
+#[butane_test]
 async fn basic_json(conn: ConnectionAsync) {
     // create
     let id = 4;
@@ -71,7 +75,6 @@ async fn basic_json(conn: ConnectionAsync) {
     let foo3 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(basic_json);
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -89,6 +92,8 @@ impl FooHH {
         }
     }
 }
+
+#[butane_test]
 async fn basic_hashmap(conn: ConnectionAsync) {
     // create
     let id = 4;
@@ -109,7 +114,6 @@ async fn basic_hashmap(conn: ConnectionAsync) {
     let foo3 = FooHH::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(basic_hashmap);
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -127,6 +131,8 @@ impl FooFullPrefixHashMap {
         }
     }
 }
+
+#[butane_test]
 async fn basic_hashmap_full_prefix(conn: ConnectionAsync) {
     // create
     let id = 4;
@@ -147,7 +153,6 @@ async fn basic_hashmap_full_prefix(conn: ConnectionAsync) {
     let foo3 = FooFullPrefixHashMap::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(basic_hashmap_full_prefix);
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -165,6 +170,8 @@ impl FooBTreeMap {
         }
     }
 }
+
+#[butane_test]
 async fn basic_btreemap(conn: ConnectionAsync) {
     // create
     let id = 4;
@@ -185,7 +192,6 @@ async fn basic_btreemap(conn: ConnectionAsync) {
     let foo3 = FooBTreeMap::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(basic_btreemap);
 
 #[derive(PartialEq, Eq, Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 struct HashedObject {
@@ -209,6 +215,8 @@ impl FooHHO {
         }
     }
 }
+
+#[butane_test]
 async fn hashmap_with_object_values(conn: ConnectionAsync) {
     // create
     let id = 4;
@@ -229,7 +237,6 @@ async fn hashmap_with_object_values(conn: ConnectionAsync) {
     let foo3 = FooHHO::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(hashmap_with_object_values);
 
 #[derive(PartialEq, Eq, Debug, Clone, FieldType, Serialize, Deserialize)]
 struct InlineFoo {
@@ -255,6 +262,7 @@ impl OuterFoo {
     }
 }
 
+#[butane_test]
 async fn inline_json(conn: ConnectionAsync) {
     // create
     let id = 4;
@@ -271,4 +279,3 @@ async fn inline_json(conn: ConnectionAsync) {
     let foo3 = OuterFoo::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(inline_json);

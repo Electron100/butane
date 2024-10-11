@@ -203,6 +203,7 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) ->
                 #cols
             ];
             fn from_row(row: &dyn butane::db::BackendRow) -> butane::Result<Self> {
+                use butane::DataObject;
                 if row.len() != #numdbfields {
                     return Err(butane::Error::BoundsError(
                         "Found unexpected number of columns in row for DataResult".to_string()
@@ -444,7 +445,7 @@ fn impl_many_save(ast_struct: &ItemStruct, config: &Config, is_async: bool) -> T
             quote!(
                 self.#ident.ensure_init(
                     #many_table_lit,
-                    butane::ToSql::to_sql(self.pk()),
+                    butane::ToSql::to_sql(butane::DataObject::pk(self)),
                     #pksqltype,
                 );
                 #save_with_conn

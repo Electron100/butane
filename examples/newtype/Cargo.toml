@@ -26,6 +26,7 @@ uuid = { workspace = true, features = ["serde", "v4"] }
 butane_cli.workspace = true
 butane_core.workspace = true
 butane_test_helper.workspace = true
+butane_test_macros.workspace = true
 cfg-if.workspace = true
 env_logger.workspace = true
 log.workspace = true

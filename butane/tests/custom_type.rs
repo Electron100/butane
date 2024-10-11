@@ -1,8 +1,8 @@
 use butane::db::ConnectionAsync;
-use butane::prelude_async::*;
 use butane::{butane_type, model, query};
 use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
 use butane_test_helper::*;
+use butane_test_macros::*;
 
 #[butane_type(Text)]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -60,6 +60,7 @@ impl HasCustomField {
     }
 }
 
+#[butane_test]
 async fn roundtrip_custom_type(conn: ConnectionAsync) {
     //create
     let mut obj = HasCustomField::new(1, Frobnozzle::Foo);
@@ -69,8 +70,8 @@ async fn roundtrip_custom_type(conn: ConnectionAsync) {
     let obj2 = HasCustomField::get(&conn, 1).await.unwrap();
     assert_eq!(obj, obj2);
 }
-testall!(roundtrip_custom_type);
 
+#[butane_test]
 async fn query_custom_type(conn: ConnectionAsync) {
     //create
     let mut obj_foo = HasCustomField::new(1, Frobnozzle::Foo);
@@ -86,4 +87,3 @@ async fn query_custom_type(conn: ConnectionAsync) {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], obj_bar)
 }
-testall!(query_custom_type);

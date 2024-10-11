@@ -2,10 +2,10 @@
 #[cfg(feature = "pg")]
 mod custom_pg {
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
-    use butane::prelude_async::*;
-    use butane::{butane_type, db::ConnectionAsync, model};
+    use butane::{butane_type, model};
     use butane::{AutoPk, FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
-    use butane_test_helper::{maketest, maketest_pg};
+    use butane_test_helper::*;
+    use butane_test_macros::butane_test;
     use geo_types;
     use tokio_postgres as postgres;
 
@@ -58,6 +58,7 @@ mod custom_pg {
         pt_to: Point,
     }
 
+    #[butane_test(pg)]
     async fn roundtrip_custom(conn: ConnectionAsync) {
         let mut trip = Trip {
             id: AutoPk::uninitialized(),
@@ -69,10 +70,10 @@ mod custom_pg {
         let trip2 = Trip::get(&conn, trip.id).await.unwrap();
         assert_eq!(trip, trip2);
     }
-    maketest_pg!(roundtrip_custom, true);
 
     /*
-        TODO point in postgres doesn't support normal equality, so need
+    TODO point in postgres doesn't support normal equality, so need
+    #[butane_test(pg)]
         fn query_custom(conn: Connection) {
         let origin = Point::new(0.0, 0.0);
         let mut trip1 = Trip {
@@ -92,7 +93,5 @@ mod custom_pg {
         let trips = query!(Trip, pt_from ~= { origin }).load(&conn).unwrap();
         assert_eq!(trips.len(), 1);
         assert_eq!(trip1, trips[0]);
-    }
-
-    maketest_pg!(query_custom);*/
+    }*/
 }

@@ -1,8 +1,8 @@
-use butane::db::ConnectionAsync;
-use butane::prelude_async::*;
+use butane::db::{Connection, ConnectionAsync};
 use butane::query::BoolExpr;
-use butane::{colname, filter, find, query, Many};
+use butane::{colname, filter, find, find_async, query, Many};
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 #[cfg(feature = "datetime")]
 use chrono::{TimeZone, Utc};
 
@@ -10,6 +10,7 @@ mod common;
 use common::blog;
 use common::blog::{Blog, Post, PostMetadata, Tag};
 
+#[butane_test]
 async fn equality(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, published == true).load(&conn).await.unwrap();
@@ -19,8 +20,8 @@ async fn equality(conn: ConnectionAsync) {
     assert_eq!(posts[1].title, "Sir Charles");
     assert_eq!(posts[2].title, "Mount Doom");
 }
-testall!(equality);
 
+#[butane_test]
 async fn equality_separate_dataresult(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(PostMetadata, published == true)
@@ -33,8 +34,8 @@ async fn equality_separate_dataresult(conn: ConnectionAsync) {
     assert_eq!(posts[1].title, "Sir Charles");
     assert_eq!(posts[2].title, "Mount Doom");
 }
-testall!(equality_separate_dataresult);
 
+#[butane_test]
 async fn ordered(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = query!(Post, published == true)
@@ -47,8 +48,8 @@ async fn ordered(conn: ConnectionAsync) {
     assert_eq!(posts[1].title, "Sir Charles");
     assert_eq!(posts[2].title, "The Tiger");
 }
-testall!(ordered);
 
+#[butane_test]
 async fn comparison(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, likes < 5).load(&conn).await.unwrap();
@@ -57,8 +58,8 @@ async fn comparison(conn: ConnectionAsync) {
     assert_eq!(posts[0].title, "The Tiger");
     assert_eq!(posts[1].title, "Mt. Everest");
 }
-testall!(comparison);
 
+#[butane_test]
 async fn like(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, title.like("M%")).load(&conn).await.unwrap();
@@ -67,8 +68,8 @@ async fn like(conn: ConnectionAsync) {
     assert_eq!(posts[0].title, "Mount Doom");
     assert_eq!(posts[1].title, "Mt. Everest");
 }
-testall!(like);
 
+#[butane_test]
 async fn combination(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = query!(Post, published == true && likes < 5)
@@ -78,8 +79,8 @@ async fn combination(conn: ConnectionAsync) {
     assert_eq!(posts.len(), 1);
     assert_eq!(posts[0].title, "The Tiger");
 }
-testall!(combination);
 
+#[butane_test]
 async fn combination_allof(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = Post::query()
@@ -94,8 +95,8 @@ async fn combination_allof(conn: ConnectionAsync) {
     assert_eq!(posts.len(), 1);
     assert_eq!(posts[0].title, "The Tiger");
 }
-testall!(combination_allof);
 
+#[butane_test]
 async fn not_found(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = query!(Post, published == false && likes > 5)
@@ -104,24 +105,24 @@ async fn not_found(conn: ConnectionAsync) {
         .unwrap();
     assert_eq!(posts.len(), 0);
 }
-testall!(not_found);
 
+#[butane_test]
 async fn rustval(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     // We don't need to escape into rust for this, but we can
-    let post = find!(Post, title == { "The Tiger" }, &conn).unwrap();
+    let post = find_async!(Post, title == { "The Tiger" }, &conn).unwrap();
     assert_eq!(post.title, "The Tiger");
 
     // or invoke a function that returns a value
     let f = || "The Tiger";
-    let post2 = find!(Post, title == { f() }, &conn).unwrap();
+    let post2 = find_async!(Post, title == { f() }, &conn).unwrap();
     assert_eq!(post, post2);
 }
-testall!(rustval);
 
+#[butane_test]
 async fn fkey_match(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
-    let blog: Blog = find!(Blog, name == "Cats", &conn).unwrap();
+    let blog: Blog = find_async!(Blog, name == "Cats", &conn).unwrap();
     let mut posts = query!(Post, blog == { &blog }).load(&conn).await.unwrap();
     let posts2 = query!(Post, blog == { blog }).load(&conn).await.unwrap();
     let blog_id = blog.id;
@@ -139,22 +140,22 @@ async fn fkey_match(conn: ConnectionAsync) {
     assert_eq!(posts, posts3);
     assert_eq!(posts, posts4);
 }
-testall!(fkey_match);
 
+#[butane_test]
 async fn many_load(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
-    let post: Post = find!(Post, title == "The Tiger", &conn).unwrap();
+    let post: Post = find_async!(Post, title == "The Tiger", &conn).unwrap();
     let tags = post.tags.load(&conn).await.unwrap();
     let mut tags: Vec<&Tag> = tags.collect();
     tags.sort_by(|t1, t2| t1.tag.partial_cmp(&t2.tag).unwrap());
     assert_eq!(tags[0].tag, "asia");
     assert_eq!(tags[1].tag, "danger");
 }
-testall!(many_load);
 
+#[butane_test]
 async fn many_serialize(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
-    let post: Post = find!(Post, title == "The Tiger", &conn).unwrap();
+    let post: Post = find_async!(Post, title == "The Tiger", &conn).unwrap();
     let tags_json: String = serde_json::to_string(&post.tags).unwrap();
     let tags: Many<Tag> = serde_json::from_str(&tags_json).unwrap();
     let tags = tags.load(&conn).await.unwrap();
@@ -163,8 +164,8 @@ async fn many_serialize(conn: ConnectionAsync) {
     assert_eq!(tags[0].tag, "asia");
     assert_eq!(tags[1].tag, "danger");
 }
-testall!(many_serialize);
 
+#[butane_test]
 async fn many_objects_with_tag(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, tags.contains("danger"))
@@ -176,8 +177,8 @@ async fn many_objects_with_tag(conn: ConnectionAsync) {
     assert_eq!(posts[1].title, "Mount Doom");
     assert_eq!(posts[2].title, "Mt. Everest");
 }
-testall!(many_objects_with_tag);
 
+#[butane_test]
 async fn many_objects_with_tag_explicit(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, tags.contains(tag == "danger"))
@@ -189,12 +190,12 @@ async fn many_objects_with_tag_explicit(conn: ConnectionAsync) {
     assert_eq!(posts[1].title, "Mount Doom");
     assert_eq!(posts[2].title, "Mt. Everest");
 }
-testall!(many_objects_with_tag_explicit);
 
+#[butane_test]
 #[cfg(feature = "datetime")]
 async fn by_timestamp(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
-    let mut post = find!(Post, title == "Sir Charles", &conn).unwrap();
+    let mut post = find_async!(Post, title == "Sir Charles", &conn).unwrap();
     // Pretend this post was published in 1970
     post.pub_time = Some(
         Utc.with_ymd_and_hms(1970, 1, 1, 1, 1, 1)
@@ -204,7 +205,7 @@ async fn by_timestamp(conn: ConnectionAsync) {
     );
     post.save(&conn).await.unwrap();
     // And pretend another post was later in 1971
-    let mut post = find!(Post, title == "The Tiger", &conn).unwrap();
+    let mut post = find_async!(Post, title == "The Tiger", &conn).unwrap();
     post.pub_time = Some(
         Utc.with_ymd_and_hms(1970, 5, 1, 1, 1, 1)
             .single()
@@ -231,9 +232,8 @@ async fn by_timestamp(conn: ConnectionAsync) {
     assert_eq!(posts[0].title, "The Tiger");
     assert_eq!(posts[1].title, "Sir Charles");
 }
-#[cfg(feature = "datetime")]
-testall!(by_timestamp);
 
+#[butane_test]
 async fn limit(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = Post::query()
@@ -246,8 +246,8 @@ async fn limit(conn: ConnectionAsync) {
     assert_eq!(posts[0].title, "Mount Doom");
     assert_eq!(posts[1].title, "Mt. Everest");
 }
-testall!(limit);
 
+#[butane_test]
 async fn offset(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     // Now get the more posts after the two we got in the limit test above
@@ -261,4 +261,3 @@ async fn offset(conn: ConnectionAsync) {
     assert_eq!(posts[0].title, "Sir Charles");
     assert_eq!(posts[1].title, "The Tiger");
 }
-testall!(offset);

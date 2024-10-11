@@ -3,12 +3,13 @@
 #![deny(missing_docs)]
 
 use butane_core::db::{
-    connect, connect_async, get_backend, pg, sqlite, Backend, BackendConnection,
-    BackendConnectionAsync, Connection, ConnectionAsync, ConnectionSpec,
+    connect, connect_async, get_backend, pg, pg::PgBackend, sqlite, sqlite::SQLiteBackend, Backend,
+    ConnectionSpec,
 };
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 use once_cell::sync::Lazy;
 
+use std::future::Future;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -17,6 +18,103 @@ use std::sync::Mutex;
 
 use block_id::{Alphabet, BlockId};
 use uuid::Uuid;
+
+pub use butane_core::db::{BackendConnection, BackendConnectionAsync, Connection, ConnectionAsync};
+pub use maybe_async_cfg;
+
+/// Trait for running a test
+#[allow(async_fn_in_trait)] // Not truly public, only used in butane for testing.
+pub trait BackendTestInstance {
+    /// Run a synchronous test.
+    fn run_test_sync(test: impl FnOnce(Connection), migrate: bool);
+    /// Run an asynchronous test.
+    async fn run_test_async<Fut>(test: impl FnOnce(ConnectionAsync) -> Fut, migrate: bool)
+    where
+        Fut: Future<Output = ()>;
+}
+
+/// Instance of a Postgres test.
+#[derive(Default)]
+pub struct PgTestInstance {}
+
+impl BackendTestInstance for PgTestInstance {
+    fn run_test_sync(test: impl FnOnce(Connection), migrate: bool) {
+        common_setup();
+        let backend = PgBackend::new();
+        let setup_data = pg_setup_sync();
+        let connstr = setup_data.connstr;
+        log::info!("connecting to {}..", connstr);
+        let mut conn = backend
+            .connect(&connstr)
+            .expect("Could not connect backend");
+        if migrate {
+            setup_db(&mut conn);
+        }
+        log::info!("running test on {}...", connstr);
+        test(conn);
+    }
+    async fn run_test_async<Fut>(test: impl FnOnce(ConnectionAsync) -> Fut, migrate: bool)
+    where
+        Fut: Future<Output = ()>,
+    {
+        common_setup();
+        let backend = PgBackend::new();
+        let setup_data = pg_setup().await;
+        let connstr = setup_data.connstr();
+        log::info!("connecting to {}..", connstr);
+        let mut conn = backend
+            .connect_async(connstr)
+            .await
+            .expect("Could not connect pg backend");
+        if migrate {
+            setup_db_async(&mut conn).await;
+        }
+        log::info!("running test on {}...", connstr);
+        test(conn).await;
+    }
+}
+
+/// Instance of a SQLite test.
+#[derive(Default)]
+pub struct SQLiteTestInstance {}
+
+impl BackendTestInstance for SQLiteTestInstance {
+    fn run_test_sync(test: impl FnOnce(Connection), migrate: bool) {
+        common_setup();
+        log::info!("connecting to sqlite memory database..");
+        let mut conn = SQLiteBackend::new()
+            .connect(":memory:")
+            .expect("Could not connect sqlite backend");
+        if migrate {
+            setup_db(&mut conn);
+        }
+        log::info!("running sqlite test");
+        test(conn);
+    }
+    async fn run_test_async<Fut>(test: impl FnOnce(ConnectionAsync) -> Fut, migrate: bool)
+    where
+        Fut: Future<Output = ()>,
+    {
+        common_setup();
+        log::info!("connecting to sqlite memory database...");
+        let mut conn = SQLiteBackend::new()
+            .connect_async(":memory:")
+            .await
+            .expect("Could not connect sqlite backend");
+        if migrate {
+            setup_db_async(&mut conn).await;
+        }
+        log::info!("running sqlite test");
+        test(conn).await;
+    }
+}
+
+/// Used with `run_test` and `run_test_async`. Result of a backend-specific setup function. Provides a connection string, and also passed to the backend-specific teardown function
+pub trait SetupData {
+    /// Return the connection string to use when establishing a
+    /// database connection.
+    fn connstr(&self) -> &str;
+}
 
 /// Create a postgres [`Connection`].
 pub fn pg_connection() -> (Connection, PgSetupData) {
@@ -64,6 +162,11 @@ impl Drop for PgServerState {
 pub struct PgSetupData {
     /// Connection string
     pub connstr: String,
+}
+impl SetupData for PgSetupData {
+    fn connstr(&self) -> &str {
+        &self.connstr
+    }
 }
 
 /// Create and start a temporary postgres server instance.
@@ -165,7 +268,7 @@ pub fn pg_setup_sync() -> PgSetupData {
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     log::info!("new db is `{}`", &new_dbname);
 
-    let mut conn = connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
+    let conn = connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
     log::debug!("closed is {}", BackendConnection::is_closed(&conn));
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .unwrap();
@@ -192,7 +295,7 @@ pub async fn pg_setup() -> PgSetupData {
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     log::info!("new db is `{}`", &new_dbname);
 
-    let mut conn = connect_async(&ConnectionSpec::new("pg", &connstr))
+    let conn = connect_async(&ConnectionSpec::new("pg", &connstr))
         .await
         .unwrap();
     log::debug!(
@@ -271,29 +374,68 @@ pub fn sqlite_connspec() -> ConnectionSpec {
     ConnectionSpec::new(sqlite::BACKEND_NAME, ":memory:")
 }
 
+/// Concrete [SetupData] for SQLite.
+pub struct SQLiteSetupData {}
+
+impl SetupData for SQLiteSetupData {
+    fn connstr(&self) -> &str {
+        ":memory:"
+    }
+}
+
 /// Setup the test sqlite database.
-pub async fn sqlite_setup() {}
+pub async fn sqlite_setup() -> SQLiteSetupData {
+    SQLiteSetupData {}
+}
 /// Tear down the test sqlite database.
-pub fn sqlite_teardown(_: ()) {}
+pub fn sqlite_teardown(_: SQLiteSetupData) {}
+
+fn common_setup() {
+    env_logger::try_init().ok();
+}
+
+/// Run a test function with a wrapper to set up and tear down the connection
+pub async fn run_test_async<T, Fut, Fut2>(
+    backend_name: &str,
+    setup: impl FnOnce() -> Fut,
+    teardown: impl FnOnce(T),
+    migrate: bool,
+    test: impl FnOnce(ConnectionAsync) -> Fut2,
+) where
+    T: SetupData,
+    Fut: Future<Output = T>,
+    Fut2: Future<Output = ()>,
+{
+    env_logger::try_init().ok();
+    let backend = get_backend(backend_name).expect("Could not find backend");
+    let setup_data = setup().await;
+    let connstr = setup_data.connstr();
+    log::info!("connecting to {}..", connstr);
+    let mut conn = backend
+        .connect_async(connstr)
+        .await
+        .expect("Could not connect backend");
+    if migrate {
+        setup_db_async(&mut conn).await;
+    }
+    log::info!("running test on {}...", connstr);
+    test(conn).await;
+    teardown(setup_data);
+}
 
 /// Wrap `$fname` in a `#[test]` with a `Connection` to `$connstr`.
 #[macro_export]
 macro_rules! maketest {
-    ($fname:ident, $backend:expr, $connstr:expr, $dataname:ident, $migrate:expr) => {
+    ($fname:ident, $backend:expr, $migrate:expr) => {
         paste::item! {
             #[tokio::test]
             pub async fn [<$fname _ $backend>]() {
-                env_logger::try_init().ok();
-                let backend = butane_core::db::get_backend(&stringify!($backend)).expect("Could not find backend");
-                let $dataname = butane_test_helper::[<$backend _setup>]().await;
-                log::info!("connecting to {}..", &$connstr);
-                let mut conn = backend.connect_async(&$connstr).await.expect("Could not connect backend");
-                if $migrate {
-                    butane_test_helper::setup_db_async(&mut conn).await;
-                }
-                log::info!("running test on {}..", &$connstr);
-                $fname(conn).await;
-                butane_test_helper::[<$backend _teardown>]($dataname);
+                use butane_test_helper::*;
+                match stringify!($backend) {
+                    "pg" => PgTestInstance::run_test_async($fname, $migrate).await,
+                    "sqlite" => SQLiteTestInstance::run_test_async($fname, $migrate).await,
+                    _ => panic!("Unknown backend $backend")
+                };
             }
         }
     };
@@ -303,46 +445,6 @@ macro_rules! maketest {
 #[macro_export]
 macro_rules! maketest_pg {
     ($fname:ident, $migrate:expr) => {
-        maketest!(
-            $fname,
-            pg,
-            &butane_test_helper::pg_connstr(&setup_data),
-            setup_data,
-            $migrate
-        );
-    };
-}
-
-/// Create a sqlite and postgres `#[test]` that each invoke `$fname` with a [`Connection`] containing the schema.
-#[macro_export]
-macro_rules! testall {
-    ($fname:ident) => {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "sqlite")] {
-                maketest!($fname, sqlite, &format!(":memory:"), setup_data, true);
-            }
-        }
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "pg")] {
-                maketest_pg!($fname, true);
-            }
-        }
-    };
-}
-
-/// Create a sqlite and postgres `#[test]` that each invoke `$fname` with a [`Connection`] with no schema.
-#[macro_export]
-macro_rules! testall_no_migrate {
-    ($fname:ident) => {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "sqlite")] {
-                maketest!($fname, sqlite, &format!(":memory:"), setup_data, false);
-            }
-        }
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "pg")] {
-                maketest_pg!($fname, false);
-            }
-        }
+        maketest!($fname, pg, $migrate);
     };
 }

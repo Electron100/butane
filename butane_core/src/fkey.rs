@@ -85,7 +85,7 @@ impl<T: DataObject> ForeignKey<T> {
     }
 }
 
-/// [`Many`] operations which require a `Connection`
+/// [`ForeignKey`] operations which require a `Connection`
 #[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
 #[maybe_async_cfg::maybe(
     idents(ConnectionMethods(sync = "ConnectionMethods"),),

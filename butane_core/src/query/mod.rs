@@ -190,8 +190,8 @@ impl<T: DataResult> Clone for Query<T> {
         Query {
             table: self.table.clone(),
             filter: self.filter.clone(),
-            limit: self.limit.clone(),
-            offset: self.offset.clone(),
+            limit: self.limit,
+            offset: self.offset,
             sort: self.sort.clone(),
             phantom: PhantomData,
         }

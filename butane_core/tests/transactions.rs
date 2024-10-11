@@ -1,6 +1,8 @@
-use butane_core::db::{BackendConnectionAsync, ConnectionAsync};
+use butane_core::db::ConnectionAsync;
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 
+#[butane_test(nomigrate)]
 async fn commit_empty_transaction(mut conn: ConnectionAsync) {
     assert!(!conn.is_closed());
 
@@ -10,8 +12,8 @@ async fn commit_empty_transaction(mut conn: ConnectionAsync) {
     // it is impossible to reuse the transaction after this.
     // i.e. already_consumed is unreachable.
 }
-testall_no_migrate!(commit_empty_transaction);
 
+#[butane_test(nomigrate)]
 async fn rollback_empty_transaction(mut conn: ConnectionAsync) {
     let tr = conn.transaction().await.unwrap();
 
@@ -19,8 +21,8 @@ async fn rollback_empty_transaction(mut conn: ConnectionAsync) {
     // it is impossible to reuse the transaction after this.
     // i.e. already_consumed is unreachable.
 }
-testall_no_migrate!(rollback_empty_transaction);
 
+#[butane_test(nomigrate)]
 async fn debug_transaction_before_consuming(mut conn: ConnectionAsync) {
     let backend_name = conn.backend_name();
 
@@ -34,4 +36,3 @@ async fn debug_transaction_before_consuming(mut conn: ConnectionAsync) {
 
     assert!(tr.commit().await.is_ok());
 }
-testall_no_migrate!(debug_transaction_before_consuming);

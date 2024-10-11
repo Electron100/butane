@@ -1,6 +1,5 @@
 //! Models for the getting_started example.
 
-use butane::prelude::*;
 use butane::AutoPk;
 use butane::{model, ForeignKey, Many};
 

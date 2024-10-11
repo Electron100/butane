@@ -3,7 +3,7 @@ use tokio::sync::OnceCell;
 
 /// Wrapper around tokio's OnceCell get_or_try_init method
 /// This is a sync version which provides the same semantics with a spinlock, as simultaneous initialization should be very rare.
-pub fn get_or_try_init_tokio_once_cell_sync<'a, T, F>(cell: &'a OnceCell<T>, f: F) -> Result<&'a T>
+pub fn get_or_try_init_tokio_once_cell_sync<T, F>(cell: &OnceCell<T>, f: F) -> Result<&T>
 where
     F: Fn() -> Result<T>,
 {

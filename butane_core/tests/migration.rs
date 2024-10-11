@@ -1,7 +1,8 @@
-use butane_core::db::{BackendConnectionAsync, ConnectionAsync, ConnectionMethodsAsync};
+use butane_core::db::ConnectionAsync;
 use butane_core::migrations::adb::*;
 use butane_core::SqlType;
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 
 #[test]
 fn empty_diff() {
@@ -211,6 +212,7 @@ fn add_table_fkey() {
 
 /// This is the same as test "add_table_fkey", except that it
 /// runs the DDL on a database, and then deletes the column.
+#[butane_test(nomigrate)]
 async fn add_table_fkey_delete_column(conn: ConnectionAsync) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
@@ -293,11 +295,11 @@ async fn add_table_fkey_delete_column(conn: ConnectionAsync) {
         .unwrap();
     conn.execute(&sql).await.unwrap();
 }
-testall_no_migrate!(add_table_fkey_delete_column);
 
 /// This is the same as test "add_table_fkey", except that it
 /// intentionally links a column on table a to table b, and
 /// it runs the DDL on a database.
+#[butane_test(nomigrate)]
 async fn add_table_fkey_back_reference(conn: ConnectionAsync) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
@@ -384,10 +386,10 @@ async fn add_table_fkey_back_reference(conn: ConnectionAsync) {
     conn.execute("SELECT * from a").await.unwrap();
     conn.execute("SELECT * from b").await.unwrap();
 }
-testall_no_migrate!(add_table_fkey_back_reference);
 
 /// This is the same as test "add_table_fkey", except that it
 /// creates a table with multiple fkey constraints.
+#[butane_test(nomigrate)]
 async fn add_table_fkey_multiple(conn: ConnectionAsync) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
@@ -495,7 +497,6 @@ async fn add_table_fkey_multiple(conn: ConnectionAsync) {
     conn.execute("SELECT * from a").await.unwrap();
     conn.execute("SELECT * from b").await.unwrap();
 }
-testall_no_migrate!(add_table_fkey_multiple);
 
 /// Creates the test case for adding a foreign key, returning the migration operations,
 /// the target ADB, and the tables which should be expected to be created.

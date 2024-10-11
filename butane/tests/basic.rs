@@ -1,9 +1,10 @@
 #![allow(clippy::disallowed_names)]
 
-use butane::db::ConnectionAsync;
-use butane::{butane_type, find, model, query, AutoPk, ForeignKey};
-use butane::{colname, prelude_async::*};
+use butane::colname;
+use butane::db::{Connection, ConnectionAsync};
+use butane::{butane_type, find, find_async, model, query, AutoPk, ForeignKey};
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 #[cfg(feature = "sqlite")]
@@ -109,6 +110,7 @@ struct TimeHolder {
     pub when: chrono::DateTime<Utc>,
 }
 
+#[butane_test]
 async fn basic_crud(conn: ConnectionAsync) {
     //create
     let mut foo = Foo::new(1);
@@ -132,17 +134,14 @@ async fn basic_crud(conn: ConnectionAsync) {
 
     // delete
     assert!(foo3.delete(&conn).await.is_ok());
-    if matches!(
-        Foo::get(&conn, 1).await.err(),
-        Some(butane::Error::NoSuchObject)
-    ) {
-    } else {
-        panic!("Expected NoSuchObject");
+    match Foo::get(&conn, 1).await.err() {
+        Some(butane::Error::NoSuchObject) => (),
+        _ => panic!("Expected NoSuchObject"),
     }
     assert_eq!(None, Foo::try_get(&conn, 1).await.unwrap());
 }
-testall!(basic_crud);
 
+#[butane_test]
 async fn basic_find(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
@@ -155,11 +154,11 @@ async fn basic_find(conn: ConnectionAsync) {
     foo2.save(&conn).await.unwrap();
 
     // find
-    let found: Foo = find!(Foo, bar == 43, &conn).unwrap();
+    let found: Foo = find_async!(Foo, bar == 43, &conn).unwrap();
     assert_eq!(found, foo2);
 }
-testall!(basic_find);
 
+#[butane_test]
 async fn basic_query(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
@@ -180,8 +179,8 @@ async fn basic_query(conn: ConnectionAsync) {
     let found = query!(Foo, bar < 44).load(&conn).await.unwrap();
     assert_eq!(found.len(), 2);
 }
-testall!(basic_query);
 
+#[butane_test]
 async fn basic_query_delete(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
@@ -208,8 +207,8 @@ async fn basic_query_delete(conn: ConnectionAsync) {
     let cnt = query!(Foo, baz.like("hello%")).delete(&conn).await.unwrap();
     assert_eq!(cnt, 2);
 }
-testall!(basic_query_delete);
 
+#[butane_test]
 async fn string_pk(conn: ConnectionAsync) {
     let mut foo = Foo::new(1);
     foo.save(&conn).await.unwrap();
@@ -219,8 +218,8 @@ async fn string_pk(conn: ConnectionAsync) {
     let bar2 = Bar::get(&conn, "tarzan".to_string()).await.unwrap();
     assert_eq!(bar, bar2);
 }
-testall!(string_pk);
 
+#[butane_test]
 async fn foreign_key(conn: ConnectionAsync) {
     let mut foo = Foo::new(1);
     foo.save(&conn).await.unwrap();
@@ -234,8 +233,8 @@ async fn foreign_key(conn: ConnectionAsync) {
     let foo3: &Foo = bar2.foo.get().unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(foreign_key);
 
+#[butane_test]
 async fn auto_pk(conn: ConnectionAsync) {
     let mut baz1 = Baz::new("baz1");
     baz1.save(&conn).await.unwrap();
@@ -246,8 +245,8 @@ async fn auto_pk(conn: ConnectionAsync) {
     assert!(baz1.id < baz2.id);
     assert!(baz2.id < baz3.id);
 }
-testall!(auto_pk);
 
+#[butane_test]
 async fn only_pk(conn: ConnectionAsync) {
     let mut obj = HasOnlyPk::new(1);
     obj.save(&conn).await.unwrap();
@@ -258,8 +257,8 @@ async fn only_pk(conn: ConnectionAsync) {
     // verify it didnt get a new id
     assert_eq!(obj.id, 1);
 }
-testall!(only_pk);
 
+#[butane_test]
 async fn only_auto_pk(conn: ConnectionAsync) {
     let mut obj = HasOnlyAutoPk::default();
     obj.save(&conn).await.unwrap();
@@ -270,8 +269,8 @@ async fn only_auto_pk(conn: ConnectionAsync) {
     // verify it didnt get a new id
     assert_eq!(obj.id, pk);
 }
-testall!(only_auto_pk);
 
+#[butane_test]
 async fn basic_committed_transaction(mut conn: ConnectionAsync) {
     let tr = conn.transaction().await.unwrap();
 
@@ -285,8 +284,8 @@ async fn basic_committed_transaction(mut conn: ConnectionAsync) {
     let foo2 = Foo::get(&conn, 1).await.unwrap();
     assert_eq!(foo, foo2);
 }
-testall!(basic_committed_transaction);
 
+#[butane_test]
 async fn basic_dropped_transaction(mut conn: ConnectionAsync) {
     // Create an object with a transaction but never commit it
     {
@@ -303,8 +302,8 @@ async fn basic_dropped_transaction(mut conn: ConnectionAsync) {
         Err(e) => panic!("Unexpected error {e}"),
     }
 }
-testall!(basic_dropped_transaction);
 
+#[butane_test]
 async fn basic_rollback_transaction(mut conn: ConnectionAsync) {
     let tr = conn.transaction().await.unwrap();
 
@@ -321,8 +320,8 @@ async fn basic_rollback_transaction(mut conn: ConnectionAsync) {
         Err(e) => panic!("Unexpected error {e}"),
     }
 }
-testall!(basic_rollback_transaction);
 
+#[butane_test]
 async fn basic_unique_field_error_on_non_unique(conn: ConnectionAsync) {
     let mut foo1 = Foo::new(1);
     foo1.bar = 42;
@@ -345,8 +344,8 @@ async fn basic_unique_field_error_on_non_unique(conn: ConnectionAsync) {
         _ => false,
     });
 }
-testall!(basic_unique_field_error_on_non_unique);
 
+#[butane_test]
 async fn fkey_same_type(conn: ConnectionAsync) {
     let mut o1 = SelfReferential::new(1);
     let mut o2 = SelfReferential::new(2);
@@ -360,16 +359,16 @@ async fn fkey_same_type(conn: ConnectionAsync) {
     assert_eq!(inner, o2);
     assert!(inner.reference.is_none());
 }
-testall!(fkey_same_type);
 
+#[butane_test]
 async fn cant_save_unsaved_fkey(conn: ConnectionAsync) {
     let foo = Foo::new(1);
     let mut bar = Bar::new("tarzan", foo);
     assert!(bar.save(&conn).await.is_err());
 }
-testall!(cant_save_unsaved_fkey);
 
 #[cfg(feature = "datetime")]
+#[butane_test]
 async fn basic_time(conn: ConnectionAsync) {
     let now = Utc::now();
     let mut time = TimeHolder {
@@ -385,9 +384,8 @@ async fn basic_time(conn: ConnectionAsync) {
     // lose some precision when we go to the database.
     assert_eq!(time.utc.timestamp(), time2.utc.timestamp());
 }
-#[cfg(feature = "datetime")]
-testall!(basic_time);
 
+#[butane_test]
 async fn basic_load_first(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
@@ -407,8 +405,8 @@ async fn basic_load_first(conn: ConnectionAsync) {
 
     assert_eq!(found, Some(foo1));
 }
-testall!(basic_load_first);
 
+#[butane_test]
 async fn basic_load_first_ordered(conn: ConnectionAsync) {
     //create
     let mut foo1 = Foo::new(1);
@@ -438,8 +436,8 @@ async fn basic_load_first_ordered(conn: ConnectionAsync) {
 
     assert_eq!(found_desc, Some(foo2));
 }
-testall!(basic_load_first_ordered);
 
+#[butane_test]
 async fn save_upserts_by_default(conn: ConnectionAsync) {
     let mut foo = Foo::new(1);
     foo.bar = 42;
@@ -456,4 +454,3 @@ async fn save_upserts_by_default(conn: ConnectionAsync) {
     let retrieved = Foo::get(&conn, 1).await.unwrap();
     assert_eq!(retrieved.bar, 43);
 }
-testall!(save_upserts_by_default);

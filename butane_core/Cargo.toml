@@ -62,6 +62,7 @@ uuid = { workspace = true, optional = true }
 butane_core = { workspace = true, features = ["log"] }
 assert_matches = "1.5"
 butane_test_helper = { workspace = true }
+butane_test_macros.workspace = true
 env_logger = { workspace = true }
 paste = { workspace = true }
 tempfile.workspace = true

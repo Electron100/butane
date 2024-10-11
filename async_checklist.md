@@ -1,5 +1,5 @@
 * [x] Clean up pattern for sync/async variants. Inconsistent between suffix and module
-* [ ] Tests should run against sync and async
+* [x] Tests should run against sync and async
 * [ ] Establish soundness for unsafe sections of AsyncAdapter
 * [ ] Consider publishing `AsyncAdapter` into its own crate
 * [ ] Ensure Postgres works in sync

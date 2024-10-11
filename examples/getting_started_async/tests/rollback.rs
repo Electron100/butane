@@ -2,6 +2,7 @@ use butane::db::{BackendConnection, Connection};
 use butane::migrations::Migrations;
 use butane::DataObjectOpAsync;
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 
 use getting_started::models::{Blog, Post, Tag};
 
@@ -34,6 +35,7 @@ async fn insert_data(connection: &Connection) {
     post.save(connection).await.unwrap();
 }
 
+#[butane_test]
 async fn migrate_and_unmigrate(mut connection: Connection) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
@@ -46,4 +48,3 @@ async fn migrate_and_unmigrate(mut connection: Connection) {
     // Undo migrations.
     migrations.unmigrate(&mut connection).await.unwrap();
 }
-testall_no_migrate!(migrate_and_unmigrate);

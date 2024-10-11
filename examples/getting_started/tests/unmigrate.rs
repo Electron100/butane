@@ -1,30 +1,27 @@
-// todo re-enable this when we have a sync version of the test machinery available
-
-/*
 use butane::db::{BackendConnection, Connection};
 use butane::migrations::Migrations;
-use butane::DataObjectOpAsync;
+use butane::DataObjectOpSync;
 use butane_test_helper::*;
-
+use butane_test_macros::butane_test;
 
 use getting_started::models::{Blog, Post, Tag};
 
-async fn create_tag(connection: &Connection, name: &str) -> Tag {
+fn create_tag(connection: &Connection, name: &str) -> Tag {
     let mut tag = Tag::new(name);
-    tag.save(connection).await.unwrap();
+    tag.save(connection).unwrap();
     tag
 }
 
-async fn insert_data(connection: &Connection) {
+fn insert_data(connection: &Connection) {
     if connection.backend_name() == "sqlite" {
         // https://github.com/Electron100/butane/issues/226
         return;
     }
     let mut cats_blog = Blog::new("Cats");
-    cats_blog.save(connection).await.unwrap();
+    cats_blog.save(connection).unwrap();
 
-    let tag_asia = create_tag(connection, "asia").await;
-    let tag_danger = create_tag(connection, "danger").await;
+    let tag_asia = create_tag(connection, "asia");
+    let tag_danger = create_tag(connection, "danger");
 
     let mut post = Post::new(
         &cats_blog,
@@ -35,20 +32,19 @@ async fn insert_data(connection: &Connection) {
     post.likes = 4;
     post.tags.add(&tag_danger).unwrap();
     post.tags.add(&tag_asia).unwrap();
-    post.save(connection).await.unwrap();
+    post.save(connection).unwrap();
 }
 
-async fn migrate_and_unmigrate(mut connection: Connection) {
+#[butane_test(sync, nomigrate)]
+fn migrate_and_unmigrate(mut connection: Connection) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
 
-    migrations.migrate(&mut connection).await.unwrap();
+    migrations.migrate(&mut connection).unwrap();
 
-    insert_data(&connection).await;
+    insert_data(&connection);
 
     // Undo migrations.
-    migrations.unmigrate(&mut connection).await.unwrap();
+    migrations.unmigrate(&mut connection).unwrap();
 }
-testall_no_migrate!(migrate_and_unmigrate);
-*/

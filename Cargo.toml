@@ -6,6 +6,7 @@ members = [
   "butane_codegen",
   "butane_core",
   "butane_test_helper",
+  "butane_test_macros",
   "example",
   "examples/newtype",
   "examples/getting_started",
@@ -24,6 +25,7 @@ butane_cli = { version = "0.6", path = "butane_cli" }
 butane_core = { version = "0.6", path = "butane_core" }
 butane_codegen = { version = "0.6", path = "butane_codegen" }
 butane_test_helper = { path = "butane_test_helper" }
+butane_test_macros = { path = "butane_test_macros" }
 cfg-if = "^1.0"
 chrono = { version = "0.4.25", default-features = false, features = [
   "serde",

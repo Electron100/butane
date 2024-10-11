@@ -1,10 +1,11 @@
-use butane_core::db::{connect_async, BackendConnectionAsync, ConnectionAsync, ConnectionSpec};
+use butane_core::db::{connect_async, ConnectionAsync, ConnectionSpec};
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 
+#[butane_test(nomigrate)]
 async fn connection_not_closed(conn: ConnectionAsync) {
     assert!(!conn.is_closed());
 }
-testall_no_migrate!(connection_not_closed);
 
 #[test]
 fn persist_invalid_connection_backend() {
@@ -61,6 +62,7 @@ async fn unreachable_pg_connection() {
     }
 }
 
+#[butane_test(nomigrate)]
 async fn debug_connection(conn: ConnectionAsync) {
     let backend_name = conn.backend_name();
 
@@ -71,7 +73,6 @@ async fn debug_connection(conn: ConnectionAsync) {
         assert!(debug_str.contains("path: Some(\"\")"));
     }
 }
-testall_no_migrate!(debug_connection);
 
 #[test]
 fn wont_load_connection_spec_from_missing_path() {

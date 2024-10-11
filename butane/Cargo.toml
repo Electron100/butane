@@ -33,6 +33,7 @@ butane_core = { workspace = true }
 
 [dev-dependencies]
 butane_test_helper = { workspace = true }
+butane_test_macros = { workspace = true }
 cfg-if = { workspace = true }
 exec_time = { version = "0.1.4" }
 paste = { workspace = true }
@@ -43,6 +44,7 @@ geo-types = "0.7"
 log.workspace = true
 nonempty.workspace = true
 quote = { workspace = true }
+maybe-async-cfg.workspace = true
 proc-macro2 = { workspace = true }
 once_cell = { workspace = true }
 tokio = { workspace = true }

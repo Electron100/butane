@@ -14,6 +14,7 @@ documentation = "https://docs.rs/butane/"
 [dependencies]
 block-id = "0.2"
 butane_core = { features = ["pg", "sqlite"], workspace = true }
+env_logger.workspace = true
 libc = "0.2"
 log.workspace = true
 maybe-async-cfg.workspace = true

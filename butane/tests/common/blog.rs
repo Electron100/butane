@@ -1,6 +1,9 @@
 //! Helpers for several tests.
-use butane::{dataresult, model, DataObject, DataObjectOpAsync};
-use butane::{db::ConnectionAsync, ForeignKey, Many};
+use butane::{dataresult, model};
+use butane::{
+    db::{Connection, ConnectionAsync},
+    ForeignKey, Many,
+};
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc};
 #[cfg(feature = "fake")]
@@ -100,7 +103,16 @@ impl Tag {
     }
 }
 
+#[maybe_async_cfg::maybe(
+    sync(),
+    async(keep_self),
+    idents(
+        DataObjectOpAsync(async = "DataObjectOpAsync", sync = "DataObjectOpSync"),
+        ConnectionAsync(async = "ConnectionAsync", sync = "Connection")
+    )
+)]
 pub async fn create_tag(conn: &ConnectionAsync, name: &str) -> Tag {
+    use butane::DataObjectOpAsync;
     let mut tag = Tag::new(name);
     tag.save(conn).await.unwrap();
     tag
@@ -110,7 +122,17 @@ pub async fn create_tag(conn: &ConnectionAsync, name: &str) -> Tag {
 /// 1. "Cats"
 /// 2. "Mountains"
 #[allow(dead_code)] // only used by some test files
-pub async fn setup_blog(conn: &ConnectionAsync) {
+#[maybe_async_cfg::maybe(
+    sync(),
+    async(keep_self),
+    idents(
+        DataObjectOp,
+        Connection(async = "ConnectionAsync", sync = "Connection"),
+        create_tag(async = "create_tag", snake),
+    )
+)]
+pub async fn setup_blog(conn: &Connection) {
+    use butane::DataObjectOp;
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(conn).await.unwrap();
     let mut mountains_blog = Blog::new(2, "Mountains");

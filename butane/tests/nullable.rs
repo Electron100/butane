@@ -1,7 +1,7 @@
 use butane::db::ConnectionAsync;
-use butane::prelude_async::*;
 use butane::{model, query};
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 
 #[model]
 #[derive(PartialEq, Eq, Debug)]
@@ -15,6 +15,7 @@ impl WithNullable {
     }
 }
 
+#[butane_test]
 async fn basic_optional(conn: ConnectionAsync) {
     let mut with_none = WithNullable::new(1);
     with_none.save(&conn).await.unwrap();
@@ -29,8 +30,8 @@ async fn basic_optional(conn: ConnectionAsync) {
     let obj = WithNullable::get(&conn, 2).await.unwrap();
     assert_eq!(obj.foo, Some(42));
 }
-testall!(basic_optional);
 
+#[butane_test]
 async fn query_optional_with_some(conn: ConnectionAsync) {
     let mut obj = WithNullable::new(1);
     obj.save(&conn).await.unwrap();
@@ -53,8 +54,8 @@ async fn query_optional_with_some(conn: ConnectionAsync) {
     assert_eq!(objs[0].foo, Some(43));
     assert_eq!(objs[1].foo, Some(44));
 }
-testall!(query_optional_with_some);
 
+#[butane_test]
 async fn query_optional_with_none(conn: ConnectionAsync) {
     let mut obj = WithNullable::new(1);
     obj.save(&conn).await.unwrap();
@@ -67,4 +68,3 @@ async fn query_optional_with_none(conn: ConnectionAsync) {
     assert_eq!(objs.len(), 1);
     assert_eq!(objs[0].id, 1);
 }
-testall!(query_optional_with_none);

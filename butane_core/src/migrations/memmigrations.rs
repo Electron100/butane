@@ -139,7 +139,6 @@ impl Migrations for MemMigrations {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl MigrationsMut for MemMigrations {
     fn current(&mut self) -> &mut Self::M {
         &mut self.current

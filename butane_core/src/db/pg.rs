@@ -108,7 +108,7 @@ impl PgConnectionLike for PgConnection {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl BackendConnection for PgConnection {
     async fn transaction(&mut self) -> Result<Transaction<'_>> {
         let trans: postgres::Transaction<'_> = self.client.transaction().await?;
@@ -153,7 +153,7 @@ trait PgConnectionLike {
     fn client(&self) -> Result<&Self::Client>;
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl<T> ConnectionMethods for T
 where
     T: PgConnectionLike + std::marker::Sync,
@@ -385,7 +385,7 @@ impl<'c> PgConnectionLike for PgTransaction<'c> {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl<'c> BackendTransaction<'c> for PgTransaction<'c> {
     async fn commit(&mut self) -> Result<()> {
         match self.trans.take() {

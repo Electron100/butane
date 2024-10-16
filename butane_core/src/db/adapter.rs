@@ -171,7 +171,7 @@ where
     }
 }
 unsafe impl<T: Debug + ?Sized> Send for SyncSendPtrMut<T> {}
-unsafe impl<T> Sync for SyncSendPtrMut<T> {}
+unsafe impl<T: ?Sized> Sync for SyncSendPtrMut<T> {}
 
 impl<T: Debug + ?Sized> Debug for SyncSendPtrMut<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
@@ -259,7 +259,7 @@ impl<T: ?Sized> Drop for AsyncAdapter<T> {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl<T> ConnectionMethodsAsync for AsyncAdapter<T>
 where
     T: ConnectionMethods + ?Sized,
@@ -338,7 +338,7 @@ where
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl<T> BackendConnectionAsync for AsyncAdapter<T>
 where
     T: BackendConnection,
@@ -383,7 +383,7 @@ where
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl<T, 'c> BackendTransactionAsync<'c> for AsyncAdapter<T>
 where
     T: BackendTransaction<'c> + ?Sized,

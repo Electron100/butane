@@ -10,7 +10,7 @@ macro_rules! connection_method_wrapper {
             sync(keep_self),
             async()
         )]
-        #[async_trait::async_trait(?Send)]
+        #[async_trait::async_trait]
         impl ConnectionMethods for $ty {
             async fn execute(&self, sql: &str) -> Result<()> {
                 ConnectionMethods::execute(self.wrapped_connection_methods()?, sql).await

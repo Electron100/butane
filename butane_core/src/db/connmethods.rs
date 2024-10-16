@@ -11,9 +11,13 @@ use crate::{Result, SqlType, SqlVal, SqlValRef};
 /// to call these methods directly and will instead use methods on
 /// [DataObject][crate::DataObject] or the `query!` macro. This trait is
 /// implemented by both database connections and transactions.
-#[maybe_async_cfg::maybe(sync(keep_self), async(self = "ConnectionMethodsAsync"))]
-#[async_trait(?Send)]
-pub trait ConnectionMethods {
+#[maybe_async_cfg::maybe(
+    sync(keep_self),
+    async(self = "ConnectionMethodsAsync"),
+    idents(AsyncRequiresSync)
+)]
+#[async_trait]
+pub trait ConnectionMethods: super::internal::AsyncRequiresSync {
     async fn execute(&self, sql: &str) -> Result<()>;
     async fn query<'c>(
         &'c self,

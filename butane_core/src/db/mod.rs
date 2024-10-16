@@ -65,6 +65,16 @@ mod internal {
     pub trait AsyncRequiresSend: Send {}
     #[maybe_async_cfg::maybe(idents(AsyncRequiresSend), async())]
     impl<T: Send> AsyncRequiresSend for T {}
+
+    #[maybe_async_cfg::maybe(sync())]
+    pub trait AsyncRequiresSync {}
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSync), sync())]
+    impl<T> AsyncRequiresSync for T {}
+
+    #[maybe_async_cfg::maybe(async())]
+    pub trait AsyncRequiresSync: Sync {}
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSync), async())]
+    impl<T: Sync> AsyncRequiresSync for T {}
 }
 
 /// Database connection.
@@ -77,7 +87,7 @@ mod internal {
     sync(self = "BackendConnection"),
     async(self = "BackendConnectionAsync")
 )]
-#[async_trait(?Send)]
+#[async_trait]
 pub trait BackendConnection: ConnectionMethods + Debug + Send {
     /// Begin a database transaction. The transaction object must be
     /// used in place of this connection until it is committed or aborted.
@@ -101,7 +111,7 @@ pub trait BackendConnection: ConnectionMethods + Debug + Send {
     sync(),
     async()
 )]
-#[async_trait(?Send)]
+#[async_trait]
 impl BackendConnection for Box<dyn BackendConnection> {
     async fn transaction(&mut self) -> Result<Transaction> {
         self.deref_mut().transaction().await
@@ -126,7 +136,7 @@ impl BackendConnection for Box<dyn BackendConnection> {
     sync(),
     async()
 )]
-#[async_trait(?Send)]
+#[async_trait]
 impl ConnectionMethods for Box<dyn BackendConnection> {
     async fn execute(&self, sql: &str) -> Result<()> {
         self.deref().execute(sql).await
@@ -274,7 +284,7 @@ impl ConnectionAsync {
     sync(keep_self),
     async()
 )]
-#[async_trait(?Send)]
+#[async_trait]
 impl BackendConnection for Connection {
     async fn transaction(&mut self) -> Result<Transaction> {
         self.conn.transaction().await
@@ -296,7 +306,7 @@ connection_method_wrapper!(Connection);
     sync(keep_self),
     async()
 )]
-#[async_trait(?Send)]
+#[async_trait]
 pub trait BackendTransaction<'c>: ConnectionMethods + internal::AsyncRequiresSend + Debug {
     /// Commit the transaction Unfortunately because we use this as a
     /// trait object, we can't consume self. It should be understood
@@ -364,7 +374,7 @@ connection_method_wrapper!(Transaction<'_>);
     sync(keep_self),
     async()
 )]
-#[async_trait(?Send)]
+#[async_trait]
 impl<'c> BackendTransaction<'c> for Transaction<'c> {
     async fn commit(&mut self) -> Result<()> {
         self.trans.commit().await
@@ -386,7 +396,7 @@ impl<'c> BackendTransaction<'c> for Transaction<'c> {
     sync(),
     async()
 )]
-#[async_trait(?Send)]
+#[async_trait]
 impl<'c> BackendTransaction<'c> for Box<dyn BackendTransaction<'c> + 'c> {
     async fn commit(&mut self) -> Result<()> {
         self.deref_mut().commit().await
@@ -408,7 +418,7 @@ impl<'c> BackendTransaction<'c> for Box<dyn BackendTransaction<'c> + 'c> {
     sync(),
     async()
 )]
-#[async_trait(?Send)]
+#[async_trait]
 impl<'bt> ConnectionMethods for Box<dyn BackendTransaction<'bt> + 'bt> {
     async fn execute(&self, sql: &str) -> Result<()> {
         self.deref().execute(sql).await

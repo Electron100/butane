@@ -454,3 +454,13 @@ async fn save_upserts_by_default(conn: ConnectionAsync) {
     let retrieved = Foo::get(&conn, 1).await.unwrap();
     assert_eq!(retrieved.bar, 43);
 }
+
+#[butane_test(async)]
+async fn tokio_spawn(conn: ConnectionAsync) {
+    // This test exists mostly to make sure it compiles. Verifies that
+    // we can Send the futures from ConnectionMethodsAsync.
+    tokio::spawn(async move {
+        let mut foo = Foo::new(1);
+        foo.save(&conn).await.unwrap();
+    });
+}

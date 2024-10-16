@@ -41,7 +41,7 @@ impl DummyConnection {
     sync(),
     async()
 )]
-#[async_trait(?Send)]
+#[async_trait]
 impl ConnectionMethods for DummyConnection {
     async fn execute(&self, sql: &str) -> Result<()> {
         Err(Error::PoisonedConnection)
@@ -110,7 +110,7 @@ impl ConnectionMethods for DummyConnection {
     sync(),
     async()
 )]
-#[async_trait(?Send)]
+#[async_trait]
 impl BackendConnection for DummyConnection {
     async fn transaction(&mut self) -> Result<Transaction<'_>> {
         Err(Error::PoisonedConnection)

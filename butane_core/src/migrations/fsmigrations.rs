@@ -447,7 +447,6 @@ impl Migrations for FsMigrations {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl MigrationsMut for FsMigrations {
     fn current(&mut self) -> &mut Self::M {
         &mut self.current

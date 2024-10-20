@@ -118,12 +118,12 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
     idents(
         ConnectionMethods(sync = "ConnectionMethods"),
         save_many_to_many(sync = "save_many_to_many_sync", async = "save_many_to_many_async"),
-        QueryOp,
+        QueryOps,
     ),
     sync(),
     async()
 )]
-pub trait DataObjectOp<T: DataObject> {
+pub trait DataObjectOps<T: DataObject> {
     /// Find this object in the database based on primary key.
     /// Returns `Error::NoSuchObject` if the primary key does not exist.
     async fn get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Self>
@@ -140,7 +140,7 @@ pub trait DataObjectOp<T: DataObject> {
     where
         Self: DataObject + Sized,
     {
-        use crate::query::QueryOp;
+        use crate::query::QueryOps;
         Ok(<Self as DataResult>::query()
             .filter(query::BoolExpr::Eq(
                 T::PKCOL,
@@ -223,8 +223,8 @@ pub trait DataObjectOp<T: DataObject> {
     }
 }
 
-impl<T> DataObjectOpSync<T> for T where T: DataObject {}
-impl<T> DataObjectOpAsync<T> for T where T: DataObject {}
+impl<T> DataObjectOpsSync<T> for T where T: DataObject {}
+impl<T> DataObjectOpsAsync<T> for T where T: DataObject {}
 
 /// ASYNC TODO is this still necessary
 pub trait ModelTyped {

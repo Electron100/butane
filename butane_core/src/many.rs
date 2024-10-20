@@ -22,7 +22,7 @@ fn default_oc<T>() -> OnceCell<Vec<T>> {
 /// U::PKType. Table name is T_foo_Many where foo is the name of
 /// the Many field
 ///
-/// See [`ManyOpSync`] and [`ManyOpAsync`] for operations requiring a live database connection.
+/// See [`ManyOpsSync`] and [`ManyOpsAsync`] for operations requiring a live database connection.
 //
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Many<T>
@@ -127,7 +127,7 @@ where
 }
 
 #[maybe_async_cfg::maybe(
-    idents(ConnectionMethods(sync, async = "ConnectionMethodsAsync"), QueryOp),
+    idents(ConnectionMethods(sync, async = "ConnectionMethodsAsync"), QueryOps),
     sync(),
     async()
 )]
@@ -141,7 +141,7 @@ async fn load_query_uncached<'a, T>(
 where
     T: DataObject + 'a,
 {
-    use crate::query::QueryOp;
+    use crate::query::QueryOps;
     let mut vals: Vec<T> = query.load(conn).await?;
     // Now add in the values for things not saved to the db yet
     if !many.new_values.is_empty() {
@@ -195,7 +195,7 @@ where
     sync(),
     async()
 )]
-pub trait ManyOp<T: DataObject> {
+pub trait ManyOps<T: DataObject> {
     /// Used by macro-generated code. You do not need to call this directly.
     async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
@@ -225,15 +225,15 @@ pub trait ManyOp<T: DataObject> {
 #[maybe_async_cfg::maybe(
     idents(
         ConnectionMethods(sync = "ConnectionMethods"),
-        ManyOpInternal,
-        ManyOp,
+        ManyOpsInternal,
+        ManyOps,
         load_query(sync = "load_query_sync", async = "load_query_async"),
     ),
     keep_self,
     sync(),
     async()
 )]
-impl<T: DataObject> ManyOp<T> for Many<T> {
+impl<T: DataObject> ManyOps<T> for Many<T> {
     async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
         while !self.new_values.is_empty() {

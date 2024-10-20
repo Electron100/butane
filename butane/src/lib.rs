@@ -9,7 +9,7 @@
 pub use butane_codegen::{butane_type, dataresult, model, FieldType, PrimaryKeyType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
-pub use butane_core::many::{Many, ManyOpAsync, ManyOpSync};
+pub use butane_core::many::{Many, ManyOpsAsync, ManyOpsSync};
 pub use butane_core::migrations;
 pub use butane_core::query;
 pub use butane_core::{
@@ -17,7 +17,7 @@ pub use butane_core::{
     Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
 // todo put ops in a separate package?
-pub use butane_core::{DataObjectOpAsync, DataObjectOpSync};
+pub use butane_core::{DataObjectOpsAsync, DataObjectOpsSync};
 
 pub mod db {
     //! Database helpers
@@ -163,7 +163,7 @@ macro_rules! colname {
 #[macro_export]
 macro_rules! find {
     ($dbobj:ident, $filter:expr, $conn:expr) => {
-        butane::query::QueryOpSync::load(butane::query!($dbobj, $filter).limit(1), $conn)
+        butane::query::QueryOpsSync::load(butane::query!($dbobj, $filter).limit(1), $conn)
             .and_then(|mut results| results.pop().ok_or(butane::Error::NoSuchObject))
     };
 }
@@ -173,7 +173,7 @@ macro_rules! find {
 macro_rules! find_async {
     ($dbobj:ident, $filter:expr, $conn:expr) => {
         // todo sync version
-        butane::query::QueryOpAsync::load(butane::query!($dbobj, $filter).limit(1), $conn)
+        butane::query::QueryOpsAsync::load(butane::query!($dbobj, $filter).limit(1), $conn)
             .await
             .and_then(|mut results| results.pop().ok_or(butane::Error::NoSuchObject))
     };
@@ -195,10 +195,10 @@ pub mod prelude {
     pub use super::prelude_common::*;
 
     pub use butane_core::db::BackendConnection;
-    pub use butane_core::fkey::ForeignKeyOpSync;
-    pub use butane_core::many::ManyOpSync;
-    pub use butane_core::query::QueryOpSync;
-    pub use butane_core::DataObjectOpSync;
+    pub use butane_core::fkey::ForeignKeyOpsSync;
+    pub use butane_core::many::ManyOpsSync;
+    pub use butane_core::query::QueryOpsSync;
+    pub use butane_core::DataObjectOpsSync;
 }
 
 pub mod prelude_async {
@@ -208,10 +208,10 @@ pub mod prelude_async {
     pub use super::prelude_common::*;
 
     pub use butane_core::db::BackendConnectionAsync;
-    pub use butane_core::fkey::ForeignKeyOpAsync;
-    pub use butane_core::many::ManyOpAsync;
-    pub use butane_core::query::QueryOpAsync;
-    pub use butane_core::DataObjectOpAsync;
+    pub use butane_core::fkey::ForeignKeyOpsAsync;
+    pub use butane_core::many::ManyOpsAsync;
+    pub use butane_core::query::QueryOpsAsync;
+    pub use butane_core::DataObjectOpsAsync;
 }
 
 pub mod internal {

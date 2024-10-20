@@ -17,7 +17,7 @@ use crate::{
 ///
 /// Initialize using `From` or `from_pk`
 ///
-/// See [`ForeignKeyOpSync`] and [`ForeignKeyOpAsync`] for operations requiring a live database connection.
+/// See [`ForeignKeyOpsSync`] and [`ForeignKeyOpsAsync`] for operations requiring a live database connection.
 ///
 /// # Examples
 /// ```ignore
@@ -92,7 +92,7 @@ impl<T: DataObject> ForeignKey<T> {
     sync(),
     async()
 )]
-pub trait ForeignKeyOp<T: DataObject> {
+pub trait ForeignKeyOps<T: DataObject> {
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to it.
     async fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&T>
@@ -100,12 +100,12 @@ pub trait ForeignKeyOp<T: DataObject> {
         T: 'a;
 }
 
-impl<T: DataObject> ForeignKeyOpAsync<T> for ForeignKey<T> {
+impl<T: DataObject> ForeignKeyOpsAsync<T> for ForeignKey<T> {
     async fn load<'a>(&'a self, conn: &impl ConnectionMethodsAsync) -> Result<&T>
     where
         T: 'a,
     {
-        use crate::DataObjectOpAsync;
+        use crate::DataObjectOpsAsync;
         self.val
             .get_or_try_init(|| async {
                 let pk = self.valpk.get().unwrap();
@@ -118,12 +118,12 @@ impl<T: DataObject> ForeignKeyOpAsync<T> for ForeignKey<T> {
     }
 }
 
-impl<T: DataObject> ForeignKeyOpSync<T> for ForeignKey<T> {
+impl<T: DataObject> ForeignKeyOpsSync<T> for ForeignKey<T> {
     fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&T>
     where
         T: 'a,
     {
-        use crate::DataObjectOpSync;
+        use crate::DataObjectOpsSync;
         crate::sync::get_or_try_init_tokio_once_cell_sync(&self.val, || {
             let pk = self.valpk.get().unwrap();
             T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)

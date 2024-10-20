@@ -107,12 +107,12 @@ impl Tag {
     sync(),
     async(keep_self),
     idents(
-        DataObjectOpAsync(async = "DataObjectOpAsync", sync = "DataObjectOpSync"),
+        DataObjectOpsAsync(async = "DataObjectOpsAsync", sync = "DataObjectOpsSync"),
         ConnectionAsync(async = "ConnectionAsync", sync = "Connection")
     )
 )]
 pub async fn create_tag(conn: &ConnectionAsync, name: &str) -> Tag {
-    use butane::DataObjectOpAsync;
+    use butane::DataObjectOpsAsync;
     let mut tag = Tag::new(name);
     tag.save(conn).await.unwrap();
     tag
@@ -126,13 +126,13 @@ pub async fn create_tag(conn: &ConnectionAsync, name: &str) -> Tag {
     sync(),
     async(keep_self),
     idents(
-        DataObjectOp,
+        DataObjectOps,
         Connection(async = "ConnectionAsync", sync = "Connection"),
         create_tag(async = "create_tag", snake),
     )
 )]
 pub async fn setup_blog(conn: &Connection) {
-    use butane::DataObjectOp;
+    use butane::DataObjectOps;
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(conn).await.unwrap();
     let mut mountains_blog = Blog::new(2, "Mountains");

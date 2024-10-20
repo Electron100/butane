@@ -1,8 +1,9 @@
 //! Implementation of foreign key relationships between models.
 #![deny(missing_docs)]
+use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
 use std::borrow::Cow;
 use std::fmt::Debug;
-use tokio::sync::OnceCell;
+use std::sync::OnceLock;
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
@@ -37,8 +38,9 @@ where
 {
     // At least one must be initialized (enforced internally by this
     // type), but both need not be
-    val: OnceCell<Box<T>>,
-    valpk: OnceCell<SqlVal>,
+    // Using OnceLock instead of OnceCell because of Sync requirements when working with async.
+    val: OnceLock<Box<T>>,
+    valpk: OnceLock<SqlVal>,
 }
 impl<T: DataObject> ForeignKey<T> {
     /// Create a value from a reference to the primary key of the value
@@ -68,8 +70,8 @@ impl<T: DataObject> ForeignKey<T> {
 
     fn new_raw() -> Self {
         ForeignKey {
-            val: OnceCell::new(),
-            valpk: OnceCell::new(),
+            val: OnceLock::new(),
+            valpk: OnceLock::new(),
         }
     }
 
@@ -106,15 +108,14 @@ impl<T: DataObject> ForeignKeyOpAsync<T> for ForeignKey<T> {
         T: 'a,
     {
         use crate::DataObjectOpAsync;
-        self.val
-            .get_or_try_init(|| async {
-                let pk = self.valpk.get().unwrap();
-                T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?)
-                    .await
-                    .map(Box::new)
-            })
-            .await
-            .map(|v| v.as_ref())
+        get_or_init_once_lock_async(&self.val, || async {
+            let pk = self.valpk.get().unwrap();
+            T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?)
+                .await
+                .map(Box::new)
+        })
+        .await
+        .map(|v| v.as_ref())
     }
 }
 
@@ -124,7 +125,7 @@ impl<T: DataObject> ForeignKeyOpSync<T> for ForeignKey<T> {
         T: 'a,
     {
         use crate::DataObjectOpSync;
-        crate::sync::get_or_try_init_tokio_once_cell_sync(&self.val, || {
+        get_or_init_once_lock(&self.val, || {
             let pk = self.valpk.get().unwrap();
             T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
         })
@@ -185,7 +186,7 @@ where
     fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
         Ok(ForeignKey {
             valpk: SqlVal::from(valref).into(),
-            val: OnceCell::new(),
+            val: OnceLock::new(),
         })
     }
 }

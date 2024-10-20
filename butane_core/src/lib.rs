@@ -23,7 +23,7 @@ pub mod sqlval;
 pub mod uuid;
 
 mod autopk;
-mod sync;
+mod util;
 
 pub use autopk::AutoPk;
 use custom::SqlTypeCustom;

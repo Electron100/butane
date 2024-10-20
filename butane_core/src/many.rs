@@ -2,17 +2,18 @@
 #![deny(missing_docs)]
 use crate::db::{Column, ConnectionMethods, ConnectionMethodsAsync};
 use crate::query::{BoolExpr, Expr, OrderDirection, Query};
+use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
 use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use tokio::sync::OnceCell;
+use std::sync::OnceLock;
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
 
-fn default_oc<T>() -> OnceCell<Vec<T>> {
+fn default_oc<T>() -> OnceLock<Vec<T>> {
     // Same as impl Default for once_cell::unsync::OnceCell
-    OnceCell::new()
+    OnceLock::new()
 }
 
 /// Used to implement a many-to-many relationship between models.
@@ -38,7 +39,7 @@ where
     removed_values: Vec<SqlVal>,
     #[serde(skip)]
     #[serde(default = "default_oc")]
-    all_values: OnceCell<Vec<T>>,
+    all_values: OnceLock<Vec<T>>,
 }
 impl<T> Many<T>
 where
@@ -57,7 +58,7 @@ where
             owner_type: SqlType::Int,
             new_values: Vec::new(),
             removed_values: Vec::new(),
-            all_values: OnceCell::new(),
+            all_values: OnceLock::new(),
         }
     }
 
@@ -69,7 +70,7 @@ where
         self.item_table = Cow::Borrowed(item_table);
         self.owner = Some(owner);
         self.owner_type = owner_type;
-        self.all_values = OnceCell::new();
+        self.all_values = OnceLock::new();
     }
 
     /// Adds a value. Returns Err(ValueNotSaved) if the
@@ -82,7 +83,7 @@ where
         }
 
         // all_values is now out of date, so clear it
-        self.all_values = OnceCell::new();
+        self.all_values = OnceLock::new();
         self.new_values.push(new_val.pk().to_sql());
         Ok(())
     }
@@ -90,7 +91,7 @@ where
     /// Removes a value.
     pub fn remove(&mut self, val: &T) {
         // all_values is now out of date, so clear it
-        self.all_values = OnceCell::new();
+        self.all_values = OnceLock::new();
         self.removed_values.push(val.pk().to_sql())
     }
 
@@ -157,23 +158,12 @@ where
 
 /// Loads the values referred to by this many relationship from a
 /// database query if necessary and returns a reference to them.
-async fn load_query_async<'a, T>(
-    many: &'a Many<T>,
-    conn: &impl ConnectionMethodsAsync,
-    query: Query<T>,
-) -> Result<impl Iterator<Item = &'a T>>
-where
-    T: DataObject + 'a,
-{
-    many.all_values
-        .get_or_try_init(|| load_query_uncached_async(many, conn, query))
-        .await
-        .map(|v| v.iter())
-}
-
-/// Loads the values referred to by this many relationship from a
-/// database query if necessary and returns a reference to them.
-fn load_query_sync<'a, T>(
+#[maybe_async_cfg::maybe(
+    idents(load_query_uncached(snake)),
+    sync(),
+    async(idents(get_or_init_once_lock(snake), ConnectionMethods))
+)]
+async fn load_query<'a, T>(
     many: &'a Many<T>,
     conn: &impl ConnectionMethods,
     query: Query<T>,
@@ -181,11 +171,9 @@ fn load_query_sync<'a, T>(
 where
     T: DataObject + 'a,
 {
-    crate::sync::get_or_try_init_tokio_once_cell_sync(&many.all_values, || {
-        // TODO it would be nice to avoid this clone
-        load_query_uncached_sync(many, conn, query.clone())
-    })
-    .map(|v| v.iter())
+    get_or_init_once_lock(&many.all_values, || load_query_uncached(many, conn, query))
+        .await
+        .map(|v| v.iter())
 }
 
 /// [`Many`] operations which require a `Connection`
@@ -268,7 +256,7 @@ impl<T: DataObject> ManyOp<T> for Many<T> {
         self.new_values.clear();
         self.removed_values.clear();
         // all_values is now out of date, so clear it
-        self.all_values = OnceCell::new();
+        self.all_values = OnceLock::new();
         Ok(())
     }
 

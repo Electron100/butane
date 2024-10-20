@@ -436,9 +436,9 @@ fn impl_many_save(ast_struct: &ItemStruct, config: &Config, is_async: bool) -> T
                 quote!(<<Self as butane::DataObject>::PKType as butane::FieldType>::SQLTYPE);
 
             let save_with_conn = if is_async {
-                quote!(butane::ManyOpAsync::save(&mut self.#ident, conn).await?;)
+                quote!(butane::ManyOpsAsync::save(&mut self.#ident, conn).await?;)
             } else {
-                quote!(butane::ManyOpSync::save(&mut self.#ident, conn)?;)
+                quote!(butane::ManyOpsSync::save(&mut self.#ident, conn)?;)
             };
 
             // Save needs to ensure_initialized

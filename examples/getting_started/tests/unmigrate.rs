@@ -1,6 +1,6 @@
 use butane::db::{BackendConnection, Connection};
 use butane::migrations::Migrations;
-use butane::DataObjectOpSync;
+use butane::DataObjectOpsSync;
 use butane_test_helper::*;
 use butane_test_macros::butane_test;
 

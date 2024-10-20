@@ -10,11 +10,11 @@ use newtype::models::{Blog, Post, Tags};
     async(),
     idents(
         Connection(sync = "Connection", async = "ConnectionAsync"),
-        DataObjectOp(sync = "DataObjectOpSync", async = "DataObjectOpAsync")
+        DataObjectOps(sync = "DataObjectOpsSync", async = "DataObjectOpsAsync")
     )
 )]
 async fn insert_data(connection: &Connection) {
-    use butane::DataObjectOp;
+    use butane::DataObjectOps;
     if connection.backend_name() == "sqlite" {
         // https://github.com/Electron100/butane/issues/226
         return;

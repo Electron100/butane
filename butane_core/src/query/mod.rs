@@ -117,7 +117,7 @@ impl Column {
 }
 
 /// Representation of a database query.
-/// See [`QueryOpSync`] and [`QueryOpAsync`] for operations requiring a live database connection.
+/// See [`QueryOpsSync`] and [`QueryOpsAsync`] for operations requiring a live database connection.
 #[derive(Debug)]
 pub struct Query<T: DataResult> {
     table: TblName,
@@ -201,14 +201,14 @@ impl<T: DataResult> Clone for Query<T> {
 mod private {
     use super::*;
 
-    /// Internal QueryOp helpers
+    /// Internal QueryOps helpers
     #[allow(async_fn_in_trait)] // Not truly a public trait
     #[maybe_async_cfg::maybe(
         idents(ConnectionMethods(sync = "ConnectionMethods")),
         sync(),
         async()
     )]
-    pub trait QueryOpInternal<T> {
+    pub trait QueryOpsInternal<T> {
         async fn fetch(
             self,
             conn: &impl ConnectionMethods,
@@ -216,12 +216,12 @@ mod private {
         ) -> Result<Box<dyn BackendRows + '_>>;
     }
     #[maybe_async_cfg::maybe(
-        idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpInternal),
+        idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpsInternal),
         keep_self,
         sync(),
         async()
     )]
-    impl<T: DataResult> QueryOpInternal<T> for Query<T> {
+    impl<T: DataResult> QueryOpsInternal<T> for Query<T> {
         async fn fetch(
             self,
             conn: &impl ConnectionMethods,
@@ -244,17 +244,17 @@ mod private {
         }
     }
 }
-use private::QueryOpInternalAsync;
-use private::QueryOpInternalSync;
+use private::QueryOpsInternalAsync;
+use private::QueryOpsInternalSync;
 
 /// [`Query`] operations which require a `Connection`
 #[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
 #[maybe_async_cfg::maybe(
-    idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpInternal),
+    idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpsInternal),
     sync(),
     async()
 )]
-pub trait QueryOp<T>: QueryOpInternal<T> {
+pub trait QueryOps<T>: QueryOpsInternal<T> {
     /// Executes the query against `conn` and returns the first result (if any).
     async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>>;
 
@@ -268,23 +268,23 @@ pub trait QueryOp<T>: QueryOpInternal<T> {
 #[maybe_async_cfg::maybe(
     idents(
         ConnectionMethods(sync = "ConnectionMethods"),
-        QueryOp,
-        QueryOpInternal
+        QueryOps,
+        QueryOpsInternal
     ),
     keep_self,
     sync(),
     async()
 )]
-impl<T: DataResult> QueryOp<T> for Query<T> {
+impl<T: DataResult> QueryOps<T> for Query<T> {
     async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        QueryOpInternal::fetch(self, conn, Some(1))
+        QueryOpsInternal::fetch(self, conn, Some(1))
             .await?
             .mapped(T::from_row)
             .nth(0)
     }
     async fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
         let limit = self.limit.to_owned();
-        QueryOpInternal::fetch(self, conn, limit)
+        QueryOpsInternal::fetch(self, conn, limit)
             .await?
             .mapped(T::from_row)
             .collect()

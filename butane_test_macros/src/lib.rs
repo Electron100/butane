@@ -30,10 +30,10 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
         use butane_core::DataObject;
         use butane_core::DataResult;
         use butane_core::db::BackendConnection;
-        use butane_core::fkey::ForeignKeyOpSync;
-        use butane_core::many::ManyOpSync;
-        use butane_core::query::QueryOpSync;
-        use butane_core::DataObjectOpSync;
+        use butane_core::fkey::ForeignKeyOpsSync;
+        use butane_core::many::ManyOpsSync;
+        use butane_core::query::QueryOpsSync;
+        use butane_core::DataObjectOpsSync;
     ))
     .unwrap();
 
@@ -46,10 +46,10 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
         use butane_core::DataObject;
         use butane_core::DataResult;
         use butane_core::db::BackendConnectionAsync;
-        use butane_core::fkey::ForeignKeyOpAsync;
-        use butane_core::many::ManyOpAsync;
-        use butane_core::query::QueryOpAsync;
-        use butane_core::DataObjectOpAsync;
+        use butane_core::fkey::ForeignKeyOpsAsync;
+        use butane_core::many::ManyOpsAsync;
+        use butane_core::query::QueryOpsAsync;
+        use butane_core::DataObjectOpsAsync;
     ))
     .unwrap();
 

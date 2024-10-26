@@ -31,9 +31,11 @@ indent_style = tab
 
 [notes.org]
 indent_size = unset
+indent_style = unset
 
 [*.md]
 indent_size = unset
 
 [LICENSE-APACHE.txt]
 indent_size = unset
+indent_style = unset

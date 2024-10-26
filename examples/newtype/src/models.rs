@@ -42,7 +42,7 @@ impl Blog {
             id: BlogId(uuid::Uuid::new_v4()),
             name: BlogName(name.into()),
         };
-        blog.validate(&())?;
+        blog.validate()?;
         Ok(blog)
     }
 }

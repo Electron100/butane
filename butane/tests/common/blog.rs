@@ -1,4 +1,5 @@
 //! Helpers for several tests.
+#![allow(dead_code)] // not all parts used in all tests
 use butane::{dataresult, model};
 use butane::{
     db::{Connection, ConnectionAsync},

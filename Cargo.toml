@@ -16,14 +16,14 @@ members = [
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Electron100/butane"
-version = "0.6.1"
+version = "0.7.0"
 
 [workspace.dependencies]
 async-trait = "0.1"
-butane = { version = "0.6", path = "butane" }
-butane_cli = { version = "0.6", path = "butane_cli" }
-butane_core = { version = "0.6", path = "butane_core" }
-butane_codegen = { version = "0.6", path = "butane_codegen" }
+butane = { version = "0.7", path = "butane" }
+butane_cli = { path = "butane_cli" }
+butane_core = { version = "0.7", path = "butane_core" }
+butane_codegen = { version = "0.7", path = "butane_codegen" }
 butane_test_helper = { path = "butane_test_helper" }
 butane_test_macros = { path = "butane_test_macros" }
 cfg-if = "^1.0"

@@ -35,7 +35,6 @@ butane_core = { workspace = true }
 butane_test_helper = { workspace = true }
 butane_test_macros = { workspace = true }
 cfg-if = { workspace = true }
-exec_time = { version = "0.1.4" }
 paste = { workspace = true }
 chrono = { workspace = true }
 env_logger = { workspace = true }

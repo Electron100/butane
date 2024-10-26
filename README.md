@@ -94,7 +94,7 @@ enabled: you will want to enable `sqlite` and/or `pg`:
   straightforward API and eking out the smallest possible overhead,
   the API will win.
 
-## Breaking Changes & Version Migrations
+## Migration of Breaking Changes
 ### 0.8 (not yet released)
 
 This is a major release which adds Async support. Effort has been made
@@ -122,8 +122,18 @@ The Ops traits are:
 * `ManyOpsSync` / `ManyOpsAsync` (for use with [`Many`](https://docs.rs/butane/latest/butane/struct.Many.html))
 
 ### 0.7
-* Replace all occurrences of the `#[auto]` attribute (within a model) with the [`AutoPk`](https://docs.rs/butane/latest/butane/struct.AutoPk.html) type as a wrapper.
-* The `ObjectState` type and the auto-created `state` field for each model have been removed. Delete all references to the `state` field.
+#### `AutoPk`
+Replace model fields like
+```rust
+#[auto]
+pub id: i64
+```
+with
+```rust
+pub id: AutoPk<i64>
+```
+#### `ObjectState` is removed
+Remove any references to `ObjectState` or to the (previously automatically generated) state field on models.
 
 ## Roadmap
 

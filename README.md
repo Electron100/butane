@@ -100,7 +100,9 @@ enabled: you will want to enable `sqlite` and/or `pg`:
 This is a major release which adds Async support. Effort has been made
 to keep the sync experience as unchanged as possible. Async versions
 of many types have been added, but the sync ones generally retain
-their previous names. In order to allow sync and async code to look as
+their previous names. 
+
+In order to allow sync and async code to look as
 similar as possible for types and traits which do not otherwise need
 separate sync and async variants, several "Ops" traits have been
 introduced which contain methods split off from prior types and traits. 

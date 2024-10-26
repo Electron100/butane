@@ -226,12 +226,6 @@ pub trait DataObjectOps<T: DataObject> {
 impl<T> DataObjectOpsSync<T> for T where T: DataObject {}
 impl<T> DataObjectOpsAsync<T> for T where T: DataObject {}
 
-/// ASYNC TODO is this still necessary
-pub trait ModelTyped {
-    /// ASYNC TODO
-    type Model: DataObject;
-}
-
 /// Butane errors.
 #[allow(missing_docs)]
 #[derive(Debug, ThisError)]

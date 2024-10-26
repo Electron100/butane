@@ -10,8 +10,6 @@ use butane::migrations::Migrations;
 use butane::prelude_async::*;
 use models::{Blog, Post};
 
-// todo this example doesn't necessarily need to be async
-
 /// Load a [Connection].
 pub async fn establish_connection() -> ConnectionAsync {
     let mut connection =

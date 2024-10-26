@@ -16,7 +16,7 @@ pub use butane_core::{
     AsPrimaryKey, AutoPk, DataObject, DataResult, Error, FieldType, FromSql, PrimaryKeyType,
     Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
-// todo put ops in a separate package?
+
 pub use butane_core::{DataObjectOpsAsync, DataObjectOpsSync};
 
 pub mod db {
@@ -172,7 +172,6 @@ macro_rules! find {
 #[macro_export]
 macro_rules! find_async {
     ($dbobj:ident, $filter:expr, $conn:expr) => {
-        // todo sync version
         butane::query::QueryOpsAsync::load(butane::query!($dbobj, $filter).limit(1), $conn)
             .await
             .and_then(|mut results| results.pop().ok_or(butane::Error::NoSuchObject))

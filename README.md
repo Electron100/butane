@@ -94,6 +94,35 @@ enabled: you will want to enable `sqlite` and/or `pg`:
   straightforward API and eking out the smallest possible overhead,
   the API will win.
 
+## Breaking Changes & Version Migrations
+### 0.8 (not yet released)
+
+This is a major release which adds Async support. Effort has been made
+to keep the sync experience as unchanged as possible. Async versions
+of many types have been added, but the sync ones generally retain
+their previous names. In order to allow sync and async code to look as
+similar as possible for types and traits which do not otherwise need
+separate sync and async variants, several "Ops" traits have been
+introduced which contain methods split off from prior types and traits. 
+
+For example, if `obj` is an instance of
+[`DataObject`](https://docs.rs/butane/latest/butane/trait.DataObject.html),
+then you may call `obj.save(conn)` (sync) or `obj.save(conn).await`
+(async). The `save` method no longer lives on `DataObject`. Instead,
+you must use either `butane::DataObjectOpsSync` or
+`butane::DataObjectOpsAsync`. Which trait is in scope will determine
+whether the `save` method is sync or async.
+
+The Ops traits are:
+* `DataObjectOpsSync` / `DataObjectOpsAsync` (for use with [`DataObject`](https://docs.rs/butane/latest/butane/trait.DataObject.html))
+* `QueryOpsSync` / `QueryOpsSync` (for use with [`Query`](https://docs.rs/butane/latest/butane/query/struct.Query.html), less commonly needed directly if you use the [`query`](https://docs.rs/butane/latest/butane/macro.query.html) or [`filter`](https://docs.rs/butane/latest/butane/macro.filter.html) macros)
+* `ForeignKeyOpsSync` / `ForeignKeyOpsAsync` (for use with [`ForeignKey`](https://docs.rs/butane/latest/butane/struct.ForeignKey.html))
+* `ManyOpsSync` / `ManyOpsAsync` (for use with [`Many`](https://docs.rs/butane/latest/butane/struct.Many.html))
+
+### 0.7
+* Replace all occurrences of the `#[auto]` attribute (within a model) with the [`AutoPk`](https://docs.rs/butane/latest/butane/struct.AutoPk.html) type as a wrapper.
+* The `ObjectState` type and the auto-created `state` field for each model have been removed. Delete all references to the `state` field.
+
 ## Roadmap
 
 Butane is young. The following features are currently missing, but planned

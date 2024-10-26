@@ -100,12 +100,12 @@ enabled: you will want to enable `sqlite` and/or `pg`:
 This is a major release which adds Async support. Effort has been made
 to keep the sync experience as unchanged as possible. Async versions
 of many types have been added, but the sync ones generally retain
-their previous names. 
+their previous names.
 
 In order to allow sync and async code to look as
 similar as possible for types and traits which do not otherwise need
 separate sync and async variants, several "Ops" traits have been
-introduced which contain methods split off from prior types and traits. 
+introduced which contain methods split off from prior types and traits.
 
 For example, if `obj` is an instance of
 [`DataObject`](https://docs.rs/butane/latest/butane/trait.DataObject.html),
@@ -117,7 +117,9 @@ whether the `save` method is sync or async.
 
 The Ops traits are:
 * `DataObjectOpsSync` / `DataObjectOpsAsync` (for use with [`DataObject`](https://docs.rs/butane/latest/butane/trait.DataObject.html))
-* `QueryOpsSync` / `QueryOpsSync` (for use with [`Query`](https://docs.rs/butane/latest/butane/query/struct.Query.html), less commonly needed directly if you use the [`query`](https://docs.rs/butane/latest/butane/macro.query.html) or [`filter`](https://docs.rs/butane/latest/butane/macro.filter.html) macros)
+* `QueryOpsSync` / `QueryOpsSync` (for use with [`Query`](https://docs.rs/butane/latest/butane/query/struct.Query.html),
+  less commonly needed directly if you use the [`query`](https://docs.rs/butane/latest/butane/macro.query.html) or
+  [`filter`](https://docs.rs/butane/latest/butane/macro.filter.html) macros)
 * `ForeignKeyOpsSync` / `ForeignKeyOpsAsync` (for use with [`ForeignKey`](https://docs.rs/butane/latest/butane/struct.ForeignKey.html))
 * `ManyOpsSync` / `ManyOpsAsync` (for use with [`Many`](https://docs.rs/butane/latest/butane/struct.Many.html))
 

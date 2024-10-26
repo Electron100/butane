@@ -109,7 +109,8 @@ impl BackendTestInstance for SQLiteTestInstance {
     }
 }
 
-/// Used with `run_test` and `run_test_async`. Result of a backend-specific setup function. Provides a connection string, and also passed to the backend-specific teardown function
+/// Used with `run_test` and `run_test_async`. Result of a backend-specific setup function.
+/// Provides a connection string, and also passed to the backend-specific teardown function.
 pub trait SetupData {
     /// Return the connection string to use when establishing a
     /// database connection.

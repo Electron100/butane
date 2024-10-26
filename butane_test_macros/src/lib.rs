@@ -62,7 +62,15 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut funcs = Vec::<TokenStream2>::new();
     if include_sync {
         funcs.push(quote!(
-            #[maybe_async_cfg::maybe(sync(),idents(ConnectionAsync(sync="Connection"), find_async(sync="find"), setup_blog(sync="setup_blog_sync"), create_tag(sync="create_tag_sync")))]
+            #[maybe_async_cfg::maybe(
+                sync(),
+                idents(
+                    ConnectionAsync(sync="Connection"),
+                    find_async(sync="find"),
+                    setup_blog(sync="setup_blog_sync"),
+                    create_tag(sync="create_tag_sync"),
+                )
+            )]
             #func_sync
         ));
     }

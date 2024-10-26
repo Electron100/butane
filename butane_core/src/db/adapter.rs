@@ -67,8 +67,8 @@ impl AsyncAdapterEnv {
         let static_func: Box<dyn FnOnce() + Send + 'static> =
             unsafe { std::mem::transmute(boxed_func) };
         self.sender.send(Command::Func(static_func))?;
-        // https://stackoverflow.com/questions/52424449/is-there-a-way-to-express-same-generic-type-with-different-lifetime-bound
-        //https://docs.rs/crossbeam/0.8.2/crossbeam/fn.scope.html
+        // https://stackoverflow.com/questions/52424449/
+        // https://docs.rs/crossbeam/0.8.2/crossbeam/fn.scope.html
         // TODO ensure soundness and document why
         rx.await?
     }
@@ -94,8 +94,8 @@ impl AsyncAdapterEnv {
         let static_func: Box<dyn FnOnce() + Send + 'static> =
             unsafe { std::mem::transmute(boxed_func) };
         self.sender.send(Command::Func(static_func))?;
-        // https://stackoverflow.com/questions/52424449/is-there-a-way-to-express-same-generic-type-with-different-lifetime-bound
-        //https://docs.rs/crossbeam/0.8.2/crossbeam/fn.scope.html
+        // https://stackoverflow.com/questions/52424449/
+        // https://docs.rs/crossbeam/0.8.2/crossbeam/fn.scope.html
         // TODO ensure soundness and document why
         rx.await?
     }

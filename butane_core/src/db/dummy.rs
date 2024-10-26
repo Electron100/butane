@@ -1,4 +1,5 @@
-//! Provides a dummy backend which always fails and which is used as a return type in certain failure scenarios (see also [super::ConnectionAsync]'s `with_sync` method)
+//! Provides a dummy backend which always fails and which is used as a return type in certain failure scenarios
+//! (see also [super::ConnectionAsync]'s `with_sync` method).
 #![allow(unused)]
 
 use async_trait::async_trait;
@@ -29,9 +30,11 @@ impl Backend for DummyBackend {
     }
 }
 
-/// Provides a connection implementation which fails all operations with [Error::PoisonedConnection]. [ConnectionAsync] provides a `with_sync` method which allows running a non-async function
-/// which takes synchronous [Connection]. This is implemented using std::mem::swap to satisfy the borrow checker. The original async connection is replaced with a dummy one while the
-/// sync operation is being run.
+/// Provides a connection implementation which fails all operations with [Error::PoisonedConnection].
+///
+/// [ConnectionAsync] provides a `with_sync` method which allows running a non-async function
+/// which takes synchronous [Connection]. This is implemented using std::mem::swap to satisfy the borrow checker.
+/// The original async connection is replaced with a dummy one while the sync operation is being run.
 #[derive(Clone, Debug)]
 pub(crate) struct DummyConnection {}
 impl DummyConnection {

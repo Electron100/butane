@@ -51,7 +51,7 @@ impl<T> SyncAdapter<T> {
     fn chain<S>(&self, inner: S) -> SyncAdapter<S> {
         SyncAdapter {
             runtime_handle: self.runtime_handle.clone(),
-            _runtime: self._runtime.as_ref().map(|r| r.clone()),
+            _runtime: self._runtime.as_ref().cloned(),
             inner,
         }
     }
@@ -146,7 +146,7 @@ where
         // We can't use chain because of the lifetimes and mutable borrows below,
         // so set up these runtime clones now.
         let runtime_handle = self.runtime_handle.clone();
-        let runtime = self._runtime.as_ref().map(|r| r.clone());
+        let runtime = self._runtime.as_ref().cloned();
         let transaction: TransactionAsync =
             self.runtime_handle.block_on(self.inner.transaction())?;
         let transaction_adapter = SyncAdapter {

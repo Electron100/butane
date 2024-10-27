@@ -31,6 +31,7 @@ fmt :
 
 check-fmt :
 	$(CARGO_NIGHTLY) fmt --check
+	editorconfig-checker
 
 spellcheck :
 	typos

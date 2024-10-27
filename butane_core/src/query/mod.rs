@@ -201,7 +201,7 @@ impl<T: DataResult> Clone for Query<T> {
 mod private {
     use super::*;
 
-    /// Internal QueryOps helpers
+    /// Internal QueryOps helpers.
     #[allow(async_fn_in_trait)] // Not truly a public trait
     #[maybe_async_cfg::maybe(
         idents(ConnectionMethods(sync = "ConnectionMethods")),

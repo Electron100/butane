@@ -25,6 +25,5 @@ rand.workspace = true
 tempfile.workspace = true
 uuid = { features = ["v4"], workspace = true }
 
-
 [package.metadata.release]
 release = false

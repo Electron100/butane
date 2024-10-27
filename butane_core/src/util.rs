@@ -1,5 +1,6 @@
-use crate::Result;
 use std::sync::OnceLock;
+
+use crate::Result;
 
 pub fn get_or_init_once_lock<T>(cell: &OnceLock<T>, f: impl FnOnce() -> Result<T>) -> Result<&T> {
     if let Some(val) = cell.get() {

@@ -1,12 +1,13 @@
 //! R2D2 support for Butane.
 
+use std::ops::Deref;
+
 pub use r2d2::ManageConnection;
 
-use crate::db::{BackendConnection, Connection, ConnectionMethods};
-use crate::db::{Column, ConnectionSpec, RawQueryResult};
+use crate::db::{
+    BackendConnection, Column, Connection, ConnectionMethods, ConnectionSpec, RawQueryResult,
+};
 use crate::{query::BoolExpr, query::Order, Result, SqlVal, SqlValRef};
-
-use std::ops::Deref;
 
 /// R2D2 support for Butane. Implements [`r2d2::ManageConnection`].
 #[derive(Clone, Debug)]
@@ -62,11 +63,11 @@ impl ConnectionMethods for r2d2::PooledConnection<ConnectionManager> {
         self.deref()
             .insert_returning_pk(table, columns, pkcol, values)
     }
-    /// Like `insert_returning_pk` but with no return value
+    /// Like `insert_returning_pk` but with no return value.
     fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
         self.deref().insert_only(table, columns, values)
     }
-    /// Insert unless there's a conflict on the primary key column, in which case update
+    /// Insert unless there's a conflict on the primary key column, in which case update.
     fn insert_or_replace(
         &self,
         table: &str,

@@ -297,7 +297,7 @@ where
         self.invoke(|conn| conn.insert_returning_pk(table, columns, pkcol, values))
             .await
     }
-    /// Like `insert_returning_pk` but with no return value
+    /// Like `insert_returning_pk` but with no return value.
     async fn insert_only(
         &self,
         table: &str,
@@ -307,7 +307,7 @@ where
         self.invoke(|conn| conn.insert_only(table, columns, values))
             .await
     }
-    /// Insert unless there's a conflict on the primary key column, in which case update
+    /// Insert unless there's a conflict on the primary key column, in which case update.
     async fn insert_or_replace(
         &self,
         table: &str,

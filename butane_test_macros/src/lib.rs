@@ -1,4 +1,4 @@
-//! Macros for butane tests
+//! Macros for butane tests.
 
 use proc_macro::TokenStream;
 use proc_macro2::Span;
@@ -176,7 +176,7 @@ fn make_ident(name: &str) -> Ident {
     Ident::new(name, Span::call_site())
 }
 
-/// Options for butane_test
+/// Options for butane_test.
 #[derive(PartialEq, Eq)]
 enum TestOption {
     Sync,

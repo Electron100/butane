@@ -73,7 +73,7 @@ pub mod db {
 /// let first_place = 1;
 /// let e2 = filter!(Contestant, rank == { first_place });
 /// let e3 = filter!(Contestant, name.like("A%"));
-///```
+/// ```
 ///
 /// [`BoolExpr`]: crate::query::BoolExpr
 /// [`Query`]: crate::query::Query
@@ -151,7 +151,7 @@ macro_rules! colname {
 ///
 /// let conn = butane::db::connect(&ConnectionSpec::new("sqlite", "foo.db")).unwrap();
 /// let alice: Result<Contestant, butane::Error> = find!(Contestant, name == "Alice", &conn);
-///```
+/// ```
 ///
 /// [`filter]: crate::filter
 /// [`Result`]: crate::Result
@@ -164,7 +164,7 @@ macro_rules! find {
     };
 }
 
-/// Like [`find`], but for async
+/// Like [`find`], but for async.
 #[macro_export]
 macro_rules! find_async {
     ($dbobj:ident, $filter:expr, $conn:expr) => {

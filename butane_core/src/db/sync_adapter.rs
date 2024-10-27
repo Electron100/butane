@@ -1,3 +1,8 @@
+use std::future::Future;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+
 use crate::db::{
     Backend, BackendConnection, BackendConnectionAsync, BackendTransaction,
     BackendTransactionAsync, Connection, ConnectionAsync, ConnectionMethods, RawQueryResult,
@@ -6,10 +11,6 @@ use crate::db::{
 use crate::migrations::adb;
 use crate::query::{BoolExpr, Order};
 use crate::{debug, Column, Result, SqlVal, SqlValRef};
-use async_trait::async_trait;
-
-use std::future::Future;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct SyncAdapter<T> {

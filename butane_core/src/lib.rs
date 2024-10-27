@@ -7,7 +7,6 @@ use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 
 use serde::{Deserialize, Serialize};
-
 use thiserror::Error as ThisError;
 
 pub mod codegen;

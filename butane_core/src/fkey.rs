@@ -1,6 +1,5 @@
 //! Implementation of foreign key relationships between models.
 #![deny(missing_docs)]
-use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::sync::OnceLock;
@@ -9,6 +8,7 @@ use std::sync::OnceLock;
 use fake::{Dummy, Faker};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
 use crate::{
     AsPrimaryKey, ConnectionMethods, ConnectionMethodsAsync, DataObject, Error, FieldType, FromSql,
     Result, SqlType, SqlVal, SqlValRef, ToSql,
@@ -87,7 +87,7 @@ impl<T: DataObject> ForeignKey<T> {
     }
 }
 
-/// [`ForeignKey`] operations which require a `Connection`
+/// [`ForeignKey`] operations which require a `Connection`.
 #[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
 #[maybe_async_cfg::maybe(
     idents(ConnectionMethods(sync = "ConnectionMethods"),),

@@ -6,6 +6,9 @@ use async_trait::async_trait;
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
+use futures_util::stream::StreamExt;
+use tokio_postgres as postgres;
+use tokio_postgres::GenericClient;
 
 use super::connmethods::VecRows;
 use super::helper;
@@ -19,9 +22,6 @@ use crate::db::{
 use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
 use crate::query::{BoolExpr, Expr};
 use crate::{debug, query, warn, Error, Result, SqlType, SqlVal, SqlValRef};
-use futures_util::stream::StreamExt;
-use tokio_postgres as postgres;
-use tokio_postgres::GenericClient;
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
@@ -63,8 +63,6 @@ impl Backend for PgBackend {
         })
     }
 }
-
-// type PgConnHandle<TlsT> = tokio::task::JoinHandle<postgres::Connection<postgres::Socket, TlsT>>;
 
 /// Pg database connection.
 pub struct PgConnection {

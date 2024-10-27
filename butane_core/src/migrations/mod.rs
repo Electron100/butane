@@ -5,6 +5,7 @@
 
 use std::path::Path;
 
+use async_trait::async_trait;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
@@ -26,7 +27,6 @@ mod fs;
 mod fsmigrations;
 pub use fsmigrations::{FsMigration, FsMigrations};
 mod memmigrations;
-use async_trait::async_trait;
 pub use memmigrations::{MemMigration, MemMigrations};
 
 /// A collection of migrations.

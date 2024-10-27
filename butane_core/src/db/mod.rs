@@ -92,7 +92,7 @@ pub trait BackendConnection: ConnectionMethods + Debug + Send {
     /// Begin a database transaction. The transaction object must be
     /// used in place of this connection until it is committed or aborted.
     async fn transaction(&mut self) -> Result<Transaction<'_>>;
-    /// Retrieve the backend for this connection
+    /// Retrieve the backend for this connection.
     fn backend(&self) -> Box<dyn Backend>;
     /// Retrieve the backend name for this connection.
     fn backend_name(&self) -> &'static str;
@@ -226,7 +226,7 @@ impl Connection {
     pub async fn execute(&self, sql: impl AsRef<str>) -> Result<()> {
         self.conn.execute(sql.as_ref()).await
     }
-    // For use with connection_method_wrapper macro
+    // For use with connection_method_wrapper macro.
     #[allow(clippy::unnecessary_wraps)]
     fn wrapped_connection_methods(&self) -> Result<&dyn BackendConnection> {
         Ok(self.conn.as_ref())
@@ -237,8 +237,8 @@ impl Connection {
         Ok(adapter::AsyncAdapter::new(|| Ok(self))?.into_connection())
     }
 
-    /// Runs the provided function with a synchronous wrapper around this
-    /// asynchronous connection.
+    /// Runs the provided function with a synchronous wrapper around this asynchronous connection.
+    ///
     /// Because this relies on some (safe) memory gymnastics,
     /// there is a small but nonzero risk that if certain tokio calls fail unexpectedly at
     /// the wrong place the the connection will be poisoned -- all subsequent calls
@@ -308,10 +308,11 @@ connection_method_wrapper!(Connection);
 )]
 #[async_trait]
 pub trait BackendTransaction<'c>: ConnectionMethods + internal::AsyncRequiresSend + Debug {
-    /// Commit the transaction Unfortunately because we use this as a
-    /// trait object, we can't consume self. It should be understood
-    /// that no methods should be called after commit. This trait is
-    /// not public, and that behavior is enforced by Transaction
+    /// Commit the transaction.
+    ///
+    /// Unfortunately because we use this as a trait object, we can't consume self.
+    /// It should be understood that no methods should be called after commit.
+    /// This trait is not public, and that behavior is enforced by Transaction.
     async fn commit(&mut self) -> Result<()>;
     /// Roll back the transaction. Same comment about consuming self as above.
     async fn rollback(&mut self) -> Result<()>;
@@ -348,7 +349,7 @@ impl<'c> Transaction<'c> {
     pub(super) fn new(trans: Box<dyn BackendTransaction<'c> + 'c>) -> Self {
         Transaction { trans }
     }
-    /// Commit the transaction
+    /// Commit the transaction.
     pub async fn commit(mut self) -> Result<()> {
         self.trans.commit().await
     }
@@ -356,7 +357,7 @@ impl<'c> Transaction<'c> {
     pub async fn rollback(mut self) -> Result<()> {
         self.trans.deref_mut().rollback().await
     }
-    // For use with connection_method_wrapper macro
+    // For use with connection_method_wrapper macro.
     #[allow(clippy::unnecessary_wraps)]
     fn wrapped_connection_methods(&self) -> Result<&dyn ConnectionMethods> {
         let a: &dyn BackendTransaction<'c> = self.trans.as_ref();
@@ -567,8 +568,9 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     }
 }
 
-/// Connect to a database. For non-boxed connections, see individual
-/// [`Backend`] implementations.
+/// Connect to a database.
+///
+/// For non-boxed connections, see individual [`Backend`] implementations.
 pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     let conn = get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
@@ -576,8 +578,9 @@ pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     Ok(conn)
 }
 
-/// Connect to a database. For non-boxed connections, see individual
-/// [`Backend`] implementations.
+/// Connect to a database async.
+///
+/// For non-boxed connections, see individual [`Backend`] implementations.
 pub async fn connect_async(spec: &ConnectionSpec) -> Result<ConnectionAsync> {
     get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?

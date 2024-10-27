@@ -1,5 +1,4 @@
 //! SQLite database backend
-use async_trait::async_trait;
 use std::borrow::Cow;
 use std::fmt::{Debug, Write};
 use std::ops::Deref;
@@ -7,6 +6,12 @@ use std::path::Path;
 use std::pin::Pin;
 #[cfg(feature = "log")]
 use std::sync::Once;
+
+use async_trait::async_trait;
+#[cfg(feature = "datetime")]
+use chrono::naive::NaiveDateTime;
+use fallible_streaming_iterator::FallibleStreamingIterator;
+use pin_project::pin_project;
 
 use super::{helper, Backend, BackendRow, Column, RawQueryResult};
 use super::{
@@ -18,10 +23,6 @@ use crate::migrations::adb::ARef;
 use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::query::{BoolExpr, Order};
 use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
-#[cfg(feature = "datetime")]
-use chrono::naive::NaiveDateTime;
-use fallible_streaming_iterator::FallibleStreamingIterator;
-use pin_project::pin_project;
 
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";

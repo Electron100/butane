@@ -1,15 +1,16 @@
 //! Implementation of many-to-many relationships between models.
 #![deny(missing_docs)]
-use crate::db::{Column, ConnectionMethods, ConnectionMethodsAsync};
-use crate::query::{BoolExpr, Expr, OrderDirection, Query};
-use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
-use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::sync::OnceLock;
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
+use serde::{Deserialize, Serialize};
+
+use crate::db::{Column, ConnectionMethods, ConnectionMethodsAsync};
+use crate::query::{BoolExpr, Expr, OrderDirection, Query};
+use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
+use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 
 fn default_oc<T>() -> OnceLock<Vec<T>> {
     // Same as impl Default for once_cell::unsync::OnceCell
@@ -118,7 +119,7 @@ where
         }))
     }
 
-    /// Describes the columns of the Many table
+    /// Describes the columns of the Many table.
     pub fn columns(&self) -> [Column; 2] {
         [
             Column::new("owner", self.owner_type.clone()),
@@ -176,7 +177,7 @@ where
         .map(|v| v.iter())
 }
 
-/// [`Many`] operations which require a `Connection`
+/// [`Many`] operations which require a `Connection`.
 #[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
 #[maybe_async_cfg::maybe(
     idents(ConnectionMethods(sync = "ConnectionMethods"),),

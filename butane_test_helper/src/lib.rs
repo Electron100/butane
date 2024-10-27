@@ -2,13 +2,6 @@
 //! Macros depend on [`butane_core`], `env_logger` and [`log`].
 #![deny(missing_docs)]
 
-use butane_core::db::{
-    connect, connect_async, get_backend, pg, pg::PgBackend, sqlite, sqlite::SQLiteBackend, Backend,
-    ConnectionSpec,
-};
-use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
-use once_cell::sync::Lazy;
-
 use std::future::Future;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::ops::Deref;
@@ -17,12 +10,18 @@ use std::process::{ChildStderr, Command, Stdio};
 use std::sync::Mutex;
 
 use block_id::{Alphabet, BlockId};
+use butane_core::db::{
+    connect, connect_async, get_backend, pg, pg::PgBackend, sqlite, sqlite::SQLiteBackend, Backend,
+    ConnectionSpec,
+};
+use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
+use once_cell::sync::Lazy;
 use uuid::Uuid;
 
 pub use butane_core::db::{BackendConnection, BackendConnectionAsync, Connection, ConnectionAsync};
 pub use maybe_async_cfg;
 
-/// Trait for running a test
+/// Trait for running a test.
 #[allow(async_fn_in_trait)] // Not truly public, only used in butane for testing.
 pub trait BackendTestInstance {
     /// Run a synchronous test.
@@ -395,7 +394,7 @@ fn common_setup() {
     env_logger::try_init().ok();
 }
 
-/// Run a test function with a wrapper to set up and tear down the connection
+/// Run a test function with a wrapper to set up and tear down the connection.
 pub async fn run_test_async<T, Fut, Fut2>(
     backend_name: &str,
     setup: impl FnOnce() -> Fut,

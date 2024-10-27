@@ -66,6 +66,7 @@ butane_test_macros.workspace = true
 env_logger = { workspace = true }
 paste = { workspace = true }
 tempfile.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 
 [[test]]
 name = "uuid"

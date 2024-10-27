@@ -10,6 +10,7 @@ members = [
   "example",
   "examples/newtype",
   "examples/getting_started",
+  "examples/getting_started_async",
 ]
 
 [workspace.package]

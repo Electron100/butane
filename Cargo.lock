@@ -951,6 +951,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "getting_started_async"
+version = "0.1.0"
+dependencies = [
+ "butane",
+ "butane_cli",
+ "butane_core",
+ "butane_test_helper",
+ "butane_test_macros",
+ "cfg-if",
+ "env_logger",
+ "log",
+ "paste",
+ "tokio",
+]
+
+[[package]]
 name = "gimli"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

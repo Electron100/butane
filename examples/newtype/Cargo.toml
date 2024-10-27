@@ -31,7 +31,7 @@ cfg-if.workspace = true
 env_logger.workspace = true
 log.workspace = true
 paste.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 
 [package.metadata.release]
 release = false

@@ -135,8 +135,7 @@ enum DeleteCommands {
     },
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
+fn main() {
     let cli = Cli::parse();
 
     env_logger::Builder::new()

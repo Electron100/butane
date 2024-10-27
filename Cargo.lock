@@ -306,7 +306,6 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "tokio",
 ]
 
 [[package]]

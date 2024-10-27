@@ -572,10 +572,9 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
 ///
 /// For non-boxed connections, see individual [`Backend`] implementations.
 pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
-    let conn = get_backend(&spec.backend_name)
+    get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
-        .connect(&spec.conn_str)?;
-    Ok(conn)
+        .connect(&spec.conn_str)
 }
 
 /// Connect to a database async.

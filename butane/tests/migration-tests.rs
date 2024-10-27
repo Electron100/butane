@@ -177,7 +177,7 @@ fn current_migration_custom_type() {
 #[test]
 fn migration_add_field_sqlite() {
     migration_add_field(
-        &mut butane_test_helper::sqlite_connection(),
+        &mut sqlite_connection(),
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;",
         // The exact details of futzing a DROP COLUMN in sqlite aren't
         // important (e.g. the temp table naming is certainly not part
@@ -188,7 +188,7 @@ fn migration_add_field_sqlite() {
         "CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
 INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;
 ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
-    )
+    );
 }
 
 #[cfg(feature = "pg")]
@@ -212,7 +212,7 @@ fn migration_add_field_with_default_sqlite() {
         r#"CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
             INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;
             DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
-    )
+    );
 }
 
 #[cfg(feature = "pg")]
@@ -223,7 +223,7 @@ fn migration_add_field_with_default_pg() {
         &mut conn,
         "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 42;",
         "ALTER TABLE Foo DROP COLUMN baz;",
-    )
+    );
 }
 
 #[cfg(feature = "pg")]
@@ -290,7 +290,7 @@ fn migration_add_and_remove_field_sqlite() {
             CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
             INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;
             ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
-    )
+    );
 }
 
 #[cfg(feature = "pg")]
@@ -311,7 +311,7 @@ fn migration_delete_table_sqlite() {
         &mut sqlite_connection(),
         "DROP TABLE Foo;",
         "CREATE TABLE Foo (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
-    )
+    );
 }
 
 #[cfg(feature = "pg")]

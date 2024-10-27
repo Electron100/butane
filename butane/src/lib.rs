@@ -13,11 +13,9 @@ pub use butane_core::many::{Many, ManyOpsAsync, ManyOpsSync};
 pub use butane_core::migrations;
 pub use butane_core::query;
 pub use butane_core::{
-    AsPrimaryKey, AutoPk, DataObject, DataResult, Error, FieldType, FromSql, PrimaryKeyType,
-    Result, SqlType, SqlVal, SqlValRef, ToSql,
+    AsPrimaryKey, AutoPk, DataObject, DataObjectOpsAsync, DataObjectOpsSync, DataResult, Error,
+    FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
-
-pub use butane_core::{DataObjectOpsAsync, DataObjectOpsSync};
 
 pub mod db {
     //! Database helpers
@@ -71,12 +69,10 @@ pub mod db {
 ///   rank: i32,
 ///   nationality: String
 /// }
-/// # tokio_test::block_on(async {
-///   let e: BoolExpr = filter!(Contestant, nationality == "US" && rank < 42);
-///   let first_place = 1;
-///   let e2 = filter!(Contestant, rank == { first_place });
-///   let e3 = filter!(Contestant, name.like("A%"));
-/// # })
+/// let e: BoolExpr = filter!(Contestant, nationality == "US" && rank < 42);
+/// let first_place = 1;
+/// let e2 = filter!(Contestant, rank == { first_place });
+/// let e3 = filter!(Contestant, name.like("A%"));
 ///```
 ///
 /// [`BoolExpr`]: crate::query::BoolExpr

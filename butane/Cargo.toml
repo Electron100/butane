@@ -46,7 +46,7 @@ quote = { workspace = true }
 maybe-async-cfg.workspace = true
 proc-macro2 = { workspace = true }
 once_cell = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
 tokio-postgres = { features = ["with-geo-types-0_7"], workspace = true }
 tokio-test = { workspace = true }
 rand = { workspace = true }
@@ -55,7 +55,6 @@ rusqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sqlparser = { workspace = true }
-tokio = { workspace = true, features = ["macros"] }
 uuid_for_test = { package = "uuid", version = "1.2", features = ["v4"] }
 
 [package.metadata.docs.rs]

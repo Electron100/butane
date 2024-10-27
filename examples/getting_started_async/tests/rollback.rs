@@ -1,18 +1,18 @@
-use butane::db::{BackendConnection, Connection};
+use butane::db::{BackendConnectionAsync, ConnectionAsync};
 use butane::migrations::Migrations;
-use butane::DataObjectOpAsync;
+use butane::DataObjectOpsAsync;
 use butane_test_helper::*;
 use butane_test_macros::butane_test;
 
-use getting_started::models::{Blog, Post, Tag};
+use getting_started_async::models::{Blog, Post, Tag};
 
-async fn create_tag(connection: &Connection, name: &str) -> Tag {
+async fn create_tag(connection: &ConnectionAsync, name: &str) -> Tag {
     let mut tag = Tag::new(name);
     tag.save(connection).await.unwrap();
     tag
 }
 
-async fn insert_data(connection: &Connection) {
+async fn insert_data(connection: &ConnectionAsync) {
     if connection.backend_name() == "sqlite" {
         // https://github.com/Electron100/butane/issues/226
         return;
@@ -35,16 +35,16 @@ async fn insert_data(connection: &Connection) {
     post.save(connection).await.unwrap();
 }
 
-#[butane_test]
-async fn migrate_and_unmigrate(mut connection: Connection) {
+#[butane_test(async)]
+async fn migrate_and_unmigrate(mut connection: ConnectionAsync) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
 
-    migrations.migrate(&mut connection).await.unwrap();
+    migrations.migrate_async(&mut connection).await.unwrap();
 
     insert_data(&connection).await;
 
     // Undo migrations.
-    migrations.unmigrate(&mut connection).await.unwrap();
+    migrations.unmigrate_async(&mut connection).await.unwrap();
 }

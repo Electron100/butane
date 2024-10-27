@@ -5,8 +5,7 @@
 pub mod butane_migrations;
 pub mod models;
 
-use butane::db::Connection;
-use butane::db::ConnectionSpec;
+use butane::db::{Connection, ConnectionSpec};
 use butane::migrations::Migrations;
 use butane::prelude::*;
 use models::{Blog, Post};

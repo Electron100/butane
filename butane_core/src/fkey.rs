@@ -97,13 +97,13 @@ impl<T: DataObject> ForeignKey<T> {
 pub trait ForeignKeyOps<T: DataObject> {
     /// Loads the value referred to by this foreign key from the
     /// database if necessary and returns a reference to it.
-    async fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&T>
+    async fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&'a T>
     where
         T: 'a;
 }
 
 impl<T: DataObject> ForeignKeyOpsAsync<T> for ForeignKey<T> {
-    async fn load<'a>(&'a self, conn: &impl ConnectionMethodsAsync) -> Result<&T>
+    async fn load<'a>(&'a self, conn: &impl ConnectionMethodsAsync) -> Result<&'a T>
     where
         T: 'a,
     {
@@ -120,7 +120,7 @@ impl<T: DataObject> ForeignKeyOpsAsync<T> for ForeignKey<T> {
 }
 
 impl<T: DataObject> ForeignKeyOpsSync<T> for ForeignKey<T> {
-    fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&T>
+    fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&'a T>
     where
         T: 'a,
     {

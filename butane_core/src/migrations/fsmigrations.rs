@@ -244,9 +244,8 @@ impl MigrationMut for FsMigration {
         let typefile = self.root.join(TYPES_FILENAME);
 
         let mut types: SqlTypeMap = match self.fs.read(&typefile) {
-            Ok(reader) => serde_json::from_reader(reader).map_err(|e| {
+            Ok(reader) => serde_json::from_reader(reader).inspect_err(|_| {
                 eprintln!("failed to read types {typefile:?}");
-                e
             })?,
             Err(_) => BTreeMap::new(),
         };
@@ -254,9 +253,8 @@ impl MigrationMut for FsMigration {
         self.write_contents(
             TYPES_FILENAME,
             serde_json::to_string(&types)
-                .map_err(|e| {
+                .inspect_err(|_| {
                     eprintln!("failed to write types {typefile:?}");
-                    e
                 })?
                 .as_bytes(),
         )?;

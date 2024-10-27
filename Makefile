@@ -36,7 +36,7 @@ spellcheck :
 	typos
 
 doclint :
-	RUSTDOCFLAGS="-D warnings" $(CARGO_NIGHTLY) doc --no-deps --all-features
+	RUSTDOCFLAGS="-D warnings" RUSTFLAGS="-A elided_named_lifetimes" $(CARGO_NIGHTLY) doc --no-deps --all-features
 
 doc :
 	cd butane && $(CARGO_NIGHTLY) doc --no-deps --all-features

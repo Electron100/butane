@@ -1,7 +1,7 @@
 //! Library providing functionality used by butane macros and tools.
-#![deny(missing_docs)]
 #![allow(clippy::iter_nth_zero)]
 #![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
+#![deny(missing_docs)]
 
 use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
@@ -116,7 +116,7 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
 #[maybe_async_cfg::maybe(
     idents(
         ConnectionMethods(sync = "ConnectionMethods"),
-        save_many_to_many(sync = "save_many_to_many_sync", async = "save_many_to_many_async"),
+        save_many_to_many(snake),
         QueryOps,
     ),
     sync(),

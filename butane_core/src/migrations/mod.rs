@@ -30,7 +30,7 @@ mod memmigrations;
 pub use memmigrations::{MemMigration, MemMigrations};
 
 /// A collection of migrations.
-#[async_trait]
+#[allow(async_fn_in_trait)] // We don't expect to need to change the Send bounds of the future.
 pub trait Migrations: Clone {
     type M: Migration;
 

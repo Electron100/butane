@@ -198,54 +198,44 @@ impl<T: DataResult> Clone for Query<T> {
     }
 }
 
-mod private {
-    use super::*;
-
-    /// Internal QueryOps helpers.
-    #[allow(async_fn_in_trait)] // Not truly a public trait
-    #[maybe_async_cfg::maybe(
-        idents(ConnectionMethods(sync = "ConnectionMethods")),
-        sync(),
-        async()
-    )]
-    pub trait QueryOpsInternal<T> {
-        async fn fetch(
-            self,
-            conn: &impl ConnectionMethods,
-            limit: Option<i32>,
-        ) -> Result<Box<dyn BackendRows + '_>>;
-    }
-    #[maybe_async_cfg::maybe(
-        idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpsInternal),
-        keep_self,
-        sync(),
-        async()
-    )]
-    impl<T: DataResult> QueryOpsInternal<T> for Query<T> {
-        async fn fetch(
-            self,
-            conn: &impl ConnectionMethods,
-            limit: Option<i32>,
-        ) -> Result<Box<dyn BackendRows + '_>> {
-            let sort = if self.sort.is_empty() {
-                None
-            } else {
-                Some(self.sort.as_slice())
-            };
-            conn.query(
-                &self.table,
-                T::COLUMNS,
-                self.filter,
-                limit,
-                self.offset,
-                sort,
-            )
-            .await
-        }
+/// Internal QueryOps helpers.
+#[allow(async_fn_in_trait)] // Not truly a public trait
+#[maybe_async_cfg::maybe(idents(ConnectionMethods(sync = "ConnectionMethods")), sync(), async())]
+trait QueryOpsInternal<T> {
+    async fn fetch(
+        self,
+        conn: &impl ConnectionMethods,
+        limit: Option<i32>,
+    ) -> Result<Box<dyn BackendRows + '_>>;
+}
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpsInternal),
+    keep_self,
+    sync(),
+    async()
+)]
+impl<T: DataResult> QueryOpsInternal<T> for Query<T> {
+    async fn fetch(
+        self,
+        conn: &impl ConnectionMethods,
+        limit: Option<i32>,
+    ) -> Result<Box<dyn BackendRows + '_>> {
+        let sort = if self.sort.is_empty() {
+            None
+        } else {
+            Some(self.sort.as_slice())
+        };
+        conn.query(
+            &self.table,
+            T::COLUMNS,
+            self.filter,
+            limit,
+            self.offset,
+            sort,
+        )
+        .await
     }
 }
-use private::QueryOpsInternalAsync;
-use private::QueryOpsInternalSync;
 
 /// [`Query`] operations which require a `Connection`
 #[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
@@ -254,7 +244,7 @@ use private::QueryOpsInternalSync;
     sync(),
     async()
 )]
-pub trait QueryOps<T>: QueryOpsInternal<T> {
+pub trait QueryOps<T> {
     /// Executes the query against `conn` and returns the first result (if any).
     async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>>;
 

@@ -210,9 +210,9 @@ pub mod prelude_async {
 }
 
 pub mod internal {
-    //! Internals which will we be used in macro-generated code.
+    //! Internals used in macro-generated code.
     //!
-    //! Do not use directly.
+    //! Do not use directly. Semver-exempt.
 
     pub use async_trait::async_trait;
 

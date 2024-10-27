@@ -28,8 +28,6 @@ use serde::{Deserialize, Serialize};
 use crate::query::{BoolExpr, Order};
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 
-// todo figure this out
-//#[cfg(feature = "async-adapter")]
 mod adapter;
 pub(crate) mod dummy;
 use dummy::DummyConnection;
@@ -56,6 +54,9 @@ pub mod r2;
 use crate::connection_method_wrapper;
 
 mod internal {
+    // AsyncRequiresSend and AsyncRequiresSync are used to conditionally add bounds
+    // to types only in their async version.
+
     #[maybe_async_cfg::maybe(sync())]
     pub trait AsyncRequiresSend {}
     #[maybe_async_cfg::maybe(idents(AsyncRequiresSend), sync())]
@@ -103,9 +104,9 @@ pub trait BackendConnection: ConnectionMethods + Debug + Send {
 
 #[maybe_async_cfg::maybe(
     idents(
-        BackendConnection(sync = "BackendConnection", async = "BackendConnectionAsync"),
-        Connection(sync = "Connection", async = "ConnectionAsync"),
-        Transaction(sync = "Transaction", async = "TransactionAsync")
+        BackendConnection(sync = "BackendConnection"),
+        Connection(sync = "Connection"),
+        Transaction(sync = "Transaction")
     ),
     keep_self,
     sync(),
@@ -211,7 +212,7 @@ impl ConnectionMethods for Box<dyn BackendConnection> {
 )]
 #[derive(Debug)]
 pub struct Connection {
-    pub(super) conn: Box<dyn BackendConnection>,
+    conn: Box<dyn BackendConnection>,
 }
 
 #[maybe_async_cfg::maybe(
@@ -232,6 +233,10 @@ impl Connection {
         Ok(self.conn.as_ref())
     }
 
+    /// Consume this connection and convert it into an async one.
+    /// Note that the under the hood this adds an adapter layer which runs
+    /// the synchronous connection on a separate thread -- it is not "natively"
+    /// async.
     #[maybe_async_cfg::only_if(key = "sync")]
     pub fn into_async(self) -> Result<ConnectionAsync> {
         Ok(adapter::AsyncAdapter::new(|| Ok(self))?.into_connection())
@@ -270,6 +275,9 @@ impl Connection {
 }
 
 impl ConnectionAsync {
+    /// Consume this connection and convert it into a synchronous one.
+    /// Note that the under the hood this adds an adapter layer which drives
+    /// the async connection  -- the async machinery is not eliminated.
     pub fn into_sync(self) -> Result<Connection> {
         Ok(SyncAdapter::new(self)?.into_connection())
     }
@@ -307,7 +315,9 @@ connection_method_wrapper!(Connection);
     async()
 )]
 #[async_trait]
-pub trait BackendTransaction<'c>: ConnectionMethods + internal::AsyncRequiresSend + Debug {
+pub(super) trait BackendTransaction<'c>:
+    ConnectionMethods + internal::AsyncRequiresSend + Debug
+{
     /// Commit the transaction.
     ///
     /// Unfortunately because we use this as a trait object, we can't consume self.
@@ -369,8 +379,8 @@ connection_method_wrapper!(Transaction<'_>);
 
 #[maybe_async_cfg::maybe(
     idents(
-        BackendTransaction(sync = "BackendTransaction", async = "BackendTransactionAsync"),
-        ConnectionMethods(sync = "ConnectionMethods", async = "ConnectionMethodsAsync")
+        BackendTransaction(sync = "BackendTransaction"),
+        ConnectionMethods(sync = "ConnectionMethods")
     ),
     sync(keep_self),
     async()
@@ -490,7 +500,11 @@ impl<'bt> ConnectionMethods for Box<dyn BackendTransaction<'bt> + 'bt> {
 pub trait Backend: Send + Sync + DynClone {
     fn name(&self) -> &'static str;
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
+    /// Establish a new sync connection. The format of the connection
+    /// string is backend-dependent.
     fn connect(&self, conn_str: &str) -> Result<Connection>;
+    /// Establish a new async connection. The format of the connection
+    /// string is backend-dependent.
     async fn connect_async(&self, conn_str: &str) -> Result<ConnectionAsync>;
 }
 
@@ -540,7 +554,6 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
     }
 }
 
-/// Database backend. A boxed implementation can be returned by name via [`get_backend`].
 #[async_trait]
 impl Backend for Box<dyn Backend> {
     fn name(&self) -> &'static str {

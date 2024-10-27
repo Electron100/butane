@@ -12,6 +12,7 @@ use crate::migrations::adb;
 use crate::query::{BoolExpr, Order};
 use crate::{debug, Column, Result, SqlVal, SqlValRef};
 
+/// Adapter that allows running synchronous operations on an async type.
 #[derive(Debug)]
 pub struct SyncAdapter<T> {
     runtime_handle: tokio::runtime::Handle,

@@ -120,6 +120,7 @@ impl SQLiteConnection {
         Ok(&self.conn)
     }
 }
+
 impl ConnectionMethods for SQLiteConnection {
     fn execute(&self, sql: &str) -> Result<()> {
         ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)

@@ -155,8 +155,7 @@ impl<T> VecRows<T> {
         VecRows { rows, idx: 0 }
     }
 }
-//todo should we still have this feature
-//#[cfg(feature = "async-adapter")]
+
 pub(crate) fn vec_from_backend_rows<'a>(
     mut other: Box<dyn BackendRows + 'a>,
     columns: &[Column],
@@ -197,8 +196,6 @@ pub(crate) struct VecRow {
     values: Vec<SqlVal>,
 }
 
-//todo should this still be a separate feature
-//#[cfg(feature = "async-adapter")]
 impl VecRow {
     fn new(original: &(dyn BackendRow), columns: &[Column]) -> Result<Self> {
         if original.len() != columns.len() {

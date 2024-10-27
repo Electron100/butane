@@ -52,7 +52,7 @@ impl Backend for PgBackend {
     }
 
     fn connect(&self, path: &str) -> Result<Connection> {
-        debug!("connecting via sync adapter");
+        debug!("Postgres connecting via sync adapter");
         let conn = SyncAdapter::new(self.clone())?.connect(path)?;
         Ok(conn)
     }

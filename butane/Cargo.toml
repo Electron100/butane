@@ -27,11 +27,13 @@ tls = ["butane_core/tls"]
 uuid = ["butane_codegen/uuid", "butane_core/uuid"]
 
 [dependencies]
+async-trait = { workspace = true }
 butane_codegen = { workspace = true }
 butane_core = { workspace = true }
 
 [dev-dependencies]
 butane_test_helper = { workspace = true }
+butane_test_macros = { workspace = true }
 cfg-if = { workspace = true }
 paste = { workspace = true }
 chrono = { workspace = true }
@@ -41,9 +43,12 @@ geo-types = "0.7"
 log.workspace = true
 nonempty.workspace = true
 quote = { workspace = true }
+maybe-async-cfg.workspace = true
 proc-macro2 = { workspace = true }
 once_cell = { workspace = true }
-postgres = { features = ["with-geo-types-0_7"], workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+tokio-postgres = { features = ["with-geo-types-0_7"], workspace = true }
+tokio-test = { workspace = true }
 rand = { workspace = true }
 r2d2_for_test = { package = "r2d2", version = "0.8" }
 rusqlite = { workspace = true }

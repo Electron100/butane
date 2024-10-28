@@ -3,6 +3,8 @@
 
 use std::ops::{Deref, DerefMut};
 
+use async_trait::async_trait;
+
 use crate::query::{BoolExpr, Expr, Order};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
 
@@ -10,49 +12,61 @@ use crate::{Result, SqlType, SqlVal, SqlValRef};
 /// to call these methods directly and will instead use methods on
 /// [DataObject][crate::DataObject] or the `query!` macro. This trait is
 /// implemented by both database connections and transactions.
-pub trait ConnectionMethods {
-    fn execute(&self, sql: &str) -> Result<()>;
-    fn query<'a, 'b, 'c: 'a>(
+#[maybe_async_cfg::maybe(
+    sync(keep_self),
+    async(self = "ConnectionMethodsAsync"),
+    idents(AsyncRequiresSync)
+)]
+#[async_trait]
+pub trait ConnectionMethods: super::internal::AsyncRequiresSync {
+    async fn execute(&self, sql: &str) -> Result<()>;
+    async fn query<'c>(
         &'c self,
         table: &str,
-        columns: &'b [Column],
+        columns: &[Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
         offset: Option<i32>,
         sort: Option<&[Order]>,
-    ) -> Result<RawQueryResult<'a>>;
-    fn insert_returning_pk(
+    ) -> Result<RawQueryResult<'c>>;
+    async fn insert_returning_pk(
         &self,
         table: &str,
         columns: &[Column],
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal>;
-    /// Like `insert_returning_pk` but with no return value
-    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()>;
-    /// Insert unless there's a conflict on the primary key column, in which case update
-    fn insert_or_replace(
+    /// Like `insert_returning_pk` but with no return value.
+    async fn insert_only(
+        &self,
+        table: &str,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()>;
+    /// Insert unless there's a conflict on the primary key column, in which case update.
+    async fn insert_or_replace(
         &self,
         table: &str,
         columns: &[Column],
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<()>;
-    fn update(
+    async fn update(
         &self,
         table: &str,
         pkcol: Column,
-        pk: SqlValRef,
+        pk: SqlValRef<'_>,
         columns: &[Column],
         values: &[SqlValRef<'_>],
     ) -> Result<()>;
-    fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
-        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))?;
+    async fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
+        self.delete_where(table, BoolExpr::Eq(pkcol, Expr::Val(pk)))
+            .await?;
         Ok(())
     }
-    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize>;
+    async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize>;
     /// Tests if a table exists in the database.
-    fn has_table(&self, table: &str) -> Result<bool>;
+    async fn has_table(&self, table: &str) -> Result<bool>;
 }
 
 /// Represents a database column. Most users do not need to use this
@@ -141,6 +155,17 @@ impl<T> VecRows<T> {
         VecRows { rows, idx: 0 }
     }
 }
+
+pub(crate) fn vec_from_backend_rows<'a>(
+    mut other: Box<dyn BackendRows + 'a>,
+    columns: &[Column],
+) -> Result<VecRows<VecRow>> {
+    let mut rows: Vec<VecRow> = Vec::new();
+    while let Some(row) = other.next()? {
+        rows.push(VecRow::new(row, columns)?)
+    }
+    Ok(VecRows::new(rows))
+}
 impl<T> BackendRows for VecRows<T>
 where
     T: BackendRow,
@@ -163,5 +188,47 @@ impl<'a> BackendRows for Box<dyn BackendRows + 'a> {
 
     fn current(&self) -> Option<&(dyn BackendRow)> {
         self.deref().current()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct VecRow {
+    values: Vec<SqlVal>,
+}
+
+impl VecRow {
+    fn new(original: &(dyn BackendRow), columns: &[Column]) -> Result<Self> {
+        if original.len() != columns.len() {
+            return Err(crate::Error::BoundsError(
+                "row length doesn't match columns specifier length".into(),
+            ));
+        }
+        Ok(Self {
+            values: (0..(columns.len()))
+                .map(|i| {
+                    original
+                        .get(i, columns[i].ty.clone())
+                        .map(|valref| valref.into())
+                })
+                .collect::<Result<Vec<SqlVal>>>()?,
+        })
+    }
+}
+impl BackendRow for VecRow {
+    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef> {
+        self.values
+            .get(idx)
+            .ok_or_else(|| crate::Error::BoundsError("idx out of bounds".into()))
+            .and_then(|val| {
+                if val.is_compatible(&ty, true) {
+                    Ok(val)
+                } else {
+                    Err(crate::Error::CannotConvertSqlVal(ty.clone(), val.clone()))
+                }
+            })
+            .map(|val| val.as_ref())
+    }
+    fn len(&self) -> usize {
+        self.values.len()
     }
 }

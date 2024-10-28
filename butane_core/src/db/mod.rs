@@ -21,35 +21,78 @@ use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
+use async_trait::async_trait;
+use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 
-use crate::query::BoolExpr;
+use crate::query::{BoolExpr, Order};
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
+
+mod adapter;
+pub(crate) mod dummy;
+use dummy::DummyConnection;
+mod sync_adapter;
+pub use sync_adapter::SyncAdapter;
 
 mod connmethods;
 pub use connmethods::{
-    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
+    BackendRow, BackendRows, Column, ConnectionMethods, ConnectionMethodsAsync, MapDeref,
+    QueryResult, RawQueryResult,
 };
 mod helper;
 mod macros;
 #[cfg(feature = "pg")]
 pub mod pg;
+
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
 #[cfg(feature = "r2d2")]
 pub mod r2;
-#[cfg(feature = "r2d2")]
-pub use r2::ConnectionManager;
 
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
 
+mod internal {
+    // AsyncRequiresSend and AsyncRequiresSync are used to conditionally add bounds
+    // to types only in their async version.
+
+    #[maybe_async_cfg::maybe(sync())]
+    pub trait AsyncRequiresSend {}
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSend), sync())]
+    impl<T> AsyncRequiresSend for T {}
+
+    #[maybe_async_cfg::maybe(async())]
+    pub trait AsyncRequiresSend: Send {}
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSend), async())]
+    impl<T: Send> AsyncRequiresSend for T {}
+
+    #[maybe_async_cfg::maybe(sync())]
+    pub trait AsyncRequiresSync {}
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSync), sync())]
+    impl<T> AsyncRequiresSync for T {}
+
+    #[maybe_async_cfg::maybe(async())]
+    pub trait AsyncRequiresSync: Sync {}
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSync), async())]
+    impl<T: Sync> AsyncRequiresSync for T {}
+}
+
 /// Database connection.
-pub trait BackendConnection: ConnectionMethods + Debug + Send + 'static {
+#[maybe_async_cfg::maybe(
+    idents(
+        AsyncRequiresSend,
+        ConnectionMethods(sync = "ConnectionMethods", async = "ConnectionMethodsAsync"),
+        Transaction(sync = "Transaction", async = "TransactionAsync"),
+    ),
+    sync(self = "BackendConnection"),
+    async(self = "BackendConnectionAsync")
+)]
+#[async_trait]
+pub trait BackendConnection: ConnectionMethods + Debug + Send {
     /// Begin a database transaction. The transaction object must be
-    /// used in place of this connection until it is committed and aborted.
-    fn transaction(&mut self) -> Result<Transaction>;
+    /// used in place of this connection until it is committed or aborted.
+    async fn transaction(&mut self) -> Result<Transaction<'_>>;
     /// Retrieve the backend for this connection.
     fn backend(&self) -> Box<dyn Backend>;
     /// Retrieve the backend name for this connection.
@@ -59,25 +102,200 @@ pub trait BackendConnection: ConnectionMethods + Debug + Send + 'static {
     fn is_closed(&self) -> bool;
 }
 
+#[maybe_async_cfg::maybe(
+    idents(
+        BackendConnection(sync = "BackendConnection"),
+        Connection(sync = "Connection"),
+        Transaction(sync = "Transaction")
+    ),
+    keep_self,
+    sync(),
+    async()
+)]
+#[async_trait]
+impl BackendConnection for Box<dyn BackendConnection> {
+    async fn transaction(&mut self) -> Result<Transaction> {
+        self.deref_mut().transaction().await
+    }
+    fn backend(&self) -> Box<dyn Backend> {
+        self.deref().backend()
+    }
+    fn backend_name(&self) -> &'static str {
+        self.deref().backend_name()
+    }
+    fn is_closed(&self) -> bool {
+        self.deref().is_closed()
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        BackendConnection(sync = "BackendConnection"),
+        ConnectionMethods(sync = "ConnectionMethods")
+    ),
+    keep_self,
+    sync(),
+    async()
+)]
+#[async_trait]
+impl ConnectionMethods for Box<dyn BackendConnection> {
+    async fn execute(&self, sql: &str) -> Result<()> {
+        self.deref().execute(sql).await
+    }
+    async fn query<'c>(
+        &'c self,
+        table: &str,
+        columns: &[Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+        offset: Option<i32>,
+        sort: Option<&[Order]>,
+    ) -> Result<RawQueryResult<'c>> {
+        self.deref()
+            .query(table, columns, expr, limit, offset, sort)
+            .await
+    }
+    async fn insert_returning_pk(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<SqlVal> {
+        self.deref()
+            .insert_returning_pk(table, columns, pkcol, values)
+            .await
+    }
+    async fn insert_only(
+        &self,
+        table: &str,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.deref().insert_only(table, columns, values).await
+    }
+    async fn insert_or_replace(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.deref()
+            .insert_or_replace(table, columns, pkcol, values)
+            .await
+    }
+    async fn update(
+        &self,
+        table: &str,
+        pkcol: Column,
+        pk: SqlValRef<'_>,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.deref().update(table, pkcol, pk, columns, values).await
+    }
+    async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
+        self.deref().delete_where(table, expr).await
+    }
+    async fn has_table(&self, table: &str) -> Result<bool> {
+        self.deref().has_table(table).await
+    }
+}
+
 /// Database connection. May be a connection to any type of database
 /// as it is a boxed abstraction over a specific connection.
+#[maybe_async_cfg::maybe(
+    idents(BackendConnection(sync = "BackendConnection")),
+    sync(keep_self),
+    async(self = "ConnectionAsync")
+)]
 #[derive(Debug)]
 pub struct Connection {
     conn: Box<dyn BackendConnection>,
 }
+
+#[maybe_async_cfg::maybe(
+    idents(BackendConnection(sync = "BackendConnection")),
+    sync(keep_self),
+    async()
+)]
 impl Connection {
-    pub fn execute(&mut self, sql: impl AsRef<str>) -> Result<()> {
-        self.conn.execute(sql.as_ref())
+    pub fn new(conn: Box<dyn BackendConnection>) -> Self {
+        Self { conn }
     }
-    // For use with connection_method_wrapper macro
+    pub async fn execute(&self, sql: impl AsRef<str>) -> Result<()> {
+        self.conn.execute(sql.as_ref()).await
+    }
+    // For use with connection_method_wrapper macro.
     #[allow(clippy::unnecessary_wraps)]
     fn wrapped_connection_methods(&self) -> Result<&dyn BackendConnection> {
         Ok(self.conn.as_ref())
     }
+
+    /// Consume this connection and convert it into an async one.
+    /// Note that the under the hood this adds an adapter layer which runs
+    /// the synchronous connection on a separate thread -- it is not "natively"
+    /// async.
+    #[maybe_async_cfg::only_if(key = "sync")]
+    pub fn into_async(self) -> Result<ConnectionAsync> {
+        Ok(adapter::AsyncAdapter::new(|| Ok(self))?.into_connection())
+    }
+
+    /// Runs the provided function with a synchronous wrapper around this asynchronous connection.
+    ///
+    /// Because this relies on some (safe) memory gymnastics,
+    /// there is a small but nonzero risk that if certain tokio calls fail unexpectedly at
+    /// the wrong place the the connection will be poisoned -- all subsequent calls
+    /// to all methods will fail.
+    #[maybe_async_cfg::only_if(key = "async")]
+    pub async fn with_sync<F, T>(&mut self, f: F) -> Result<T>
+    where
+        F: FnOnce(&mut SyncAdapter<Self>) -> Result<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let mut conn2 = Connection::new(Box::new(DummyConnection::new()));
+        std::mem::swap(&mut conn2, self);
+        let ret: Result<(Result<T>, Connection)> = tokio::task::spawn_blocking(|| {
+            let mut sync_conn = SyncAdapter::new(conn2)?;
+            let f_ret = f(&mut sync_conn);
+            let async_conn = sync_conn.into_inner();
+            Ok((f_ret, async_conn))
+        })
+        .await?;
+        match ret {
+            Ok((inner_ret, mut conn)) => {
+                std::mem::swap(&mut conn, self);
+                inner_ret
+            }
+            // Self is poisoned
+            Err(e) => Err(e),
+        }
+    }
 }
+
+impl ConnectionAsync {
+    /// Consume this connection and convert it into a synchronous one.
+    /// Note that the under the hood this adds an adapter layer which drives
+    /// the async connection  -- the async machinery is not eliminated.
+    pub fn into_sync(self) -> Result<Connection> {
+        Ok(SyncAdapter::new(self)?.into_connection())
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        BackendConnection(sync = "BackendConnection"),
+        Connection(sync = "Connection"),
+        Transaction(sync = "Transaction")
+    ),
+    sync(keep_self),
+    async()
+)]
+#[async_trait]
 impl BackendConnection for Connection {
-    fn transaction(&mut self) -> Result<Transaction> {
-        self.conn.transaction()
+    async fn transaction(&mut self) -> Result<Transaction> {
+        self.conn.transaction().await
     }
     fn backend(&self) -> Box<dyn Backend> {
         self.conn.backend()
@@ -90,6 +308,207 @@ impl BackendConnection for Connection {
     }
 }
 connection_method_wrapper!(Connection);
+
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethods"), AsyncRequiresSend),
+    sync(keep_self),
+    async()
+)]
+#[async_trait]
+pub(super) trait BackendTransaction<'c>:
+    ConnectionMethods + internal::AsyncRequiresSend + Debug
+{
+    /// Commit the transaction.
+    ///
+    /// Unfortunately because we use this as a trait object, we can't consume self.
+    /// It should be understood that no methods should be called after commit.
+    /// This trait is not public, and that behavior is enforced by Transaction.
+    async fn commit(&mut self) -> Result<()>;
+    /// Roll back the transaction. Same comment about consuming self as above.
+    async fn rollback(&mut self) -> Result<()>;
+
+    // Workaround for https://github.com/rust-lang/rfcs/issues/2765
+    fn connection_methods(&self) -> &dyn ConnectionMethods;
+}
+
+/// Database transaction.
+///
+/// Begin a transaction using the `BackendConnection`
+/// [`transaction`][crate::db::BackendConnection::transaction] method.
+#[maybe_async_cfg::maybe(
+    idents(BackendTransaction(sync = "BackendTransaction")),
+    sync(self = "Transaction"),
+    async()
+)]
+#[derive(Debug)]
+pub struct Transaction<'c> {
+    pub(super) trans: Box<dyn BackendTransaction<'c> + 'c>,
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        BackendTransaction(sync = "BackendTransaction"),
+        ConnectionMethods(sync = "ConnectionMethods")
+    ),
+    sync(keep_self),
+    async()
+)]
+impl<'c> Transaction<'c> {
+    // unused may occur if no backends are selected
+    #[allow(unused)]
+    pub(super) fn new(trans: Box<dyn BackendTransaction<'c> + 'c>) -> Self {
+        Transaction { trans }
+    }
+    /// Commit the transaction.
+    pub async fn commit(mut self) -> Result<()> {
+        self.trans.commit().await
+    }
+    /// Roll back the transaction. Equivalent to dropping it.
+    pub async fn rollback(mut self) -> Result<()> {
+        self.trans.deref_mut().rollback().await
+    }
+    // For use with connection_method_wrapper macro.
+    #[allow(clippy::unnecessary_wraps)]
+    fn wrapped_connection_methods(&self) -> Result<&dyn ConnectionMethods> {
+        let a: &dyn BackendTransaction<'c> = self.trans.as_ref();
+        Ok(a.connection_methods())
+    }
+}
+
+connection_method_wrapper!(Transaction<'_>);
+
+#[maybe_async_cfg::maybe(
+    idents(
+        BackendTransaction(sync = "BackendTransaction"),
+        ConnectionMethods(sync = "ConnectionMethods")
+    ),
+    sync(keep_self),
+    async()
+)]
+#[async_trait]
+impl<'c> BackendTransaction<'c> for Transaction<'c> {
+    async fn commit(&mut self) -> Result<()> {
+        self.trans.commit().await
+    }
+    async fn rollback(&mut self) -> Result<()> {
+        self.trans.deref_mut().rollback().await
+    }
+    fn connection_methods(&self) -> &dyn ConnectionMethods {
+        self
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        BackendTransaction(sync = "BackendTransaction"),
+        ConnectionMethods(sync = "ConnectionMethods")
+    ),
+    keep_self,
+    sync(),
+    async()
+)]
+#[async_trait]
+impl<'c> BackendTransaction<'c> for Box<dyn BackendTransaction<'c> + 'c> {
+    async fn commit(&mut self) -> Result<()> {
+        self.deref_mut().commit().await
+    }
+    async fn rollback(&mut self) -> Result<()> {
+        self.deref_mut().rollback().await
+    }
+    fn connection_methods(&self) -> &dyn ConnectionMethods {
+        self
+    }
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        BackendTransaction(sync = "BackendTransaction"),
+        ConnectionMethods(sync = "ConnectionMethods")
+    ),
+    keep_self,
+    sync(),
+    async()
+)]
+#[async_trait]
+impl<'bt> ConnectionMethods for Box<dyn BackendTransaction<'bt> + 'bt> {
+    async fn execute(&self, sql: &str) -> Result<()> {
+        self.deref().execute(sql).await
+    }
+    async fn query<'c>(
+        &'c self,
+        table: &str,
+        columns: &[Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+        offset: Option<i32>,
+        sort: Option<&[Order]>,
+    ) -> Result<RawQueryResult<'c>> {
+        self.deref()
+            .query(table, columns, expr, limit, offset, sort)
+            .await
+    }
+    async fn insert_returning_pk(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<SqlVal> {
+        self.deref()
+            .insert_returning_pk(table, columns, pkcol, values)
+            .await
+    }
+    async fn insert_only(
+        &self,
+        table: &str,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.deref().insert_only(table, columns, values).await
+    }
+    async fn insert_or_replace(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.deref()
+            .insert_or_replace(table, columns, pkcol, values)
+            .await
+    }
+    async fn update(
+        &self,
+        table: &str,
+        pkcol: Column,
+        pk: SqlValRef<'_>,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.deref().update(table, pkcol, pk, columns, values).await
+    }
+    async fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
+        self.deref().delete_where(table, expr).await
+    }
+    async fn has_table(&self, table: &str) -> Result<bool> {
+        self.deref().has_table(table).await
+    }
+}
+
+/// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
+#[async_trait]
+pub trait Backend: Send + Sync + DynClone {
+    fn name(&self) -> &'static str;
+    fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
+    /// Establish a new sync connection. The format of the connection
+    /// string is backend-dependent.
+    fn connect(&self, conn_str: &str) -> Result<Connection>;
+    /// Establish a new async connection. The format of the connection
+    /// string is backend-dependent.
+    async fn connect_async(&self, conn_str: &str) -> Result<ConnectionAsync>;
+}
+
+dyn_clone::clone_trait_object!(Backend);
 
 /// Connection specification. Contains the name of a database backend
 /// and the backend-specific connection string. See [`connect`]
@@ -135,13 +554,7 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
     }
 }
 
-/// Database backend. A boxed implementation can be returned by name via [`get_backend`].
-pub trait Backend {
-    fn name(&self) -> &'static str;
-    fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
-    fn connect(&self, conn_str: &str) -> Result<Connection>;
-}
-
+#[async_trait]
 impl Backend for Box<dyn Backend> {
     fn name(&self) -> &'static str {
         self.deref().name()
@@ -151,6 +564,9 @@ impl Backend for Box<dyn Backend> {
     }
     fn connect(&self, conn_str: &str) -> Result<Connection> {
         self.deref().connect(conn_str)
+    }
+    async fn connect_async(&self, conn_str: &str) -> Result<ConnectionAsync> {
+        self.deref().connect_async(conn_str).await
     }
 }
 
@@ -165,55 +581,21 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     }
 }
 
-/// Connect to a database. For non-boxed connections, see individual
-/// [`Backend`] implementations.
+/// Connect to a database.
+///
+/// For non-boxed connections, see individual [`Backend`] implementations.
 pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
     get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
         .connect(&spec.conn_str)
 }
 
-trait BackendTransaction<'c>: ConnectionMethods + Debug {
-    /// Commit the transaction Unfortunately because we use this as a
-    /// trait object, we can't consume self. It should be understood
-    /// that no methods should be called after commit. This trait is
-    /// not public, and that behavior is enforced by Transaction
-    fn commit(&mut self) -> Result<()>;
-    /// Roll back the transaction. Same comment about consuming self as above.
-    fn rollback(&mut self) -> Result<()>;
-
-    // Workaround for https://github.com/rust-lang/rfcs/issues/2765
-    fn connection_methods(&self) -> &dyn ConnectionMethods;
-}
-
-/// Database transaction.
+/// Connect to a database async.
 ///
-/// Begin a transaction using the `BackendConnection`
-/// [`transaction`][crate::db::BackendConnection::transaction] method.
-#[derive(Debug)]
-pub struct Transaction<'c> {
-    trans: Box<dyn BackendTransaction<'c> + 'c>,
+/// For non-boxed connections, see individual [`Backend`] implementations.
+pub async fn connect_async(spec: &ConnectionSpec) -> Result<ConnectionAsync> {
+    get_backend(&spec.backend_name)
+        .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?
+        .connect_async(&spec.conn_str)
+        .await
 }
-impl<'c> Transaction<'c> {
-    // unused may occur if no backends are selected
-    #[allow(unused)]
-    fn new(trans: Box<dyn BackendTransaction<'c> + 'c>) -> Self {
-        Transaction { trans }
-    }
-    /// Commit the transaction
-    pub fn commit(mut self) -> Result<()> {
-        self.trans.deref_mut().commit()
-    }
-    /// Roll back the transaction. Equivalent to dropping it.
-    pub fn rollback(mut self) -> Result<()> {
-        self.trans.deref_mut().rollback()
-    }
-    // For use with connection_method_wrapper macro
-    #[allow(clippy::unnecessary_wraps)]
-    fn wrapped_connection_methods(&self) -> Result<&dyn ConnectionMethods> {
-        let a: &dyn BackendTransaction<'c> = self.trans.as_ref();
-        Ok(a.connection_methods())
-    }
-}
-
-connection_method_wrapper!(Transaction<'_>);

@@ -3,9 +3,12 @@
 use std::collections::{BTreeMap, HashMap};
 
 use butane::model;
-use butane::prelude::*;
-use butane::{db::Connection, FieldType};
+use butane::{
+    db::{Connection, ConnectionAsync},
+    FieldType,
+};
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -26,25 +29,26 @@ impl FooJJ {
     }
 }
 
-fn json_null(conn: Connection) {
+#[butane_test]
+async fn json_null(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooJJ::new(id);
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooJJ::get(&conn, id).unwrap();
+    let mut foo2 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooJJ::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(json_null);
 
-fn basic_json(conn: Connection) {
+#[butane_test]
+async fn basic_json(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooJJ::new(id);
@@ -59,19 +63,18 @@ fn basic_json(conn: Connection) {
         }"#;
 
     foo.val = serde_json::from_str(data).unwrap();
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooJJ::get(&conn, id).unwrap();
+    let mut foo2 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooJJ::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooJJ::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(basic_json);
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -89,7 +92,9 @@ impl FooHH {
         }
     }
 }
-fn basic_hashmap(conn: Connection) {
+
+#[butane_test]
+async fn basic_hashmap(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooHH::new(id);
@@ -97,19 +102,18 @@ fn basic_hashmap(conn: Connection) {
     data.insert("a".to_string(), "1".to_string());
 
     foo.val = data;
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooHH::get(&conn, id).unwrap();
+    let mut foo2 = FooHH::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooHH::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooHH::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(basic_hashmap);
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -127,7 +131,9 @@ impl FooFullPrefixHashMap {
         }
     }
 }
-fn basic_hashmap_full_prefix(conn: Connection) {
+
+#[butane_test]
+async fn basic_hashmap_full_prefix(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooFullPrefixHashMap::new(id);
@@ -135,19 +141,18 @@ fn basic_hashmap_full_prefix(conn: Connection) {
     data.insert("a".to_string(), "1".to_string());
 
     foo.val = data;
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooFullPrefixHashMap::get(&conn, id).unwrap();
+    let mut foo2 = FooFullPrefixHashMap::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooFullPrefixHashMap::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooFullPrefixHashMap::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(basic_hashmap_full_prefix);
 
 #[model]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -165,7 +170,9 @@ impl FooBTreeMap {
         }
     }
 }
-fn basic_btreemap(conn: Connection) {
+
+#[butane_test]
+async fn basic_btreemap(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooBTreeMap::new(id);
@@ -173,19 +180,18 @@ fn basic_btreemap(conn: Connection) {
     data.insert("a".to_string(), "1".to_string());
 
     foo.val = data;
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooBTreeMap::get(&conn, id).unwrap();
+    let mut foo2 = FooBTreeMap::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooBTreeMap::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooBTreeMap::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(basic_btreemap);
 
 #[derive(PartialEq, Eq, Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 struct HashedObject {
@@ -209,7 +215,9 @@ impl FooHHO {
         }
     }
 }
-fn hashmap_with_object_values(conn: Connection) {
+
+#[butane_test]
+async fn hashmap_with_object_values(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = FooHHO::new(id);
@@ -217,19 +225,18 @@ fn hashmap_with_object_values(conn: Connection) {
     data.insert("a".to_string(), HashedObject { x: 1, y: 3 });
 
     foo.val = data;
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = FooHHO::get(&conn, id).unwrap();
+    let mut foo2 = FooHHO::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = 43;
-    foo2.save(&conn).unwrap();
-    let foo3 = FooHHO::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = FooHHO::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(hashmap_with_object_values);
 
 #[derive(PartialEq, Eq, Debug, Clone, FieldType, Serialize, Deserialize)]
 struct InlineFoo {
@@ -255,20 +262,20 @@ impl OuterFoo {
     }
 }
 
-fn inline_json(conn: Connection) {
+#[butane_test]
+async fn inline_json(conn: ConnectionAsync) {
     // create
     let id = 4;
     let mut foo = OuterFoo::new(id, InlineFoo::new(4, 8));
-    foo.save(&conn).unwrap();
+    foo.save(&conn).await.unwrap();
 
     // read
-    let mut foo2 = OuterFoo::get(&conn, id).unwrap();
+    let mut foo2 = OuterFoo::get(&conn, id).await.unwrap();
     assert_eq!(foo, foo2);
 
     // update
     foo2.bar = InlineFoo::new(5, 9);
-    foo2.save(&conn).unwrap();
-    let foo3 = OuterFoo::get(&conn, id).unwrap();
+    foo2.save(&conn).await.unwrap();
+    let foo3 = OuterFoo::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
-testall!(inline_json);

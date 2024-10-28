@@ -1,7 +1,7 @@
 //! Simple example with all code in a single file.
-use butane::db::{Connection, ConnectionSpec};
-use butane::prelude::*;
-use butane::{find, model, query, AutoPk, Error, ForeignKey, Many};
+use butane::db::{ConnectionAsync, ConnectionSpec};
+use butane::prelude_async::*;
+use butane::{find_async, model, query, AutoPk, Error, ForeignKey, Many};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -46,52 +46,59 @@ struct Tag {
     tag: String,
 }
 
-fn query() -> Result<()> {
-    let conn = establish_connection()?;
+async fn query() -> Result<()> {
+    let conn = establish_connection().await?;
     let mut blog = Blog {
         name: "Bears".into(),
         ..Default::default()
     };
-    blog.save(&conn).unwrap();
+    blog.save(&conn).await.unwrap();
 
     let mut tag = Tag {
         tag: "dinosaurs".into(),
     };
-    tag.save(&conn).unwrap();
+    tag.save(&conn).await.unwrap();
 
     let mut post = Post::new(&blog, "Grizzly".into(), "lorem ipsum".into());
     post.published = true;
     post.tags.add(&tag)?;
-    post.save(&conn).unwrap();
+    post.save(&conn).await.unwrap();
 
-    let _specific_post = Post::get(&conn, 1)?;
-    let published_posts = query!(Post, published == true).limit(5).load(&conn)?;
+    let _specific_post = Post::get(&conn, 1).await?;
+    let published_posts = query!(Post, published == true).limit(5).load(&conn).await?;
     assert!(!published_posts.is_empty());
-    let unliked_posts = query!(Post, published == true && likes < 5).load(&conn)?;
+    let unliked_posts = query!(Post, published == true && likes < 5)
+        .load(&conn)
+        .await?;
     assert!(!unliked_posts.is_empty());
-    let _blog: &Blog = unliked_posts.first().unwrap().blog.load(&conn)?;
-    let tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn)?;
+    let _blog: &Blog = unliked_posts.first().unwrap().blog.load(&conn).await?;
+    let tagged_posts = query!(Post, tags.contains("dinosaurs")).load(&conn).await?;
     assert!(!tagged_posts.is_empty());
-    let tagged_posts = query!(Post, tags.contains(tag == "dinosaurs")).load(&conn)?;
+    let tagged_posts = query!(Post, tags.contains(tag == "dinosaurs"))
+        .load(&conn)
+        .await?;
     assert!(!tagged_posts.is_empty());
-    let blog: Blog = find!(Blog, name == "Bears", &conn).unwrap();
-    let posts_in_blog = query!(Post, blog == { &blog }).load(&conn)?;
+    let blog: Blog = find_async!(Blog, name == "Bears", &conn).unwrap();
+    let posts_in_blog = query!(Post, blog == { &blog }).load(&conn).await?;
     assert!(!posts_in_blog.is_empty());
-    let posts_in_blog = query!(Post, blog == { blog }).load(&conn)?;
+    let posts_in_blog = query!(Post, blog == { blog }).load(&conn).await?;
     assert!(!posts_in_blog.is_empty());
-    let posts_in_blog = query!(Post, blog.matches(name == "Bears")).load(&conn)?;
+    let posts_in_blog = query!(Post, blog.matches(name == "Bears"))
+        .load(&conn)
+        .await?;
     assert!(!posts_in_blog.is_empty());
     Ok(())
 }
 
-fn establish_connection() -> Result<Connection> {
+async fn establish_connection() -> Result<ConnectionAsync> {
     let mut cwd = std::env::current_dir()?;
     cwd.push(".butane");
     let spec = ConnectionSpec::load(cwd)?;
-    let conn = butane::db::connect(&spec)?;
+    let conn = butane::db::connect_async(&spec).await?;
     Ok(conn)
 }
 
-fn main() -> Result<()> {
-    query()
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
+    query().await
 }

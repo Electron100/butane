@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
@@ -55,7 +54,7 @@ impl MigrationsState {
 /// A migration stored in the filesystem.
 #[derive(Clone, Debug)]
 pub struct FsMigration {
-    fs: Rc<dyn Filesystem>,
+    fs: std::sync::Arc<dyn Filesystem + Send + Sync>,
     root: PathBuf,
 }
 
@@ -245,9 +244,8 @@ impl MigrationMut for FsMigration {
         let typefile = self.root.join(TYPES_FILENAME);
 
         let mut types: SqlTypeMap = match self.fs.read(&typefile) {
-            Ok(reader) => serde_json::from_reader(reader).map_err(|e| {
+            Ok(reader) => serde_json::from_reader(reader).inspect_err(|_| {
                 eprintln!("failed to read types {typefile:?}");
-                e
             })?,
             Err(_) => BTreeMap::new(),
         };
@@ -255,9 +253,8 @@ impl MigrationMut for FsMigration {
         self.write_contents(
             TYPES_FILENAME,
             serde_json::to_string(&types)
-                .map_err(|e| {
+                .inspect_err(|_| {
                     eprintln!("failed to write types {typefile:?}");
-                    e
                 })?
                 .as_bytes(),
         )?;
@@ -346,14 +343,14 @@ impl Eq for FsMigration {}
 /// A collection of migrations stored in the filesystem.
 #[derive(Clone, Debug)]
 pub struct FsMigrations {
-    fs: Rc<dyn Filesystem>,
+    fs: std::sync::Arc<dyn Filesystem + Send + Sync>,
     root: PathBuf,
     current: FsMigration,
 }
 impl FsMigrations {
     /// Create a new instance.
     pub fn new(root: PathBuf) -> Self {
-        let fs = Rc::new(OsFilesystem {});
+        let fs = std::sync::Arc::new(OsFilesystem {});
         let current = FsMigration {
             fs: fs.clone(),
             root: root.join("current"),

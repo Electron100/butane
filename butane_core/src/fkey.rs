@@ -1,20 +1,24 @@
 //! Implementation of foreign key relationships between models.
 #![deny(missing_docs)]
 use std::borrow::Cow;
+use std::fmt::Debug;
+use std::sync::OnceLock;
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
-use once_cell::unsync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::db::ConnectionMethods;
+use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
 use crate::{
-    AsPrimaryKey, DataObject, Error, FieldType, FromSql, Result, SqlType, SqlVal, SqlValRef, ToSql,
+    AsPrimaryKey, ConnectionMethods, ConnectionMethodsAsync, DataObject, Error, FieldType, FromSql,
+    Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
 
 /// Used to implement a relationship between models.
 ///
 /// Initialize using `From` or `from_pk`
+///
+/// See [`ForeignKeyOpsSync`] and [`ForeignKeyOpsAsync`] for operations requiring a live database connection.
 ///
 /// # Examples
 /// ```ignore
@@ -34,8 +38,9 @@ where
 {
     // At least one must be initialized (enforced internally by this
     // type), but both need not be
-    val: OnceCell<Box<T>>,
-    valpk: OnceCell<SqlVal>,
+    // Using OnceLock instead of OnceCell because of Sync requirements when working with async.
+    val: OnceLock<Box<T>>,
+    valpk: OnceLock<SqlVal>,
 }
 impl<T: DataObject> ForeignKey<T> {
     /// Create a value from a reference to the primary key of the value
@@ -63,21 +68,10 @@ impl<T: DataObject> ForeignKey<T> {
         }
     }
 
-    /// Loads the value referred to by this foreign key from the
-    /// database if necessary and returns a reference to it.
-    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<&T> {
-        self.val
-            .get_or_try_init(|| {
-                let pk = self.valpk.get().unwrap();
-                T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
-            })
-            .map(|v| v.as_ref())
-    }
-
     fn new_raw() -> Self {
         ForeignKey {
-            val: OnceCell::new(),
-            valpk: OnceCell::new(),
+            val: OnceLock::new(),
+            valpk: OnceLock::new(),
         }
     }
 
@@ -90,6 +84,52 @@ impl<T: DataObject> ForeignKey<T> {
             },
         }
         self.valpk.get().unwrap()
+    }
+}
+
+/// [`ForeignKey`] operations which require a `Connection`.
+#[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethods"),),
+    sync(),
+    async()
+)]
+pub trait ForeignKeyOps<T: DataObject> {
+    /// Loads the value referred to by this foreign key from the
+    /// database if necessary and returns a reference to it.
+    async fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&'a T>
+    where
+        T: 'a;
+}
+
+impl<T: DataObject> ForeignKeyOpsAsync<T> for ForeignKey<T> {
+    async fn load<'a>(&'a self, conn: &impl ConnectionMethodsAsync) -> Result<&'a T>
+    where
+        T: 'a,
+    {
+        use crate::DataObjectOpsAsync;
+        get_or_init_once_lock_async(&self.val, || async {
+            let pk = self.valpk.get().unwrap();
+            T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?)
+                .await
+                .map(Box::new)
+        })
+        .await
+        .map(|v| v.as_ref())
+    }
+}
+
+impl<T: DataObject> ForeignKeyOpsSync<T> for ForeignKey<T> {
+    fn load<'a>(&'a self, conn: &impl ConnectionMethods) -> Result<&'a T>
+    where
+        T: 'a,
+    {
+        use crate::DataObjectOpsSync;
+        get_or_init_once_lock(&self.val, || {
+            let pk = self.valpk.get().unwrap();
+            T::get(conn, T::PKType::from_sql_ref(pk.as_ref())?).map(Box::new)
+        })
+        .map(|v| v.as_ref())
     }
 }
 
@@ -146,7 +186,7 @@ where
     fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
         Ok(ForeignKey {
             valpk: SqlVal::from(valref).into(),
-            val: OnceCell::new(),
+            val: OnceLock::new(),
         })
     }
 }

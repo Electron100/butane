@@ -7,22 +7,22 @@ use std::pin::Pin;
 #[cfg(feature = "log")]
 use std::sync::Once;
 
+use async_trait::async_trait;
 #[cfg(feature = "datetime")]
 use chrono::naive::NaiveDateTime;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use pin_project::pin_project;
 
-use super::helper;
-use crate::connection_method_wrapper;
-use crate::db::{
-    Backend, BackendConnection, BackendRow, BackendRows, BackendTransaction, Column, Connection,
-    ConnectionMethods, RawQueryResult, Transaction,
+use super::{helper, Backend, BackendRow, Column, RawQueryResult};
+use super::{
+    BackendConnection, BackendTransaction, Connection, ConnectionAsync, ConnectionMethods,
+    Transaction,
 };
-use crate::debug;
-use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
-use crate::query;
+use crate::db::connmethods::BackendRows;
+use crate::migrations::adb::ARef;
+use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::query::{BoolExpr, Order};
-use crate::{Error, Result, SqlType, SqlVal, SqlValRef};
+use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -49,7 +49,7 @@ fn log_callback(error_code: std::ffi::c_int, message: &str) {
 }
 
 /// SQLite [`Backend`] implementation.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SQLiteBackend;
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
@@ -63,6 +63,8 @@ impl SQLiteBackend {
         Ok(connection)
     }
 }
+
+#[async_trait]
 impl Backend for SQLiteBackend {
     fn name(&self) -> &'static str {
         BACKEND_NAME
@@ -86,6 +88,9 @@ impl Backend for SQLiteBackend {
         Ok(Connection {
             conn: Box::new(self.connect(path)?),
         })
+    }
+    async fn connect_async(&self, path: &str) -> Result<ConnectionAsync> {
+        super::adapter::connect_async_via_sync(self, path).await
     }
 }
 
@@ -115,7 +120,68 @@ impl SQLiteConnection {
         Ok(&self.conn)
     }
 }
-connection_method_wrapper!(SQLiteConnection);
+
+impl ConnectionMethods for SQLiteConnection {
+    fn execute(&self, sql: &str) -> Result<()> {
+        ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
+    }
+    fn query<'a, 'c>(
+        &'c self,
+        table: &str,
+        columns: &[Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+        offset: Option<i32>,
+        sort: Option<&[crate::query::Order]>,
+    ) -> Result<RawQueryResult<'c>> {
+        self.wrapped_connection_methods()?
+            .query(table, columns, expr, limit, offset, sort)
+    }
+    fn insert_returning_pk(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<SqlVal> {
+        self.wrapped_connection_methods()?
+            .insert_returning_pk(table, columns, pkcol, values)
+    }
+    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
+        self.wrapped_connection_methods()?
+            .insert_only(table, columns, values)
+    }
+    fn insert_or_replace(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.wrapped_connection_methods()?
+            .insert_or_replace(table, columns, pkcol, values)
+    }
+    fn update(
+        &self,
+        table: &str,
+        pkcol: Column,
+        pk: SqlValRef<'_>,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.wrapped_connection_methods()?
+            .update(table, pkcol, pk, columns, values)
+    }
+    fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
+        self.wrapped_connection_methods()?.delete(table, pkcol, pk)
+    }
+    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
+        self.wrapped_connection_methods()?.delete_where(table, expr)
+    }
+    fn has_table(&self, table: &str) -> Result<bool> {
+        self.wrapped_connection_methods()?.has_table(table)
+    }
+}
 
 impl BackendConnection for SQLiteConnection {
     fn transaction(&mut self) -> Result<Transaction<'_>> {
@@ -143,15 +209,15 @@ impl ConnectionMethods for rusqlite::Connection {
         Ok(())
     }
 
-    fn query<'a, 'b, 'c: 'a>(
+    fn query<'c>(
         &'c self,
         table: &str,
-        columns: &'b [Column],
+        columns: &[Column],
         expr: Option<BoolExpr>,
         limit: Option<i32>,
         offset: Option<i32>,
         order: Option<&[Order]>,
-    ) -> Result<RawQueryResult<'a>> {
+    ) -> Result<RawQueryResult<'c>> {
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
         let mut values: Vec<SqlVal> = Vec::new();
@@ -327,7 +393,68 @@ impl<'c> SqliteTransaction<'c> {
         Error::Internal("transaction has already been consumed".to_string())
     }
 }
-connection_method_wrapper!(SqliteTransaction<'_>);
+impl ConnectionMethods for SqliteTransaction<'_> {
+    fn execute(&self, sql: &str) -> Result<()> {
+        ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
+    }
+    fn query<'c>(
+        &'c self,
+        table: &str,
+        columns: &[Column],
+        expr: Option<BoolExpr>,
+        limit: Option<i32>,
+        offset: Option<i32>,
+        sort: Option<&[crate::query::Order]>,
+    ) -> Result<RawQueryResult<'c>> {
+        self.wrapped_connection_methods()?
+            .query(table, columns, expr, limit, offset, sort)
+    }
+    fn insert_returning_pk(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<SqlVal> {
+        self.wrapped_connection_methods()?
+            .insert_returning_pk(table, columns, pkcol, values)
+    }
+    fn insert_only(&self, table: &str, columns: &[Column], values: &[SqlValRef<'_>]) -> Result<()> {
+        self.wrapped_connection_methods()?
+            .insert_only(table, columns, values)
+    }
+    fn insert_or_replace(
+        &self,
+        table: &str,
+        columns: &[Column],
+        pkcol: &Column,
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.wrapped_connection_methods()?
+            .insert_or_replace(table, columns, pkcol, values)
+    }
+    fn update(
+        &self,
+        table: &str,
+        pkcol: Column,
+        pk: SqlValRef<'_>,
+        columns: &[Column],
+        values: &[SqlValRef<'_>],
+    ) -> Result<()> {
+        self.wrapped_connection_methods()?
+            .update(table, pkcol, pk, columns, values)
+    }
+    fn delete(&self, table: &str, pkcol: &'static str, pk: SqlVal) -> Result<()> {
+        self.wrapped_connection_methods()?.delete(table, pkcol, pk)
+    }
+    fn delete_where(&self, table: &str, expr: BoolExpr) -> Result<usize> {
+        self.wrapped_connection_methods()?.delete_where(table, expr)
+    }
+    fn has_table(&self, table: &str) -> Result<bool> {
+        self.wrapped_connection_methods()?.has_table(table)
+    }
+}
+
 impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
         match self.trans.take() {

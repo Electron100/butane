@@ -1,10 +1,11 @@
-use butane_core::db::{connect, BackendConnection, Connection, ConnectionSpec};
+use butane_core::db::{connect_async, ConnectionAsync, ConnectionSpec};
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 
-fn connection_not_closed(conn: Connection) {
+#[butane_test(nomigrate)]
+async fn connection_not_closed(conn: ConnectionAsync) {
     assert!(!conn.is_closed());
 }
-testall_no_migrate!(connection_not_closed);
 
 #[test]
 fn persist_invalid_connection_backend() {
@@ -21,13 +22,13 @@ fn persist_invalid_connection_backend() {
     assert_eq!(spec, loaded_spec);
 }
 
-#[test]
-fn invalid_pg_connection() {
+#[tokio::test]
+async fn invalid_pg_connection() {
     let spec = ConnectionSpec::new("pg", "does_not_parse");
     assert_eq!(spec.backend_name, "pg".to_string());
     assert_eq!(spec.conn_str, "does_not_parse".to_string());
 
-    let result = connect(&spec);
+    let result = connect_async(&spec).await;
     assert!(matches!(result, Err(butane_core::Error::Postgres(_))));
     match result {
         Err(butane_core::Error::Postgres(e)) => {
@@ -38,8 +39,8 @@ fn invalid_pg_connection() {
     }
 }
 
-#[test]
-fn unreachable_pg_connection() {
+#[tokio::test]
+async fn unreachable_pg_connection() {
     let spec = ConnectionSpec::new("pg", "host=does_not_exist user=does_not_exist");
     assert_eq!(spec.backend_name, "pg".to_string());
     assert_eq!(
@@ -47,7 +48,7 @@ fn unreachable_pg_connection() {
         "host=does_not_exist user=does_not_exist".to_string()
     );
 
-    let result = connect(&spec);
+    let result = connect_async(&spec).await;
     assert!(matches!(result, Err(butane_core::Error::Postgres(_))));
     match result {
         Err(butane_core::Error::Postgres(e)) => {
@@ -61,16 +62,17 @@ fn unreachable_pg_connection() {
     }
 }
 
-fn debug_connection(conn: Connection) {
+#[butane_test(nomigrate)]
+async fn debug_connection(conn: ConnectionAsync) {
     let backend_name = conn.backend_name();
 
+    let debug_str = format!("{:?}", conn);
     if backend_name == "pg" {
-        assert!(format!("{:?}", conn).contains("conn: true"));
+        assert!(debug_str.contains("conn: true"));
     } else {
-        assert!(format!("{:?}", conn).contains("path: Some(\"\")"));
+        assert!(debug_str.contains("path: Some(\"\")"));
     }
 }
-testall_no_migrate!(debug_connection);
 
 #[test]
 fn wont_load_connection_spec_from_missing_path() {

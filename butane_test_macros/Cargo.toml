@@ -1,0 +1,17 @@
+[package]
+name = "butane_test_macros"
+version.workspace = true
+authors = ["James Oakley <james@electronstudio.org>"]
+edition.workspace = true
+description = "Macros for Butane tests."
+publish = false
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features=["parsing"] }
+
+[lib]
+proc-macro = true

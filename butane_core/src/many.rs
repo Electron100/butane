@@ -1,18 +1,20 @@
 //! Implementation of many-to-many relationships between models.
 #![deny(missing_docs)]
 use std::borrow::Cow;
+use std::sync::OnceLock;
 
 #[cfg(feature = "fake")]
 use fake::{Dummy, Faker};
-use once_cell::unsync::OnceCell;
 use serde::{Deserialize, Serialize};
 
-use crate::db::{Column, ConnectionMethods};
+use crate::db::{Column, ConnectionMethods, ConnectionMethodsAsync};
 use crate::query::{BoolExpr, Expr, OrderDirection, Query};
-use crate::{DataObject, Error, FieldType, PrimaryKeyType, Result, SqlType, SqlVal, ToSql};
+use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
+use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 
-fn default_oc<T>() -> OnceCell<Vec<T>> {
-    OnceCell::default()
+fn default_oc<T>() -> OnceLock<Vec<T>> {
+    // Same as impl Default for once_cell::unsync::OnceCell
+    OnceLock::new()
 }
 
 /// Used to implement a many-to-many relationship between models.
@@ -21,6 +23,8 @@ fn default_oc<T>() -> OnceCell<Vec<T>> {
 /// many-to-many relationship with U, owner type is T::PKType, has is
 /// U::PKType. Table name is T_foo_Many where foo is the name of
 /// the Many field
+///
+/// See [`ManyOpsSync`] and [`ManyOpsAsync`] for operations requiring a live database connection.
 //
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Many<T>
@@ -36,7 +40,7 @@ where
     removed_values: Vec<SqlVal>,
     #[serde(skip)]
     #[serde(default = "default_oc")]
-    all_values: OnceCell<Vec<T>>,
+    all_values: OnceLock<Vec<T>>,
 }
 impl<T> Many<T>
 where
@@ -55,7 +59,7 @@ where
             owner_type: SqlType::Int,
             new_values: Vec::new(),
             removed_values: Vec::new(),
-            all_values: OnceCell::new(),
+            all_values: OnceLock::new(),
         }
     }
 
@@ -67,7 +71,7 @@ where
         self.item_table = Cow::Borrowed(item_table);
         self.owner = Some(owner);
         self.owner_type = owner_type;
-        self.all_values = OnceCell::new();
+        self.all_values = OnceLock::new();
     }
 
     /// Adds a value. Returns Err(ValueNotSaved) if the
@@ -80,7 +84,7 @@ where
         }
 
         // all_values is now out of date, so clear it
-        self.all_values = OnceCell::new();
+        self.all_values = OnceLock::new();
         self.new_values.push(new_val.pk().to_sql());
         Ok(())
     }
@@ -88,7 +92,7 @@ where
     /// Removes a value.
     pub fn remove(&mut self, val: &T) {
         // all_values is now out of date, so clear it
-        self.all_values = OnceCell::new();
+        self.all_values = OnceLock::new();
         self.removed_values.push(val.pk().to_sql())
     }
 
@@ -98,56 +102,6 @@ where
             .get()
             .ok_or(Error::ValueNotLoaded)
             .map(|v| v.iter())
-    }
-
-    /// Used by macro-generated code. You do not need to call this directly.
-    pub fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
-        let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
-        while !self.new_values.is_empty() {
-            conn.insert_only(
-                &self.item_table,
-                &self.columns(),
-                &[
-                    owner.as_ref(),
-                    self.new_values.pop().unwrap().as_ref().clone(),
-                ],
-            )?;
-        }
-        if !self.removed_values.is_empty() {
-            conn.delete_where(
-                &self.item_table,
-                BoolExpr::In("has", std::mem::take(&mut self.removed_values)),
-            )?;
-        }
-        self.new_values.clear();
-        Ok(())
-    }
-
-    /// Delete all references from the database, and any unsaved additions.
-    pub fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
-        let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
-        conn.delete_where(
-            &self.item_table,
-            BoolExpr::Eq("owner", Expr::Val(owner.clone())),
-        )?;
-        self.new_values.clear();
-        self.removed_values.clear();
-        // all_values is now out of date, so clear it
-        self.all_values = OnceCell::new();
-        Ok(())
-    }
-
-    /// Loads the values referred to by this many relationship from the
-    /// database if necessary and returns a reference to them.
-    pub fn load(&self, conn: &impl ConnectionMethods) -> Result<impl Iterator<Item = &T>> {
-        let query = self.query();
-        // If not initialised then there are no values
-        let vals: Result<Vec<&T>> = if query.is_err() {
-            Ok(Vec::new())
-        } else {
-            Ok(self.load_query(conn, query.unwrap())?.collect())
-        };
-        vals.map(|v| v.into_iter())
     }
 
     /// Query the values referred to by this many relationship from the
@@ -165,48 +119,7 @@ where
         }))
     }
 
-    /// Loads the values referred to by this many relationship from a
-    /// database query if necessary and returns a reference to them.
-    fn load_query(
-        &self,
-        conn: &impl ConnectionMethods,
-        query: Query<T>,
-    ) -> Result<impl Iterator<Item = &T>> {
-        let vals: Result<&Vec<T>> = self.all_values.get_or_try_init(|| {
-            let mut vals = query.load(conn)?;
-            // Now add in the values for things not saved to the db yet
-            if !self.new_values.is_empty() {
-                vals.append(
-                    &mut T::query()
-                        .filter(BoolExpr::In(T::PKCOL, self.new_values.clone()))
-                        .load(conn)?,
-                );
-            }
-            Ok(vals)
-        });
-        vals.map(|v| v.iter())
-    }
-
-    /// Loads and orders the values referred to by this many relationship from a
-    /// database if necessary and returns a reference to them.
-    pub fn load_ordered(
-        &self,
-        conn: &impl ConnectionMethods,
-        order: OrderDirection,
-    ) -> Result<impl Iterator<Item = &T>> {
-        let query = self.query();
-        // If not initialised then there are no values
-        let vals: Result<Vec<&T>> = if query.is_err() {
-            Ok(Vec::new())
-        } else {
-            Ok(self
-                .load_query(conn, query.unwrap().order(T::PKCOL, order))?
-                .collect())
-        };
-        vals.map(|v| v.into_iter())
-    }
-
-    /// Describes the columns of the Many table
+    /// Describes the columns of the Many table.
     pub fn columns(&self) -> [Column; 2] {
         [
             Column::new("owner", self.owner_type.clone()),
@@ -214,6 +127,180 @@ where
         ]
     }
 }
+
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync, async = "ConnectionMethodsAsync"), QueryOps),
+    sync(),
+    async()
+)]
+/// Loads the values referred to by this many relationship from a
+/// database query if necessary and returns a reference to them.
+async fn load_query_uncached<'a, T>(
+    many: &'a Many<T>,
+    conn: &impl ConnectionMethods,
+    query: Query<T>,
+) -> Result<Vec<T>>
+where
+    T: DataObject + 'a,
+{
+    use crate::query::QueryOps;
+    let mut vals: Vec<T> = query.load(conn).await?;
+    // Now add in the values for things not saved to the db yet
+    if !many.new_values.is_empty() {
+        vals.append(
+            &mut T::query()
+                .filter(BoolExpr::In(T::PKCOL, many.new_values.clone()))
+                .load(conn)
+                .await?,
+        );
+    }
+    Ok(vals)
+}
+
+/// Loads the values referred to by this many relationship from a
+/// database query if necessary and returns a reference to them.
+#[maybe_async_cfg::maybe(
+    idents(load_query_uncached(snake)),
+    sync(),
+    async(idents(get_or_init_once_lock(snake), ConnectionMethods))
+)]
+async fn load_query<'a, T>(
+    many: &'a Many<T>,
+    conn: &impl ConnectionMethods,
+    query: Query<T>,
+) -> Result<impl Iterator<Item = &'a T>>
+where
+    T: DataObject + 'a,
+{
+    get_or_init_once_lock(&many.all_values, || load_query_uncached(many, conn, query))
+        .await
+        .map(|v| v.iter())
+}
+
+/// [`Many`] operations which require a `Connection`.
+#[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethods"),),
+    sync(),
+    async()
+)]
+pub trait ManyOps<T: DataObject> {
+    /// Used by macro-generated code. You do not need to call this directly.
+    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+
+    /// Delete all references from the database, and any unsaved additions.
+    async fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+
+    /// Loads the values referred to by this many relationship from the
+    /// database if necessary and returns a reference to them.
+    async fn load<'a>(
+        &'a self,
+        conn: &impl ConnectionMethods,
+    ) -> Result<impl Iterator<Item = &'a T>>
+    where
+        T: 'a;
+
+    /// Loads and orders the values referred to by this many relationship from a
+    /// database if necessary and returns a reference to them.
+    async fn load_ordered<'a>(
+        &'a self,
+        conn: &impl ConnectionMethods,
+        order: OrderDirection,
+    ) -> Result<impl Iterator<Item = &'a T>>
+    where
+        T: 'a;
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        ConnectionMethods(sync = "ConnectionMethods"),
+        ManyOpsInternal,
+        ManyOps,
+        load_query(sync = "load_query_sync", async = "load_query_async"),
+    ),
+    keep_self,
+    sync(),
+    async()
+)]
+impl<T: DataObject> ManyOps<T> for Many<T> {
+    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+        let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
+        while !self.new_values.is_empty() {
+            conn.insert_only(
+                &self.item_table,
+                &self.columns(),
+                &[
+                    owner.as_ref(),
+                    self.new_values.pop().unwrap().as_ref().clone(),
+                ],
+            )
+            .await?;
+        }
+        if !self.removed_values.is_empty() {
+            conn.delete_where(
+                &self.item_table,
+                BoolExpr::In("has", std::mem::take(&mut self.removed_values)),
+            )
+            .await?;
+        }
+        self.new_values.clear();
+        Ok(())
+    }
+
+    async fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+        let owner = self.owner.as_ref().ok_or(Error::NotInitialized)?;
+        conn.delete_where(
+            &self.item_table,
+            BoolExpr::Eq("owner", Expr::Val(owner.clone())),
+        )
+        .await?;
+        self.new_values.clear();
+        self.removed_values.clear();
+        // all_values is now out of date, so clear it
+        self.all_values = OnceLock::new();
+        Ok(())
+    }
+
+    async fn load<'a>(
+        &'a self,
+        conn: &impl ConnectionMethods,
+    ) -> Result<impl Iterator<Item = &'a T>>
+    where
+        T: 'a,
+    {
+        let query = self.query();
+        // If not initialised then there are no values
+        let vals: Result<Vec<&T>> = if query.is_err() {
+            Ok(Vec::new())
+        } else {
+            Ok(load_query(self, conn, query.unwrap()).await?.collect())
+        };
+        vals.map(|v| v.into_iter())
+    }
+
+    async fn load_ordered<'a>(
+        &'a self,
+        conn: &impl ConnectionMethods,
+        order: OrderDirection,
+    ) -> Result<impl Iterator<Item = &'a T>>
+    where
+        T: 'a,
+    {
+        let query = self.query();
+        // If not initialised then there are no values
+        let vals: Result<Vec<&T>> = if query.is_err() {
+            Ok(Vec::new())
+        } else {
+            Ok(
+                load_query(self, conn, query.unwrap().order(T::PKCOL, order))
+                    .await?
+                    .collect(),
+            )
+        };
+        vals.map(|v| v.into_iter())
+    }
+}
+
 impl<T: DataObject> PartialEq<Many<T>> for Many<T> {
     fn eq(&self, other: &Many<T>) -> bool {
         (self.owner == other.owner) && (self.item_table == other.item_table)

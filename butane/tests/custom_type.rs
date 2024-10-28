@@ -1,8 +1,8 @@
-use butane::db::Connection;
-use butane::prelude::*;
+use butane::db::ConnectionAsync;
 use butane::{butane_type, model, query};
 use butane::{FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
 use butane_test_helper::*;
+use butane_test_macros::*;
 
 #[butane_type(Text)]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -60,29 +60,30 @@ impl HasCustomField {
     }
 }
 
-fn roundtrip_custom_type(conn: Connection) {
+#[butane_test]
+async fn roundtrip_custom_type(conn: ConnectionAsync) {
     //create
     let mut obj = HasCustomField::new(1, Frobnozzle::Foo);
-    obj.save(&conn).unwrap();
+    obj.save(&conn).await.unwrap();
 
     // read
-    let obj2 = HasCustomField::get(&conn, 1).unwrap();
+    let obj2 = HasCustomField::get(&conn, 1).await.unwrap();
     assert_eq!(obj, obj2);
 }
-testall!(roundtrip_custom_type);
 
-fn query_custom_type(conn: Connection) {
+#[butane_test]
+async fn query_custom_type(conn: ConnectionAsync) {
     //create
     let mut obj_foo = HasCustomField::new(1, Frobnozzle::Foo);
-    obj_foo.save(&conn).unwrap();
+    obj_foo.save(&conn).await.unwrap();
     let mut obj_bar = HasCustomField::new(2, Frobnozzle::Bar);
-    obj_bar.save(&conn).unwrap();
+    obj_bar.save(&conn).await.unwrap();
 
     // query
     let results = query!(HasCustomField, frob == { Frobnozzle::Bar })
         .load(&conn)
+        .await
         .unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], obj_bar)
 }
-testall!(query_custom_type);

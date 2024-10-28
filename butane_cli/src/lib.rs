@@ -13,13 +13,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use butane::db::Backend;
+use butane::db::{Connection, ConnectionMethods};
 use butane::migrations::adb;
 use butane::migrations::adb::{diff, AColumn, ARef, Operation, ADB};
 use butane::migrations::{
     copy_migration, FsMigrations, MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut,
 };
 use butane::query::BoolExpr;
-use butane::{db, db::Connection, db::ConnectionMethods, migrations};
+use butane::{db, migrations};
 use cargo_metadata::MetadataCommand;
 use chrono::Utc;
 use nonempty::NonEmpty;
@@ -522,7 +524,7 @@ pub fn regenerate_migrations(base_dir: &Path) -> Result<()> {
 
 /// Load the [`db::Backend`]s used in the latest migration.
 /// Error if there are no existing migrations.
-pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {
+pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn Backend>>> {
     if let Ok(ms) = get_migrations(base_dir) {
         if let Some(latest_migration) = ms.latest() {
             let backend_names = latest_migration.sql_backends()?;
@@ -532,7 +534,7 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
                 backend_names.join(", ")
             );
 
-            let mut backends: Vec<Box<dyn db::Backend>> = vec![];
+            let mut backends: Vec<Box<dyn Backend>> = vec![];
 
             for backend_name in backend_names {
                 backends.push(
@@ -541,7 +543,7 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
                 );
             }
 
-            return Ok(NonEmpty::<Box<dyn db::Backend>>::from_vec(backends).unwrap());
+            return Ok(NonEmpty::<Box<dyn Backend>>::from_vec(backends).unwrap());
         }
     }
     Err(anyhow::anyhow!("There are no exiting migrations."))
@@ -549,7 +551,7 @@ pub fn load_latest_migration_backends(base_dir: &Path) -> Result<NonEmpty<Box<dy
 
 /// Load [`db::Backend`]s selected in the latest migration, or when there are no migrations,
 /// fallback to the backend named in the connection.
-pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn db::Backend>>> {
+pub fn load_backends(base_dir: &Path) -> Result<NonEmpty<Box<dyn Backend>>> {
     // Try to use the same backends as the latest migration.
     let backends = load_latest_migration_backends(base_dir);
     if backends.is_ok() {

@@ -1,17 +1,26 @@
-use butane::db::{BackendConnection, Connection};
+use butane::db::{BackendConnectionAsync, Connection, ConnectionAsync};
 use butane::migrations::Migrations;
-use butane::DataObject;
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 
 use newtype::models::{Blog, Post, Tags};
 
-fn insert_data(connection: &Connection) {
+#[maybe_async_cfg::maybe(
+    sync(),
+    async(),
+    idents(
+        Connection(sync = "Connection", async = "ConnectionAsync"),
+        DataObjectOps(sync = "DataObjectOpsSync", async = "DataObjectOpsAsync")
+    )
+)]
+async fn insert_data(connection: &Connection) {
+    use butane::DataObjectOps;
     if connection.backend_name() == "sqlite" {
         // https://github.com/Electron100/butane/issues/226
         return;
     }
     let mut cats_blog = Blog::new("Cats").unwrap();
-    cats_blog.save(connection).unwrap();
+    cats_blog.save(connection).await.unwrap();
 
     let mut post = Post::new(
         &cats_blog,
@@ -24,19 +33,33 @@ fn insert_data(connection: &Connection) {
         "asia".to_string(),
         "danger".to_string(),
     ]));
-    post.save(connection).unwrap();
+    post.save(connection).await.unwrap();
 }
 
-fn migrate_and_unmigrate(mut connection: Connection) {
+#[butane_test(async, nomigrate)]
+async fn migrate_and_unmigrate_async(mut connection: ConnectionAsync) {
+    // Migrate forward.
+    let base_dir = std::path::PathBuf::from(".butane");
+    let migrations = butane_cli::get_migrations(&base_dir).unwrap();
+
+    migrations.migrate_async(&mut connection).await.unwrap();
+
+    insert_data_async(&connection).await;
+
+    // Undo migrations.
+    migrations.unmigrate_async(&mut connection).await.unwrap();
+}
+
+#[butane_test(sync, nomigrate)]
+fn migrate_and_unmigrate_sync(mut connection: Connection) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
 
     migrations.migrate(&mut connection).unwrap();
 
-    insert_data(&connection);
+    insert_data_sync(&connection);
 
     // Undo migrations.
     migrations.unmigrate(&mut connection).unwrap();
 }
-testall_no_migrate!(migrate_and_unmigrate);

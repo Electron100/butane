@@ -1,8 +1,8 @@
+use butane::db::{BackendConnection, Connection};
+use butane::migrations::{MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
+use butane::{SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
-use butane_core::db::{BackendConnection, Connection};
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
-use butane_core::migrations::{MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
-use butane_core::{SqlType, SqlVal};
 #[cfg(feature = "pg")]
 use butane_test_helper::pg_connection;
 #[cfg(feature = "sqlite")]
@@ -229,6 +229,7 @@ fn migration_add_field_with_default_pg() {
 #[cfg(feature = "pg")]
 #[test]
 fn migration_modify_field_pg() {
+    env_logger::try_init().ok();
     let (mut conn, _data) = pg_connection();
     // Not verifying rename right now because we don't detect it
     // https://github.com/Electron100/butane/issues/89

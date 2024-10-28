@@ -9,13 +9,12 @@
 pub use butane_codegen::{butane_type, dataresult, model, FieldType, PrimaryKeyType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
-pub use butane_core::internal;
-pub use butane_core::many::Many;
+pub use butane_core::many::{Many, ManyOpsAsync, ManyOpsSync};
 pub use butane_core::migrations;
 pub use butane_core::query;
 pub use butane_core::{
-    AsPrimaryKey, AutoPk, DataObject, DataResult, Error, FieldType, FromSql, PrimaryKeyType,
-    Result, SqlType, SqlVal, SqlValRef, ToSql,
+    AsPrimaryKey, AutoPk, DataObject, DataObjectOpsAsync, DataObjectOpsSync, DataResult, Error,
+    FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
 
 pub mod db {
@@ -160,23 +159,62 @@ macro_rules! colname {
 #[macro_export]
 macro_rules! find {
     ($dbobj:ident, $filter:expr, $conn:expr) => {
-        butane::query!($dbobj, $filter)
-            .limit(1)
-            .load($conn)
+        butane::query::QueryOpsSync::load(butane::query!($dbobj, $filter).limit(1), $conn)
             .and_then(|mut results| results.pop().ok_or(butane::Error::NoSuchObject))
     };
 }
 
-pub mod prelude {
-    //! Prelude module to improve ergonomics.
-    //!
-    //! Its use is recommended, but not required. If not used, the use
-    //! of butane's macros may require some of its re-exports to be
-    //! used manually.
-    pub use butane_core::db::BackendConnection;
+/// Like [`find`], but for async.
+#[macro_export]
+macro_rules! find_async {
+    ($dbobj:ident, $filter:expr, $conn:expr) => {
+        butane::query::QueryOpsAsync::load(butane::query!($dbobj, $filter).limit(1), $conn)
+            .await
+            .and_then(|mut results| results.pop().ok_or(butane::Error::NoSuchObject))
+    };
+}
 
+mod prelude_common {
     #[doc(no_inline)]
     pub use crate::DataObject;
     #[doc(no_inline)]
     pub use crate::DataResult;
+}
+
+pub mod prelude {
+    //! Prelude module to improve ergonomics. Brings certain traits into scope.
+    //! This module is for sync operation. For asynchronous, see [`super::prelude_async`].
+    //!
+    //! Its use is recommended, but not required.
+
+    pub use super::prelude_common::*;
+
+    pub use butane_core::db::BackendConnection;
+    pub use butane_core::fkey::ForeignKeyOpsSync;
+    pub use butane_core::many::ManyOpsSync;
+    pub use butane_core::query::QueryOpsSync;
+    pub use butane_core::DataObjectOpsSync;
+}
+
+pub mod prelude_async {
+    //! Prelude module to improve ergonomics in async operation. Brings certain traits into scope.
+    //!
+    //! Its use is recommended, but not required.
+    pub use super::prelude_common::*;
+
+    pub use butane_core::db::BackendConnectionAsync;
+    pub use butane_core::fkey::ForeignKeyOpsAsync;
+    pub use butane_core::many::ManyOpsAsync;
+    pub use butane_core::query::QueryOpsAsync;
+    pub use butane_core::DataObjectOpsAsync;
+}
+
+pub mod internal {
+    //! Internals used in macro-generated code.
+    //!
+    //! Do not use directly. Semver-exempt.
+
+    pub use async_trait::async_trait;
+
+    pub use butane_core::internal::*;
 }

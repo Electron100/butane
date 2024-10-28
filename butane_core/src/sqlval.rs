@@ -289,7 +289,7 @@ pub trait FieldType: ToSql + FromSql {
 }
 
 /// Marker trait for a type suitable for being a primary key
-pub trait PrimaryKeyType: FieldType + Clone + PartialEq {
+pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync {
     /// Test if this object's pk is valid. The only case in which this
     /// returns false is if the pk is an AutoPk and it's not yet valid.
     ///

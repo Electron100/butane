@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 
 use fallible_iterator::FallibleIterator;
 
-use crate::db::{BackendRows, ConnectionMethods, QueryResult};
+use crate::db::{BackendRows, ConnectionMethods, ConnectionMethodsAsync, QueryResult};
 use crate::{DataResult, Result, SqlVal};
 
 mod fieldexpr;
@@ -117,7 +117,8 @@ impl Column {
 }
 
 /// Representation of a database query.
-#[derive(Clone, Debug)]
+/// See [`QueryOpsSync`] and [`QueryOpsAsync`] for operations requiring a live database connection.
+#[derive(Debug)]
 pub struct Query<T: DataResult> {
     table: TblName,
     filter: Option<BoolExpr>,
@@ -181,8 +182,40 @@ impl<T: DataResult> Query<T> {
     pub fn order_desc(self, column: &'static str) -> Query<T> {
         self.order(column, OrderDirection::Descending)
     }
+}
 
-    fn fetch(
+// Explicit impl so that Clone is implemented even if T is not Clone
+impl<T: DataResult> Clone for Query<T> {
+    fn clone(&self) -> Self {
+        Query {
+            table: self.table.clone(),
+            filter: self.filter.clone(),
+            limit: self.limit,
+            offset: self.offset,
+            sort: self.sort.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Internal QueryOps helpers.
+#[allow(async_fn_in_trait)] // Not truly a public trait
+#[maybe_async_cfg::maybe(idents(ConnectionMethods(sync = "ConnectionMethods")), sync(), async())]
+trait QueryOpsInternal<T> {
+    async fn fetch(
+        self,
+        conn: &impl ConnectionMethods,
+        limit: Option<i32>,
+    ) -> Result<Box<dyn BackendRows + '_>>;
+}
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpsInternal),
+    keep_self,
+    sync(),
+    async()
+)]
+impl<T: DataResult> QueryOpsInternal<T> for Query<T> {
+    async fn fetch(
         self,
         conn: &impl ConnectionMethods,
         limit: Option<i32>,
@@ -200,21 +233,54 @@ impl<T: DataResult> Query<T> {
             self.offset,
             sort,
         )
+        .await
     }
+}
 
+/// [`Query`] operations which require a `Connection`
+#[allow(async_fn_in_trait)] // Not intended to be implemented outside Butane
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpsInternal),
+    sync(),
+    async()
+)]
+pub trait QueryOps<T> {
     /// Executes the query against `conn` and returns the first result (if any).
-    pub fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
-        self.fetch(conn, Some(1))?.mapped(T::from_row).nth(0)
-    }
+    async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>>;
 
     /// Executes the query against `conn`.
-    pub fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
-        let limit = self.limit.to_owned();
-        self.fetch(conn, limit)?.mapped(T::from_row).collect()
-    }
+    async fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>>;
 
     /// Executes the query against `conn` and deletes all matching objects.
-    pub fn delete(self, conn: &impl ConnectionMethods) -> Result<usize> {
+    async fn delete(self, conn: &impl ConnectionMethods) -> Result<usize>;
+}
+
+#[maybe_async_cfg::maybe(
+    idents(
+        ConnectionMethods(sync = "ConnectionMethods"),
+        QueryOps,
+        QueryOpsInternal
+    ),
+    keep_self,
+    sync(),
+    async()
+)]
+impl<T: DataResult> QueryOps<T> for Query<T> {
+    async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {
+        QueryOpsInternal::fetch(self, conn, Some(1))
+            .await?
+            .mapped(T::from_row)
+            .nth(0)
+    }
+    async fn load(self, conn: &impl ConnectionMethods) -> Result<QueryResult<T>> {
+        let limit = self.limit.to_owned();
+        QueryOpsInternal::fetch(self, conn, limit)
+            .await?
+            .mapped(T::from_row)
+            .collect()
+    }
+    async fn delete(self, conn: &impl ConnectionMethods) -> Result<usize> {
         conn.delete_where(&self.table, self.filter.unwrap_or(BoolExpr::True))
+            .await
     }
 }

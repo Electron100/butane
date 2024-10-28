@@ -3,9 +3,9 @@ use std::fmt::Debug;
 
 use super::adb::{ATable, DeferredSqlType, TypeKey, ADB};
 use super::ButaneMigration;
-use crate::db::ConnectionMethods;
+use crate::db::{BackendConnection, ConnectionMethods};
 use crate::query::{BoolExpr, Expr};
-use crate::{db, sqlval::ToSql, DataObject, DataResult, Error, Result};
+use crate::{sqlval::ToSql, DataObject, DataResult, Error, Result};
 
 /// Type representing a database migration. A migration describes how
 /// to bring the database from state A to state B. In general, the
@@ -38,7 +38,7 @@ pub trait Migration: Debug + PartialEq {
     /// Apply the migration to a database connection. The connection
     /// must be for the same type of database as this and the database
     /// must be in the state of the migration prior to this one
-    fn apply(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
+    fn apply(&self, conn: &mut impl BackendConnection) -> Result<()> {
         let backend_name = conn.backend_name();
         let tx = conn.transaction()?;
         let sql = self
@@ -53,7 +53,7 @@ pub trait Migration: Debug + PartialEq {
     /// work. Use carefully -- the caller must ensure that the
     /// database schema already matches that expected by this
     /// migration.
-    fn mark_applied(&self, conn: &impl db::ConnectionMethods) -> Result<()> {
+    fn mark_applied(&self, conn: &impl ConnectionMethods) -> Result<()> {
         conn.insert_only(
             ButaneMigration::TABLE,
             ButaneMigration::COLUMNS,
@@ -65,7 +65,7 @@ pub trait Migration: Debug + PartialEq {
     /// connection. The connection must be for the same type of
     /// database as this and this must be the latest migration applied
     /// to the database.
-    fn downgrade(&self, conn: &mut impl db::BackendConnection) -> Result<()> {
+    fn downgrade(&self, conn: &mut impl BackendConnection) -> Result<()> {
         let backend_name = conn.backend_name();
         let tx = conn.transaction()?;
         let sql = self

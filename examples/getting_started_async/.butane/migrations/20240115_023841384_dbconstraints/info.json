@@ -1,0 +1,11 @@
+{
+  "from_name": "20201229_171630604_likes",
+  "table_bases": {
+    "Blog": "20201229_144636751_init",
+    "Tag": "20201229_144636751_init"
+  },
+  "backends": [
+    "sqlite",
+    "pg"
+  ]
+}

@@ -15,6 +15,7 @@ doc = false
 [[bin]]
 name = "butane"
 path = "src/main.rs"
+doc = false
 
 [features]
 default = ["pg", "sqlite"]

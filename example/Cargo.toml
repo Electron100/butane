@@ -11,7 +11,8 @@ build = "build.rs"
 sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
-butane = { features = ["sqlite"], workspace = true }
+butane = { features = ["pg", "sqlite"], workspace = true }
+tokio = { workspace = true, features = ["macros"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"

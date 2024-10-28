@@ -1,7 +1,8 @@
-use butane_core::db::{BackendConnection, Connection, ConnectionMethods};
+use butane_core::db::ConnectionAsync;
 use butane_core::migrations::adb::*;
 use butane_core::SqlType;
 use butane_test_helper::*;
+use butane_test_macros::butane_test;
 
 #[test]
 fn empty_diff() {
@@ -211,7 +212,8 @@ fn add_table_fkey() {
 
 /// This is the same as test "add_table_fkey", except that it
 /// runs the DDL on a database, and then deletes the column.
-fn add_table_fkey_delete_column(conn: Connection) {
+#[butane_test(nomigrate)]
+async fn add_table_fkey_delete_column(conn: ConnectionAsync) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
     let old = ADB::default();
@@ -280,9 +282,9 @@ fn add_table_fkey_delete_column(conn: Connection) {
     let backend = conn.backend();
     let sql = backend.create_migration_sql(&new, ops).unwrap();
 
-    conn.execute(&sql).unwrap();
-    conn.execute("SELECT * from a").unwrap();
-    conn.execute("SELECT * from b").unwrap();
+    conn.execute(&sql).await.unwrap();
+    conn.execute("SELECT * from a").await.unwrap();
+    conn.execute("SELECT * from b").await.unwrap();
 
     // "ALTER TABLE b DROP COLUMN fkey;" fails due to sqlite not being
     // able to remove the attached constraint, however the RemoveColumn
@@ -291,14 +293,14 @@ fn add_table_fkey_delete_column(conn: Connection) {
     let sql = backend
         .create_migration_sql(&new, vec![remove_column_op])
         .unwrap();
-    conn.execute(&sql).unwrap();
+    conn.execute(&sql).await.unwrap();
 }
-testall_no_migrate!(add_table_fkey_delete_column);
 
 /// This is the same as test "add_table_fkey", except that it
 /// intentionally links a column on table a to table b, and
 /// it runs the DDL on a database.
-fn add_table_fkey_back_reference(conn: Connection) {
+#[butane_test(nomigrate)]
+async fn add_table_fkey_back_reference(conn: ConnectionAsync) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
     let old = ADB::default();
@@ -380,15 +382,15 @@ fn add_table_fkey_back_reference(conn: Connection) {
         );
     }
 
-    conn.execute(&sql).unwrap();
-    conn.execute("SELECT * from a").unwrap();
-    conn.execute("SELECT * from b").unwrap();
+    conn.execute(&sql).await.unwrap();
+    conn.execute("SELECT * from a").await.unwrap();
+    conn.execute("SELECT * from b").await.unwrap();
 }
-testall_no_migrate!(add_table_fkey_back_reference);
 
 /// This is the same as test "add_table_fkey", except that it
 /// creates a table with multiple fkey constraints.
-fn add_table_fkey_multiple(conn: Connection) {
+#[butane_test(nomigrate)]
+async fn add_table_fkey_multiple(conn: ConnectionAsync) {
     let known_int_type = DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int));
 
     let old = ADB::default();
@@ -491,11 +493,10 @@ fn add_table_fkey_multiple(conn: Connection) {
     let backend = conn.backend();
     let sql = backend.create_migration_sql(&new, ops).unwrap();
 
-    conn.execute(&sql).unwrap();
-    conn.execute("SELECT * from a").unwrap();
-    conn.execute("SELECT * from b").unwrap();
+    conn.execute(&sql).await.unwrap();
+    conn.execute("SELECT * from a").await.unwrap();
+    conn.execute("SELECT * from b").await.unwrap();
 }
-testall_no_migrate!(add_table_fkey_multiple);
 
 /// Creates the test case for adding a foreign key, returning the migration operations,
 /// the target ADB, and the tables which should be expected to be created.

@@ -1,0 +1,53 @@
+[package]
+name = "getting_started_async"
+version = "0.1.0"
+authors = ["James Oakley <james@electronstudio.org>"]
+license.workspace = true
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "show_posts_async"
+path = "src/bin/show_posts.rs"
+doc = false
+
+[[bin]]
+name = "write_post_async"
+path = "src/bin/write_post.rs"
+doc = false
+
+[[bin]]
+name = "delete_post_async"
+path = "src/bin/delete_post.rs"
+doc = false
+
+[[bin]]
+name = "publish_post_async"
+path = "src/bin/publish_post.rs"
+doc = false
+
+[lib]
+doc = false
+
+[features]
+default = ["pg", "sqlite", "sqlite-bundled"]
+pg = ["butane/pg"]
+sqlite = ["butane/sqlite"]
+sqlite-bundled = ["butane/sqlite-bundled"]
+
+[dependencies]
+butane.workspace = true
+tokio = { workspace = true, features = ["macros"] }
+
+[dev-dependencies]
+butane_cli.workspace = true
+butane_core.workspace = true
+butane_test_helper.workspace = true
+butane_test_macros.workspace = true
+cfg-if.workspace = true
+env_logger.workspace = true
+log.workspace = true
+paste.workspace = true
+
+[package.metadata.release]
+release = false

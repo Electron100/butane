@@ -1,5 +1,7 @@
 # butane `getting_started` example
 
+This is the sync version of this example. There is also [an async version](../getting_started_async)
+
 To use this example, build the entire project using `cargo build` in the project root,
 and then run these commands in this directory:
 

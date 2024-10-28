@@ -5,11 +5,14 @@
 
 use std::path::Path;
 
+use async_trait::async_trait;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
-use crate::db::{BackendConnection, BackendRows};
-use crate::db::{Column, ConnectionMethods};
+use crate::db::{
+    Backend, BackendConnection, BackendRows, Column, ConnectionAsync, ConnectionMethods,
+    ConnectionMethodsAsync,
+};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
 
@@ -27,7 +30,8 @@ mod memmigrations;
 pub use memmigrations::{MemMigration, MemMigrations};
 
 /// A collection of migrations.
-pub trait Migrations {
+#[allow(async_fn_in_trait)] // We don't expect to need to change the Send bounds of the future.
+pub trait Migrations: Clone {
     type M: Migration;
 
     /// Gets the migration with the given name, if it exists
@@ -120,6 +124,19 @@ pub trait Migrations {
         Ok(())
     }
 
+    /// Migrate connection forward.
+    async fn migrate_async(&self, conn: &mut ConnectionAsync) -> Result<()>
+    where
+        Self: Send + 'static,
+    {
+        let m2 = self.clone();
+        conn.with_sync(move |conn| {
+            m2.migrate(conn)?;
+            Ok(())
+        })
+        .await
+    }
+
     /// Remove all applied migrations.
     fn unmigrate(&self, connection: &mut impl BackendConnection) -> Result<()> {
         let mut migration = match self.last_applied_migration(connection)? {
@@ -136,6 +153,19 @@ pub trait Migrations {
             migration.downgrade(connection)?;
         }
         Ok(())
+    }
+
+    /// Remove all applied migrations.
+    async fn unmigrate_async(&self, conn: &mut ConnectionAsync) -> Result<()>
+    where
+        Self: Send + 'static,
+    {
+        let m2 = self.clone();
+        conn.with_sync(move |conn| {
+            m2.unmigrate(conn)?;
+            Ok(())
+        })
+        .await
     }
 }
 
@@ -187,7 +217,7 @@ where
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration(
         &mut self,
-        backends: &NonEmpty<Box<dyn db::Backend>>,
+        backends: &NonEmpty<Box<dyn Backend>>,
         name: &str,
         from: Option<&Self::M>,
     ) -> Result<bool> {
@@ -200,7 +230,7 @@ where
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration_to(
         &mut self,
-        backends: &NonEmpty<Box<dyn db::Backend>>,
+        backends: &NonEmpty<Box<dyn Backend>>,
         name: &str,
         from: Option<&Self::M>,
         to_db: ADB,
@@ -307,6 +337,8 @@ pub fn copy_migration(from: &impl Migration, to: &mut impl MigrationMut) -> Resu
 struct ButaneMigration {
     name: String,
 }
+
+#[async_trait]
 impl DataResult for ButaneMigration {
     type DBO = Self;
     const COLUMNS: &'static [Column] = &[Column::new("name", SqlType::Text)];
@@ -320,10 +352,12 @@ impl DataResult for ButaneMigration {
             name: FromSql::from_sql_ref(row.get(0, SqlType::Text).unwrap())?,
         })
     }
+
     fn query() -> query::Query<Self> {
         query::Query::new("butane_migrations")
     }
 }
+
 impl DataObject for ButaneMigration {
     type PKType = String;
     type Fields = (); // we don't need Fields as we never filter
@@ -332,9 +366,6 @@ impl DataObject for ButaneMigration {
     const AUTO_PK: bool = false;
     fn pk(&self) -> &String {
         &self.name
-    }
-    fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
-        conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
     }
 }
 
@@ -350,7 +381,10 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
         }
         values
     }
-    fn save_many_to_many(&mut self, _conn: &impl ConnectionMethods) -> Result<()> {
+    async fn save_many_to_many_async(&mut self, _conn: &impl ConnectionMethodsAsync) -> Result<()> {
+        Ok(()) // no-op
+    }
+    fn save_many_to_many_sync(&mut self, _conn: &impl ConnectionMethods) -> Result<()> {
         Ok(()) // no-op
     }
 }

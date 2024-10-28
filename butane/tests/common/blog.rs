@@ -1,8 +1,10 @@
 //! Helpers for several tests.
 #![allow(dead_code)] // not all parts used in all tests
-
-use butane::{dataresult, model, DataObject};
-use butane::{db::Connection, ForeignKey, Many};
+use butane::{dataresult, model};
+use butane::{
+    db::{Connection, ConnectionAsync},
+    ForeignKey, Many,
+};
 #[cfg(feature = "datetime")]
 use chrono::{naive::NaiveDateTime, offset::Utc};
 #[cfg(feature = "fake")]
@@ -71,6 +73,7 @@ impl Post {
 
 #[cfg(feature = "datetime")]
 #[dataresult(Post)]
+#[allow(unused)] // Not all test files use it.
 pub struct PostMetadata {
     pub id: i64,
     pub title: String,
@@ -101,9 +104,18 @@ impl Tag {
     }
 }
 
-pub fn create_tag(conn: &Connection, name: &str) -> Tag {
+#[maybe_async_cfg::maybe(
+    sync(),
+    async(keep_self),
+    idents(
+        DataObjectOpsAsync(async = "DataObjectOpsAsync", sync = "DataObjectOpsSync"),
+        ConnectionAsync(async = "ConnectionAsync", sync = "Connection")
+    )
+)]
+pub async fn create_tag(conn: &ConnectionAsync, name: &str) -> Tag {
+    use butane::DataObjectOpsAsync;
     let mut tag = Tag::new(name);
-    tag.save(conn).unwrap();
+    tag.save(conn).await.unwrap();
     tag
 }
 
@@ -111,14 +123,24 @@ pub fn create_tag(conn: &Connection, name: &str) -> Tag {
 /// 1. "Cats"
 /// 2. "Mountains"
 #[allow(dead_code)] // only used by some test files
-pub fn setup_blog(conn: &Connection) {
+#[maybe_async_cfg::maybe(
+    sync(),
+    async(keep_self),
+    idents(
+        DataObjectOps,
+        Connection(async = "ConnectionAsync", sync = "Connection"),
+        create_tag(async = "create_tag", snake),
+    )
+)]
+pub async fn setup_blog(conn: &Connection) {
+    use butane::DataObjectOps;
     let mut cats_blog = Blog::new(1, "Cats");
-    cats_blog.save(conn).unwrap();
+    cats_blog.save(conn).await.unwrap();
     let mut mountains_blog = Blog::new(2, "Mountains");
-    mountains_blog.save(conn).unwrap();
+    mountains_blog.save(conn).await.unwrap();
 
-    let tag_asia = create_tag(conn, "asia");
-    let tag_danger = create_tag(conn, "danger");
+    let tag_asia = create_tag(conn, "asia").await;
+    let tag_danger = create_tag(conn, "danger").await;
 
     let mut post = Post::new(
         1,
@@ -134,7 +156,7 @@ pub fn setup_blog(conn: &Connection) {
     post.likes = 4;
     post.tags.add(&tag_danger).unwrap();
     post.tags.add(&tag_asia).unwrap();
-    post.save(conn).unwrap();
+    post.save(conn).await.unwrap();
 
     let mut post = Post::new(
         2,
@@ -144,7 +166,7 @@ pub fn setup_blog(conn: &Connection) {
     );
     post.published = true;
     post.likes = 20;
-    post.save(conn).unwrap();
+    post.save(conn).await.unwrap();
 
     let mut post = Post::new(
         3,
@@ -155,7 +177,7 @@ pub fn setup_blog(conn: &Connection) {
     post.published = true;
     post.likes = 10;
     post.tags.add(&tag_danger).unwrap();
-    post.save(conn).unwrap();
+    post.save(conn).await.unwrap();
 
     let mut post = Post::new(
         4,
@@ -165,5 +187,5 @@ pub fn setup_blog(conn: &Connection) {
     );
     post.published = false;
     post.tags.add(&tag_danger).unwrap();
-    post.save(conn).unwrap();
+    post.save(conn).await.unwrap();
 }

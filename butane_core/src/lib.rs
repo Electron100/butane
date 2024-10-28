@@ -1,9 +1,9 @@
 //! Library providing functionality used by butane macros and tools.
-
 #![allow(clippy::iter_nth_zero)]
 #![allow(clippy::upper_case_acronyms)] //grandfathered, not going to break API to rename
 #![deny(missing_docs)]
 
+use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 
 use serde::{Deserialize, Serialize};
@@ -22,9 +22,11 @@ pub mod sqlval;
 pub mod uuid;
 
 mod autopk;
+mod util;
+
 pub use autopk::AutoPk;
 use custom::SqlTypeCustom;
-use db::{BackendRow, Column, ConnectionMethods};
+use db::{BackendRow, Column, ConnectionMethods, ConnectionMethodsAsync};
 pub use query::Query;
 pub use sqlval::{AsPrimaryKey, FieldType, FromSql, PrimaryKeyType, SqlVal, SqlValRef, ToSql};
 
@@ -62,6 +64,7 @@ pub mod internal {
     /// Methods implemented by Butane codegen and called by other
     /// parts of Butane. You do not need to call these directly
     /// WARNING: Semver exempt
+    #[allow(async_fn_in_trait)] // Not really a public trait
     pub trait DataObjectInternal: DataResult<DBO = Self> {
         /// Like [DataResult::COLUMNS] but omits [AutoPk].
         const NON_AUTO_COLUMNS: &'static [Column];
@@ -71,7 +74,14 @@ pub mod internal {
 
         /// Saves many-to-many relationships pointed to by fields on this model.
         /// Performed automatically by `save`. You do not need to call this directly.
-        fn save_many_to_many(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
+        async fn save_many_to_many_async(
+            &mut self,
+            conn: &impl ConnectionMethodsAsync,
+        ) -> Result<()>;
+
+        /// Saves many-to-many relationships pointed to by fields on this model.
+        /// Performed automatically by `save`. You do not need to call this directly.
+        fn save_many_to_many_sync(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
         /// Returns the Sql values of all columns except not any auto columns.
         /// Used internally. You are unlikely to need to call this directly.
@@ -83,7 +93,8 @@ pub mod internal {
 ///
 /// Rather than implementing this type manually, use the
 /// `#[model]` attribute.
-pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal {
+#[allow(async_fn_in_trait)] // Implementation is intended to be through procmacro
+pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sync {
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
     /// Link to a generated struct providing query helpers for each field.
@@ -98,39 +109,62 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal {
 
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
+}
 
+/// [`DataObject`] operations that require a live database connection.
+#[allow(async_fn_in_trait)] // Implementation is intended to be through procmacro
+#[maybe_async_cfg::maybe(
+    idents(
+        ConnectionMethods(sync = "ConnectionMethods"),
+        save_many_to_many(snake),
+        QueryOps,
+    ),
+    sync(),
+    async()
+)]
+pub trait DataObjectOps<T: DataObject> {
     /// Find this object in the database based on primary key.
     /// Returns `Error::NoSuchObject` if the primary key does not exist.
-    fn get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Self>
+    async fn get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Self>
     where
-        Self: Sized,
+        Self: DataObject + Sized,
+        Self::PKType: Sync,
     {
-        Self::try_get(conn, id)?.ok_or(Error::NoSuchObject)
+        Self::try_get(conn, id).await?.ok_or(Error::NoSuchObject)
     }
+
     /// Find this object in the database based on primary key.
     /// Returns `None` if the primary key does not exist.
-    fn try_get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Option<Self>>
+    async fn try_get(conn: &impl ConnectionMethods, id: impl ToSql) -> Result<Option<Self>>
     where
-        Self: Sized,
+        Self: DataObject + Sized,
     {
+        use crate::query::QueryOps;
         Ok(<Self as DataResult>::query()
             .filter(query::BoolExpr::Eq(
-                Self::PKCOL,
-                query::Expr::Val(id.to_sql()),
+                T::PKCOL,
+                query::Expr::Val(id.borrow().to_sql()),
             ))
             .limit(1)
-            .load(conn)?
+            .load(conn)
+            .await?
             .into_iter()
             .nth(0))
     }
+
     /// Save the object to the database.
-    fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
+    async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>
+    where
+        Self: DataObject,
+    {
         let pkcol = Column::new(Self::PKCOL, <Self::PKType as FieldType>::SQLTYPE);
 
         if Self::AUTO_PK && <Self as DataResult>::COLUMNS.len() == 1 {
             // Our only field is an AutoPk
             if !self.pk().is_valid() {
-                let pk = conn.insert_returning_pk(Self::TABLE, &[], &pkcol, &[])?;
+                let pk = conn
+                    .insert_returning_pk(Self::TABLE, &[], &pkcol, &[])
+                    .await?;
                 self.pk_mut().initialize(pk)?;
             }
         } else if Self::AUTO_PK {
@@ -149,15 +183,18 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal {
                     self.pk().to_sql_ref(),
                     Self::NON_AUTO_COLUMNS,
                     &self.non_auto_values(false),
-                )?;
+                )
+                .await?;
             } else {
                 // invalid pk, do an insert
-                let pk = conn.insert_returning_pk(
-                    Self::TABLE,
-                    Self::NON_AUTO_COLUMNS,
-                    &pkcol,
-                    &self.non_auto_values(true),
-                )?;
+                let pk = conn
+                    .insert_returning_pk(
+                        Self::TABLE,
+                        Self::NON_AUTO_COLUMNS,
+                        &pkcol,
+                        &self.non_auto_values(true),
+                    )
+                    .await?;
                 self.pk_mut().initialize(pk)?;
             };
         } else {
@@ -167,19 +204,26 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal {
                 Self::COLUMNS,
                 &pkcol,
                 &self.non_auto_values(true),
-            )?;
+            )
+            .await?;
         }
 
-        self.save_many_to_many(conn)?;
+        Self::save_many_to_many(self, conn).await?;
 
         Ok(())
     }
 
     /// Delete the object from the database.
-    fn delete(&self, conn: &impl ConnectionMethods) -> Result<()> {
-        conn.delete(Self::TABLE, Self::PKCOL, self.pk().to_sql())
+    async fn delete(&self, conn: &impl ConnectionMethods) -> Result<()>
+    where
+        Self: DataObject,
+    {
+        conn.delete(T::TABLE, T::PKCOL, self.pk().to_sql()).await
     }
 }
+
+impl<T> DataObjectOpsSync<T> for T where T: DataObject {}
+impl<T> DataObjectOpsAsync<T> for T where T: DataObject {}
 
 /// Butane errors.
 #[allow(missing_docs)]
@@ -229,6 +273,8 @@ pub enum Error {
     LiteralForCustomUnsupported(custom::SqlValCustom),
     #[error("This DataObject doesn't support determining whether it has been saved.")]
     SaveDeterminationNotSupported,
+    #[error("This is a dummy poisoned connection.")]
+    PoisonedConnection,
     #[error("(De)serialization error {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("IO error {0}")]
@@ -241,7 +287,7 @@ pub enum Error {
     SQLiteFromSQL(rusqlite::types::FromSqlError),
     #[cfg(feature = "pg")]
     #[error("Postgres error {0}")]
-    Postgres(#[from] postgres::Error),
+    Postgres(#[from] tokio_postgres::Error),
     #[cfg(feature = "datetime")]
     #[error("Chrono error {0}")]
     Chrono(#[from] chrono::ParseError),
@@ -252,6 +298,12 @@ pub enum Error {
     TLS(#[from] native_tls::Error),
     #[error("Generic error {0}")]
     Generic(#[from] Box<dyn std::error::Error + Sync + Send>),
+    #[error("Tokio join error {0}")]
+    TokioJoin(#[from] tokio::task::JoinError),
+    #[error("Tokio recv error {0}")]
+    TokioRecv(#[from] tokio::sync::oneshot::error::RecvError),
+    #[error("Crossbeam cannot send/recv, channel disconnected")]
+    CrossbeamChannel,
 }
 
 #[cfg(feature = "sqlite")]
@@ -267,6 +319,18 @@ impl From<rusqlite::types::FromSqlError> for Error {
             FromSqlError::Other(_) => Error::SQLiteFromSQL(e),
             _ => Error::SQLiteFromSQL(e),
         }
+    }
+}
+
+impl<T> From<crossbeam_channel::SendError<T>> for Error {
+    fn from(_e: crossbeam_channel::SendError<T>) -> Self {
+        Self::CrossbeamChannel
+    }
+}
+
+impl From<crossbeam_channel::RecvError> for Error {
+    fn from(_e: crossbeam_channel::RecvError) -> Self {
+        Self::CrossbeamChannel
     }
 }
 

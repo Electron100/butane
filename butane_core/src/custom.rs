@@ -11,11 +11,14 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "pg")]
+use tokio_postgres as postgres;
+
 /// For use with [SqlType::Custom](crate::SqlType)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlTypeCustom {
     #[cfg(feature = "pg")]
-    Pg(#[serde(with = "pgtypeser")] postgres::types::Type),
+    Pg(#[serde(with = "pgtypeser")] tokio_postgres::types::Type),
 }
 
 /// For use with [SqlVal::Custom](crate::SqlVal)
@@ -137,6 +140,7 @@ impl From<SqlValRefCustom<'_>> for SqlValCustom {
 #[cfg(feature = "pg")]
 mod pgtypeser {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use tokio_postgres as postgres;
 
     pub fn serialize<S>(ty: &postgres::types::Type, serializer: S) -> Result<S::Ok, S::Error>
     where

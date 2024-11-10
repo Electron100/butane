@@ -81,7 +81,6 @@ mod internal {
 /// Database connection.
 #[maybe_async_cfg::maybe(
     idents(
-        AsyncRequiresSend,
         ConnectionMethods(sync = "ConnectionMethods", async = "ConnectionMethodsAsync"),
         Transaction(sync = "Transaction", async = "TransactionAsync"),
     ),

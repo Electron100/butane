@@ -9,7 +9,6 @@ use crate::query::Order;
 use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
-use tokio::sync::oneshot;
 
 enum Command {
     Func(Box<dyn FnOnce() + Send>),
@@ -54,19 +53,26 @@ impl AsyncAdapterEnv {
         F: FnOnce(&'c T) -> Result<U> + Send,
         F: 'result,
         U: Send + 'result,
-        T: ?Sized + 'c, // TODO should this be Send
+        T: ?Sized + 'c,
         's: 'result,
         'c: 'result,
     {
-        // func itself must be `Send`, but we do not require &T to be Send (and thus don't reuire T to be Sync).
-        // We do this by basically unsafely sending our raw context pointer over to the worker thread anyway.
-        let (tx, rx) = oneshot::channel();
+        // func itself must be `Send`, but we do not require &T to be
+        // Send (and thus don't reuire T to be Sync).  We do this by
+        // basically unsafely sending our raw context pointer over to
+        // the worker thread anyway.  The key observation on why we
+        // believe this to be sound is that we actually created the
+        // context over on the worker thread in the first place (see
+        // [AsyncAdapter::new]) and we do not allow direct access to
+        // it. So despite fact that we pass the context pointer back
+        // and forth, it's essentially owned by the worker thread -- all operations
+        // with context occur on that worker thread.
+        let (tx, rx) = tokio::sync::oneshot::channel();
         let func_taking_ptr = |ctx: SyncSendPtrMut<T>| func(unsafe { ctx.inner.as_ref() }.unwrap());
-        let wrapped_func = move || _ = tx.send(func_taking_ptr(context.clone_unsafe()));
-        self.invoke_internal_unsafe(wrapped_func)?;
-
-        // https://docs.rs/crossbeam/0.8.2/crossbeam/fn.scope.html
-        // TODO ensure soundness and document why
+        unsafe {
+            let wrapped_func = move || _ = tx.send(func_taking_ptr(context.clone_unsafe()));
+            self.invoke_internal_unsafe(wrapped_func)?;
+        }
         rx.await?
     }
 
@@ -79,17 +85,16 @@ impl AsyncAdapterEnv {
         F: FnOnce(&'c mut T) -> Result<U> + Send,
         F: 'result,
         U: Send + 'result,
-        T: ?Sized + 'c, // TODO should this be Send
+        T: ?Sized + 'c,
         's: 'result,
         'c: 'result,
     {
-        let (tx, rx) = oneshot::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
         let func_taking_ptr = |ctx: SyncSendPtrMut<T>| func(unsafe { ctx.inner.as_mut().unwrap() });
-        let wrapped_func = move || _ = tx.send(func_taking_ptr(context.clone_unsafe()));
-        self.invoke_internal_unsafe(wrapped_func)?;
-        // https://stackoverflow.com/questions/52424449/
-        // https://docs.rs/crossbeam/0.8.2/crossbeam/fn.scope.html
-        // TODO ensure soundness and document why
+        unsafe {
+            let wrapped_func = move || _ = tx.send(func_taking_ptr(context.clone_unsafe()));
+            self.invoke_internal_unsafe(wrapped_func)?;
+        }
         rx.await?
     }
 
@@ -105,22 +110,27 @@ impl AsyncAdapterEnv {
         let (tx, rx) = crossbeam_channel::unbounded();
         let context_ptr = unsafe { SendPtr::new(context) };
         let func_taking_ptr = |ctx: SendPtr<T>| func(unsafe { ctx.inner.as_ref() }.unwrap());
-        let wrapped_func = move || _ = tx.send(func_taking_ptr(context_ptr));
-        self.invoke_internal_unsafe(wrapped_func)?;
-        // TODO ensure soundness and document why
+        unsafe {
+            let wrapped_func = move || _ = tx.send(func_taking_ptr(context_ptr));
+            self.invoke_internal_unsafe(wrapped_func)?;
+        }
         rx.recv()?
     }
 
-    fn invoke_internal_unsafe<'s, 'result>(
+    unsafe fn invoke_internal_unsafe<'s, 'result>(
         &'s self,
-        // wrapped_func is a complete encapsulation of the function we want to invoke without any parameters left to provide
+        // wrapped_func is a complete encapsulation of the function we
+        // want to invoke without any parameters left to provide
         wrapped_func: impl FnOnce() + Send + 'result,
     ) -> Result<()> {
         // We transmute wrapped_func (with an intermediate boxing
         // step) solely to transform it's lifetime. The lifetime is an
-        // issue here because Rust itself has no way of knowing how long our sync worker thread is going to use it for.
-        // But *we* know that our worker thread will immediately execute the function and the caller to this method will wait
-        // to hear from the worker thread before proceeding (and thus before letting the lifetime lapse)
+        // issue here because Rust itself has no way of knowing how
+        // long our sync worker thread is going to use it for.  But
+        // *we* know that our worker thread will immediately execute
+        // the function and the caller to this method will wait to
+        // hear from the worker thread before proceeding (and thus
+        // before letting the lifetime lapse)
         // https://stackoverflow.com/questions/52424449/
         let boxed_func: Box<dyn FnOnce() + Send + 'result> = Box::new(wrapped_func);
         let static_func: Box<dyn FnOnce() + Send + 'static> =
@@ -134,7 +144,10 @@ impl Drop for AsyncAdapterEnv {
     fn drop(&mut self) {
         let r = self.sender.send(Command::Shutdown);
         if r.is_err() {
-            crate::error!("Cannot send async adapter env shutdown command because channel is disconnected. Assuming this means thread died and is joinable. If it is not, join may hang indefinitely");
+            // editorconfig-checker-disable
+            crate::error!("Cannot send async adapter env shutdown command because channel is disconnected.\
+                           Assuming this means thread died and is joinable. If it is not, join may hang indefinitely");
+            // editorconfig-checker-enable
         }
         self.thread_handle.take().map(|h| h.join());
     }
@@ -158,18 +171,16 @@ struct SyncSendPtrMut<T: ?Sized> {
     inner: *mut T,
 }
 impl<T: ?Sized> SyncSendPtrMut<T> {
-    fn new(inner: *mut T) -> Self {
-        // todo should this be unsafe
+    unsafe fn new(inner: *mut T) -> Self {
         Self { inner }
     }
-    // TODO should be unsafe
-    fn clone_unsafe(&self) -> Self {
+    unsafe fn clone_unsafe(&self) -> Self {
         Self { inner: self.inner }
     }
 }
 impl<T> From<T> for SyncSendPtrMut<T>
 where
-    T: Debug + Sized,
+    T: Sized,
 {
     fn from(val: T) -> Self {
         Self {
@@ -177,7 +188,7 @@ where
         }
     }
 }
-unsafe impl<T: Debug + ?Sized> Send for SyncSendPtrMut<T> {}
+unsafe impl<T: ?Sized> Send for SyncSendPtrMut<T> {}
 unsafe impl<T: ?Sized> Sync for SyncSendPtrMut<T> {}
 
 impl<T: Debug + ?Sized> Debug for SyncSendPtrMut<T> {
@@ -212,7 +223,6 @@ impl<T: ?Sized> AsyncAdapter<T> {
         'c: 'result,
         's: 'c,
     {
-        // todo verify the interior mutability won't panic here
         self.env.invoke(&self.context, func).await
     }
 
@@ -223,7 +233,6 @@ impl<T: ?Sized> AsyncAdapter<T> {
         U: Send + 'result,
         'c: 'result,
     {
-        // todo verify the interior mutability won't panic here
         self.env.invoke_mut(&self.context, func).await
     }
 
@@ -234,22 +243,31 @@ impl<T: ?Sized> AsyncAdapter<T> {
         U: Send + 'result,
         'c: 'result,
     {
-        // todo verify the interior mutability won't panic here
         self.env.invoke_blocking(self.context.inner, func)
     }
 }
 
 impl<T> AsyncAdapter<T> {
+    /// Create a new async adapter using `create_context` to create an instance of the inner type `T`.
     pub(super) fn new<F>(create_context: F) -> Result<Self>
     where
         Self: Sized,
         F: FnOnce() -> Result<T> + Send,
     {
-        // TODO execute the create context function on the thread
-        let context = create_context()?;
+        let env = AsyncAdapterEnv::new();
+
+        // Execute the context creation function on our worker thread.
+        let dummy = (); // because we have to pass a context pointer to env.invoke
+        let context = env.invoke_blocking(&dummy, |_ctx: &()| {
+            let concrete_context = create_context()?;
+            // See comments about soundness on AsyncAdapterEnv::invoke
+            let context = unsafe { SyncSendPtrMut::new(Box::into_raw(Box::new(concrete_context))) };
+            Ok(context)
+        })?;
+
         Ok(Self {
-            env: Arc::new(AsyncAdapterEnv::new()),
-            context: SyncSendPtrMut::new(Box::into_raw(Box::new(context))),
+            env: Arc::new(env),
+            context,
         })
     }
 }
@@ -356,7 +374,7 @@ where
             .invoke_mut(|conn| {
                 let transaction: Transaction = conn.transaction()?;
                 let transaction_ptr: *mut dyn BackendTransaction = Box::into_raw(transaction.trans);
-                Ok(SyncSendPtrMut::new(transaction_ptr))
+                Ok(unsafe { SyncSendPtrMut::new(transaction_ptr) })
             })
             .await?;
         let transaction_adapter = self.create_with_same_env(transaction_ptr);
@@ -381,10 +399,17 @@ where
 fn ok_or_panic_with_adapter_error<T>(r: Result<T>) -> T {
     match r {
         Ok(ret) => ret,
-        // This is unfortunate, but should be rare. We never use it when invoking functions that can fail in their own right, so
-        // it indicates that the channel operation failed, which should only be possible if the other thread died unexpectedly.
+        // This is unfortunate, but should be rare. We never use it
+        // when invoking functions that can fail in their own right,
+        // so it indicates that the channel operation failed, which
+        // should only be possible if the other thread died
+        // unexpectedly.
         Err(e) => panic!(
-            "Internal error occurred within the sync->async adapter invoked when wrapping a function which does not permit error returns.\nError: {}",
+            // editorconfig-checker-disable
+            "Internal error occurred within the sync->async adapter invoked when wrapping a function\
+             which does not permit error returns.\n\
+             Error: {}",
+            // editorconfig-checker-enable
         e
         )
     }
@@ -419,7 +444,6 @@ where
 
 /// Create an async connection using the synchronous `connect` method of `backend`. Use this when authoring
 /// a backend which doesn't natively support async.
-#[cfg(feature = "sqlite")] // todo expose this publicly for out-of-tree backends
 pub async fn connect_async_via_sync<B>(backend: &B, conn_str: &str) -> Result<ConnectionAsync>
 where
     B: Backend + Clone + 'static,

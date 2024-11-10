@@ -29,6 +29,7 @@ use crate::query::{BoolExpr, Order};
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 
 mod adapter;
+pub use adapter::connect_async_via_sync;
 pub(crate) mod dummy;
 use dummy::DummyConnection;
 mod sync_adapter;

@@ -395,6 +395,8 @@ impl std::fmt::Display for SqlType {
 #[cfg(feature = "log")]
 pub use log::debug;
 #[cfg(feature = "log")]
+pub use log::error;
+#[cfg(feature = "log")]
 pub use log::info;
 #[cfg(feature = "log")]
 pub use log::warn;
@@ -420,6 +422,13 @@ mod btlog {
     /// Noop for when feature log is not enabled.
     #[macro_export]
     macro_rules! warn {
+        (target: $target:expr, $($arg:tt)+) => {};
+        ($($arg:tt)+) => {};
+    }
+
+    /// Noop for when feature log is not enabled.
+    #[macro_export]
+    macro_rules! error {
         (target: $target:expr, $($arg:tt)+) => {};
         ($($arg:tt)+) => {};
     }

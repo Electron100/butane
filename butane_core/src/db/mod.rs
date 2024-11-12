@@ -30,7 +30,8 @@ use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 
 #[cfg(feature = "async-adapter")]
 mod adapter;
-
+#[cfg(feature = "async-adapter")]
+pub use adapter::connect_async_via_sync;
 #[cfg(feature = "async")]
 pub(crate) mod dummy;
 
@@ -87,7 +88,6 @@ mod internal {
 /// Database connection.
 #[maybe_async_cfg::maybe(
     idents(
-        AsyncRequiresSend,
         ConnectionMethods(sync = "ConnectionMethods", async = "ConnectionMethodsAsync"),
         Transaction(sync = "Transaction", async = "TransactionAsync"),
     ),

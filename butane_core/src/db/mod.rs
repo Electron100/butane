@@ -29,6 +29,7 @@ use crate::query::{BoolExpr, Order};
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 
 mod adapter;
+pub use adapter::connect_async_via_sync;
 pub(crate) mod dummy;
 use dummy::DummyConnection;
 mod sync_adapter;
@@ -81,7 +82,6 @@ mod internal {
 /// Database connection.
 #[maybe_async_cfg::maybe(
     idents(
-        AsyncRequiresSend,
         ConnectionMethods(sync = "ConnectionMethods", async = "ConnectionMethodsAsync"),
         Transaction(sync = "Transaction", async = "TransactionAsync"),
     ),

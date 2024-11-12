@@ -8,7 +8,7 @@ macro_rules! connection_method_wrapper {
                 Transaction(sync = "Transaction")
             ),
             sync(keep_self),
-            async()
+            async(feature = "async")
         )]
         #[async_trait::async_trait]
         impl ConnectionMethods for $ty {

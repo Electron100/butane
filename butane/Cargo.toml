@@ -13,6 +13,8 @@ documentation = "https://docs.rs/butane/"
 build = "build.rs"
 
 [features]
+async = ["butane_core/async"]
+async-adapter = ["butane_core/async-adapter"]
 default = ["datetime", "json", "uuid"]
 fake = ["butane_core/fake"]
 json = ["butane_codegen/json", "butane_core/json"]
@@ -27,7 +29,6 @@ tls = ["butane_core/tls"]
 uuid = ["butane_codegen/uuid", "butane_core/uuid"]
 
 [dependencies]
-async-trait = { workspace = true }
 butane_codegen = { workspace = true }
 butane_core = { workspace = true }
 

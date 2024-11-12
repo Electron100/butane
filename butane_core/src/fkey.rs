@@ -8,10 +8,12 @@ use std::sync::OnceLock;
 use fake::{Dummy, Faker};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
+use crate::util::get_or_init_once_lock;
+#[cfg(feature = "async")]
+use crate::{util::get_or_init_once_lock_async, ConnectionMethodsAsync};
 use crate::{
-    AsPrimaryKey, ConnectionMethods, ConnectionMethodsAsync, DataObject, Error, FieldType, FromSql,
-    Result, SqlType, SqlVal, SqlValRef, ToSql,
+    AsPrimaryKey, ConnectionMethods, DataObject, Error, FieldType, FromSql, Result, SqlType,
+    SqlVal, SqlValRef, ToSql,
 };
 
 /// Used to implement a relationship between models.
@@ -92,7 +94,7 @@ impl<T: DataObject> ForeignKey<T> {
 #[maybe_async_cfg::maybe(
     idents(ConnectionMethods(sync = "ConnectionMethods"),),
     sync(),
-    async()
+    async(feature = "async")
 )]
 pub trait ForeignKeyOps<T: DataObject> {
     /// Loads the value referred to by this foreign key from the
@@ -102,6 +104,7 @@ pub trait ForeignKeyOps<T: DataObject> {
         T: 'a;
 }
 
+#[cfg(feature = "async")]
 impl<T: DataObject> ForeignKeyOpsAsync<T> for ForeignKey<T> {
     async fn load<'a>(&'a self, conn: &impl ConnectionMethodsAsync) -> Result<&'a T>
     where

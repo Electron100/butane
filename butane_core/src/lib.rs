@@ -26,9 +26,12 @@ mod util;
 
 pub use autopk::AutoPk;
 use custom::SqlTypeCustom;
-use db::{BackendRow, Column, ConnectionMethods, ConnectionMethodsAsync};
+use db::{BackendRow, Column, ConnectionMethods};
 pub use query::Query;
 pub use sqlval::{AsPrimaryKey, FieldType, FromSql, PrimaryKeyType, SqlVal, SqlValRef, ToSql};
+
+#[cfg(feature = "async")]
+use db::ConnectionMethodsAsync;
 
 /// Result type that uses [`crate::Error`].
 pub type Result<T> = std::result::Result<T, crate::Error>;
@@ -74,6 +77,7 @@ pub mod internal {
 
         /// Saves many-to-many relationships pointed to by fields on this model.
         /// Performed automatically by `save`. You do not need to call this directly.
+        #[cfg(feature = "async")]
         async fn save_many_to_many_async(
             &mut self,
             conn: &impl ConnectionMethodsAsync,
@@ -120,7 +124,7 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
         QueryOps,
     ),
     sync(),
-    async()
+    async(feature = "async")
 )]
 pub trait DataObjectOps<T: DataObject> {
     /// Find this object in the database based on primary key.
@@ -223,6 +227,7 @@ pub trait DataObjectOps<T: DataObject> {
 }
 
 impl<T> DataObjectOpsSync<T> for T where T: DataObject {}
+#[cfg(feature = "async")]
 impl<T> DataObjectOpsAsync<T> for T where T: DataObject {}
 
 /// Butane errors.
@@ -275,6 +280,8 @@ pub enum Error {
     SaveDeterminationNotSupported,
     #[error("This is a dummy poisoned connection.")]
     PoisonedConnection,
+    #[error("Connect connect_async for synchronous backend {0}. To support this, enable the async-adapter feature.")]
+    NoAsyncAdapter(&'static str),
     #[error("(De)serialization error {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("IO error {0}")]
@@ -298,10 +305,13 @@ pub enum Error {
     TLS(#[from] native_tls::Error),
     #[error("Generic error {0}")]
     Generic(#[from] Box<dyn std::error::Error + Sync + Send>),
+    #[cfg(feature = "async")]
     #[error("Tokio join error {0}")]
     TokioJoin(#[from] tokio::task::JoinError),
     #[error("Tokio recv error {0}")]
+    #[cfg(feature = "async")]
     TokioRecv(#[from] tokio::sync::oneshot::error::RecvError),
+    #[cfg(feature = "async-adapter")]
     #[error("Crossbeam cannot send/recv, channel disconnected")]
     CrossbeamChannel,
 }
@@ -322,12 +332,14 @@ impl From<rusqlite::types::FromSqlError> for Error {
     }
 }
 
+#[cfg(feature = "async-adapter")]
 impl<T> From<crossbeam_channel::SendError<T>> for Error {
     fn from(_e: crossbeam_channel::SendError<T>) -> Self {
         Self::CrossbeamChannel
     }
 }
 
+#[cfg(feature = "async-adapter")]
 impl From<crossbeam_channel::RecvError> for Error {
     fn from(_e: crossbeam_channel::RecvError) -> Self {
         Self::CrossbeamChannel

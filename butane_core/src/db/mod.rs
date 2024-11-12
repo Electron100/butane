@@ -28,16 +28,22 @@ use serde::{Deserialize, Serialize};
 use crate::query::{BoolExpr, Order};
 use crate::{migrations::adb, Error, Result, SqlVal, SqlValRef};
 
+#[cfg(feature = "async-adapter")]
 mod adapter;
+
+#[cfg(feature = "async")]
 pub(crate) mod dummy;
-use dummy::DummyConnection;
+
+#[cfg(feature = "async")]
 mod sync_adapter;
+#[cfg(feature = "async")]
 pub use sync_adapter::SyncAdapter;
 
 mod connmethods;
+#[cfg(feature = "async")]
+pub use connmethods::ConnectionMethodsAsync;
 pub use connmethods::{
-    BackendRow, BackendRows, Column, ConnectionMethods, ConnectionMethodsAsync, MapDeref,
-    QueryResult, RawQueryResult,
+    BackendRow, BackendRows, Column, ConnectionMethods, MapDeref, QueryResult, RawQueryResult,
 };
 mod helper;
 mod macros;
@@ -62,9 +68,9 @@ mod internal {
     #[maybe_async_cfg::maybe(idents(AsyncRequiresSend), sync())]
     impl<T> AsyncRequiresSend for T {}
 
-    #[maybe_async_cfg::maybe(async())]
+    #[maybe_async_cfg::maybe(async(feature = "async"))]
     pub trait AsyncRequiresSend: Send {}
-    #[maybe_async_cfg::maybe(idents(AsyncRequiresSend), async())]
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSend), async(feature = "async"))]
     impl<T: Send> AsyncRequiresSend for T {}
 
     #[maybe_async_cfg::maybe(sync())]
@@ -72,9 +78,9 @@ mod internal {
     #[maybe_async_cfg::maybe(idents(AsyncRequiresSync), sync())]
     impl<T> AsyncRequiresSync for T {}
 
-    #[maybe_async_cfg::maybe(async())]
+    #[maybe_async_cfg::maybe(async(feature = "async"))]
     pub trait AsyncRequiresSync: Sync {}
-    #[maybe_async_cfg::maybe(idents(AsyncRequiresSync), async())]
+    #[maybe_async_cfg::maybe(idents(AsyncRequiresSync), async(feature = "async"))]
     impl<T: Sync> AsyncRequiresSync for T {}
 }
 
@@ -86,7 +92,7 @@ mod internal {
         Transaction(sync = "Transaction", async = "TransactionAsync"),
     ),
     sync(self = "BackendConnection"),
-    async(self = "BackendConnectionAsync")
+    async(feature = "async", self = "BackendConnectionAsync")
 )]
 #[async_trait]
 pub trait BackendConnection: ConnectionMethods + Debug + Send {
@@ -110,7 +116,7 @@ pub trait BackendConnection: ConnectionMethods + Debug + Send {
     ),
     keep_self,
     sync(),
-    async()
+    async(feature = "async")
 )]
 #[async_trait]
 impl BackendConnection for Box<dyn BackendConnection> {
@@ -135,7 +141,7 @@ impl BackendConnection for Box<dyn BackendConnection> {
     ),
     keep_self,
     sync(),
-    async()
+    async(feature = "async")
 )]
 #[async_trait]
 impl ConnectionMethods for Box<dyn BackendConnection> {
@@ -208,7 +214,7 @@ impl ConnectionMethods for Box<dyn BackendConnection> {
 #[maybe_async_cfg::maybe(
     idents(BackendConnection(sync = "BackendConnection")),
     sync(keep_self),
-    async(self = "ConnectionAsync")
+    async(self = "ConnectionAsync", feature = "async")
 )]
 #[derive(Debug)]
 pub struct Connection {
@@ -218,7 +224,7 @@ pub struct Connection {
 #[maybe_async_cfg::maybe(
     idents(BackendConnection(sync = "BackendConnection")),
     sync(keep_self),
-    async()
+    async(feature = "async")
 )]
 impl Connection {
     pub fn new(conn: Box<dyn BackendConnection>) -> Self {
@@ -238,6 +244,7 @@ impl Connection {
     /// the synchronous connection on a separate thread -- it is not "natively"
     /// async.
     #[maybe_async_cfg::only_if(key = "sync")]
+    #[cfg(feature = "async-adapter")]
     pub fn into_async(self) -> Result<ConnectionAsync> {
         Ok(adapter::AsyncAdapter::new(|| Ok(self))?.into_connection())
     }
@@ -254,7 +261,7 @@ impl Connection {
         F: FnOnce(&mut SyncAdapter<Self>) -> Result<T> + Send + 'static,
         T: Send + 'static,
     {
-        let mut conn2 = Connection::new(Box::new(DummyConnection::new()));
+        let mut conn2 = Connection::new(Box::new(dummy::DummyConnection::new()));
         std::mem::swap(&mut conn2, self);
         let ret: Result<(Result<T>, Connection)> = tokio::task::spawn_blocking(|| {
             let mut sync_conn = SyncAdapter::new(conn2)?;
@@ -274,6 +281,7 @@ impl Connection {
     }
 }
 
+#[cfg(feature = "async")]
 impl ConnectionAsync {
     /// Consume this connection and convert it into a synchronous one.
     /// Note that the under the hood this adds an adapter layer which drives
@@ -290,7 +298,7 @@ impl ConnectionAsync {
         Transaction(sync = "Transaction")
     ),
     sync(keep_self),
-    async()
+    async(feature = "async")
 )]
 #[async_trait]
 impl BackendConnection for Connection {
@@ -312,7 +320,7 @@ connection_method_wrapper!(Connection);
 #[maybe_async_cfg::maybe(
     idents(ConnectionMethods(sync = "ConnectionMethods"), AsyncRequiresSend),
     sync(keep_self),
-    async()
+    async(feature = "async")
 )]
 #[async_trait]
 pub(super) trait BackendTransaction<'c>:
@@ -338,7 +346,7 @@ pub(super) trait BackendTransaction<'c>:
 #[maybe_async_cfg::maybe(
     idents(BackendTransaction(sync = "BackendTransaction")),
     sync(self = "Transaction"),
-    async()
+    async(feature = "async")
 )]
 #[derive(Debug)]
 pub struct Transaction<'c> {
@@ -351,7 +359,7 @@ pub struct Transaction<'c> {
         ConnectionMethods(sync = "ConnectionMethods")
     ),
     sync(keep_self),
-    async()
+    async(feature = "async")
 )]
 impl<'c> Transaction<'c> {
     // unused may occur if no backends are selected
@@ -383,7 +391,7 @@ connection_method_wrapper!(Transaction<'_>);
         ConnectionMethods(sync = "ConnectionMethods")
     ),
     sync(keep_self),
-    async()
+    async(feature = "async")
 )]
 #[async_trait]
 impl<'c> BackendTransaction<'c> for Transaction<'c> {
@@ -405,7 +413,7 @@ impl<'c> BackendTransaction<'c> for Transaction<'c> {
     ),
     keep_self,
     sync(),
-    async()
+    async(feature = "async")
 )]
 #[async_trait]
 impl<'c> BackendTransaction<'c> for Box<dyn BackendTransaction<'c> + 'c> {
@@ -427,7 +435,7 @@ impl<'c> BackendTransaction<'c> for Box<dyn BackendTransaction<'c> + 'c> {
     ),
     keep_self,
     sync(),
-    async()
+    async(feature = "async")
 )]
 #[async_trait]
 impl<'bt> ConnectionMethods for Box<dyn BackendTransaction<'bt> + 'bt> {
@@ -505,6 +513,7 @@ pub trait Backend: Send + Sync + DynClone {
     fn connect(&self, conn_str: &str) -> Result<Connection>;
     /// Establish a new async connection. The format of the connection
     /// string is backend-dependent.
+    #[cfg(feature = "async")]
     async fn connect_async(&self, conn_str: &str) -> Result<ConnectionAsync>;
 }
 
@@ -565,6 +574,7 @@ impl Backend for Box<dyn Backend> {
     fn connect(&self, conn_str: &str) -> Result<Connection> {
         self.deref().connect(conn_str)
     }
+    #[cfg(feature = "async")]
     async fn connect_async(&self, conn_str: &str) -> Result<ConnectionAsync> {
         self.deref().connect_async(conn_str).await
     }
@@ -593,6 +603,7 @@ pub fn connect(spec: &ConnectionSpec) -> Result<Connection> {
 /// Connect to a database async.
 ///
 /// For non-boxed connections, see individual [`Backend`] implementations.
+#[cfg(feature = "async")]
 pub async fn connect_async(spec: &ConnectionSpec) -> Result<ConnectionAsync> {
     get_backend(&spec.backend_name)
         .ok_or_else(|| Error::UnknownBackend(spec.backend_name.clone()))?

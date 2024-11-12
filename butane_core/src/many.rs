@@ -7,9 +7,13 @@ use std::sync::OnceLock;
 use fake::{Dummy, Faker};
 use serde::{Deserialize, Serialize};
 
-use crate::db::{Column, ConnectionMethods, ConnectionMethodsAsync};
+#[cfg(feature = "async")]
+use crate::db::ConnectionMethodsAsync;
+use crate::db::{Column, ConnectionMethods};
 use crate::query::{BoolExpr, Expr, OrderDirection, Query};
-use crate::util::{get_or_init_once_lock, get_or_init_once_lock_async};
+use crate::util::get_or_init_once_lock;
+#[cfg(feature = "async")]
+use crate::util::get_or_init_once_lock_async;
 use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 
 fn default_oc<T>() -> OnceLock<Vec<T>> {
@@ -131,7 +135,7 @@ where
 #[maybe_async_cfg::maybe(
     idents(ConnectionMethods(sync, async = "ConnectionMethodsAsync"), QueryOps),
     sync(),
-    async()
+    async(feature = "async")
 )]
 /// Loads the values referred to by this many relationship from a
 /// database query if necessary and returns a reference to them.
@@ -162,7 +166,10 @@ where
 #[maybe_async_cfg::maybe(
     idents(load_query_uncached(snake)),
     sync(),
-    async(idents(get_or_init_once_lock(snake), ConnectionMethods))
+    async(
+        feature = "async",
+        idents(get_or_init_once_lock(snake), ConnectionMethods)
+    )
 )]
 async fn load_query<'a, T>(
     many: &'a Many<T>,
@@ -182,7 +189,7 @@ where
 #[maybe_async_cfg::maybe(
     idents(ConnectionMethods(sync = "ConnectionMethods"),),
     sync(),
-    async()
+    async(feature = "async")
 )]
 pub trait ManyOps<T: DataObject> {
     /// Used by macro-generated code. You do not need to call this directly.
@@ -220,7 +227,7 @@ pub trait ManyOps<T: DataObject> {
     ),
     keep_self,
     sync(),
-    async()
+    async(feature = "async")
 )]
 impl<T: DataObject> ManyOps<T> for Many<T> {
     async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()> {

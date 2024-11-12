@@ -116,7 +116,7 @@ impl ConnectionMethods for DummyConnection {
     ),
     keep_self,
     sync(),
-    async()
+    async(feature = "async")
 )]
 #[async_trait]
 impl BackendConnection for DummyConnection {

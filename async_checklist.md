@@ -9,5 +9,5 @@
 * [ ] Clean up miscellaneous TODOs
 * [ ] Establish soundness for unsafe sections of AsyncAdapter
 * [ ] Consider publishing `AsyncAdapter` into its own crate
-* [ ] Should async and/or async_adapter be under a separate feature?
+* [x] Should async and/or async_adapter be under a separate feature?
 * [ ] Integrate deadpool or bb8 for async connection pool

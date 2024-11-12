@@ -14,7 +14,7 @@ use crate::{Result, SqlType, SqlVal, SqlValRef};
 /// implemented by both database connections and transactions.
 #[maybe_async_cfg::maybe(
     sync(keep_self),
-    async(self = "ConnectionMethodsAsync"),
+    async(feature = "async", self = "ConnectionMethodsAsync"),
     idents(AsyncRequiresSync)
 )]
 #[async_trait]
@@ -156,6 +156,7 @@ impl<T> VecRows<T> {
     }
 }
 
+#[cfg(feature = "async-adapter")]
 pub(crate) fn vec_from_backend_rows<'a>(
     mut other: Box<dyn BackendRows + 'a>,
     columns: &[Column],
@@ -191,11 +192,13 @@ impl<'a> BackendRows for Box<dyn BackendRows + 'a> {
     }
 }
 
+#[cfg(feature = "async-adapter")]
 #[derive(Debug)]
 pub(crate) struct VecRow {
     values: Vec<SqlVal>,
 }
 
+#[cfg(feature = "async-adapter")]
 impl VecRow {
     fn new(original: &(dyn BackendRow), columns: &[Column]) -> Result<Self> {
         if original.len() != columns.len() {
@@ -214,6 +217,8 @@ impl VecRow {
         })
     }
 }
+
+#[cfg(feature = "async-adapter")]
 impl BackendRow for VecRow {
     fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef> {
         self.values

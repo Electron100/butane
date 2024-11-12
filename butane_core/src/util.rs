@@ -14,6 +14,7 @@ pub fn get_or_init_once_lock<T>(cell: &OnceLock<T>, f: impl FnOnce() -> Result<T
     }
 }
 
+#[cfg(feature = "async")]
 pub async fn get_or_init_once_lock_async<T, Fut>(
     cell: &OnceLock<T>,
     f: impl FnOnce() -> Fut,

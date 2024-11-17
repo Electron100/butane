@@ -15,7 +15,7 @@ sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
-butane = {workspace = true, features = ["async"]}
+butane = {workspace = true, features = ["async", "async-adapter"]}
 fake = { workspace = true, features = ["chrono", "derive", "uuid"] }
 garde = { version = "*", features = ["derive"] }
 serde.workspace = true

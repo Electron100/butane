@@ -9,6 +9,7 @@ build :
 	cd butane && $(CARGO) check --features pg
 	cd butane && $(CARGO) check --features pg,datetime
 	cd butane && $(CARGO) check --features sqlite
+	cd examples/getting_started && $(CARGO) check --features "sqlite,sqlite-bundled"
 	cargo build --all-features
 
 lint :
@@ -21,6 +22,8 @@ check : build doclint lint spellcheck check-fmt test
 
 test :
 	$(CARGO) test --all-features
+	# And run the example tests separately to avoid feature combinations
+	cd examples; for dir in *; do cargo +stable test -p $dir --all-features; done
 
 clean :
 	$(CARGO) clean

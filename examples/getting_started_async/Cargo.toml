@@ -36,7 +36,7 @@ sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
-butane = {features = ["async"], workspace = true}
+butane = {features = ["async", "async-adapter"], workspace = true}
 tokio = { workspace = true, features = ["macros"] }
 
 [dev-dependencies]

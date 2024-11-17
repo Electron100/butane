@@ -464,13 +464,13 @@ fn def_for_save_many_to_many_async(ast_struct: &ItemStruct, config: &Config) -> 
     };
 
     quote!(
-     async fn save_many_to_many_async(
+        async fn save_many_to_many_async(
             &mut self,
             #conn_arg_name: &impl butane::db::ConnectionMethodsAsync,
-     ) -> butane::Result<()> {
+        ) -> butane::Result<()> {
             #many_save_async
             Ok(())
-     }
+        }
     )
 }
 

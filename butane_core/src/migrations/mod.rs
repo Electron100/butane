@@ -9,10 +9,9 @@ use async_trait::async_trait;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
 
-use crate::db::{
-    Backend, BackendConnection, BackendRows, Column, ConnectionAsync, ConnectionMethods,
-    ConnectionMethodsAsync,
-};
+use crate::db::{Backend, BackendConnection, BackendRows, Column, ConnectionMethods};
+#[cfg(feature = "async")]
+use crate::db::{ConnectionAsync, ConnectionMethodsAsync};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
 
@@ -124,6 +123,7 @@ pub trait Migrations: Clone {
         Ok(())
     }
 
+    #[cfg(feature = "async")]
     /// Migrate connection forward.
     async fn migrate_async(&self, conn: &mut ConnectionAsync) -> Result<()>
     where
@@ -156,6 +156,7 @@ pub trait Migrations: Clone {
     }
 
     /// Remove all applied migrations.
+    #[cfg(feature = "async")]
     async fn unmigrate_async(&self, conn: &mut ConnectionAsync) -> Result<()>
     where
         Self: Send + 'static,
@@ -381,6 +382,7 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
         }
         values
     }
+    #[cfg(feature = "async")]
     async fn save_many_to_many_async(&mut self, _conn: &impl ConnectionMethodsAsync) -> Result<()> {
         Ok(()) // no-op
     }

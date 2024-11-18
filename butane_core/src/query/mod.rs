@@ -9,7 +9,9 @@ use std::marker::PhantomData;
 
 use fallible_iterator::FallibleIterator;
 
-use crate::db::{BackendRows, ConnectionMethods, ConnectionMethodsAsync, QueryResult};
+#[cfg(feature = "async")]
+use crate::db::ConnectionMethodsAsync;
+use crate::db::{BackendRows, ConnectionMethods, QueryResult};
 use crate::{DataResult, Result, SqlVal};
 
 mod fieldexpr;
@@ -200,7 +202,11 @@ impl<T: DataResult> Clone for Query<T> {
 
 /// Internal QueryOps helpers.
 #[allow(async_fn_in_trait)] // Not truly a public trait
-#[maybe_async_cfg::maybe(idents(ConnectionMethods(sync = "ConnectionMethods")), sync(), async())]
+#[maybe_async_cfg::maybe(
+    idents(ConnectionMethods(sync = "ConnectionMethods")),
+    sync(),
+    async(feature = "async")
+)]
 trait QueryOpsInternal<T> {
     async fn fetch(
         self,
@@ -212,7 +218,7 @@ trait QueryOpsInternal<T> {
     idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpsInternal),
     keep_self,
     sync(),
-    async()
+    async(feature = "async")
 )]
 impl<T: DataResult> QueryOpsInternal<T> for Query<T> {
     async fn fetch(
@@ -242,7 +248,7 @@ impl<T: DataResult> QueryOpsInternal<T> for Query<T> {
 #[maybe_async_cfg::maybe(
     idents(ConnectionMethods(sync = "ConnectionMethods"), QueryOpsInternal),
     sync(),
-    async()
+    async(feature = "async")
 )]
 pub trait QueryOps<T> {
     /// Executes the query against `conn` and returns the first result (if any).
@@ -263,7 +269,7 @@ pub trait QueryOps<T> {
     ),
     keep_self,
     sync(),
-    async()
+    async(feature = "async")
 )]
 impl<T: DataResult> QueryOps<T> for Query<T> {
     async fn load_first(self, conn: &impl ConnectionMethods) -> Result<Option<T>> {

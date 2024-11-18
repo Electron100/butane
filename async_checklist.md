@@ -8,5 +8,5 @@
 * [x] Fully support sync too. Using async should not be required
 * [ ] Clean up miscellaneous TODOs
 * [x] Establish soundness for unsafe sections of AsyncAdapter
-* [ ] Should async and/or async_adapter be under a separate feature?
+* [x] Should async and/or async_adapter be under a separate feature?
 * [ ] Integrate deadpool or bb8 for async connection pool

@@ -22,7 +22,7 @@ doc = false
 doc = false
 
 [features]
-default = ["pg", "sqlite", "sqlite-bundled"]
+default = ["sqlite", "sqlite-bundled"]
 pg = ["butane/pg"]
 sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]

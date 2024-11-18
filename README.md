@@ -69,6 +69,8 @@ Butane exposes several features to Cargo. By default, no backends are
 enabled: you will want to enable `sqlite` and/or `pg`:
 
 * `default`: Turns on `datetime`, `json` and `uuid`.
+* `async`: Turns on async support. This is automatically enabled for the `pg` backend, which is implemented on the `tokio-postgres` crate.
+* `async-adapter`: Enables the use of `async` with the `sqlite` backend, which is not natively async.
 * `debug`: Used in developing Butane, not expected to be enabled by consumers.
 * `datetime`: Support for timestamps (using [`chrono`](https://crates.io/crates/chrono) crate).
 * `fake`: Support for the [`fake`](https://crates.io/crates/fake) crate's generation of fake data.

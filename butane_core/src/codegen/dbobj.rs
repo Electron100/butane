@@ -37,8 +37,8 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let values_no_pk: Vec<TokenStream2> = push_values(ast_struct, |f: &Field| f != &pk_field);
     let insert_cols = columns(ast_struct, |f| !is_auto(f));
 
-    let many_save_async = impl_many_save(ast_struct, config, true);
     let many_save_sync = impl_many_save(ast_struct, config, false);
+    let save_many_to_many_async = def_for_save_many_to_many_async(ast_struct, config);
 
     let conn_arg_name = if many_save_sync.is_empty() {
         syn::Ident::new("_conn", Span::call_site())
@@ -83,13 +83,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
             fn pk_mut(&mut self) -> &mut impl butane::PrimaryKeyType {
                 &mut self.#pkident
             }
-            async fn save_many_to_many_async(
-                &mut self,
-                #conn_arg_name: &impl butane::db::ConnectionMethodsAsync,
-            ) -> butane::Result<()> {
-                #many_save_async
-                Ok(())
-            }
+            #save_many_to_many_async
             fn save_many_to_many_sync(
                 &mut self,
                 #conn_arg_name: &impl butane::db::ConnectionMethods,
@@ -458,4 +452,29 @@ fn impl_many_save(ast_struct: &ItemStruct, config: &Config, is_async: bool) -> T
             )
         })
         .collect();
+}
+
+#[cfg(feature = "async")]
+fn def_for_save_many_to_many_async(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
+    let many_save_async = impl_many_save(ast_struct, config, true);
+    let conn_arg_name = if many_save_async.is_empty() {
+        syn::Ident::new("_conn", Span::call_site())
+    } else {
+        syn::Ident::new("conn", Span::call_site())
+    };
+
+    quote!(
+        async fn save_many_to_many_async(
+            &mut self,
+            #conn_arg_name: &impl butane::db::ConnectionMethodsAsync,
+        ) -> butane::Result<()> {
+            #many_save_async
+            Ok(())
+        }
+    )
+}
+
+#[cfg(not(feature = "async"))]
+fn def_for_save_many_to_many_async(_ast_struct: &ItemStruct, _config: &Config) -> TokenStream2 {
+    quote!()
 }

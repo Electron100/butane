@@ -13,12 +13,14 @@ documentation = "https://docs.rs/butane/"
 build = "build.rs"
 
 [features]
+async = ["butane_core/async", "butane_codegen/async"]
+async-adapter = ["butane_core/async-adapter"]
 default = ["datetime", "json", "uuid"]
 fake = ["butane_core/fake"]
 json = ["butane_codegen/json", "butane_core/json"]
 sqlite = ["butane_core/sqlite"]
 sqlite-bundled = ["butane_core/sqlite-bundled"]
-pg = ["butane_core/pg"]
+pg = ["async", "butane_core/pg"]
 datetime = ["butane_codegen/datetime", "butane_core/datetime"]
 debug = ["butane_core/debug"]
 log = ["butane_core/log"]
@@ -27,7 +29,6 @@ tls = ["butane_core/tls"]
 uuid = ["butane_codegen/uuid", "butane_core/uuid"]
 
 [dependencies]
-async-trait = { workspace = true }
 butane_codegen = { workspace = true }
 butane_core = { workspace = true }
 

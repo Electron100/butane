@@ -9,12 +9,14 @@
 pub use butane_codegen::{butane_type, dataresult, model, FieldType, PrimaryKeyType};
 pub use butane_core::custom;
 pub use butane_core::fkey::ForeignKey;
-pub use butane_core::many::{Many, ManyOpsAsync, ManyOpsSync};
+pub use butane_core::many::{Many, ManyOpsSync};
 pub use butane_core::migrations;
 pub use butane_core::query;
+#[cfg(feature = "async")]
+pub use butane_core::{many::ManyOpsAsync, DataObjectOpsAsync};
 pub use butane_core::{
-    AsPrimaryKey, AutoPk, DataObject, DataObjectOpsAsync, DataObjectOpsSync, DataResult, Error,
-    FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql,
+    AsPrimaryKey, AutoPk, DataObject, DataObjectOpsSync, DataResult, Error, FieldType, FromSql,
+    PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
 
 pub mod db {
@@ -196,6 +198,7 @@ pub mod prelude {
     pub use butane_core::DataObjectOpsSync;
 }
 
+#[cfg(feature = "async")]
 pub mod prelude_async {
     //! Prelude module to improve ergonomics in async operation. Brings certain traits into scope.
     //!
@@ -213,8 +216,6 @@ pub mod internal {
     //! Internals used in macro-generated code.
     //!
     //! Do not use directly. Semver-exempt.
-
-    pub use async_trait::async_trait;
 
     pub use butane_core::internal::*;
 }

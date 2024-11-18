@@ -14,7 +14,7 @@ pub fn get_or_init_once_lock<T>(cell: &OnceLock<T>, f: impl FnOnce() -> Result<T
     }
 }
 
-/// If the given `OnceLock` is already intialized, return the value.
+/// If the given `OnceLock` is already initialized, return the value.
 /// Otherwise, invoke `f` and store the value.
 #[cfg(feature = "async")]
 pub async fn get_or_init_once_lock_async<T, Fut>(

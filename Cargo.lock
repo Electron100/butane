@@ -1142,8 +1142,9 @@ dependencies = [
 
 [[package]]
 name = "maybe-async-cfg"
-version = "0.2.4"
-source = "git+https://github.com/nvksv/maybe-async-cfg.git?rev=b35f2f42e9b12a25fc731376fe6cdcf41869b2da#b35f2f42e9b12a25fc731376fe6cdcf41869b2da"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dbfaa67a76e2623580df07d6bb5e7956c0a4bae4b418314083a9c619bd66627"
 dependencies = [
  "manyhow",
  "proc-macro2",

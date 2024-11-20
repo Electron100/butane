@@ -36,6 +36,7 @@ crossbeam-channel = "0.5"
 env_logger = "0.11"
 fake = "2.6"
 log = "0.4"
+maybe-async-cfg = "0.2.5"
 nonempty = "0.10"
 once_cell = "1.5.2"
 paste = "1.0.11"
@@ -53,12 +54,6 @@ tokio = { version = "1"}
 tokio-postgres = "0.7"
 tokio-test = { version = "0.4"}
 uuid = "1.2"
-
-# Switch back to crates.io version once one is published containing
-# the referenced commit. Anything newer than 0.2.4 should have it.
-[workspace.dependencies.maybe-async-cfg]
-git = "https://github.com/nvksv/maybe-async-cfg.git"
-rev = "b35f2f42e9b12a25fc731376fe6cdcf41869b2da"
 
 [workspace.metadata.release]
 allow-branch = ["master"]

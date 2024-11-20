@@ -1,8 +1,8 @@
-use butane::db::{BackendConnection, Connection};
-use butane::migrations::{MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
-use butane::{SqlType, SqlVal};
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
+use butane_core::db::{BackendConnection, Connection};
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
+use butane_core::migrations::{MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
+use butane_core::{SqlType, SqlVal};
 #[cfg(feature = "pg")]
 use butane_test_helper::pg_connection;
 #[cfg(feature = "sqlite")]

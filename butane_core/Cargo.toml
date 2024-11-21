@@ -59,7 +59,7 @@ thiserror = "1.0"
 uuid = { workspace = true, optional = true }
 
 [dev-dependencies]
-butane_core = { workspace = true, features = ["log"] }
+butane_core = { workspace = true, features = ["log", "async-adapter"] }
 assert_matches = "1.5"
 butane_test_helper = { workspace = true }
 butane_test_macros.workspace = true

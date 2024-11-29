@@ -182,7 +182,7 @@ where
     }
 }
 
-impl<'a> BackendRows for Box<dyn BackendRows + 'a> {
+impl BackendRows for Box<dyn BackendRows + '_> {
     fn next(&mut self) -> Result<Option<&(dyn BackendRow)>> {
         BackendRows::next(self.deref_mut())
     }

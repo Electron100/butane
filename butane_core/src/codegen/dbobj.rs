@@ -427,7 +427,7 @@ where
 }
 
 fn impl_many_save(ast_struct: &ItemStruct, config: &Config, is_async: bool) -> TokenStream2 {
-    return fields(ast_struct)
+    fields(ast_struct)
         .filter(|f| is_many_to_many(f))
         .map(|f| {
             let ident = f.ident.clone().expect("Fields must be named for butane");
@@ -451,7 +451,7 @@ fn impl_many_save(ast_struct: &ItemStruct, config: &Config, is_async: bool) -> T
                 #save_with_conn
             )
         })
-        .collect();
+        .collect()
 }
 
 #[cfg(feature = "async")]

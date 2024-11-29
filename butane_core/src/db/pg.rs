@@ -367,7 +367,7 @@ impl<'c> PgTransaction<'c> {
         Error::Internal("transaction has already been consumed".to_string())
     }
 }
-impl<'c> Debug for PgTransaction<'c> {
+impl Debug for PgTransaction<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PgTransaction")
             // postgres::Transaction doesnt expose any internal state
@@ -421,7 +421,7 @@ impl postgres::types::ToSql for SqlVal {
     postgres::types::to_sql_checked!();
 }
 
-impl<'a> postgres::types::ToSql for SqlValRef<'a> {
+impl postgres::types::ToSql for SqlValRef<'_> {
     fn to_sql(
         &self,
         requested_ty: &postgres::types::Type,

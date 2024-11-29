@@ -563,7 +563,7 @@ impl<'a> QueryAdapter<'a> {
     }
 }
 
-impl<'a> BackendRows for QueryAdapter<'a> {
+impl BackendRows for QueryAdapter<'_> {
     fn next<'b>(&'b mut self) -> Result<Option<&'b (dyn BackendRow + 'b)>> {
         Ok(self
             .inner

@@ -47,7 +47,6 @@ tokio-postgres = { optional = true, workspace = true }
 postgres-native-tls = { version = "0.5", optional = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
-r2d2 = { optional = true, workspace = true }
 rand = { optional = true, workspace = true }
 regex = { version = "1.5", features = ["std"] }
 rusqlite = { workspace = true, optional = true }

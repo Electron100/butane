@@ -506,7 +506,7 @@ impl MigrationLock {
 
     fn new_shared(path: &Path) -> Result<Self> {
         let file = Self::get_file(path)?;
-        file.lock_shared()?;
+        fs2::FileExt::lock_shared(&file)?;
         Ok(MigrationLock { file })
     }
 
@@ -521,6 +521,6 @@ impl MigrationLock {
 }
 impl Drop for MigrationLock {
     fn drop(&mut self) {
-        self.file.unlock().unwrap();
+        fs2::FileExt::unlock(&self.file).unwrap();
     }
 }

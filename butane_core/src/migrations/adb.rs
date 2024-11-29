@@ -91,7 +91,7 @@ impl<'de> Deserialize<'de> for TypeKey {
 
 #[derive(Debug)]
 struct TypeKeyVisitor;
-impl<'de> Visitor<'de> for TypeKeyVisitor {
+impl Visitor<'_> for TypeKeyVisitor {
     type Value = TypeKey;
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("serialized TypeKey")

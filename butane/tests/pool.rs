@@ -1,13 +1,11 @@
-#[cfg(all(feature = "r2d2", any(feature = "pg", feature = "sqlite")))]
-use butane::db::r2::ConnectionManager;
-#[cfg(feature = "pg")]
-use butane_test_helper::pg_connspec;
 #[cfg(any(feature = "pg", feature = "sqlite"))]
-use butane_test_helper::setup_db;
-#[cfg(feature = "sqlite")]
-use butane_test_helper::sqlite_connspec;
-#[cfg(all(feature = "r2d2", any(feature = "pg", feature = "sqlite")))]
+use butane::db::ConnectionManager;
+use butane_test_helper::*;
+use butane_test_macros::butane_test;
+#[cfg(any(feature = "pg", feature = "sqlite"))]
+#[cfg(any(feature = "pg", feature = "sqlite"))]
 use r2d2;
+use std::ops::DerefMut;
 
 #[cfg(feature = "sqlite")]
 #[test]
@@ -48,4 +46,22 @@ fn r2d2_pq() {
         assert_eq!(pool.state().idle_connections, 1);
     }
     assert_eq!(pool.state().idle_connections, 3);
+}
+
+#[tokio::test]
+async fn deadpool_test_pg_async() {
+    let (connspec, _data) = pg_connspec().await;
+    let manager = ConnectionManager::new(connspec);
+    let pool = deadpool::managed::Pool::builder(manager).build().unwrap();
+    assert_eq!(pool.status().size, 0);
+    assert_eq!(pool.status().available, 0);
+    {
+        let mut conn: deadpool::managed::Object<ConnectionManager> = pool.get().await.unwrap();
+        assert_eq!(pool.status().size, 1);
+        assert_eq!(pool.status().available, 0);
+
+        setup_db_async(conn.deref_mut()).await;
+    }
+    assert_eq!(pool.status().size, 1);
+    assert_eq!(pool.status().available, 1);
 }

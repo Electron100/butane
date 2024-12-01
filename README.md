@@ -72,12 +72,13 @@ enabled: you will want to enable `sqlite` and/or `pg`:
 * `async`: Turns on async support. This is automatically enabled for the `pg` backend, which is implemented on the `tokio-postgres` crate.
 * `async-adapter`: Enables the use of `async` with the `sqlite` backend, which is not natively async.
 * `debug`: Used in developing Butane, not expected to be enabled by consumers.
+* `deadpool`: Connection pooling using [`deadpool`](https://crates.io/crates/deadpool).
 * `datetime`: Support for timestamps (using [`chrono`](https://crates.io/crates/chrono) crate).
 * `fake`: Support for the [`fake`](https://crates.io/crates/fake) crate's generation of fake data.
 * `json`: Support for storing structs as JSON, including using postgres' `JSONB` field type.
 * `log`: Log certain warnings to the [`log`](https://crates.io/crates/log) crate facade (target "butane").
 * `pg`: Support for PostgreSQL using [`postgres`](https://crates.io/crates/postgres) crate.
-* `r2d2`: Connection pooling using [`r2d2`](https://crates.io/crates/r2d2) support
+* `r2d2`: Connection pooling using [`r2d2`](https://crates.io/crates/r2d2).
   (See `butane::db::ConnectionManager`).
 * `sqlite`: Support for SQLite using [`rusqlite`](https://crates.io/crates/rusqlite) crate.
 * `sqlite-bundled`: Bundles sqlite instead of using the system version.
@@ -98,7 +99,7 @@ enabled: you will want to enable `sqlite` and/or `pg`:
 
 ## Migration of Breaking Changes
 ### 0.8 (not yet released)
-
+#### Async
 This is a major release which adds Async support. Effort has been made
 to keep the sync experience as unchanged as possible. Async versions
 of many types have been added, but the sync ones generally retain
@@ -124,6 +125,12 @@ The Ops traits are:
   [`filter`](https://docs.rs/butane/latest/butane/macro.filter.html) macros)
 * `ForeignKeyOpsSync` / `ForeignKeyOpsAsync` (for use with [`ForeignKey`](https://docs.rs/butane/latest/butane/struct.ForeignKey.html))
 * `ManyOpsSync` / `ManyOpsAsync` (for use with [`Many`](https://docs.rs/butane/latest/butane/struct.Many.html))
+
+#### ConnectionManager
+The `ConnectionManager` struct has moved from `butane::db::r2` to
+`butane::db`. It no longer implements `ConnectionMethods` as this was
+unnecessary due to `Deref`. The `butane::db::r2` module is no longer
+public.
 
 ### 0.7
 #### `AutoPk`

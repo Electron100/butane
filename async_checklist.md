@@ -9,4 +9,4 @@
 * [ ] Clean up miscellaneous TODOs
 * [x] Establish soundness for unsafe sections of AsyncAdapter
 * [x] Should async and/or async_adapter be under a separate feature?
-* [ ] Integrate deadpool or bb8 for async connection pool
+* [x] Integrate deadpool or bb8 for async connection pool

@@ -21,6 +21,8 @@ mod r2;
 mod deadpool;
 
 /// Connection manager used with connection pooling systems such as r2d2 or deadpool.
+/// With the `r2d2` feature enabled, it implements `r2d2::ManageConnection`.
+/// With the `deadpool` feature enabled, it implements `deadpool::managed::Manager`.
 #[cfg(any(feature = "deadpool", feature = "r2d2"))]
 #[derive(Clone, Debug)]
 pub struct ConnectionManager {

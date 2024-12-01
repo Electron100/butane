@@ -76,8 +76,8 @@ name = "json"
 required-features = ["json"]
 
 [[test]]
-name = "r2d2"
-required-features = ["r2d2"]
+name = "pool"
+required-features = ["r2d2", "deadpool"]
 
 [[test]]
 name = "uuid"

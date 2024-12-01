@@ -1,7 +1,6 @@
 #[cfg(any(feature = "pg", feature = "sqlite"))]
 use butane::db::ConnectionManager;
 use butane_test_helper::*;
-use butane_test_macros::butane_test;
 #[cfg(any(feature = "pg", feature = "sqlite"))]
 #[cfg(any(feature = "pg", feature = "sqlite"))]
 use r2d2;

@@ -17,7 +17,7 @@ In `Cargo.toml`, add a dependency on Butane:
 
 ``` toml
 [dependencies]
-butane = { version = "0.6", features=["pg", "sqlite"] }
+butane = { version = "0.7", features=["pg", "sqlite"] }
 ```
 
 This guide will focus on using SQLite initially, and use "pg" for

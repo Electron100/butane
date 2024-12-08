@@ -54,9 +54,6 @@ pub mod pg;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
-#[cfg(feature = "r2d2")]
-pub mod r2;
-
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
 

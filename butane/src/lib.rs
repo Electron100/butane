@@ -19,10 +19,7 @@ pub use butane_core::{
     PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql,
 };
 
-pub mod db {
-    //! Database helpers
-    pub use butane_core::db::*;
-}
+pub mod db;
 
 /// Macro to construct a [`BoolExpr`] (for use with a [`Query`]) from
 /// an expression with Rust syntax.

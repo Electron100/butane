@@ -50,6 +50,7 @@ jobs:
     - name: Setup postgres on MacOS
       if: runner.os == 'macOS'
       run: |
+        brew install postgresql
         initdb -D /usr/local/var/postgres
         pg_ctl -D /usr/local/var/postgres start
         sleep 3

@@ -1,10 +1,15 @@
 #[cfg(any(feature = "pg", feature = "sqlite"))]
 use butane::db::ConnectionManager;
+use butane::prelude_async::*;
+use butane::query;
 use butane_test_helper::*;
 #[cfg(any(feature = "pg", feature = "sqlite"))]
 #[cfg(any(feature = "pg", feature = "sqlite"))]
 use r2d2;
 use std::ops::DerefMut;
+
+mod common;
+use common::blog::Blog;
 
 #[cfg(feature = "sqlite")]
 #[test]
@@ -60,6 +65,10 @@ async fn deadpool_test_pg_async() {
         assert_eq!(pool.status().available, 0);
 
         setup_db_async(conn.deref_mut()).await;
+        let _matching_blog = query!(Blog, name == "some blog")
+            .load(conn.deref_mut())
+            .await
+            .unwrap();
     }
     assert_eq!(pool.status().size, 1);
     assert_eq!(pool.status().available, 1);

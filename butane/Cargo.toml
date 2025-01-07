@@ -64,8 +64,20 @@ uuid_for_test = { package = "uuid", version = "1.2", features = ["v4"] }
 all-features = true
 
 [[test]]
+name = "basic"
+required-features = ["async"]
+
+[[test]]
+name = "custom_enum_derived"
+required-features = ["async"]
+
+[[test]]
 name = "custom_pg"
 required-features = ["pg"]
+
+[[test]]
+name = "custom_type"
+required-features = ["async"]
 
 [[test]]
 name = "fake"
@@ -73,12 +85,24 @@ required-features = ["fake"]
 
 [[test]]
 name = "json"
-required-features = ["json"]
+required-features = ["async", "json"]
+
+[[test]]
+name = "many"
+required-features = ["async"]
+
+[[test]]
+name = "nullable"
+required-features = ["async"]
 
 [[test]]
 name = "pool"
 required-features = ["r2d2", "deadpool"]
 
 [[test]]
+name = "query"
+required-features = ["async"]
+
+[[test]]
 name = "uuid"
-required-features = ["uuid"]
+required-features = ["async", "uuid"]

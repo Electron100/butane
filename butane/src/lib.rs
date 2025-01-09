@@ -56,23 +56,28 @@ pub mod db;
 ///    is single literal, it is assumed to be used to match the
 ///    primary key.
 ///
-/// # Examples
-/// ```
-/// # use butane::query::BoolExpr;
-/// # use butane_codegen::model;
-/// # use butane_codegen::filter;
-/// #[model]
-/// struct Contestant {
-///   #[pk]
-///   name: String,
-///   rank: i32,
-///   nationality: String
-/// }
-/// let e: BoolExpr = filter!(Contestant, nationality == "US" && rank < 42);
-/// let first_place = 1;
-/// let e2 = filter!(Contestant, rank == { first_place });
-/// let e3 = filter!(Contestant, name.like("A%"));
-/// ```
+#[cfg_attr(
+    feature = "async",
+    doc = r##"
+# Examples
+```
+# use butane::query::BoolExpr;
+# use butane_codegen::model;
+# use butane_codegen::filter;
+#[model]
+struct Contestant {
+    #[pk]
+    name: String,
+    rank: i32,
+    nationality: String
+}
+let e: BoolExpr = filter!(Contestant, nationality == "US" && rank < 42);
+let first_place = 1;
+let e2 = filter!(Contestant, rank == { first_place });
+let e3 = filter!(Contestant, name.like("A%"));
+```
+"##
+)]
 ///
 /// [`BoolExpr`]: crate::query::BoolExpr
 /// [`Query`]: crate::query::Query
@@ -83,22 +88,27 @@ pub use butane_codegen::filter;
 /// Use as `query!(Foo, expr)`, where `Foo` is a model type. Returns [`Query`]`<Foo>`.
 ///
 /// Shorthand for `Foo::query().filter(`[`filter`]`!(Foo, expr))`
-//
-/// # Examples
-/// ```
-/// # use butane::query::*;
-/// # use butane_codegen::model;
-/// # use butane::query;
-/// # use butane::prelude::*;
-/// #[model]
-/// struct Contestant {
-///   #[pk]
-///   name: String,
-///   rank: i32,
-///   nationality: String
-/// }
-/// let top_tier: Query<Contestant> = query!(Contestant, rank <= 10);
-/// ```
+///
+#[cfg_attr(
+    feature = "async",
+    doc = r##"
+# Examples
+```
+# use butane::query::*;
+# use butane_codegen::model;
+# use butane::query;
+# use butane::prelude::*;
+#[model]
+struct Contestant {
+    #[pk]
+    name: String,
+    rank: i32,
+    nationality: String
+}
+let top_tier: Query<Contestant> = query!(Contestant, rank <= 10);
+```
+"##
+)]
 ///
 /// [`filter]: crate::filter
 /// [`Query`]: crate::query::Query
@@ -131,26 +141,31 @@ macro_rules! colname {
 ///
 /// This macro is for convenience -- it does nothing that can't be done with `query!` or `filter!`.
 ///
-/// # Examples
-/// ```no_run
-/// # use butane::db::ConnectionSpec;
-/// # use butane::query::BoolExpr;
-/// # use butane_codegen::model;
-/// # use butane::prelude::*;
-/// # use butane::query;
-/// # use butane::find;
-/// # use butane::DataObject;
-/// #[model]
-/// struct Contestant {
-///   #[pk]
-///   name: String,
-///   rank: i32,
-///   nationality: String
-/// }
-///
-/// let conn = butane::db::connect(&ConnectionSpec::new("sqlite", "foo.db")).unwrap();
-/// let alice: Result<Contestant, butane::Error> = find!(Contestant, name == "Alice", &conn);
-/// ```
+#[cfg_attr(
+    feature = "async",
+    doc = r##"
+# Examples
+```no_run
+# use butane::db::ConnectionSpec;
+# use butane::query::BoolExpr;
+# use butane_codegen::model;
+# use butane::prelude::*;
+# use butane::query;
+# use butane::find;
+# use butane::DataObject;
+#[model]
+struct Contestant {
+    #[pk]
+    name: String,
+    rank: i32,
+    nationality: String
+}
+
+let conn = butane::db::connect(&ConnectionSpec::new("sqlite", "foo.db")).unwrap();
+let alice: Result<Contestant, butane::Error> = find!(Contestant, name == "Alice", &conn);
+```
+"##
+)]
 ///
 /// [`filter]: crate::filter
 /// [`Result`]: crate::Result

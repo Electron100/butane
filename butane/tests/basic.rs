@@ -464,3 +464,14 @@ async fn tokio_spawn(conn: ConnectionAsync) {
         foo.save(&conn).await.unwrap();
     });
 }
+
+#[model]
+struct TypeVariantsTest {
+    id: i64,
+    str1: String,
+    str2: std::string::String,
+    str3: ::std::string::String,
+    blob1: Vec<u8>,
+    blob2: std::vec::Vec<u8>,
+    blob3: ::std::vec::Vec<u8>,
+}

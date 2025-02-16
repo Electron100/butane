@@ -459,9 +459,15 @@ pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         return some_known(SqlType::BigInt);
     } else if *ty == parse_quote!(f32) || *ty == parse_quote!(f64) {
         return some_known(SqlType::Real);
-    } else if *ty == parse_quote!(String) {
+    } else if *ty == parse_quote!(String)
+        || *ty == parse_quote!(std::string::String)
+        || *ty == parse_quote!(::std::string::String)
+    {
         return some_known(SqlType::Text);
-    } else if *ty == parse_quote!(Vec<u8>) {
+    } else if *ty == parse_quote!(Vec<u8>)
+        || *ty == parse_quote!(std::vec::Vec<u8>)
+        || *ty == parse_quote!(::std::vec::Vec<u8>)
+    {
         return some_known(SqlType::Blob);
     }
 

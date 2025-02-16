@@ -1,6 +1,7 @@
 //! Contains the [AutoPk] type for autoincrementing primary keys.
 
 use std::cmp::Ordering;
+use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +10,7 @@ use super::{FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValR
 /// Wrapper around a [PrimaryKeyType] to indicate the the primary key
 /// will be initialized automatically when the object is created in
 /// the database.
+/// Dereferences to an `Option<T>`.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AutoPk<T: PrimaryKeyType> {
     inner: Option<T>,
@@ -32,6 +34,13 @@ impl<T: PrimaryKeyType> AutoPk<T> {
 
     fn expect_inner(&self) -> &T {
         self.inner.as_ref().expect("PK is not generated yet!")
+    }
+}
+
+impl<T: PrimaryKeyType> Deref for AutoPk<T> {
+    type Target = Option<T>;
+    fn deref(&self) -> &Option<T> {
+        &self.inner
     }
 }
 

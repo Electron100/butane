@@ -1,0 +1,3 @@
+[default.extend-words]
+# We deliberately use typ for type to avoid a reserved word
+typ = "typ"

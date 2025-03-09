@@ -13,6 +13,9 @@ trim_trailing_whitespace = true
 indent_size = 2
 indent_style = space
 
+[deny.toml]
+max_line_length = 140 # no multiline inline tables in toml
+
 [butane_cli/src/main.rs]
 max_line_length = 400
 

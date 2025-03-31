@@ -2,6 +2,8 @@
 //! Macros depend on [`butane_core`], `env_logger` and [`log`].
 #![deny(missing_docs)]
 
+extern crate alloc;
+
 use std::future::Future;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::ops::Deref;

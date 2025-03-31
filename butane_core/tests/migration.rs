@@ -1,3 +1,5 @@
+extern crate alloc;
+
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
 use butane_core::db::{BackendConnection, Connection};
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};

@@ -146,12 +146,23 @@ pub struct PgServerState {
 }
 impl Drop for PgServerState {
     fn drop(&mut self) {
+        // Avoid using Child.kill on Unix, as it uses SIGKILL, which postgresql recommends against,
+        // and is known to cause shared memory leakage on macOS.
+        // See Notes section of https://www.postgresql.org/docs/current/app-postgres.html
+        #[cfg(windows)]
         self.proc.kill().ok();
+        #[cfg(not(windows))]
+        unsafe {
+            libc::kill(self.proc.id() as i32, libc::SIGTERM);
+        }
+
+        // Wait for the process to exit
         let mut buf = String::new();
         self.stderr.read_to_string(&mut buf).unwrap();
         if !buf.is_empty() {
             log::warn!("pg shutdown error: {buf}");
         }
+
         log::info!("Deleting {}", self.dir.display());
         std::fs::remove_dir_all(&self.dir).unwrap();
     }

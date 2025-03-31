@@ -4,4 +4,4 @@ ALTER TABLE Post_tags_Many DROP CONSTRAINT Post_tags_Many_has_fkey;
 DROP TABLE Blog;
 DROP TABLE Post;
 DROP TABLE Post_tags_Many;
-DROP TABLE Tag;
+DROP TABLE "Tag";

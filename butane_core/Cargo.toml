@@ -64,6 +64,7 @@ butane_test_helper = { workspace = true }
 butane_test_macros.workspace = true
 env_logger = { workspace = true }
 paste = { workspace = true }
+pretty_assertions.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 

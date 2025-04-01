@@ -7,6 +7,8 @@
 //! Backwards compatibility of the library will not even be considered, as the
 //! only objective of the crate is to provide a stable CLI.
 
+extern crate alloc;
+
 use std::{
     fs::File,
     io::Write,

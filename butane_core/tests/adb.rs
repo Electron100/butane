@@ -373,10 +373,10 @@ async fn add_table_fkey_back_reference(conn: ConnectionAsync) {
             vec![
                 "CREATE TABLE a (",
                 "fkey INTEGER NOT NULL PRIMARY KEY,",
-                "FOREIGN KEY (fkey) REFERENCES b(id)",
+                "FOREIGN KEY (fkey) REFERENCES b(\"id\")",
                 ");",
                 "CREATE TABLE b (",
-                "id INTEGER NOT NULL PRIMARY KEY",
+                "\"id\" INTEGER NOT NULL PRIMARY KEY",
                 ");",
             ]
         );
@@ -588,11 +588,11 @@ fn add_renamed_table_fkey_ddl_sqlite() {
         sql_lines,
         vec![
             "CREATE TABLE a_table (",
-            "id INTEGER NOT NULL PRIMARY KEY",
+            "\"id\" INTEGER NOT NULL PRIMARY KEY",
             ");",
             "CREATE TABLE b (",
             "b INTEGER NOT NULL PRIMARY KEY,",
-            "FOREIGN KEY (b) REFERENCES a_table(id)",
+            "FOREIGN KEY (b) REFERENCES a_table(\"id\")",
             ");",
         ]
     );
@@ -609,12 +609,12 @@ fn add_renamed_table_fkey_ddl_pg() {
         sql_lines,
         vec![
             "CREATE TABLE a_table (",
-            "id INTEGER NOT NULL PRIMARY KEY",
+            "\"id\" INTEGER NOT NULL PRIMARY KEY",
             ");",
             "CREATE TABLE b (",
             "b INTEGER NOT NULL PRIMARY KEY",
             ");",
-            "ALTER TABLE b ADD FOREIGN KEY (b) REFERENCES a_table(id);",
+            "ALTER TABLE b ADD FOREIGN KEY (b) REFERENCES a_table(\"id\");",
         ]
     );
 }
@@ -722,16 +722,16 @@ fn add_table_many_ddl_sqlite() {
         sql_lines,
         vec![
             "CREATE TABLE a (",
-            "id INTEGER NOT NULL PRIMARY KEY",
+            "\"id\" INTEGER NOT NULL PRIMARY KEY",
             ");",
             "CREATE TABLE b (",
-            "id INTEGER NOT NULL PRIMARY KEY",
+            "\"id\" INTEGER NOT NULL PRIMARY KEY",
             ");",
             "CREATE TABLE b_many_a_Many (",
-            "owner INTEGER NOT NULL,",
+            "\"owner\" INTEGER NOT NULL,",
             "has INTEGER NOT NULL,",
-            "FOREIGN KEY (owner) REFERENCES b(id)",
-            "FOREIGN KEY (has) REFERENCES a(id)",
+            "FOREIGN KEY (\"owner\") REFERENCES b(\"id\")",
+            "FOREIGN KEY (has) REFERENCES a(\"id\")",
             ");",
         ]
     );
@@ -748,17 +748,17 @@ fn add_table_many_ddl_pg() {
         sql_lines,
         vec![
             "CREATE TABLE a (",
-            "id INTEGER NOT NULL PRIMARY KEY",
+            "\"id\" INTEGER NOT NULL PRIMARY KEY",
             ");",
             "CREATE TABLE b (",
-            "id INTEGER NOT NULL PRIMARY KEY",
+            "\"id\" INTEGER NOT NULL PRIMARY KEY",
             ");",
             "CREATE TABLE b_many_a_Many (",
-            "owner INTEGER NOT NULL,",
+            "\"owner\" INTEGER NOT NULL,",
             "has INTEGER NOT NULL",
             ");",
-            "ALTER TABLE b_many_a_Many ADD FOREIGN KEY (owner) REFERENCES b(id);",
-            "ALTER TABLE b_many_a_Many ADD FOREIGN KEY (has) REFERENCES a(id);",
+            "ALTER TABLE b_many_a_Many ADD FOREIGN KEY (\"owner\") REFERENCES b(\"id\");",
+            "ALTER TABLE b_many_a_Many ADD FOREIGN KEY (has) REFERENCES a(\"id\");",
         ]
     );
 }

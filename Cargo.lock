@@ -262,7 +262,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "r2d2",
- "rand 0.8.5",
+ "rand 0.9.0",
  "rusqlite",
  "serde",
  "serde_json",
@@ -334,7 +334,7 @@ dependencies = [
  "pretty_assertions",
  "proc-macro2",
  "quote",
- "rand 0.8.5",
+ "rand 0.9.0",
  "regex",
  "rusqlite",
  "serde",
@@ -360,7 +360,7 @@ dependencies = [
  "maybe-async-cfg",
  "nonempty",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.9.0",
  "tempfile",
  "tokio-postgres",
  "uuid",
@@ -671,9 +671,9 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
 name = "dummy"
-version = "0.8.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cac124e13ae9aa56acc4241f8c8207501d93afdd8d8e62f0c1f2e12f6508c65"
+checksum = "3bbcf21279103a67372982cb1156a2154a452451dff2b884cf897ccecce389e0"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -731,14 +731,14 @@ dependencies = [
 
 [[package]]
 name = "fake"
-version = "2.10.0"
+version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d391ba4af7f1d93f01fcf7b2f29e2bc9348e109dfdbf4dcbdc51dfa38dab0b6"
+checksum = "b591050272097cc85b2f3c1cc4817ba4560057d10fcae6f7339f1cf622da0a0f"
 dependencies = [
  "chrono",
  "deunicode",
  "dummy",
- "rand 0.8.5",
+ "rand 0.9.0",
  "uuid",
 ]
 

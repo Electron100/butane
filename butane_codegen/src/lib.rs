@@ -412,6 +412,7 @@ fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream {
         {
             fn from_sql_ref(val: butane::SqlValRef) -> std::result::Result<Self, butane::Error> {
                 if let butane::SqlValRef::Json(v) = val {
+                    use ::serde::Deserialize;
                     return Ok(#struct_name::deserialize(v).unwrap());
                 }
                 Err(butane::Error::CannotConvertSqlVal(

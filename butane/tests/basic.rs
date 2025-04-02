@@ -9,7 +9,6 @@ use butane_test_macros::butane_test;
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 #[cfg(feature = "sqlite")]
 use rusqlite;
-use serde::Serialize;
 use std::ops::Deref;
 #[cfg(feature = "pg")]
 use tokio_postgres as postgres;
@@ -19,7 +18,7 @@ pub type Whatsit = String;
 
 // Note, Serialize derive exists solely to exercise the logic in butane_core::codegen::has_derive_serialize
 #[model]
-#[derive(PartialEq, Debug, Clone, Serialize)]
+#[derive(PartialEq, Debug, Clone, serde::Serialize)]
 struct Foo {
     id: i64,
     bam: f64,

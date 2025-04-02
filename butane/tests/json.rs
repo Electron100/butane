@@ -9,7 +9,6 @@ use butane::{
 };
 use butane_test_helper::*;
 use butane_test_macros::butane_test;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[model]
@@ -238,7 +237,7 @@ async fn hashmap_with_object_values(conn: ConnectionAsync) {
     assert_eq!(foo2, foo3);
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, FieldType, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, FieldType, serde::Serialize, serde::Deserialize)]
 struct InlineFoo {
     foo: i64,
     bar: u32,

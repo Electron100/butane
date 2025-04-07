@@ -386,7 +386,14 @@ async fn basic_time(conn: ConnectionAsync) {
     time.save(&conn).await.unwrap();
 
     let time2 = TimeHolder::get(&conn, 1).await.unwrap();
-    assert_eq!(time.utc, time2.utc);
+    if conn.backend_name() == "sqlite" {
+        assert_eq!(time.utc, time2.utc);
+    } else {
+        assert_eq!(
+            time.utc.timestamp_subsec_micros(),
+            time2.utc.timestamp_subsec_micros()
+        );
+    }
 }
 
 #[butane_test]

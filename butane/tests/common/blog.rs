@@ -57,7 +57,6 @@ impl Post {
     }
 }
 
-#[cfg(feature = "datetime")]
 #[dataresult(Post)]
 #[allow(unused)] // Not all test files use it.
 pub struct PostMetadata {
@@ -65,13 +64,6 @@ pub struct PostMetadata {
     pub title: String,
     #[cfg(feature = "datetime")]
     pub pub_time: Option<NaiveDateTime>,
-}
-
-#[cfg(not(feature = "datetime"))]
-#[dataresult(Post)]
-pub struct PostMetadata {
-    pub id: i64,
-    pub title: String,
 }
 
 #[model]

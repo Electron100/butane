@@ -65,7 +65,7 @@ all-features = true
 
 [[test]]
 name = "basic"
-required-features = ["async"]
+required-features = ["async", "datetime"]
 
 [[test]]
 name = "custom_enum_derived"

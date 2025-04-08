@@ -374,10 +374,10 @@ async fn add_table_fkey_back_reference(conn: ConnectionAsync) {
                 "CREATE TABLE a (",
                 "fkey INTEGER NOT NULL PRIMARY KEY,",
                 "FOREIGN KEY (fkey) REFERENCES b(\"id\")",
-                ");",
+                ") STRICT;",
                 "CREATE TABLE b (",
                 "\"id\" INTEGER NOT NULL PRIMARY KEY",
-                ");",
+                ") STRICT;",
             ]
         );
     }
@@ -589,11 +589,11 @@ fn add_renamed_table_fkey_ddl_sqlite() {
         vec![
             "CREATE TABLE a_table (",
             "\"id\" INTEGER NOT NULL PRIMARY KEY",
-            ");",
+            ") STRICT;",
             "CREATE TABLE b (",
             "b INTEGER NOT NULL PRIMARY KEY,",
             "FOREIGN KEY (b) REFERENCES a_table(\"id\")",
-            ");",
+            ") STRICT;",
         ]
     );
 }
@@ -723,16 +723,16 @@ fn add_table_many_ddl_sqlite() {
         vec![
             "CREATE TABLE a (",
             "\"id\" INTEGER NOT NULL PRIMARY KEY",
-            ");",
+            ") STRICT;",
             "CREATE TABLE b (",
             "\"id\" INTEGER NOT NULL PRIMARY KEY",
-            ");",
+            ") STRICT;",
             "CREATE TABLE b_many_a_Many (",
             "\"owner\" INTEGER NOT NULL,",
             "has INTEGER NOT NULL,",
             "FOREIGN KEY (\"owner\") REFERENCES b(\"id\")",
             "FOREIGN KEY (has) REFERENCES a(\"id\")",
-            ");",
+            ") STRICT;",
         ]
     );
 }

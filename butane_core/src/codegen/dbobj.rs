@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{spanned::Spanned, Field, ItemStruct, LitStr};
+use syn::{spanned::Spanned, Attribute, Field, ItemStruct, LitStr};
 
 use super::{
     fields, get_autopk_sql_type, get_type_argument, is_auto, is_many_to_many, is_row_field,
@@ -302,8 +302,10 @@ fn fieldexpr_func(
         }
     };
     let fnid = Ident::new(&format!("{fid}"), f.span());
+    let cfg_attr = cfg_attrs(&f.attrs);
     quote!(
         /// Create query expression.
+        #(#cfg_attr)*
         #vis fn #fnid(&self) -> #field_expr_type {
             #field_expr_ctor
         }
@@ -332,9 +334,11 @@ fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
     fields(ast_struct)
         .map(|f| {
             let ident = f.ident.clone().unwrap();
+            let cfg_attrs = cfg_attrs(&f.attrs);
             if is_row_field(f) {
                 let fty = &f.ty;
                 let ret = quote!(
+                    #(#cfg_attrs)*
                     #ident: butane::FromSql::from_sql_ref(
                         row.get(#i, <#fty as butane::FieldType>::SQLTYPE)?
                     )?
@@ -342,11 +346,21 @@ fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
                 i += 1;
                 ret
             } else if is_many_to_many(f) {
-                quote!(#ident: butane::Many::new())
+                quote!(
+                    #(#cfg_attrs)*
+                    #ident: butane::Many::new()
+                )
             } else {
                 make_compile_error!(f.span()=> "Unexpected struct field")
             }
         })
+        .collect()
+}
+
+fn cfg_attrs<'a>(attrs: &'a Vec<Attribute>) -> Vec<&'a Attribute> {
+    attrs
+        .into_iter()
+        .filter(|attr| attr.path().is_ident("cfg"))
         .collect()
 }
 
@@ -360,7 +374,11 @@ where
             Some(fname) => {
                 let ident = make_ident_literal_str(&fname);
                 let fty = &f.ty;
-                quote!(butane::db::Column::new(#ident, <#fty as butane::FieldType>::SQLTYPE),)
+                let attrs = cfg_attrs(&f.attrs);
+                quote!(
+                    #(#attrs)*
+                    butane::db::Column::new(#ident, <#fty as butane::FieldType>::SQLTYPE),
+                )
             }
             None => quote_spanned! {
                 f.span() =>
@@ -421,7 +439,11 @@ where
         .filter(|f| is_row_field(f) && !is_auto(f) && predicate(f))
         .map(|f| {
             let ident = f.ident.clone().unwrap();
-            quote!(values.push(butane::ToSql::to_sql_ref(&self.#ident));)
+            let cfg_attrs = cfg_attrs(&f.attrs);
+            quote!(
+                #(#cfg_attrs)*
+                values.push(butane::ToSql::to_sql_ref(&self.#ident));
+            )
         })
         .collect()
 }

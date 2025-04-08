@@ -26,7 +26,6 @@ impl Blog {
     }
 }
 
-#[cfg(feature = "datetime")]
 #[model]
 #[derive(Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "fake", derive(Dummy))]
@@ -35,21 +34,8 @@ pub struct Post {
     pub title: String,
     pub body: String,
     pub published: bool,
+    #[cfg(feature = "datetime")]
     pub pub_time: std::option::Option<NaiveDateTime>,
-    pub likes: i32,
-    pub tags: Many<Tag>,
-    pub blog: ForeignKey<Blog>,
-}
-
-#[cfg(not(feature = "datetime"))]
-#[model]
-#[derive(Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "fake", derive(Dummy))]
-pub struct Post {
-    pub id: i64,
-    pub title: String,
-    pub body: String,
-    pub published: bool,
     pub likes: i32,
     pub tags: Many<Tag>,
     pub blog: ForeignKey<Blog>,

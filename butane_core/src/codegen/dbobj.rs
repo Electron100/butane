@@ -357,9 +357,9 @@ fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
         .collect()
 }
 
-fn cfg_attrs<'a>(attrs: &'a Vec<Attribute>) -> Vec<&'a Attribute> {
+fn cfg_attrs(attrs: &[Attribute]) -> Vec<&Attribute> {
     attrs
-        .into_iter()
+        .iter()
         .filter(|attr| attr.path().is_ident("cfg"))
         .collect()
 }

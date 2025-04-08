@@ -46,7 +46,7 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
             .clone()
             .expect("db object fields must be named")
             .to_string();
-        if name == "pub_time".to_string() {
+        if name == *"pub_time" {
             // Temporary solution to skip pub_time field in butane tests
             continue;
         }

@@ -373,6 +373,8 @@ async fn cant_save_unsaved_fkey(conn: ConnectionAsync) {
 #[butane_test]
 async fn basic_time(conn: ConnectionAsync) {
     let mut now = Utc::now();
+    // Ensure we have a non-zero subsecond value so that the assert below confirms
+    // that the time is actually being saved with subsecond precision.
     while now.timestamp_subsec_nanos() == 0 {
         now = Utc::now();
     }
@@ -389,10 +391,7 @@ async fn basic_time(conn: ConnectionAsync) {
     if conn.backend_name() == "sqlite" {
         assert_eq!(time.utc, time2.utc);
     } else {
-        assert_eq!(
-            time.utc.timestamp_subsec_micros(),
-            time2.utc.timestamp_subsec_micros()
-        );
+        assert_eq!(time.utc.timestamp_micros(), time2.utc.timestamp_micros());
     }
 }
 

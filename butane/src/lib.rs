@@ -48,13 +48,13 @@ pub mod db;
 ///   matches. For example, to find all posts made in blogs by people
 ///   named "Pete" we might say `filter!(Post, `blog.matches(author == "Pete"))`.
 /// * `contains`: Essentially the many-to-many version of `matches`.
-///    Parameter is a sub-expression. Use with a [`Many`]
-///    field to evaluate as true if one of the many referents matches
-///    the given expression. For example, in a blog post model with a field
-///    `tags: Many<Tag>` we could filter to posts with a "cats" with
-///    the following `tags.contains(tag == "cats"). If the expression
-///    is single literal, it is assumed to be used to match the
-///    primary key.
+///   Parameter is a sub-expression. Use with a [`Many`]
+///   field to evaluate as true if one of the many referents matches
+///   the given expression. For example, in a blog post model with a field
+///   `tags: Many<Tag>` we could filter to posts with a "cats" with
+///   the following `tags.contains(tag == "cats"). If the expression
+///   is single literal, it is assumed to be used to match the
+///   primary key.
 ///
 #[cfg_attr(
     feature = "async",

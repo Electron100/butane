@@ -203,6 +203,12 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) ->
             ];
             fn from_row(row: &dyn butane::db::BackendRow) -> butane::Result<Self> {
                 use butane::DataObject;
+                if row.len() != Self::COLUMNS.len() {
+                    return Err(butane::Error::BoundsError(
+                        "Found unexpected number of columns in row for DataResult".to_string()
+                    ));
+                }
+                let mut i = 0;
                 #from_row_body
             }
             fn query() -> butane::query::Query<Self> {
@@ -324,24 +330,21 @@ fn fields_type(tyname: &Ident) -> Ident {
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
-    let mut i: usize = 0;
     fields(ast_struct)
         .map(|f| {
             let ident = f.ident.clone().unwrap();
             let cfg_attrs = cfg_attrs(&f.attrs);
             if is_row_field(f) {
-                if f.ident.clone().unwrap() == "pub_time" {
-                    // Temporary workaround to skip pub_time field in butane tests
-                    i -= 1;
-                }
-                let fty = &f.ty;
                 let ret = quote!(
                     #(#cfg_attrs)*
-                    #ident: butane::FromSql::from_sql_ref(
-                        row.get(#i, <#fty as butane::FieldType>::SQLTYPE)?
-                    )?
+                    #ident: {
+                        let value = butane::FromSql::from_sql_ref(
+                            row.get(i, Self::COLUMNS[i].ty().clone())?
+                        )?;
+                        i += 1;
+                        value
+                    }
                 );
-                i += 1;
                 ret
             } else if is_many_to_many(f) {
                 quote!(

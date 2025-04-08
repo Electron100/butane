@@ -22,7 +22,7 @@ check : build doclint lint spellcheck check-fmt test
 
 test :
 	$(CARGO) test --all-features
-	$(CARGO) test -p butane --test query --no-default-features --features sqlite,async,async-adapter,json
+	$(CARGO) test -p butane --test query --no-default-features --features sqlite,async,async-adapter
 	# And run the example tests separately to avoid feature combinations
 	cd examples; for dir in *; do cargo +stable test -p $$dir --all-features; done
 

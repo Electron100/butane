@@ -371,7 +371,13 @@ async fn cant_save_unsaved_fkey(conn: ConnectionAsync) {
 #[cfg(feature = "datetime")]
 #[butane_test]
 async fn basic_time(conn: ConnectionAsync) {
-    let now = Utc::now();
+    let mut now = Utc::now();
+    // Ensure we have a non-zero subsecond value so that the assert below confirms
+    // that the time is actually being saved with subsecond precision.
+    while now.timestamp_subsec_nanos() == 0 {
+        now = Utc::now();
+    }
+
     let mut time = TimeHolder {
         id: 1,
         naive: now.naive_utc(),
@@ -381,9 +387,11 @@ async fn basic_time(conn: ConnectionAsync) {
     time.save(&conn).await.unwrap();
 
     let time2 = TimeHolder::get(&conn, 1).await.unwrap();
-    // Note, we don't just compare the objects directly because we
-    // lose some precision when we go to the database.
-    assert_eq!(time.utc.timestamp(), time2.utc.timestamp());
+    if conn.backend_name() == "sqlite" {
+        assert_eq!(time.utc, time2.utc);
+    } else {
+        assert_eq!(time.utc.timestamp_micros(), time2.utc.timestamp_micros());
+    }
 }
 
 #[butane_test]

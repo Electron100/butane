@@ -1,5 +1,6 @@
-// We wrap everything in an inner module just so it's easier to have the feature gate in one place
-#[cfg(feature = "pg")]
+// We wrap everything in an inner module just so it's easier to have the feature gate in one place.
+// butane sqlite fails when using sqlite STRICT mode tripping up the custom type POINT.
+#[cfg(all(feature = "pg", not(feature = "sqlite")))]
 mod custom_pg {
     use butane::custom::{SqlTypeCustom, SqlValRefCustom};
     use butane::{butane_type, model};

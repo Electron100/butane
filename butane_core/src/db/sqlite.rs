@@ -654,7 +654,7 @@ fn create_table(table: &ATable, allow_exists: bool) -> String {
         constraints = ",\n".to_owned() + &constraints;
     }
     format!(
-        "CREATE TABLE {}{} (\n{}{}\n);",
+        "CREATE TABLE {}{} (\n{}{}\n) STRICT;",
         modifier, table.name, coldefs, constraints
     )
 }

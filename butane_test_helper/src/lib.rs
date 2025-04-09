@@ -118,14 +118,14 @@ pub trait SetupData {
     fn connstr(&self) -> &str;
 }
 
-/// Create a postgres [`Connection`].
+/// Create a PostgreSQL [`Connection`].
 pub fn pg_connection() -> (Connection, PgSetupData) {
     let backend = get_backend(pg::BACKEND_NAME).unwrap();
     let data = pg_setup_sync();
     (backend.connect(&pg_connstr(&data)).unwrap(), data)
 }
 
-/// Create a postgres [`ConnectionSpec`].
+/// Create a PostgreSQL [`ConnectionSpec`].
 pub async fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
     let data = pg_setup().await;
     (
@@ -182,7 +182,7 @@ impl SetupData for PgSetupData {
     }
 }
 
-/// Create and start a temporary postgres server instance.
+/// Create and start a temporary PostgreSQL server instance.
 pub fn create_tmp_server() -> PgServerState {
     let seed: u128 = rand::random::<u64>() as u128;
     let instance_id = BlockId::new(Alphabet::alphanumeric(), seed, 8)
@@ -202,11 +202,11 @@ pub fn create_tmp_server() -> PgServerState {
         .arg("-U")
         .arg("postgres")
         .output()
-        .expect("failed to run initdb");
+        .expect("failed to run initdb; PostgreSQL may not be installed.");
     if !output.status.success() {
         std::io::stdout().write_all(&output.stdout).unwrap();
         std::io::stderr().write_all(&output.stderr).unwrap();
-        panic!("postgres initdb failed")
+        panic!("PostgreSQL initdb failed")
     }
 
     let sockdir = tempfile::TempDir::new().unwrap();
@@ -263,7 +263,7 @@ extern "C" fn proc_teardown() {
 static TMP_SERVER: Lazy<Mutex<Option<PgServerState>>> =
     Lazy::new(|| Mutex::new(Some(create_tmp_server())));
 
-/// Create a running empty postgres database named `butane_test_<uuid>`.
+/// Create a running empty PostgreSQL database named `butane_test_<uuid>`.
 pub fn pg_setup_sync() -> PgSetupData {
     log::trace!("starting pg_setup");
     // By default we set up a temporary, local postgres server just
@@ -290,7 +290,7 @@ pub fn pg_setup_sync() -> PgSetupData {
     PgSetupData { connstr }
 }
 
-/// Create a running empty postgres database named `butane_test_<uuid>`.
+/// Create a running empty PostgreSQL database named `butane_test_<uuid>`.
 pub async fn pg_setup() -> PgSetupData {
     log::trace!("starting pg_setup");
     // By default we set up a temporary, local postgres server just
@@ -323,12 +323,12 @@ pub async fn pg_setup() -> PgSetupData {
     PgSetupData { connstr }
 }
 
-/// Tear down postgres database created by [`pg_setup`].
+/// Tear down PostgreSQL database created by [`pg_setup`].
 pub fn pg_teardown(_data: PgSetupData) {
     // All the work is done by the drop implementation
 }
 
-/// Obtain the connection string for the postgres database.
+/// Obtain the connection string for the PostgreSQL database.
 pub fn pg_connstr(data: &PgSetupData) -> String {
     data.connstr.clone()
 }

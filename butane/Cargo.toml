@@ -72,10 +72,6 @@ name = "custom_enum_derived"
 required-features = ["async"]
 
 [[test]]
-name = "custom_pg"
-required-features = ["pg"]
-
-[[test]]
 name = "custom_type"
 required-features = ["async"]
 

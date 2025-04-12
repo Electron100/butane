@@ -8,6 +8,7 @@ members = [
   "butane_test_helper",
   "butane_test_macros",
   "example",
+  "examples/custom_pg", 
   "examples/newtype",
   "examples/getting_started",
   "examples/getting_started_async",

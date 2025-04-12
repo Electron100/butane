@@ -1,7 +1,6 @@
 use butane::custom::{SqlTypeCustom, SqlValRefCustom};
 use butane::{butane_type, model};
 use butane::{AutoPk, FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
-use geo_types;
 use tokio_postgres as postgres;
 
 // newtype so we can implement traits for it.

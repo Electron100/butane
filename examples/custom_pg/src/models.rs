@@ -3,7 +3,7 @@ use butane::{butane_type, model};
 use butane::{AutoPk, FieldType, FromSql, SqlType, SqlVal, SqlValRef, ToSql};
 use tokio_postgres as postgres;
 
-// newtype so we can implement traits for it.
+/// Newtype for geo_types::Point so we can implement traits for it.
 #[butane_type(Custom(POINT))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Point(geo_types::Point<f64>);
@@ -44,6 +44,7 @@ impl FieldType for Point {
     type RefType = Self;
 }
 
+/// Represents a trip from one point to another.
 #[model]
 #[derive(Debug, PartialEq)]
 pub struct Trip {

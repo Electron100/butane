@@ -1,3 +1,5 @@
+extern crate alloc;
+
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
 use butane_core::db::{BackendConnection, Connection};
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
@@ -7,6 +9,7 @@ use butane_core::{SqlType, SqlVal};
 use butane_test_helper::pg_connection;
 #[cfg(feature = "sqlite")]
 use butane_test_helper::sqlite_connection;
+use pretty_assertions::assert_eq;
 use proc_macro2::TokenStream;
 use quote::quote;
 use sqlparser::dialect::GenericDialect;
@@ -185,8 +188,8 @@ fn migration_add_field_sqlite() {
         // getting sane looking downgrade sql and a test failure if it
         // changes. If the change is innocuous, this test should just
         // be updated.
-        "CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
-INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;
+        "CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
+INSERT INTO Foo__butane_tmp SELECT \"id\", bar FROM Foo;DROP TABLE Foo;
 ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
     );
 }
@@ -209,9 +212,9 @@ fn migration_add_field_with_default_sqlite() {
         &mut sqlite_connection(),
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 42;",
         // See comments on migration_add_field_sqlite
-        r#"CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
-            INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;
-            DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
+        "CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
+            INSERT INTO Foo__butane_tmp SELECT \"id\", bar FROM Foo;
+            DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
     );
 }
 
@@ -282,14 +285,14 @@ fn migration_add_and_remove_field_sqlite() {
         // getting sane looking downgrade sql and a test failure if it
         // changes. If the change is innocuous, this test should just
         // be updated.
-        r#"ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;
-            CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL);
-            INSERT INTO Foo__butane_tmp SELECT id, baz FROM Foo;
-            DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
-        r#"ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';
-            CREATE TABLE Foo__butane_tmp (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
-            INSERT INTO Foo__butane_tmp SELECT id, bar FROM Foo;DROP TABLE Foo;
-            ALTER TABLE Foo__butane_tmp RENAME TO Foo;"#,
+        "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;
+            CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL);
+            INSERT INTO Foo__butane_tmp SELECT \"id\", baz FROM Foo;
+            DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
+        "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';
+            CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
+            INSERT INTO Foo__butane_tmp SELECT \"id\", bar FROM Foo;DROP TABLE Foo;
+            ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
     );
 }
 
@@ -310,7 +313,7 @@ fn migration_delete_table_sqlite() {
     migration_delete_table(
         &mut sqlite_connection(),
         "DROP TABLE Foo;",
-        "CREATE TABLE Foo (id INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
+        "CREATE TABLE Foo (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
     );
 }
 
@@ -321,7 +324,7 @@ fn migration_delete_table_pg() {
     migration_delete_table(
         &mut conn,
         "DROP TABLE Foo;",
-        "CREATE TABLE Foo (id BIGINT NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
+        "CREATE TABLE Foo (\"id\" BIGINT NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
     );
 }
 

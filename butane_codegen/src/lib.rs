@@ -30,9 +30,9 @@ mod filter;
 /// * `#[table = "NAME"]` used on the struct to specify the name of the table (defaults to struct name)
 /// * `#[pk]` on a field to specify that it is the primary key.
 /// * `#[unique]` on a field indicates that the field's value must be unique
-///    (perhaps implemented as the SQL UNIQUE constraint by some backends).
+///   (perhaps implemented as the SQL UNIQUE constraint by some backends).
 /// * `#[default]` should be used on fields added by later migrations to avoid errors on existing objects.
-///     Unnecessary if the new field is an `Option<>`
+///   Unnecessary if the new field is an `Option<>`
 ///
 /// For example
 /// ```ignore
@@ -105,13 +105,13 @@ pub fn dataresult(args: TokenStream, input: TokenStream) -> TokenStream {
 ///   matches. For example, to find all posts made in blogs by people
 ///   named "Pete" we might say `filter!(Post, `blog.matches(author == "Pete"))`.
 /// * `contains`: Essentially the many-to-many version of `matches`.
-///    Parameter is a sub-expression. Use with a [`Many`]
-///    field to evaluate as true if one of the many referents matches
-///    the given expression. For example, in a blog post model with a field
-///    `tags: Many<Tag>` we could filter to posts with a "cats" with
-///    the following `tags.contains(tag == "cats"). If the expression
-///    is single literal, it is assumed to be used to match the
-///    primary key.
+///   Parameter is a sub-expression. Use with a [`Many`]
+///   field to evaluate as true if one of the many referents matches
+///   the given expression. For example, in a blog post model with a field
+///   `tags: Many<Tag>` we could filter to posts with a "cats" with
+///   the following `tags.contains(tag == "cats"). If the expression
+///   is single literal, it is assumed to be used to match the
+///   primary key.
 ///
 /// # Examples
 /// ```ignore
@@ -259,7 +259,7 @@ pub fn derive_field_type(input: TokenStream) -> TokenStream {
             ..
         })
         | syn::Data::Struct(syn::DataStruct {
-            fields: syn::Fields::Unit { .. },
+            fields: syn::Fields::Unit,
             ..
         }) => derive_field_type_with_json(ident),
         syn::Data::Enum(data_enum) => derive_field_type_for_enum(ident, data_enum),
@@ -412,6 +412,7 @@ fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream {
         {
             fn from_sql_ref(val: butane::SqlValRef) -> std::result::Result<Self, butane::Error> {
                 if let butane::SqlValRef::Json(v) = val {
+                    use ::serde::Deserialize;
                     return Ok(#struct_name::deserialize(v).unwrap());
                 }
                 Err(butane::Error::CannotConvertSqlVal(

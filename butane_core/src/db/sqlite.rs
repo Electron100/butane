@@ -24,7 +24,7 @@ use crate::query::{BoolExpr, Order};
 use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 
 #[cfg(feature = "datetime")]
-const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
 
 /// The name of the sqlite backend.
 pub const BACKEND_NAME: &str = "sqlite";

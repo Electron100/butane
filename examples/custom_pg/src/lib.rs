@@ -1,3 +1,5 @@
+//! Demonstrates use of non-standard Postgres types. See README for more.
+
 use butane::db::ConnectionAsync;
 use butane::prelude_async::*;
 use butane::AutoPk;
@@ -6,6 +8,7 @@ use butane_test_macros::butane_test;
 mod models;
 use models::{Point, Trip};
 
+/// Saves and loads a `Trip`.
 pub async fn roundtrip_trip_through_db(conn: ConnectionAsync) {
     let mut trip = Trip {
         id: AutoPk::uninitialized(),
@@ -18,6 +21,7 @@ pub async fn roundtrip_trip_through_db(conn: ConnectionAsync) {
     assert_eq!(trip, trip2);
 }
 
+/// Tests saving and loading a custom type.
 #[butane_test(async, pg)]
 async fn roundtrip_custom(conn: ConnectionAsync) {
     crate::roundtrip_trip_through_db(conn).await;

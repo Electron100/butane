@@ -11,16 +11,22 @@ license.workspace = true
 repository.workspace = true
 documentation = "https://docs.rs/butane/"
 
+[features]
+default = ["sqlite", "pg"]
+sqlite = ["butane_core/sqlite", "butane_core/async-adapter"]
+sqlite-bundled = ["butane_core/sqlite-bundled"]
+pg = ["butane_core/pg", "tokio-postgres"]
+
 [dependencies]
 block-id = "0.2"
-butane_core = { features = ["pg", "sqlite"], workspace = true }
+butane_core = { workspace = true }
 env_logger.workspace = true
 libc = "0.2"
 log.workspace = true
 maybe-async-cfg.workspace = true
 nonempty.workspace = true
 once_cell = { workspace = true }
-tokio-postgres = { features = ["with-geo-types-0_7"], workspace = true }
+tokio-postgres = { features = ["with-geo-types-0_7"], optional = true, workspace = true }
 rand.workspace = true
 tempfile.workspace = true
 uuid = { features = ["v4"], workspace = true }

@@ -33,7 +33,7 @@ butane.workspace = true
 [dev-dependencies]
 butane_cli.workspace = true
 butane_core.workspace = true
-butane_test_helper.workspace = true
+butane_test_helper = { workspace = true, default-features = false, features = ["sqlite", "pg"] }
 butane_test_macros.workspace = true
 cfg-if.workspace = true
 env_logger.workspace = true

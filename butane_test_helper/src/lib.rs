@@ -5,19 +5,33 @@
 extern crate alloc;
 
 use std::future::Future;
+#[cfg(feature = "pg")]
 use std::io::{BufRead, BufReader, Read, Write};
+#[cfg(feature = "pg")]
 use std::ops::Deref;
+#[cfg(feature = "pg")]
 use std::path::PathBuf;
+#[cfg(feature = "pg")]
 use std::process::{ChildStderr, Command, Stdio};
+#[cfg(feature = "pg")]
 use std::sync::Mutex;
 
+#[cfg(feature = "pg")]
 use block_id::{Alphabet, BlockId};
-use butane_core::db::{
-    connect, connect_async, get_backend, pg, pg::PgBackend, sqlite, sqlite::SQLiteBackend, Backend,
-    ConnectionSpec,
-};
+#[cfg(feature = "pg")]
+use butane_core::db::pg::PgBackend;
+#[cfg(feature = "sqlite")]
+use butane_core::db::sqlite;
+#[cfg(feature = "sqlite")]
+use butane_core::db::sqlite::SQLiteBackend;
+#[cfg(feature = "pg")]
+use butane_core::db::{connect, connect_async, pg};
+use butane_core::db::{get_backend, Backend, ConnectionSpec};
+
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
+#[cfg(feature = "pg")]
 use once_cell::sync::Lazy;
+#[cfg(feature = "pg")]
 use uuid::Uuid;
 
 pub use butane_core::db::{BackendConnection, BackendConnectionAsync, Connection, ConnectionAsync};
@@ -35,9 +49,11 @@ pub trait BackendTestInstance {
 }
 
 /// Instance of a Postgres test.
+#[cfg(feature = "pg")]
 #[derive(Default)]
 pub struct PgTestInstance {}
 
+#[cfg(feature = "pg")]
 impl BackendTestInstance for PgTestInstance {
     fn run_test_sync(test: impl FnOnce(Connection), migrate: bool) {
         common_setup();
@@ -76,9 +92,11 @@ impl BackendTestInstance for PgTestInstance {
 }
 
 /// Instance of a SQLite test.
+#[cfg(feature = "sqlite")]
 #[derive(Default)]
 pub struct SQLiteTestInstance {}
 
+#[cfg(feature = "sqlite")]
 impl BackendTestInstance for SQLiteTestInstance {
     fn run_test_sync(test: impl FnOnce(Connection), migrate: bool) {
         common_setup();
@@ -119,6 +137,7 @@ pub trait SetupData {
 }
 
 /// Create a PostgreSQL [`Connection`].
+#[cfg(feature = "pg")]
 pub fn pg_connection() -> (Connection, PgSetupData) {
     let backend = get_backend(pg::BACKEND_NAME).unwrap();
     let data = pg_setup_sync();
@@ -126,6 +145,7 @@ pub fn pg_connection() -> (Connection, PgSetupData) {
 }
 
 /// Create a PostgreSQL [`ConnectionSpec`].
+#[cfg(feature = "pg")]
 pub async fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
     let data = pg_setup().await;
     (
@@ -135,6 +155,7 @@ pub async fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
 }
 
 /// Server state for a test PostgreSQL server.
+#[cfg(feature = "pg")]
 #[derive(Debug)]
 pub struct PgServerState {
     /// Temporary directory containing the test server
@@ -146,6 +167,7 @@ pub struct PgServerState {
     /// stderr from the test server
     pub stderr: BufReader<ChildStderr>,
 }
+#[cfg(feature = "pg")]
 impl Drop for PgServerState {
     fn drop(&mut self) {
         // Avoid using Child.kill on Unix, as it uses SIGKILL, which postgresql recommends against,
@@ -171,11 +193,13 @@ impl Drop for PgServerState {
 }
 
 /// Connection spec for a test server.
+#[cfg(feature = "pg")]
 #[derive(Clone, Debug)]
 pub struct PgSetupData {
     /// Connection string
     pub connstr: String,
 }
+#[cfg(feature = "pg")]
 impl SetupData for PgSetupData {
     fn connstr(&self) -> &str {
         &self.connstr
@@ -183,6 +207,7 @@ impl SetupData for PgSetupData {
 }
 
 /// Create and start a temporary PostgreSQL server instance.
+#[cfg(feature = "pg")]
 pub fn create_tmp_server() -> PgServerState {
     let seed: u128 = rand::random::<u64>() as u128;
     let instance_id = BlockId::new(Alphabet::alphanumeric(), seed, 8)
@@ -256,14 +281,17 @@ pub fn create_tmp_server() -> PgServerState {
     }
 }
 
+#[cfg(feature = "pg")]
 extern "C" fn proc_teardown() {
     drop(TMP_SERVER.deref().lock().unwrap().take());
 }
 
+#[cfg(feature = "pg")]
 static TMP_SERVER: Lazy<Mutex<Option<PgServerState>>> =
     Lazy::new(|| Mutex::new(Some(create_tmp_server())));
 
 /// Create a running empty PostgreSQL database named `butane_test_<uuid>`.
+#[cfg(feature = "pg")]
 pub fn pg_setup_sync() -> PgSetupData {
     log::trace!("starting pg_setup");
     // By default we set up a temporary, local postgres server just
@@ -291,6 +319,7 @@ pub fn pg_setup_sync() -> PgSetupData {
 }
 
 /// Create a running empty PostgreSQL database named `butane_test_<uuid>`.
+#[cfg(feature = "pg")]
 pub async fn pg_setup() -> PgSetupData {
     log::trace!("starting pg_setup");
     // By default we set up a temporary, local postgres server just
@@ -324,11 +353,13 @@ pub async fn pg_setup() -> PgSetupData {
 }
 
 /// Tear down PostgreSQL database created by [`pg_setup`].
+#[cfg(feature = "pg")]
 pub fn pg_teardown(_data: PgSetupData) {
     // All the work is done by the drop implementation
 }
 
 /// Obtain the connection string for the PostgreSQL database.
+#[cfg(feature = "pg")]
 pub fn pg_connstr(data: &PgSetupData) -> String {
     data.connstr.clone()
 }
@@ -377,19 +408,23 @@ pub fn setup_db(conn: &mut Connection) {
 }
 
 /// Create a sqlite [`Connection`].
+#[cfg(feature = "sqlite")]
 pub fn sqlite_connection() -> Connection {
     let backend = get_backend(sqlite::BACKEND_NAME).unwrap();
     backend.connect(":memory:").unwrap()
 }
 
 /// Create a sqlite [`ConnectionSpec`].
+#[cfg(feature = "sqlite")]
 pub fn sqlite_connspec() -> ConnectionSpec {
     ConnectionSpec::new(sqlite::BACKEND_NAME, ":memory:")
 }
 
 /// Concrete [SetupData] for SQLite.
+#[cfg(feature = "sqlite")]
 pub struct SQLiteSetupData {}
 
+#[cfg(feature = "sqlite")]
 impl SetupData for SQLiteSetupData {
     fn connstr(&self) -> &str {
         ":memory:"
@@ -397,10 +432,12 @@ impl SetupData for SQLiteSetupData {
 }
 
 /// Setup the test sqlite database.
+#[cfg(feature = "sqlite")]
 pub async fn sqlite_setup() -> SQLiteSetupData {
     SQLiteSetupData {}
 }
 /// Tear down the test sqlite database.
+#[cfg(feature = "sqlite")]
 pub fn sqlite_teardown(_: SQLiteSetupData) {}
 
 fn common_setup() {
@@ -445,7 +482,9 @@ macro_rules! maketest {
             pub async fn [<$fname _ $backend>]() {
                 use butane_test_helper::*;
                 match stringify!($backend) {
+                    #[cfg(feature = "pg")]
                     "pg" => PgTestInstance::run_test_async($fname, $migrate).await,
+                    #[cfg(feature = "sqlite")]
                     "sqlite" => SQLiteTestInstance::run_test_async($fname, $migrate).await,
                     _ => panic!("Unknown backend $backend")
                 };

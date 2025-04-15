@@ -71,12 +71,14 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
                     create_tag(sync="create_tag_sync"),
                 )
             )]
+            #[cfg(test)]
             #func_sync
         ));
     }
     if include_async {
         funcs.push(quote!(
             #[maybe_async_cfg::maybe(async())]
+            #[cfg(test)]
             #func_async
         ));
     }

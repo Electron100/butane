@@ -1,0 +1,40 @@
+{
+  "name": "Trip",
+  "columns": [
+    {
+      "name": "id",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "BigInt"
+        }
+      },
+      "nullable": false,
+      "pk": true,
+      "auto": true,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "pt_from",
+      "sqltype": {
+        "Deferred": "CT:Point"
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "pt_to",
+      "sqltype": {
+        "Deferred": "CT:Point"
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

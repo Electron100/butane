@@ -153,8 +153,8 @@ pub struct Tag {
 }
 impl Tag {
     pub fn new(tag: impl Into<String>) -> Self {
-           Tag { tag: tag.into() }
-       }
+        Tag { tag: tag.into() }
+    }
 }
 ```
 

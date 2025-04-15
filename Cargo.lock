@@ -584,6 +584,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "custom_pg"
+version = "0.1.0"
+dependencies = [
+ "butane",
+ "butane_core",
+ "butane_test_helper",
+ "butane_test_macros",
+ "cfg-if",
+ "geo-types",
+ "maybe-async-cfg",
+ "tokio",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

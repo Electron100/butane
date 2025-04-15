@@ -1,0 +1,32 @@
+[package]
+name = "custom_pg"
+version = "0.1.0"
+authors = ["James Oakley <james@electronstudio.org>"]
+license.workspace = true
+edition.workspace = true
+publish = false
+
+[lib]
+doc = false
+
+[features]
+# pg is declared as a feature solely play nicely with butane_test_helper
+# it should never be disabled.
+default = ["pg"]
+pg = ["butane/pg"]
+
+
+[dependencies]
+butane = {workspace = true, features = ["async", "pg"]}
+butane_core = {workspace = true, features = ["async", "pg"]}
+butane_test_helper = { workspace = true, default-features = false, features = ["pg"] }
+butane_test_macros.workspace = true
+cfg-if = { workspace = true }
+geo-types = "0.7"
+maybe-async-cfg = { workspace = true }
+tokio = {workspace = true, features = ["macros"] }
+tokio-postgres = { features = ["with-geo-types-0_7"], workspace = true }
+
+
+[package.metadata.release]
+release = false

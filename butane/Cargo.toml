@@ -36,11 +36,11 @@ r2d2 = { optional = true, workspace = true }
 deadpool = { optional = true, workspace = true }
 
 [dev-dependencies]
-butane_test_helper = { workspace = true }
+butane_test_helper = { workspace = true, default-features = false, features = ["sqlite", "pg"] }
 butane_test_macros = { workspace = true }
 cfg-if = { workspace = true }
 paste = { workspace = true }
-chrono = { workspace = true }
+chrono = { workspace = true, features = ["now"] }
 env_logger = { workspace = true }
 fake = { workspace = true, features = ["chrono", "derive", "uuid"] }
 geo-types = "0.7"
@@ -70,10 +70,6 @@ required-features = ["async"]
 [[test]]
 name = "custom_enum_derived"
 required-features = ["async"]
-
-[[test]]
-name = "custom_pg"
-required-features = ["pg"]
 
 [[test]]
 name = "custom_type"

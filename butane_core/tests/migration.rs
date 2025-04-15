@@ -188,7 +188,7 @@ fn migration_add_field_sqlite() {
         // getting sane looking downgrade sql and a test failure if it
         // changes. If the change is innocuous, this test should just
         // be updated.
-        "CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
+        "CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL) STRICT;
 INSERT INTO Foo__butane_tmp SELECT \"id\", bar FROM Foo;DROP TABLE Foo;
 ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
     );
@@ -212,7 +212,7 @@ fn migration_add_field_with_default_sqlite() {
         &mut sqlite_connection(),
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 42;",
         // See comments on migration_add_field_sqlite
-        "CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
+        "CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL) STRICT;
             INSERT INTO Foo__butane_tmp SELECT \"id\", bar FROM Foo;
             DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
     );
@@ -286,11 +286,11 @@ fn migration_add_and_remove_field_sqlite() {
         // changes. If the change is innocuous, this test should just
         // be updated.
         "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;
-            CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL);
+            CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,baz INTEGER NOT NULL) STRICT;
             INSERT INTO Foo__butane_tmp SELECT \"id\", baz FROM Foo;
             DROP TABLE Foo;ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
         "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';
-            CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);
+            CREATE TABLE Foo__butane_tmp (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL) STRICT;
             INSERT INTO Foo__butane_tmp SELECT \"id\", bar FROM Foo;DROP TABLE Foo;
             ALTER TABLE Foo__butane_tmp RENAME TO Foo;",
     );
@@ -313,7 +313,7 @@ fn migration_delete_table_sqlite() {
     migration_delete_table(
         &mut sqlite_connection(),
         "DROP TABLE Foo;",
-        "CREATE TABLE Foo (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
+        "CREATE TABLE Foo (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL) STRICT;",
     );
 }
 

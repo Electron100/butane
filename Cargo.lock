@@ -242,7 +242,7 @@ checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 
 [[package]]
 name = "butane"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "butane_codegen",
  "butane_core",
@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "butane_cli"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "butane",
@@ -293,7 +293,7 @@ dependencies = [
 
 [[package]]
 name = "butane_codegen"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "butane_core",
  "proc-macro2",
@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "butane_core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "assert_matches",
  "async-trait",
@@ -350,7 +350,7 @@ dependencies = [
 
 [[package]]
 name = "butane_test_helper"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "block-id",
  "butane_core",
@@ -368,7 +368,7 @@ dependencies = [
 
 [[package]]
 name = "butane_test_macros"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "proc-macro2",
  "quote",

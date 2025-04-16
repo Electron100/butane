@@ -7,6 +7,10 @@ deliberately follow the same goal as [Diesel's getting-started
 guide](https://diesel.rs/guides/getting-started/): building the
 database portions of a blog.
 
+This guide shows a synchronous example, but Butane now supports
+async. Code for an async equivalent can be found at
+[examples/getting_started_async](https://github.com/Electron100/butane/tree/master/examples/getting_started_async)
+
 Let's begin by creating a new rust project
 
 ``` shell
@@ -17,7 +21,7 @@ In `Cargo.toml`, add a dependency on Butane:
 
 ``` toml
 [dependencies]
-butane = { version = "0.7", features=["pg", "sqlite"] }
+butane = { version = "0.8", features=["pg", "sqlite"] }
 ```
 
 This guide will focus on using SQLite initially, and use "pg" for
@@ -65,8 +69,7 @@ yet. Let's define some _models_ for our blog objects (in `src/models.rs`). We'll
 the Blog itself.
 
 ``` rust
-use butane::prelude::*;
-use butane::{model, ForeignKey, Many, ObjectState};
+use butane::{model, AutoPk, ForeignKey, Many, ObjectState};
 
 #[model]
 #[derive(Debug, Default)]
@@ -88,14 +91,7 @@ The `#[model]` attribute does the heavy lifting here:
 
 1. It generates automatic `impl`s of [`butane::DataResult`] and
    [`butane::DataObject`].
-2. It adds an additional field `state: butane::ObjectState` used to
-   store internal Butane state information. In general, we can ignore
-   this field, but it must be initialized when the struct is
-   constructed and there may not be another field named `state`,
-   although it is acceptable to manually include the `state:
-   ObjectState` field in the struct definition to make its presence
-   more obvious (and rust-analyzer happier).
-3. It tells Butane that instances of this struct should be represented in the
+2. It tells Butane that instances of this struct should be represented in the
    database, recording migration info (more on this later).
 
 The `id` field is special -- it's the primary key. All models must
@@ -121,28 +117,30 @@ pub struct Post {
     pub blog: ForeignKey<Blog>,
     pub tags: Many<Tag>,
     pub byline: Option<String>,
-    // listed for clarity, generated automatically if omitted
-    state: butane::ObjectState,
 }
 impl Post {
     pub fn new(blog: &Blog, title: String, body: String) -> Self {
         Post {
-            id: -1,
+            id: AutoPk::uninitialized(),
             title,
             body,
             published: false,
-            blog: blog.into(),
             tags: Many::default(),
+            blog: blog.into(),
             byline: None,
-            state: ObjectState::default(),
+            likes: 0,
         }
     }
 }
 ```
 
 Each post is associated with a single blog, represented by the
-`ForeignKey<Blog>`. Posts and tags, however, have a many-to-many
-relationship, represented here by `Many<Tag>`.
+`ForeignKey<Blog>`. Here we use `blog.into()` to construct the
+`ForeignKey`. If we had the `id` of the blog but not a `Blog` object
+itself, we could have used `ForeignKey::from_pk` instead.
+
+Posts and tags, on the other hand, have a many-to-many relationship, represented
+here by `Many<Tag>`.
 
 The Tag model itself is trivial
 
@@ -155,10 +153,7 @@ pub struct Tag {
 }
 impl Tag {
     pub fn new(tag: impl Into<String>) -> Self {
-        Tag {
-            tag: tag.into(),
-            ..Default::default()
-        }
+        Tag { tag: tag.into() }
     }
 }
 ```
@@ -226,8 +221,7 @@ pub fn create_post(conn: &Connection, blog: &Blog, title: String, body: String) 
 
 The `butane::prelude::*` import brings some common Butane traits into
 scope. If you'd prefer to avoid star-imports, you can import the
-necessary traits explicitly (in this case `use butane::{DataObject,
-DataResult};`)
+necessary traits explicitly (in this case `use butane::{query::QueryOpsSync, DataObjectOpsSync, DataResult};`)
 
 We don't need to create a new blog every time, if we have an existing
 one we want to reuse it (for simplicity we'll only add one blog in
@@ -504,9 +498,9 @@ Now compiling the code will include the migrations, however we need to update th
 to use these migrations:
 
 ``` rust
-pub fn establish_connection() -> Connection {
-    use butane::migrations::Migrations;
+use butane::migrations::Migrations;
 
+pub fn establish_connection() -> Connection {
     let mut connection = butane::db::connect(&ConnectionSpec::load(".butane/connection.json").unwrap()).unwrap();
     let migrations = butane_migrations::get_migrations().unwrap();
     migrations.migrate(&mut connection).unwrap();

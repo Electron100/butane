@@ -1,7 +1,6 @@
 //! Models for the getting_started example.
 
-use butane::AutoPk;
-use butane::{model, ForeignKey, Many};
+use butane::{model, AutoPk, ForeignKey, Many};
 
 /// Blog metadata.
 #[model]
@@ -16,8 +15,8 @@ impl Blog {
     /// Create a new Blog.
     pub fn new(name: impl Into<String>) -> Self {
         Blog {
+            id: AutoPk::uninitialized(),
             name: name.into(),
-            ..Default::default()
         }
     }
 }

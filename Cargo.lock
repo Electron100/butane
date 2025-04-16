@@ -308,7 +308,6 @@ version = "0.8.0"
 dependencies = [
  "assert_matches",
  "async-trait",
- "butane_core",
  "butane_test_helper",
  "butane_test_macros",
  "bytes",

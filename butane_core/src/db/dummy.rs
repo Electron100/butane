@@ -19,6 +19,9 @@ impl Backend for DummyBackend {
     fn name(&self) -> &'static str {
         "dummy"
     }
+    fn internal_row_insertion_id_field(&self) -> &'static str {
+        "dummy"
+    }
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         Err(Error::PoisonedConnection)
     }

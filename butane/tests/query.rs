@@ -36,7 +36,7 @@ async fn equality_separate_dataresult(conn: ConnectionAsync) {
 }
 
 #[butane_test]
-async fn ordered(conn: ConnectionAsync) {
+async fn ordered_schema_field(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let posts = query!(Post, published == true)
         .order_asc(colname!(Post, title))
@@ -47,6 +47,22 @@ async fn ordered(conn: ConnectionAsync) {
     assert_eq!(posts[0].title, "Mount Doom");
     assert_eq!(posts[1].title, "Sir Charles");
     assert_eq!(posts[2].title, "The Tiger");
+}
+
+#[butane_test]
+async fn ordered_by_insertion(conn: ConnectionAsync) {
+    let backend = conn.backend();
+    let insertion_id_column = backend.internal_row_insertion_id_field();
+    blog::setup_blog(&conn).await;
+    let posts = query!(Post, published == true)
+        .order_asc(insertion_id_column)
+        .load(&conn)
+        .await
+        .unwrap();
+    assert_eq!(posts.len(), 3);
+    assert_eq!(posts[0].title, "The Tiger");
+    assert_eq!(posts[1].title, "Sir Charles");
+    assert_eq!(posts[2].title, "Mount Doom");
 }
 
 #[butane_test]

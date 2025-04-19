@@ -25,6 +25,8 @@ use crate::{debug, query, warn, Error, Result, SqlType, SqlVal, SqlValRef};
 
 /// The name of the postgres backend.
 pub const BACKEND_NAME: &str = "pg";
+/// The internal row creation order field name.
+pub const ROW_INSERTION_ORDER_FIELD: &str = "ctid";
 
 /// Postgres [`Backend`] implementation.
 #[derive(Debug, Default, Clone)]
@@ -39,6 +41,10 @@ impl PgBackend {
 impl Backend for PgBackend {
     fn name(&self) -> &'static str {
         BACKEND_NAME
+    }
+
+    fn internal_row_insertion_id_field(&self) -> &'static str {
+        ROW_INSERTION_ORDER_FIELD
     }
 
     fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {

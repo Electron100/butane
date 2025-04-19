@@ -503,10 +503,14 @@ impl<'bt> ConnectionMethods for Box<dyn BackendTransaction<'bt> + 'bt> {
 /// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
 #[async_trait]
 pub trait Backend: Send + Sync + DynClone {
+    /// Butane name for the backend.
     fn name(&self) -> &'static str;
+    /// Backend-dependent field name for the database's internal identifier for each row.
+    fn internal_row_insertion_id_field(&self) -> &'static str;
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
-    /// Establish a new sync connection. The format of the connection
-    /// string is backend-dependent.
+    /// Establish a new sync connection.
+    ///
+    /// The format of the connection string is backend-dependent.
     fn connect(&self, conn_str: &str) -> Result<Connection>;
     /// Establish a new async connection. The format of the connection
     /// string is backend-dependent.
@@ -564,6 +568,9 @@ fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
 impl Backend for Box<dyn Backend> {
     fn name(&self) -> &'static str {
         self.deref().name()
+    }
+    fn internal_row_insertion_id_field(&self) -> &'static str {
+        self.deref().internal_row_insertion_id_field()
     }
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         self.deref().create_migration_sql(current, ops)

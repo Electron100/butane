@@ -98,7 +98,7 @@ enabled: you will want to enable `sqlite` and/or `pg`:
   the API will win.
 
 ## Migration of Breaking Changes
-### 0.8 (not yet released)
+### 0.8
 #### Async
 This is a major release which adds Async support. Effort has been made
 to keep the sync experience as unchanged as possible. Async versions
@@ -119,12 +119,12 @@ you must use either `butane::DataObjectOpsSync` or
 whether the `save` method is sync or async.
 
 The Ops traits are:
-* `DataObjectOpsSync` / `DataObjectOpsAsync` (for use with [`DataObject`](https://docs.rs/butane/latest/butane/trait.DataObject.html))
-* `QueryOpsSync` / `QueryOpsSync` (for use with [`Query`](https://docs.rs/butane/latest/butane/query/struct.Query.html),
+* [`DataObjectOpsSync`](https://docs.rs/butane/latest/butane/trait.DataObjectOpsSync.html) / [`DataObjectOpsAsync`](https://docs.rs/butane/latest/butane/trait.DataObjectOpsAsync.html) (for use with [`DataObject`](https://docs.rs/butane/latest/butane/trait.DataObject.html))
+* [`QueryOpsSync`](https://docs.rs/butane/latest/butane/prelude/trait.QueryOpsSync.html) / [`QueryOpsAsync`](https://docs.rs/butane/latest/butane/prelude_async/trait.QueryOpsAsync.html) (for use with [`Query`](https://docs.rs/butane/latest/butane/query/struct.Query.html),
   less commonly needed directly if you use the [`query`](https://docs.rs/butane/latest/butane/macro.query.html) or
   [`filter`](https://docs.rs/butane/latest/butane/macro.filter.html) macros)
-* `ForeignKeyOpsSync` / `ForeignKeyOpsAsync` (for use with [`ForeignKey`](https://docs.rs/butane/latest/butane/struct.ForeignKey.html))
-* `ManyOpsSync` / `ManyOpsAsync` (for use with [`Many`](https://docs.rs/butane/latest/butane/struct.Many.html))
+* [`ForeignKeyOpsSync`](https://docs.rs/butane/latest/butane/prelude/trait.ForeignKeyOpsSync.html) / [`ForeignKeyOpsAsync`](https://docs.rs/butane/latest/butane/prelude_async/trait.ForeignKeyOpsAsync.html) (for use with [`ForeignKey`](https://docs.rs/butane/latest/butane/struct.ForeignKey.html))
+* [`ManyOpsSync`](https://docs.rs/butane/latest/butane/trait.ManyOpsSync.html) / [`ManyOpsAsync`](https://docs.rs/butane/latest/butane/trait.ManyOpsAsync.html) (for use with [`Many`](https://docs.rs/butane/latest/butane/struct.Many.html))
 
 #### ConnectionManager
 The `ConnectionManager` struct has moved from `butane::db::r2` to

@@ -29,7 +29,7 @@ const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
 /// The name of the sqlite backend.
 pub const BACKEND_NAME: &str = "sqlite";
 /// The internal row creation order field name.
-pub const ROW_INSERTION_ORDER_FIELD: &str = "rowid";
+pub const ROW_ID_COLUMN_NAME: &str = "rowid";
 
 #[cfg(feature = "log")]
 fn log_callback(error_code: std::ffi::c_int, message: &str) {
@@ -71,8 +71,8 @@ impl Backend for SQLiteBackend {
         BACKEND_NAME
     }
 
-    fn internal_row_insertion_id_field(&self) -> &'static str {
-        ROW_INSERTION_ORDER_FIELD
+    fn row_id_column(&self) -> Option<&'static str> {
+        Some(ROW_ID_COLUMN_NAME)
     }
 
     fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {

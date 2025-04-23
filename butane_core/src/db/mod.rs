@@ -506,7 +506,13 @@ pub trait Backend: Send + Sync + DynClone {
     /// Butane name for the backend.
     fn name(&self) -> &'static str;
     /// Backend-dependent field name for the database's internal identifier for each row.
-    fn internal_row_insertion_id_field(&self) -> &'static str;
+    ///
+    /// It may be used to sort the rows in the order they were inserted,
+    /// however consult the backend documentation for the exact behavior.
+    /// For example, SQLite uses `rowid` and PostgreSQL uses `ctid`.
+    /// This is not the same as the primary key of the table.
+    /// It may be `None` if the backend does not support this.
+    fn row_id_column(&self) -> Option<&'static str>;
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String>;
     /// Establish a new sync connection.
     ///
@@ -569,8 +575,8 @@ impl Backend for Box<dyn Backend> {
     fn name(&self) -> &'static str {
         self.deref().name()
     }
-    fn internal_row_insertion_id_field(&self) -> &'static str {
-        self.deref().internal_row_insertion_id_field()
+    fn row_id_column(&self) -> Option<&'static str> {
+        self.deref().row_id_column()
     }
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         self.deref().create_migration_sql(current, ops)

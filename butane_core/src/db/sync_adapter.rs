@@ -201,8 +201,8 @@ where
     fn name(&self) -> &'static str {
         self.inner.name()
     }
-    fn internal_row_insertion_id_field(&self) -> &'static str {
-        self.inner.internal_row_insertion_id_field()
+    fn row_id_column(&self) -> Option<&'static str> {
+        self.inner.row_id_column()
     }
     fn create_migration_sql(&self, current: &adb::ADB, ops: Vec<adb::Operation>) -> Result<String> {
         self.inner.create_migration_sql(current, ops)

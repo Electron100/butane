@@ -52,7 +52,7 @@ async fn ordered_schema_field(conn: ConnectionAsync) {
 #[butane_test]
 async fn ordered_by_insertion(conn: ConnectionAsync) {
     let backend = conn.backend();
-    let insertion_id_column = backend.internal_row_insertion_id_field();
+    let insertion_id_column = backend.row_id_column().unwrap();
     blog::setup_blog(&conn).await;
     let posts = query!(Post, published == true)
         .order_asc(insertion_id_column)

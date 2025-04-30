@@ -147,19 +147,21 @@ fn main() {
         base_dir.push(".butane");
     }
 
-    // List any detached migrations.
-    if let Ok(ms) = get_migrations(&base_dir) {
-        if let Ok(detached_migrations) = ms.detached_migration_paths() {
-            if !detached_migrations.is_empty() {
-                eprintln!(
-                    "Ignoring detached migrations. Please delete or manually re-attach these:"
-                );
-                for migration in detached_migrations {
-                    eprintln!("- {migration}");
+    // List any detached migrations only for non-init commands
+    if !matches!(cli.command, Commands::Init(_)) {
+        if let Ok(ms) = get_migrations(&base_dir) {
+            if let Ok(detached_migrations) = ms.detached_migration_paths() {
+                if !detached_migrations.is_empty() {
+                    eprintln!(
+                        "Ignoring detached migrations. Please delete or manually re-attach these:"
+                    );
+                    for migration in detached_migrations {
+                        eprintln!("- {migration}");
+                    }
                 }
-            }
+            };
         };
-    };
+    }
 
     match &cli.command {
         Commands::Init(args) => handle_error(init(

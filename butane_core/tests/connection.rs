@@ -66,7 +66,7 @@ async fn unreachable_pg_connection() {
 async fn debug_connection(conn: ConnectionAsync) {
     let backend_name = conn.backend_name();
 
-    let debug_str = format!("{:?}", conn);
+    let debug_str = format!("{conn:?}");
     if backend_name == "pg" {
         assert!(debug_str.contains("conn: true"));
     } else {

@@ -143,7 +143,7 @@ where
 pub fn sql_select(columns: &[Column], table: &str, w: &mut impl Write) {
     write!(w, "SELECT ").unwrap();
     list_columns(columns, w);
-    write!(w, " FROM {table}").unwrap();
+    write!(w, " FROM {}", quote_reserved_word(table)).unwrap();
 }
 
 pub fn sql_insert_with_placeholders(

@@ -1,11 +1,8 @@
-# Butane Newtype Example
+# Butane reserved table name example
 
-Demonstrates using `derive(FieldType)` for Butane model support on the newtype pattern.
+Demonstrates that model "User" is stored in table "User" which does not conflict
+with PostgreSQL reserved table name "user".
 
 To use this example, build the entire project using `cargo build` in the project root,
-and then run these commands in this directory:
-
-1. Initialise a Sqlite database using `cargo run -p butane_cli init sqlite db.sqlite`
-2. Migrate the new sqlite database using `cargo run -p butane_cli migrate`
-3. Run the commands, such as `cargo run --bin write_post_uuid`
-
+and then run `cargo test` in this example.  See "tests/unmigrate.rs" to see how the
+tests verify the model "User" can be used.

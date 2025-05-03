@@ -18,17 +18,34 @@ use user_table::models::User;
 async fn insert_data(connection: &Connection) {
     use butane::DataObjectOps;
 
+    if connection.backend_name() == "pg" {
+        // This fails because User is a pg internal table.
+        // See https://github.com/Electron100/butane/issues/334
+        connection
+            .execute("SELECT id, email from User")
+            .await
+            .unwrap_err();
+    } else {
+        connection
+            .execute("SELECT id, email from User")
+            .await
+            .unwrap();
+    }
+
+    // This works because the table name is quoted.
+    connection
+        .execute("SELECT id, email from \"User\"")
+        .await
+        .unwrap();
+
     let mut user = User::new("1", "Joe Bloggs", "bloggs@example.com");
-    // TODO: This should fail, but it doesn't.
     user.save(connection).await.unwrap();
 
-    // Check that the user was inserted correctly.
-    // TODO: This fails on pg
     let user = find!(User, id == "1", connection).unwrap();
     assert_eq!(user.name, "Joe Bloggs");
 }
 
-#[butane_test(async, nomigrate)]
+#[test_log::test(butane_test(async, nomigrate))]
 async fn migrate_and_unmigrate_async(mut connection: ConnectionAsync) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");

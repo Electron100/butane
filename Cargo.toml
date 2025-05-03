@@ -12,6 +12,7 @@ members = [
   "examples/newtype",
   "examples/getting_started",
   "examples/getting_started_async",
+  "examples/user-table",
 ]
 
 [workspace.package]

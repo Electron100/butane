@@ -666,11 +666,11 @@ pub fn clean(base_dir: &Path) -> Result<()> {
 
 pub fn get_migrations(base_dir: &Path) -> Result<FsMigrations> {
     let root = base_dir.join("migrations");
-    if !root.is_dir() {
-        eprintln!("No butane migrations directory found. Add at least one model to your project and build.");
-        std::process::exit(1);
+    if root.is_dir() {
+        Ok(migrations::from_root(root))
+    } else {
+        Err(anyhow::Error::new(CliError::NoButaneMigrationsDir))
     }
-    Ok(migrations::from_root(root))
 }
 
 pub fn working_dir_path() -> PathBuf {
@@ -739,9 +739,20 @@ pub fn base_dir() -> PathBuf {
     current_directory
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum CliError {
+    #[error(
+        "No butane migrations directory found. Add at least one model to your project and build."
+    )]
+    NoButaneMigrationsDir,
+}
+
 pub fn handle_error(r: Result<()>) {
     if let Err(e) = r {
-        eprintln!("Encountered unexpected error: {e}");
+        match e.downcast_ref::<CliError>() {
+            Some(e2) => eprintln!("{e2}"),
+            None => eprintln!("Encountered unexpected error: {e}"),
+        }
         std::process::exit(1);
     }
 }

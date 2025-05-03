@@ -54,7 +54,7 @@ serde = { features = ["derive"], workspace = true }
 serde_json = { workspace = true }
 sqlparser = { workspace = true }
 syn = { workspace = true }
-thiserror = "2.0"
+thiserror = { workspace = true }
 uuid = { workspace = true, optional = true }
 
 [dev-dependencies]

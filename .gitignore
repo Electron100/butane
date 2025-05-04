@@ -7,3 +7,4 @@ butane.code_workspace.code-workspace
 .vscode/tasks.json
 db.sqlite
 tmp_pg
+*.db

@@ -55,3 +55,17 @@ impl Post {
         }
     }
 }
+
+/// Model which uses the SQLite reserved word `rowid` as a column name.
+#[model]
+pub struct RowidTest {
+    /// Primary key which uses the sqlite keyword `rowid`.
+    #[pk]
+    pub rowid: i32,
+}
+impl RowidTest {
+    /// Create a new `sqlite_schema` model.
+    pub fn new(rowid: i32) -> Self {
+        RowidTest { rowid }
+    }
+}

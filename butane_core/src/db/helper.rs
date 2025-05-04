@@ -21,6 +21,9 @@ pub trait PlaceholderSource {
 pub fn quote_reserved_word(word: &str) -> Cow<str> {
     if sqlparser::keywords::ALL_KEYWORDS.contains(&word.to_uppercase().as_str()) {
         format!("\"{}\"", word).into()
+    } else if word.to_lowercase() == "sqlite_schema" {
+        // sqlite_schema is a reserved word in SQLite
+        format!("\"{}\"", word).into()
     } else {
         word.into()
     }

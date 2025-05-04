@@ -662,7 +662,10 @@ fn create_table(table: &ATable, allow_exists: bool) -> String {
     }
     format!(
         "CREATE TABLE {}{} (\n{}{}\n) STRICT;",
-        modifier, table.name, coldefs, constraints
+        modifier,
+        helper::quote_reserved_word(&table.name),
+        coldefs,
+        constraints
     )
 }
 

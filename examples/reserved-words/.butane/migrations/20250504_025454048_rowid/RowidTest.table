@@ -1,0 +1,18 @@
+{
+  "name": "RowidTest",
+  "columns": [
+    {
+      "name": "rowid",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Int"
+        }
+      },
+      "nullable": false,
+      "pk": true,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

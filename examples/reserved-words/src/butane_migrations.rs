@@ -383,6 +383,222 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
         "pg": "ALTER TABLE Post_likes_Many DROP CONSTRAINT Post_likes_Many_owner_fkey;\nALTER TABLE Post_likes_Many DROP CONSTRAINT Post_likes_Many_has_fkey;\nDROP TABLE Post_likes_Many;\n",
         "sqlite": "DROP TABLE Post_likes_Many;\n"
       }
+    },
+    "20250504_025454048_rowid": {
+      "name": "20250504_025454048_rowid",
+      "db": {
+        "tables": {
+          "Post": {
+            "name": "Post",
+            "columns": [
+              {
+                "name": "id",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Int"
+                  }
+                },
+                "nullable": false,
+                "pk": true,
+                "auto": true,
+                "unique": false,
+                "default": null
+              },
+              {
+                "name": "title",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Text"
+                  }
+                },
+                "nullable": false,
+                "pk": false,
+                "auto": false,
+                "unique": false,
+                "default": null
+              },
+              {
+                "name": "body",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Text"
+                  }
+                },
+                "nullable": false,
+                "pk": false,
+                "auto": false,
+                "unique": false,
+                "default": null
+              },
+              {
+                "name": "published",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Bool"
+                  }
+                },
+                "nullable": false,
+                "pk": false,
+                "auto": false,
+                "unique": false,
+                "default": null
+              },
+              {
+                "name": "byline",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Text"
+                  }
+                },
+                "nullable": true,
+                "pk": false,
+                "auto": false,
+                "unique": false,
+                "default": null,
+                "reference": {
+                  "Literal": {
+                    "table_name": "User",
+                    "column_name": "id"
+                  }
+                }
+              }
+            ]
+          },
+          "Post_likes_Many": {
+            "name": "Post_likes_Many",
+            "columns": [
+              {
+                "name": "owner",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Int"
+                  }
+                },
+                "nullable": false,
+                "pk": false,
+                "auto": false,
+                "unique": false,
+                "default": null,
+                "reference": {
+                  "Literal": {
+                    "table_name": "Post",
+                    "column_name": "id"
+                  }
+                }
+              },
+              {
+                "name": "has",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Text"
+                  }
+                },
+                "nullable": false,
+                "pk": false,
+                "auto": false,
+                "unique": false,
+                "default": null,
+                "reference": {
+                  "Literal": {
+                    "table_name": "User",
+                    "column_name": "id"
+                  }
+                }
+              }
+            ]
+          },
+          "RowidTest": {
+            "name": "RowidTest",
+            "columns": [
+              {
+                "name": "rowid",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Int"
+                  }
+                },
+                "nullable": false,
+                "pk": true,
+                "auto": false,
+                "unique": false,
+                "default": null
+              }
+            ]
+          },
+          "Sqlite_Schema": {
+            "name": "Sqlite_Schema",
+            "columns": [
+              {
+                "name": "rowid",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Int"
+                  }
+                },
+                "nullable": false,
+                "pk": true,
+                "auto": false,
+                "unique": false,
+                "default": null
+              }
+            ]
+          },
+          "User": {
+            "name": "User",
+            "columns": [
+              {
+                "name": "id",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Text"
+                  }
+                },
+                "nullable": false,
+                "pk": true,
+                "auto": false,
+                "unique": false,
+                "default": null
+              },
+              {
+                "name": "name",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Text"
+                  }
+                },
+                "nullable": false,
+                "pk": false,
+                "auto": false,
+                "unique": false,
+                "default": null
+              },
+              {
+                "name": "email",
+                "sqltype": {
+                  "KnownId": {
+                    "Ty": "Text"
+                  }
+                },
+                "nullable": false,
+                "pk": false,
+                "auto": false,
+                "unique": false,
+                "default": null
+              }
+            ]
+          }
+        },
+        "extra_types": {}
+      },
+      "from": "20250504_002109086_add-many",
+      "up": {
+        "pg": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n);\nCREATE TABLE \"Sqlite_Schema\" (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n);\n",
+        "sqlite": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n) STRICT;\nCREATE TABLE \"Sqlite_Schema\" (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n) STRICT;\n"
+      },
+      "down": {
+        "pg": "DROP TABLE RowidTest;\nDROP TABLE \"Sqlite_Schema\";\n",
+        "sqlite": "DROP TABLE RowidTest;\nDROP TABLE \"Sqlite_Schema\";\n"
+      }
     }
   },
   "current": {
@@ -395,7 +611,7 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
     "up": {},
     "down": {}
   },
-  "latest": "20250504_002109086_add-many"
+  "latest": "20250504_025454048_rowid"
 }"#;
     MemMigrations::from_json(json)
 }

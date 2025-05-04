@@ -4,7 +4,7 @@ use butane::{find, find_async};
 use butane_test_helper::*;
 use butane_test_macros::butane_test;
 
-use user_table::models::{Post, User};
+use reserved_words::models::{Post, RowidTest, User};
 
 #[maybe_async_cfg::maybe(
     sync(),
@@ -67,6 +67,10 @@ async fn insert_data(connection: &Connection) {
             .count(),
         1
     );
+
+    let mut rowid_test = RowidTest::new(5);
+    rowid_test.save(connection).await.unwrap();
+    RowidTest::get(connection, 5).await.unwrap();
 }
 
 #[test_log::test(butane_test(async, nomigrate))]

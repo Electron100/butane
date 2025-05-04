@@ -1,0 +1,43 @@
+{
+  "name": "Post_likes_Many",
+  "columns": [
+    {
+      "name": "owner",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Int"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null,
+      "reference": {
+        "Literal": {
+          "table_name": "Post",
+          "column_name": "id"
+        }
+      }
+    },
+    {
+      "name": "has",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null,
+      "reference": {
+        "Literal": {
+          "table_name": "User",
+          "column_name": "id"
+        }
+      }
+    }
+  ]
+}

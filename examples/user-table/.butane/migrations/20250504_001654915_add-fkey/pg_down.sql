@@ -1,0 +1,2 @@
+ALTER TABLE Post DROP CONSTRAINT Post_byline_fkey;
+DROP TABLE Post;

@@ -4,7 +4,7 @@ has TEXT NOT NULL,
 FOREIGN KEY ("owner") REFERENCES Post("id")
 FOREIGN KEY (has) REFERENCES "Tag"("tag")
 ) STRICT;
-CREATE TABLE Tag (
+CREATE TABLE "Tag" (
 "tag" TEXT NOT NULL PRIMARY KEY
 ) STRICT;
 CREATE TABLE Post__butane_tmp (

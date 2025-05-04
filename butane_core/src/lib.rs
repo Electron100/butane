@@ -316,6 +316,12 @@ pub enum Error {
     #[cfg(feature = "async-adapter")]
     #[error("Crossbeam cannot send/recv, channel disconnected")]
     CrossbeamChannel,
+    #[error("SQLite version {0} is lower than minimum supported {1}")]
+    IncompatibleSQLite(&'static str, i32),
+    #[error("Table \"{0}\" not found in schema definitions")]
+    TableNotFound(String),
+    #[error("Column \"{0}\".\"{1}\" not found in schema definitions")]
+    ColumnNotFound(String, String),
 }
 
 #[cfg(feature = "sqlite")]

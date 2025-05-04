@@ -47,10 +47,10 @@ proc-macro2 = { version = "1.0", default-features = false }
 quote = { version = "1.0", default-features = false }
 r2d2 = "0.8"
 rand = "0.9"
-rusqlite = { version = "0.34", default-features = false }
+rusqlite = { version = "0.35", default-features = false }
 serde = { version = "1.0", default-features = false }
 serde_json = "1.0"
-sqlparser = "0.55"
+sqlparser = "0.56"
 syn = { version = "2", features = ["extra-traits", "full"] }
 tempfile = "3.10"
 thiserror = "2.0"

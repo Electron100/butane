@@ -330,7 +330,7 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       },
       "down": {
         "pg": "ALTER TABLE Post DROP COLUMN likes;\n",
-        "sqlite": "CREATE TABLE Post__butane_tmp (\n\"id\" INTEGER NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished INTEGER NOT NULL,\nblog INTEGER NOT NULL,\nbyline TEXT\n) STRICT;\nINSERT INTO Post__butane_tmp SELECT \"id\", title, body, published, blog, byline FROM Post;\nDROP TABLE Post;\nALTER TABLE Post__butane_tmp RENAME TO Post;\n"
+        "sqlite": "ALTER TABLE Post DROP COLUMN likes;\n"
       }
     },
     "20240115_023841384_dbconstraints": {

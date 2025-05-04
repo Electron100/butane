@@ -60,7 +60,7 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       "from": null,
       "up": {
         "pg": "CREATE TABLE \"User\" (\n\"id\" TEXT NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL,\nemail TEXT NOT NULL\n);\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n);\n",
-        "sqlite": "CREATE TABLE User (\n\"id\" TEXT NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL,\nemail TEXT NOT NULL\n) STRICT;\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n) STRICT;\n"
+        "sqlite": "CREATE TABLE \"User\" (\n\"id\" TEXT NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL,\nemail TEXT NOT NULL\n) STRICT;\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n) STRICT;\n"
       },
       "down": {
         "pg": "DROP TABLE \"User\";\n",
@@ -525,24 +525,6 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
               }
             ]
           },
-          "Sqlite_Schema": {
-            "name": "Sqlite_Schema",
-            "columns": [
-              {
-                "name": "rowid",
-                "sqltype": {
-                  "KnownId": {
-                    "Ty": "Int"
-                  }
-                },
-                "nullable": false,
-                "pk": true,
-                "auto": false,
-                "unique": false,
-                "default": null
-              }
-            ]
-          },
           "User": {
             "name": "User",
             "columns": [
@@ -592,12 +574,12 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       },
       "from": "20250504_002109086_add-many",
       "up": {
-        "pg": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n);\nCREATE TABLE \"Sqlite_Schema\" (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n);\n",
-        "sqlite": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n) STRICT;\nCREATE TABLE \"Sqlite_Schema\" (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n) STRICT;\n"
+        "pg": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n);\n",
+        "sqlite": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n) STRICT;\n"
       },
       "down": {
-        "pg": "DROP TABLE RowidTest;\nDROP TABLE \"Sqlite_Schema\";\n",
-        "sqlite": "DROP TABLE RowidTest;\nDROP TABLE \"Sqlite_Schema\";\n"
+        "pg": "DROP TABLE RowidTest;\n",
+        "sqlite": "DROP TABLE RowidTest;\n"
       }
     }
   },

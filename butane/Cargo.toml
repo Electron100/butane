@@ -15,6 +15,7 @@ build = "build.rs"
 [features]
 async = ["butane_core/async", "butane_codegen/async"]
 async-adapter = ["butane_core/async-adapter"]
+custom-pg = ["butane_core/custom-pg"]
 deadpool = ["dep:deadpool", "async"]
 default = ["datetime", "json", "uuid"]
 fake = ["butane_core/fake"]

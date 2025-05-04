@@ -11,8 +11,9 @@ use std::fmt;
 use chrono::{naive::NaiveDateTime, DateTime};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "pg")]
+#[cfg(feature = "custom-pg")]
 use crate::custom::SqlTypeCustom;
+#[cfg(feature = "custom-pg")]
 use crate::custom::{SqlValCustom, SqlValRefCustom};
 use crate::{DataObject, Error::CannotConvertSqlVal, Result, SqlType};
 
@@ -29,6 +30,7 @@ pub enum SqlValRef<'a> {
     Json(serde_json::Value),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime), // NaiveDateTime is Copy
+    #[cfg(feature = "custom-pg")]
     Custom(SqlValRefCustom<'a>),
 }
 impl SqlValRef<'_> {
@@ -46,7 +48,7 @@ impl SqlValRef<'_> {
             SqlValRef::Blob(_) => Some(SqlType::Blob),
             #[cfg(feature = "json")]
             SqlValRef::Json(_) => Some(SqlType::Json),
-            #[cfg(feature = "pg")]
+            #[cfg(feature = "custom-pg")]
             SqlValRef::Custom(c) => match c {
                 SqlValRefCustom::PgToSql { ty, .. } => {
                     Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone())))
@@ -55,8 +57,6 @@ impl SqlValRef<'_> {
                     Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone())))
                 }
             },
-            #[cfg(not(feature = "pg"))]
-            SqlValRef::Custom(_) => None,
         }
     }
 }
@@ -80,6 +80,7 @@ pub enum SqlVal {
     Json(serde_json::Value),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime),
+    #[cfg(feature = "custom-pg")]
     Custom(Box<SqlValCustom>),
 }
 impl SqlVal {
@@ -165,11 +166,11 @@ impl SqlVal {
             SqlVal::Blob(_) => Some(SqlType::Blob),
             #[cfg(feature = "json")]
             SqlVal::Json(_) => Some(SqlType::Json),
-            #[cfg(feature = "pg")]
+            #[cfg(feature = "custom-pg")]
             SqlVal::Custom(c) => match c.as_ref() {
                 SqlValCustom::Pg { ty, .. } => Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone()))),
             },
-            #[cfg(not(feature = "pg"))]
+            #[cfg(feature = "custom-pg")]
             SqlVal::Custom(_) => None,
         }
     }
@@ -189,6 +190,7 @@ impl fmt::Display for SqlVal {
             Json(val) => f.write_str(val.as_str().unwrap()),
             #[cfg(feature = "datetime")]
             Timestamp(val) => val.format("%+").fmt(f),
+            #[cfg(feature = "custom-pg")]
             Custom(val) => val.fmt(f),
         }
     }
@@ -255,6 +257,7 @@ impl From<SqlValRef<'_>> for SqlVal {
             Json(v) => SqlVal::Json(v),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlVal::Timestamp(v),
+            #[cfg(feature = "custom-pg")]
             Custom(v) => SqlVal::Custom(Box::new(v.into())),
         }
     }
@@ -275,6 +278,7 @@ impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
             Json(v) => SqlValRef::Json(v.to_owned()),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlValRef::Timestamp(*v),
+            #[cfg(feature = "custom-pg")]
             Custom(v) => SqlValRef::Custom(v.as_valref()),
         }
     }

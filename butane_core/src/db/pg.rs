@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::fmt::{Debug, Write};
 
 use async_trait::async_trait;
+#[cfg(feature = "custom-pg")]
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
 use chrono::NaiveDateTime;
@@ -12,6 +13,7 @@ use tokio_postgres::GenericClient;
 
 use super::connmethods::VecRows;
 use super::helper;
+#[cfg(feature = "custom-pg")]
 use crate::custom::{SqlTypeCustom, SqlValRefCustom};
 use crate::db::{
     Backend, BackendConnectionAsync as BackendConnection, BackendRow,
@@ -449,10 +451,12 @@ impl postgres::types::ToSql for SqlValRef<'_> {
             #[cfg(feature = "datetime")]
             Timestamp(dt) => dt.to_sql_checked(requested_ty, out),
             Null => Ok(postgres::types::IsNull::Yes),
+            #[cfg(feature = "custom-pg")]
             Custom(SqlValRefCustom::PgToSql { ty, tosql }) => {
                 check_type_match(ty, requested_ty)?;
                 tosql.to_sql_checked(requested_ty, out)
             }
+            #[cfg(feature = "custom-pg")]
             Custom(SqlValRefCustom::PgBytes { ty, data }) => {
                 check_type_match(ty, requested_ty)?;
                 out.put(*data);
@@ -469,6 +473,7 @@ impl postgres::types::ToSql for SqlValRef<'_> {
     postgres::types::to_sql_checked!();
 }
 
+#[cfg(feature = "custom-pg")]
 fn check_type_match(
     ty1: &postgres::types::Type,
     ty2: &postgres::types::Type,
@@ -505,10 +510,15 @@ impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
             )?)),
             #[cfg(feature = "datetime")]
             Type::TIMESTAMP => Ok(SqlValRef::Timestamp(NaiveDateTime::from_sql(ty, raw)?)),
+            #[cfg(feature = "custom-pg")]
             _ => Ok(SqlValRef::Custom(SqlValRefCustom::PgBytes {
                 ty: ty.clone(),
                 data: raw,
             })),
+            #[cfg(not(feature = "custom-pg"))]
+            _ => Err(Box::new(crate::Error::Internal(format!(
+                "postgres type {ty} not supported"
+            )))),
         }
     }
 
@@ -713,6 +723,7 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
                     SqlType::Blob => Cow::Borrowed("BYTEA"),
                     #[cfg(feature = "json")]
                     SqlType::Json => Cow::Borrowed("JSONB"),
+                    #[cfg(feature = "custom-pg")]
                     SqlType::Custom(c) => match c {
                         SqlTypeCustom::Pg(ref ty) => Cow::Owned(ty.name().to_string()),
                     },
@@ -905,6 +916,7 @@ fn pgtype_for_val(val: &SqlVal) -> postgres::types::Type {
         Some(SqlType::Json) => postgres::types::Type::JSON,
         #[cfg(feature = "datetime")]
         Some(SqlType::Timestamp) => postgres::types::Type::TIMESTAMP,
+        #[cfg(feature = "custom-pg")]
         Some(SqlType::Custom(inner)) => match inner {
             #[cfg(feature = "pg")]
             SqlTypeCustom::Pg(ty, ..) => ty,

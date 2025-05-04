@@ -16,9 +16,6 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
 butane = {workspace = true, features = ["async", "async-adapter", "log"] }
-serde.workspace = true
-serde_json.workspace = true
-uuid = { workspace = true, features = ["serde", "v4"] }
 
 [dev-dependencies]
 butane_cli.workspace = true

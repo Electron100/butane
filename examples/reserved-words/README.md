@@ -1,6 +1,8 @@
-# Butane reserved table name example
+# Butane reserved words example
 
-Demonstrates that model "User" is stored in table "User" which does not conflict
+Demonstrates that reserved words can be used in struct names and member names.
+
+e.g. model "User" is stored in table "User" which does not conflict
 with PostgreSQL reserved table name "user".
 
 To use this example, build the entire project using `cargo build` in the project root,

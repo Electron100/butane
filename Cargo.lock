@@ -1772,11 +1772,8 @@ dependencies = [
  "env_logger",
  "log",
  "paste",
- "serde",
- "serde_json",
  "test-log",
  "tokio",
- "uuid",
 ]
 
 [[package]]

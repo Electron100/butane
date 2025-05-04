@@ -1,11 +1,10 @@
-//! Models for the user-table example.
+//! Models for the reserved-words example.
 
 use butane::{model, AutoPk, ForeignKey, Many};
-use serde::{Deserialize, Serialize};
 
 /// User metadata.
 #[model]
-#[derive(Debug, Default, Deserialize, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
 pub struct User {
     /// User ID.
     pub id: String,
@@ -27,7 +26,7 @@ impl User {
 
 /// Post details, including a [ForeignKey] to [User].
 #[model]
-#[derive(Debug, Default, Deserialize, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
 pub struct Post {
     /// Id of the blog post.
     pub id: AutoPk<i32>,

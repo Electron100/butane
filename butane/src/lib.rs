@@ -8,12 +8,12 @@
 
 pub use butane_codegen::{butane_type, dataresult, model, FieldType, PrimaryKeyType};
 pub use butane_core::custom;
-pub use butane_core::fkey::ForeignKey;
+pub use butane_core::fkey::{ForeignKey, ForeignKeyOpsSync};
 pub use butane_core::many::{Many, ManyOpsSync};
 pub use butane_core::migrations;
 pub use butane_core::query;
 #[cfg(feature = "async")]
-pub use butane_core::{many::ManyOpsAsync, DataObjectOpsAsync};
+pub use butane_core::{fkey::ForeignKeyOpsAsync, many::ManyOpsAsync, DataObjectOpsAsync};
 pub use butane_core::{
     AsPrimaryKey, AutoPk, DataObject, DataObjectOpsSync, DataResult, Error, FieldType, FromSql,
     PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql,

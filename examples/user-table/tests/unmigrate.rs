@@ -4,7 +4,7 @@ use butane::{find, find_async};
 use butane_test_helper::*;
 use butane_test_macros::butane_test;
 
-use user_table::models::User;
+use user_table::models::{Post, User};
 
 #[maybe_async_cfg::maybe(
     sync(),
@@ -12,11 +12,13 @@ use user_table::models::User;
     idents(
         Connection(sync = "Connection", async = "ConnectionAsync"),
         DataObjectOps(sync = "DataObjectOpsSync", async = "DataObjectOpsAsync"),
+        ForeignKeyOps(sync = "ForeignKeyOpsSync", async = "ForeignKeyOpsAsync"),
+        ManyOps(sync = "ManyOpsSync", async = "ManyOpsAsync"),
         find(sync = "find", async = "find_async"),
     )
 )]
 async fn insert_data(connection: &Connection) {
-    use butane::DataObjectOps;
+    use butane::{DataObjectOps, ForeignKeyOps, ManyOps};
 
     if connection.backend_name() == "pg" {
         // This fails because User is a pg internal table.
@@ -43,6 +45,28 @@ async fn insert_data(connection: &Connection) {
 
     let user = find!(User, id == "1", connection).unwrap();
     assert_eq!(user.name, "Joe Bloggs");
+
+    let mut post = Post::new("Hello world", "This is a test");
+    post.byline = Some(user.clone().into());
+    post.save(connection).await.unwrap();
+    post.likes.add(&user.clone()).unwrap();
+    post.likes.save(connection).await.unwrap();
+
+    let post = Post::get(connection, 1).await.unwrap();
+    assert_eq!(post.title, "Hello world");
+    assert_eq!(
+        post.byline.unwrap().load(connection).await.unwrap().name,
+        "Joe Bloggs"
+    );
+    assert_eq!(
+        post.likes
+            .load(connection)
+            .await
+            .unwrap()
+            .into_iter()
+            .count(),
+        1
+    );
 }
 
 #[test_log::test(butane_test(async, nomigrate))]

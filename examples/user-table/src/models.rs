@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// User metadata.
 #[model]
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Clone, Serialize)]
 pub struct User {
     /// User ID.
     pub id: String,
@@ -27,6 +27,7 @@ impl User {
 
 /// Post details, including a [ForeignKey] to [User].
 #[model]
+#[derive(Debug, Default, Deserialize, Clone, Serialize)]
 pub struct Post {
     /// Id of the blog post.
     pub id: AutoPk<i32>,
@@ -43,11 +44,11 @@ pub struct Post {
 }
 impl Post {
     /// Create a new Post.
-    pub fn new(title: String, body: String) -> Self {
+    pub fn new(title: &str, body: &str) -> Self {
         Post {
             id: AutoPk::uninitialized(),
-            title,
-            body,
+            title: title.to_string(),
+            body: body.to_string(),
             published: false,
             byline: None,
             likes: Many::default(),

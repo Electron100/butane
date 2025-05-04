@@ -240,9 +240,16 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
             SqlType::Timestamp => {
                 SqlVal::Timestamp(chrono::DateTime::from_timestamp(0, 0).unwrap().naive_utc())
             }
+            #[cfg(feature = "custom-pg")]
             SqlType::Custom(_) => return Err(Error::NoCustomDefault),
         },
-        TypeIdentifier::Name(_) => return Err(Error::NoCustomDefault),
+        TypeIdentifier::Name(_) => {
+            // TODO: fixme
+            #[cfg(feature = "custom-pg")]
+            return Err(Error::NoCustomDefault);
+            #[cfg(not(feature = "custom-pg"))]
+            return Err(Error::NotInitialized);
+        }
     })
 }
 
@@ -307,6 +314,7 @@ pub fn sql_literal_value(val: &SqlVal) -> Result<String> {
         Json(val) => Ok(format!("{val}")),
         #[cfg(feature = "datetime")]
         Timestamp(ndt) => Ok(ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string()),
+        #[cfg(feature = "custom-pg")]
         Custom(val) => Err(Error::LiteralForCustomUnsupported(*(*val).clone())),
     }
 }

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
 
 pub mod codegen;
+#[cfg(feature = "custom-pg")]
 pub mod custom;
 pub mod db;
 pub mod fkey;
@@ -25,6 +26,7 @@ mod autopk;
 mod util;
 
 pub use autopk::AutoPk;
+#[cfg(feature = "custom-pg")]
 use custom::SqlTypeCustom;
 use db::{BackendRow, Column, ConnectionMethods};
 pub use query::Query;
@@ -266,14 +268,18 @@ pub enum Error {
     CannotResolveType(String),
     #[error("Auto fields are only supported for integer fields. {0} cannot be auto.")]
     InvalidAuto(String),
+    #[cfg(feature = "custom-pg")]
     #[error("No implicit default available for custom sql types.")]
     NoCustomDefault,
     #[error("No enum variant named '{0}'")]
     UnknownEnumVariant(String),
+    #[cfg(feature = "custom-pg")]
     #[error("Backend {1} is not compatible with custom SqlVal {0:?}")]
     IncompatibleCustom(custom::SqlValCustom, &'static str),
+    #[cfg(feature = "custom-pg")]
     #[error("Backend {1} is not compatible with custom SqlType {0:?}")]
     IncompatibleCustomT(custom::SqlTypeCustom, &'static str),
+    #[cfg(feature = "custom-pg")]
     #[error("Literal values for custom types are currently unsupported.")]
     LiteralForCustomUnsupported(custom::SqlValCustom),
     #[error("This DataObject doesn't support determining whether it has been saved.")]
@@ -369,6 +375,7 @@ pub enum SqlType {
     #[cfg(feature = "json")]
     /// JSON
     Json,
+    #[cfg(feature = "custom-pg")]
     /// Custom SQL type
     Custom(SqlTypeCustom),
 }
@@ -386,6 +393,7 @@ impl std::fmt::Display for SqlType {
             Blob => "blob",
             #[cfg(feature = "json")]
             Json => "json",
+            #[cfg(feature = "custom-pg")]
             Custom(_) => "custom",
         }
         .fmt(f)

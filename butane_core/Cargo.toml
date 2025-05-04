@@ -12,6 +12,7 @@ repository.workspace = true
 [features]
 async-adapter = ["async", "crossbeam-channel"]
 async = ["tokio"]
+custom-pg = ["pg"]
 datetime = ["chrono", "tokio-postgres?/with-chrono-0_4"]
 debug = ["log", "maybe-async-cfg/debug"]
 fake = ["dep:fake", "rand"]

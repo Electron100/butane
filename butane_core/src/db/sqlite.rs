@@ -215,7 +215,7 @@ impl BackendConnection for SQLiteConnection {
 impl ConnectionMethods for rusqlite::Connection {
     fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
-            debug!("execute sql {}", sql);
+            debug!("execute sql {sql}");
         }
         self.execute_batch(sql.as_ref())?;
         Ok(())
@@ -261,9 +261,9 @@ impl ConnectionMethods for rusqlite::Connection {
             helper::sql_offset(offset, &mut sqlquery)
         }
 
-        debug!("query sql {}", sqlquery);
+        debug!("query sql {sqlquery}");
         #[cfg(feature = "debug")]
-        debug!("values {:?}", values);
+        debug!("values {values:?}");
 
         let stmt = self.prepare(&sqlquery)?;
         let adapter = QueryAdapter::new(stmt, rusqlite::params_from_iter(values))?;
@@ -284,16 +284,16 @@ impl ConnectionMethods for rusqlite::Connection {
             &mut sql,
         );
         if cfg!(feature = "log") {
-            debug!("insert sql {}", sql);
+            debug!("insert sql {sql}");
             #[cfg(feature = "debug")]
-            debug!("values {:?}", values);
+            debug!("values {values:?}");
         }
         self.execute(&sql, rusqlite::params_from_iter(values))?;
         let pk: SqlVal = self.query_row_and_then(
             &format!(
                 "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
-                pkcol.name(),
-                table
+                helper::quote_reserved_word(pkcol.name()),
+                helper::quote_reserved_word(table),
             ),
             [],
             |row| sql_val_from_rusqlite(row.get_ref_unwrap(0), pkcol),
@@ -309,9 +309,9 @@ impl ConnectionMethods for rusqlite::Connection {
             &mut sql,
         );
         if cfg!(feature = "log") {
-            debug!("insert sql {}", sql);
+            debug!("insert sql {sql}");
             #[cfg(feature = "debug")]
-            debug!("values {:?}", values);
+            debug!("values {values:?}");
         }
         self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(())
@@ -346,9 +346,9 @@ impl ConnectionMethods for rusqlite::Connection {
         );
         let placeholder_values = [values, &[pk]].concat();
         if cfg!(feature = "log") {
-            debug!("update sql {}", sql);
+            debug!("update sql {sql}");
             #[cfg(feature = "debug")]
-            debug!("placeholders {:?}", placeholder_values);
+            debug!("placeholders {placeholder_values:?}");
         }
         self.execute(&sql, rusqlite::params_from_iter(placeholder_values))?;
         Ok(())
@@ -369,9 +369,9 @@ impl ConnectionMethods for rusqlite::Connection {
             &mut sql,
         );
         if cfg!(feature = "log") {
-            debug!("delete where sql {}", sql);
+            debug!("delete where sql {sql}");
             #[cfg(feature = "debug")]
-            debug!("placeholders {:?}", values);
+            debug!("placeholders {values:?}");
         }
         let cnt = self.execute(&sql, rusqlite::params_from_iter(values))?;
         Ok(cnt)
@@ -662,7 +662,10 @@ fn create_table(table: &ATable, allow_exists: bool) -> String {
     }
     format!(
         "CREATE TABLE {}{} (\n{}{}\n) STRICT;",
-        modifier, table.name, coldefs, constraints
+        modifier,
+        helper::quote_reserved_word(&table.name),
+        coldefs,
+        constraints
     )
 }
 

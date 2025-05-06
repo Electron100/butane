@@ -1,0 +1,10 @@
+{
+  "from_name": "20250503_065948927_init",
+  "table_bases": {
+    "User": "20250503_065948927_init"
+  },
+  "backends": [
+    "sqlite",
+    "pg"
+  ]
+}

@@ -1,5 +1,5 @@
 [package]
-name = "newtype"
+name = "reserved-words"
 version = "0.1.0"
 edition.workspace = true
 license = "MIT OR Apache-2.0"
@@ -15,21 +15,18 @@ sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]
 
 [dependencies]
-butane = {workspace = true, features = ["async", "async-adapter"] }
-garde = { version = "0.22", features = ["derive"] }
-serde.workspace = true
-serde_json.workspace = true
-uuid = { workspace = true, features = ["serde", "v4"] }
+butane = {workspace = true, features = ["async", "async-adapter", "log"] }
 
 [dev-dependencies]
 butane_cli.workspace = true
-butane_core.workspace = true
+butane_core = { workspace = true, features = ["log"] }
 butane_test_helper = { workspace = true, default-features = false, features = ["sqlite", "pg"] }
 butane_test_macros.workspace = true
 cfg-if.workspace = true
 env_logger.workspace = true
 log.workspace = true
 paste.workspace = true
+test-log = { version = "0.2", features = ["log", "trace"] }
 tokio = { workspace = true, features = ["macros"] }
 
 [package.metadata.release]

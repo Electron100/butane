@@ -1,0 +1,11 @@
+{
+  "from_name": "20250504_001654915_add-fkey",
+  "table_bases": {
+    "Post": "20250504_001654915_add-fkey",
+    "User": "20250503_065948927_init"
+  },
+  "backends": [
+    "sqlite",
+    "pg"
+  ]
+}

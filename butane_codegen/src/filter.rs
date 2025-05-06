@@ -19,9 +19,8 @@ pub fn handle_expr(fields: &impl ToTokens, expr: &Expr) -> TokenStream2 {
         _ => {
             let lit = LitStr::new(
                 &format!(
-                    "Unsupported filter expression '{}' \ndebug info: {:?}",
+                    "Unsupported filter expression '{}' \ndebug info: {expr:?}",
                     expr.clone().into_token_stream(),
-                    expr
                 ),
                 Span::call_site(),
             );

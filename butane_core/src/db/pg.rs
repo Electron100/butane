@@ -164,7 +164,7 @@ where
 {
     async fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
-            debug!("execute sql {}", sql);
+            debug!("execute sql {sql}");
         }
         // Note, let binding exists only so that the self.client() reference is not held across the await
         let future = self.client()?.batch_execute(sql.as_ref());
@@ -207,7 +207,7 @@ where
         }
 
         if cfg!(feature = "log") {
-            debug!("query sql {}", sqlquery);
+            debug!("query sql {sqlquery}");
         }
 
         let types: Vec<postgres::types::Type> = values.iter().map(pgtype_for_val).collect();
@@ -242,7 +242,7 @@ where
         );
         write!(&mut sql, " RETURNING {}", pkcol.name()).unwrap();
         if cfg!(feature = "log") {
-            debug!("insert sql {}", sql);
+            debug!("insert sql {sql}");
         }
 
         // use query instead of execute so we can get our result back
@@ -312,7 +312,7 @@ where
             .map(|v| v as &DynToSqlPg)
             .collect();
         if cfg!(feature = "log") {
-            debug!("update sql {}", sql);
+            debug!("update sql {sql}");
         }
         let future = self.client()?.execute(sql.as_str(), params.as_slice());
         future.await?;

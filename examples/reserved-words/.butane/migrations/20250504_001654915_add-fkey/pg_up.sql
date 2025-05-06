@@ -1,0 +1,8 @@
+CREATE TABLE Post (
+"id" SERIAL NOT NULL PRIMARY KEY,
+title TEXT NOT NULL,
+body TEXT NOT NULL,
+published BOOLEAN NOT NULL,
+byline TEXT
+);
+ALTER TABLE Post ADD FOREIGN KEY (byline) REFERENCES "User"("id");

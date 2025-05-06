@@ -8,6 +8,61 @@ async fn connection_not_closed(conn: ConnectionAsync) {
 }
 
 #[test]
+fn connection_uri_sqlite() {
+    let spec = ConnectionSpec::try_from("sqlite://foo.db").unwrap();
+    assert_eq!(spec.backend_name, "sqlite".to_string());
+    assert_eq!(spec.conn_str, "foo.db".to_string());
+}
+
+#[test]
+fn connection_uri_pg() {
+    let uri = "postgres://user:pass@localhost:1234/dbname";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name, "pg".to_string());
+    assert_eq!(spec.conn_str, uri.to_string());
+}
+
+#[test]
+fn connection_uri_other() {
+    let spec = ConnectionSpec::try_from("other://anything").unwrap();
+    assert_eq!(spec.backend_name, "other".to_string());
+    assert_eq!(spec.conn_str, "other://anything".to_string());
+}
+
+#[test]
+fn connection_uri_other_alt() {
+    let spec = ConnectionSpec::try_from("other:anything").unwrap();
+    assert_eq!(spec.backend_name, "other".to_string());
+    assert_eq!(spec.conn_str, "other:anything".to_string());
+}
+
+/// Test the connection URI for PostgreSQL is accepted by the pg backend.
+///
+/// This test doesnt actually connect to a database, it just checks that the connection URI
+/// is accepted by the pg backend and the error is the same as the error returned by the
+/// connection logic for a failed connection to a "host=.. user=.." style connection string.
+#[tokio::test]
+async fn connect_uri_pg() {
+    let uri = "postgres://user:pass@localhost:1234/dbname";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name, "pg".to_string());
+
+    let result = connect_async(&spec).await;
+    assert!(matches!(result, Err(butane_core::Error::Postgres(_))));
+    match result {
+        Err(butane_core::Error::Postgres(e)) => {
+            assert!(format!("{e:?}").contains("Connect"));
+            eprintln!("{e}");
+            #[cfg(target_os = "windows")]
+            assert!(format!("{e}").contains("No such host is known"));
+            #[cfg(not(target_os = "windows"))]
+            assert!(format!("{e}").ends_with("Connection refused (os error 61)"));
+        }
+        _ => panic!(),
+    }
+}
+
+#[test]
 fn persist_invalid_connection_backend() {
     let spec = ConnectionSpec::new("unknown_name", "foo://bar");
     assert_eq!(spec.backend_name, "unknown_name".to_string());
@@ -53,10 +108,13 @@ async fn unreachable_pg_connection() {
     match result {
         Err(butane_core::Error::Postgres(e)) => {
             assert!(format!("{e:?}").contains("Connect"));
+            eprintln!("{e}");
             #[cfg(target_os = "windows")]
             assert!(format!("{e}").contains("No such host is known"));
             #[cfg(not(target_os = "windows"))]
-            assert!(format!("{e}").contains("failed to lookup address information"));
+            assert!(format!("{e}").ends_with(
+                "failed to lookup address information: nodename nor servname provided, or not known"
+            ));
         }
         _ => panic!(),
     }

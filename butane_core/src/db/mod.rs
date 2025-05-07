@@ -562,6 +562,44 @@ impl ConnectionSpec {
     }
 }
 
+impl TryFrom<&str> for ConnectionSpec {
+    type Error = crate::Error;
+    fn try_from(value: &str) -> Result<Self> {
+        let parsed = fluent_uri::Uri::parse(value)?;
+        if parsed.scheme().as_str() == "sqlite" {
+            let path = value.trim_start_matches("sqlite://");
+            Ok(ConnectionSpec {
+                backend_name: "sqlite".to_string(),
+                conn_str: path.to_string(),
+            })
+        } else if ["postgres", "postgresql"].contains(&parsed.scheme().as_str()) {
+            Ok(ConnectionSpec {
+                backend_name: "pg".to_string(),
+                conn_str: value.to_string(),
+            })
+        } else {
+            Ok(ConnectionSpec {
+                backend_name: parsed.scheme().to_string(),
+                conn_str: value.to_string(),
+            })
+        }
+    }
+}
+
+impl TryFrom<String> for ConnectionSpec {
+    type Error = crate::Error;
+    fn try_from(value: String) -> Result<Self> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl TryFrom<&String> for ConnectionSpec {
+    type Error = crate::Error;
+    fn try_from(value: &String) -> Result<Self> {
+        Self::try_from(value.as_str())
+    }
+}
+
 fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
     if path.is_dir() {
         Cow::from(path.join("connection.json"))

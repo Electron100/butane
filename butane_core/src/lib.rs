@@ -256,6 +256,8 @@ pub enum Error {
     AlreadyInitialized,
     #[error("Migration error {0}")]
     MigrationError(String),
+    #[error("URI parse error {0}")]
+    UriParse(#[from] url::ParseError),
     #[error("Unknown backend {0}")]
     UnknownBackend(String),
     #[error("Range error")]

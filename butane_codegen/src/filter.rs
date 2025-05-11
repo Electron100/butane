@@ -65,14 +65,21 @@ fn handle_call(fields: &impl ToTokens, mcall: &ExprMethodCall) -> TokenStream2 {
         _ => (),
     };
     match method.as_str() {
-        "matches" => handle_in(fields, &mcall.receiver, mcall.args.first().unwrap()),
+        "matches" => handle_matches(fields, &mcall.receiver, mcall.args.first().unwrap()),
         "contains" => handle_contains(fields, &mcall.receiver, mcall.args.first().unwrap()),
         "like" => handle_like(fields, &mcall.receiver, mcall.args.first().unwrap()),
+        "is_in" => handle_in(fields, &mcall.receiver, mcall.args.iter()),
         _ => make_compile_error!("Unknown method call {}", method),
     }
 }
 
-fn handle_in(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStream2 {
+fn handle_in<'a>(fields: &impl ToTokens, receiver: &Expr, exprs: impl Iterator<Item = &'a Expr>) -> TokenStream2 {
+    let fex = fieldexpr(fields, receiver);
+    let exprs_tokens = exprs.map(|expr| handle_expr(fields, expr));
+    quote!(#fex.inn(vec![#(butane::ToSql::to_sql(#exprs_tokens)),*]))
+}
+
+fn handle_matches(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStream2 {
     let fex = fieldexpr(fields, receiver);
     if let Expr::Lit(lit) = expr {
         // treat this as matching the primary key

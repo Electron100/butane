@@ -54,7 +54,7 @@ async fn connect_uri_pg() {
             assert!(format!("{e:?}").contains("Connect"));
             eprintln!("{e}");
             #[cfg(target_os = "windows")]
-            assert!(format!("{e}").contains("No such host is known"));
+            assert!(format!("{e}").contains("error connecting to server"));
             #[cfg(not(target_os = "windows"))]
             assert!(format!("{e}").contains("Connection refused (os error "));
         }
@@ -112,7 +112,7 @@ async fn unreachable_pg_connection() {
             #[cfg(target_os = "windows")]
             assert!(format!("{e}").contains("No such host is known"));
             #[cfg(not(target_os = "windows"))]
-            assert!(format!("{e}").contains("error connecting to server: "));
+            assert!(format!("{e}").contains("failed to lookup address information"));
         }
         _ => panic!(),
     }

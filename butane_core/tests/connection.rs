@@ -112,7 +112,7 @@ async fn unreachable_pg_connection() {
             #[cfg(target_os = "windows")]
             assert!(format!("{e}").contains("No such host is known"));
             #[cfg(not(target_os = "windows"))]
-            assert!(format!("{e}").contains("failed to lookup address information: "));
+            assert!(format!("{e}").contains("error connecting to server: "));
         }
         _ => panic!(),
     }

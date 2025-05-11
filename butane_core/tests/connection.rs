@@ -56,7 +56,7 @@ async fn connect_uri_pg() {
             #[cfg(target_os = "windows")]
             assert!(format!("{e}").contains("No such host is known"));
             #[cfg(not(target_os = "windows"))]
-            assert!(format!("{e}").ends_with("Connection refused (os error 61)"));
+            assert!(format!("{e}").contains("Connection refused (os error "));
         }
         _ => panic!(),
     }
@@ -112,9 +112,7 @@ async fn unreachable_pg_connection() {
             #[cfg(target_os = "windows")]
             assert!(format!("{e}").contains("No such host is known"));
             #[cfg(not(target_os = "windows"))]
-            assert!(format!("{e}").ends_with(
-                "failed to lookup address information: nodename nor servname provided, or not known"
-            ));
+            assert!(format!("{e}").contains("failed to lookup address information: "));
         }
         _ => panic!(),
     }

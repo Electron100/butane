@@ -565,14 +565,14 @@ impl ConnectionSpec {
 impl TryFrom<&str> for ConnectionSpec {
     type Error = crate::Error;
     fn try_from(value: &str) -> Result<Self> {
-        let parsed = fluent_uri::Uri::parse(value)?;
-        if parsed.scheme().as_str() == "sqlite" {
+        let parsed = url::Url::parse(value)?;
+        if parsed.scheme() == "sqlite" {
             let path = value.trim_start_matches("sqlite://");
             Ok(ConnectionSpec {
                 backend_name: "sqlite".to_string(),
                 conn_str: path.to_string(),
             })
-        } else if ["postgres", "postgresql"].contains(&parsed.scheme().as_str()) {
+        } else if ["postgres", "postgresql"].contains(&parsed.scheme()) {
             Ok(ConnectionSpec {
                 backend_name: "pg".to_string(),
                 conn_str: value.to_string(),

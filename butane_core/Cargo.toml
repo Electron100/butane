@@ -33,7 +33,6 @@ dyn-clone = { version = "1.0" }
 fake = { workspace = true, optional = true }
 fallible-iterator = "0.3"
 fallible-streaming-iterator = "0.1"
-fluent-uri.workspace = true
 fs2 = "0.4" # for file locks
 futures-util = "0.3"
 hex = "0.4"
@@ -56,6 +55,7 @@ serde_json = { workspace = true }
 sqlparser = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
+url.workspace = true
 uuid = { workspace = true, optional = true }
 
 [dev-dependencies]

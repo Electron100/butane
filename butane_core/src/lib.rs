@@ -257,7 +257,7 @@ pub enum Error {
     #[error("Migration error {0}")]
     MigrationError(String),
     #[error("URI parse error {0}")]
-    UriParse(#[from] fluent_uri::error::ParseError),
+    UriParse(#[from] url::ParseError),
     #[error("Unknown backend {0}")]
     UnknownBackend(String),
     #[error("Range error")]

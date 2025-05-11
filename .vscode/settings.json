@@ -3,5 +3,6 @@
         "*.table": "json"
     },
     "makefile.buildBeforeLaunch": false,
-    "makefile.configureOnOpen": false
+    "makefile.configureOnOpen": false,
+    "rust-analyzer.cargo.features": "all",
 }

@@ -5,7 +5,7 @@ use std::fmt::{Debug, Write};
 use async_trait::async_trait;
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
-use chrono::{NaiveDateTime, NaiveDate};
+use chrono::{NaiveDate, NaiveDateTime};
 use futures_util::stream::StreamExt;
 use tokio_postgres as postgres;
 use tokio_postgres::GenericClient;

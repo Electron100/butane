@@ -9,7 +9,7 @@ use std::sync::Once;
 
 use async_trait::async_trait;
 #[cfg(feature = "datetime")]
-use chrono::naive::{NaiveDateTime, NaiveDate};
+use chrono::naive::{NaiveDate, NaiveDateTime};
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use pin_project::pin_project;
 

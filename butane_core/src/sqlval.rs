@@ -8,7 +8,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
 #[cfg(feature = "datetime")]
-use chrono::{naive::{NaiveDate, NaiveDateTime}, DateTime};
+use chrono::{
+    naive::{NaiveDate, NaiveDateTime},
+    DateTime,
+};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "pg")]

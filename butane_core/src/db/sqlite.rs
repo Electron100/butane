@@ -26,6 +26,9 @@ use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
 
+/// The minimum SQLite version required by this backend.
+pub const SQLITE_MIN_VERSION: i32 = 3035000;
+
 /// The name of the sqlite backend.
 pub const BACKEND_NAME: &str = "sqlite";
 /// The internal row creation order field name.
@@ -113,6 +116,12 @@ pub struct SQLiteConnection {
 }
 impl SQLiteConnection {
     fn open(path: impl AsRef<Path>) -> Result<Self> {
+        if rusqlite::version_number() < SQLITE_MIN_VERSION {
+            return Err(Error::IncompatibleSQLite(
+                rusqlite::version(),
+                SQLITE_MIN_VERSION,
+            ));
+        }
         #[cfg(feature = "log")]
         static INIT_SQLITE_LOGGING: Once = Once::new();
 
@@ -643,7 +652,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::RemoveTable(name) => Ok(drop_table(name)),
         Operation::RemoveTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
-        Operation::RemoveColumn(tbl, name) => Ok(remove_column(current, tbl, name)),
+        Operation::RemoveColumn(tbl, name) => remove_column(current, tbl, name),
         Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new))),
     }
 }
@@ -769,21 +778,24 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     ))
 }
 
-fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> String {
-    let old = current
+fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String> {
+    let current_clone = current.clone();
+    let table = current_clone
         .get_table(tbl_name)
-        .and_then(|table| table.column(name))
-        .cloned();
-    match old {
-        Some(col) => change_column(current, tbl_name, &col, None),
-        None => {
-            crate::warn!(
-                "Cannot remove column {} that does not exist from table {}",
-                name,
-                tbl_name
-            );
-            "".to_string()
-        }
+        .ok_or_else(|| Error::TableNotFound(tbl_name.to_string()))?;
+    let col = table
+        .column(name)
+        .ok_or_else(|| Error::ColumnNotFound(tbl_name.to_string(), name.to_string()))?;
+    // "ALTER TABLE b DROP COLUMN fkey;" fails due to sqlite not being
+    // able to remove the attached constraint.
+    if col.reference().is_some() {
+        Ok(change_column(current, tbl_name, col, None))
+    } else {
+        Ok(format!(
+            "ALTER TABLE {} DROP COLUMN {};",
+            helper::quote_reserved_word(tbl_name),
+            helper::quote_reserved_word(name),
+        ))
     }
 }
 

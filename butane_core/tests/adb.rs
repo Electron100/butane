@@ -286,9 +286,6 @@ async fn add_table_fkey_delete_column(conn: ConnectionAsync) {
     conn.execute("SELECT * from a").await.unwrap();
     conn.execute("SELECT * from b").await.unwrap();
 
-    // "ALTER TABLE b DROP COLUMN fkey;" fails due to sqlite not being
-    // able to remove the attached constraint, however the RemoveColumn
-    // operation already recreates the table, so this works.
     let remove_column_op = Operation::RemoveColumn("b".to_owned(), "fkey".to_owned());
     let sql = backend
         .create_migration_sql(&new, vec![remove_column_op])

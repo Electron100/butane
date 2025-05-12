@@ -5,7 +5,7 @@ use std::fmt::{Debug, Write};
 use async_trait::async_trait;
 use bytes::BufMut;
 #[cfg(feature = "datetime")]
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, NaiveDate};
 use futures_util::stream::StreamExt;
 use tokio_postgres as postgres;
 use tokio_postgres::GenericClient;
@@ -505,6 +505,8 @@ impl<'a> postgres::types::FromSql<'a> for SqlValRef<'a> {
             Type::JSONB => Ok(SqlValRef::Json(postgres::types::FromSql::from_sql(
                 ty, raw,
             )?)),
+            #[cfg(feature = "datetime")]
+            Type::DATE => Ok(SqlValRef::Date(NaiveDate::from_sql(ty, raw)?)),
             #[cfg(feature = "datetime")]
             Type::TIMESTAMP => Ok(SqlValRef::Timestamp(NaiveDateTime::from_sql(ty, raw)?)),
             _ => Ok(SqlValRef::Custom(SqlValRefCustom::PgBytes {

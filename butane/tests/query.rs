@@ -1,6 +1,6 @@
 use butane::db::{Connection, ConnectionAsync};
 use butane::query::BoolExpr;
-use butane::{colname, filter, find, find_async, query, Many};
+use butane::{colname, filter, find, find_async, model, query, AutoPk, Many, SqlVal};
 use butane_test_helper::*;
 use butane_test_macros::butane_test;
 #[cfg(feature = "datetime")]
@@ -276,4 +276,33 @@ async fn offset(conn: ConnectionAsync) {
     assert_eq!(posts.len(), 2);
     assert_eq!(posts[0].title, "Sir Charles");
     assert_eq!(posts[1].title, "The Tiger");
+}
+
+#[model]
+#[derive(PartialEq, Debug)]
+struct HasAutopk {
+    id: AutoPk<i64>,
+    text: String,
+}
+impl HasAutopk {
+    fn new(text: &str) -> Self {
+        HasAutopk {
+            id: AutoPk::default(),
+            text: text.to_string(),
+        }
+    }
+}
+
+#[butane_test]
+async fn query_autopk_by_integer(conn: ConnectionAsync) {
+    let mut val1: HasAutopk = HasAutopk::new("first");
+    let mut val2 = HasAutopk::new("second");
+    val1.save(&conn).await.unwrap();
+    val2.save(&conn).await.unwrap();
+    assert_eq!(
+        HasAutopk::fields().id().eq(&1i64),
+        BoolExpr::Eq("id", butane::query::Expr::Val(SqlVal::BigInt(1)))
+    );
+    let query_results = query!(HasAutopk, id == 1).load(&conn).await.unwrap();
+    assert_eq!(&val1, query_results.first().unwrap());
 }

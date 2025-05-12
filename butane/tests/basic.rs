@@ -6,7 +6,7 @@ use butane::{butane_type, find, find_async, model, query, AutoPk, ForeignKey};
 use butane_test_helper::*;
 use butane_test_macros::butane_test;
 #[cfg(feature = "datetime")]
-use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
+use chrono::{naive::{NaiveDate, NaiveDateTime}, offset::Utc, DateTime};
 #[cfg(feature = "sqlite")]
 use rusqlite;
 use std::ops::Deref;
@@ -108,6 +108,7 @@ struct TimeHolder {
     pub naive: NaiveDateTime,
     pub utc: DateTime<Utc>,
     pub when: chrono::DateTime<Utc>,
+    pub date: NaiveDate
 }
 
 #[butane_test]
@@ -383,6 +384,7 @@ async fn basic_time(conn: ConnectionAsync) {
         naive: now.naive_utc(),
         utc: now,
         when: now,
+        date: now.date_naive(),
     };
     time.save(&conn).await.unwrap();
 
@@ -392,6 +394,8 @@ async fn basic_time(conn: ConnectionAsync) {
     } else {
         assert_eq!(time.utc.timestamp_micros(), time2.utc.timestamp_micros());
     }
+
+    assert_eq!(time.date, time2.date);
 }
 
 #[butane_test]

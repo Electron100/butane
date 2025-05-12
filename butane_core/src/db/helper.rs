@@ -308,7 +308,7 @@ pub fn sql_literal_value(val: &SqlVal) -> Result<String> {
         #[cfg(feature = "json")]
         Json(val) => Ok(format!("{val}")),
         #[cfg(feature = "datetime")]
-        Date(val) => Ok(format!("'{}'", val.format("'%Y-%m-%d'").to_string())),
+        Date(val) => Ok(format!("'{}'", val.format("'%Y-%m-%d'"))),
         #[cfg(feature = "datetime")]
         Timestamp(ndt) => Ok(ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string()),
         Custom(val) => Err(Error::LiteralForCustomUnsupported(*(*val).clone())),

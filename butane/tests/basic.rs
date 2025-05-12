@@ -398,6 +398,28 @@ async fn basic_time(conn: ConnectionAsync) {
     assert_eq!(time.date, time2.date);
 }
 
+#[cfg(feature = "datetime")]
+#[model]
+#[derive(Debug, Default, PartialEq, Clone)]
+struct TimeHolderWithDatePk {
+    pub id: NaiveDate,
+}
+
+#[cfg(feature = "datetime")]
+#[butane_test]
+async fn date_as_pk(conn: ConnectionAsync) {
+    let now = Utc::now();
+
+    let mut holder = TimeHolderWithDatePk {
+        id: now.date_naive(),
+    };
+    holder.save(&conn).await.unwrap();
+
+    let holder2 = TimeHolderWithDatePk::get(&conn, now.date_naive()).await.unwrap();
+
+    assert_eq!(holder.id, holder2.id);
+}
+
 #[butane_test]
 async fn basic_load_first(conn: ConnectionAsync) {
     //create

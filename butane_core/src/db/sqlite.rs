@@ -9,7 +9,7 @@ use std::sync::Once;
 
 use async_trait::async_trait;
 #[cfg(feature = "datetime")]
-use chrono::naive::NaiveDateTime;
+use chrono::naive::{NaiveDateTime, NaiveDate};
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use pin_project::pin_project;
 
@@ -25,6 +25,9 @@ use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 
 #[cfg(feature = "datetime")]
 const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
+
+#[cfg(feature = "datetime")]
+const SQLITE_DATE_FORMAT: &str = "%Y-%m-%d";
 
 /// The name of the sqlite backend.
 pub const BACKEND_NAME: &str = "sqlite";
@@ -513,6 +516,11 @@ fn sqlvalref_to_sqlite<'a>(valref: &SqlValRef<'a>) -> rusqlite::types::ToSqlOutp
             .map(rusqlite::types::ToSqlOutput::from)
             .unwrap(),
         #[cfg(feature = "datetime")]
+        Date(date) => {
+            let f = date.format(SQLITE_DATE_FORMAT);
+            Owned(Value::Text(f.to_string()))
+        }
+        #[cfg(feature = "datetime")]
         Timestamp(dt) => {
             let f = dt.format(SQLITE_DT_FORMAT);
             Owned(Value::Text(f.to_string()))
@@ -625,6 +633,11 @@ fn sql_valref_from_rusqlite<'a>(
         SqlType::Text => SqlValRef::Text(val.as_str()?),
         #[cfg(feature = "json")]
         SqlType::Json => SqlValRef::Json(serde_json::from_str(val.as_str()?)?),
+        #[cfg(feature = "datetime")]
+        SqlType::Date => SqlValRef::Date(NaiveDate::parse_from_str(
+            val.as_str()?,
+            SQLITE_DATE_FORMAT,
+        )?),
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => SqlValRef::Timestamp(NaiveDateTime::parse_from_str(
             val.as_str()?,
@@ -749,6 +762,8 @@ fn sqltype(ty: &SqlType) -> &'static str {
         SqlType::Blob => "BLOB",
         #[cfg(feature = "json")]
         SqlType::Json => "TEXT",
+        #[cfg(feature = "datetime")]
+        SqlType::Date => "TEXT",
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => "TEXT",
         SqlType::Custom(_) => panic!("Custom types not supported by sqlite backend"),

@@ -240,6 +240,8 @@ pub fn column_default(col: &AColumn) -> Result<SqlVal> {
             SqlType::Timestamp => {
                 SqlVal::Timestamp(chrono::DateTime::from_timestamp(0, 0).unwrap().naive_utc())
             }
+            #[cfg(feature = "datetime")]
+            SqlType::Date => SqlVal::Date(chrono::naive::NaiveDate::from_ymd_opt(1, 1, 1).unwrap()),
             SqlType::Custom(_) => return Err(Error::NoCustomDefault),
         },
         TypeIdentifier::Name(_) => return Err(Error::NoCustomDefault),
@@ -305,6 +307,8 @@ pub fn sql_literal_value(val: &SqlVal) -> Result<String> {
         Blob(val) => Ok(format!("x'{}'", hex::encode_upper(val))),
         #[cfg(feature = "json")]
         Json(val) => Ok(format!("{val}")),
+        #[cfg(feature = "datetime")]
+        Date(val) => Ok(format!("'{}'", val.format("'%Y-%m-%d'").to_string())),
         #[cfg(feature = "datetime")]
         Timestamp(ndt) => Ok(ndt.format("'%Y-%m-%dT%H:%M:%S%.f'").to_string()),
         Custom(val) => Err(Error::LiteralForCustomUnsupported(*(*val).clone())),

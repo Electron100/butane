@@ -377,7 +377,7 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       },
       "down": {
         "pg": "CREATE TABLE Post_tags_Many (\n\"owner\" BYTEA NOT NULL,\nhas TEXT NOT NULL\n);\nCREATE TABLE \"Tag\" (\n\"tag\" TEXT NOT NULL PRIMARY KEY\n);\nALTER TABLE Post DROP COLUMN tags;\nALTER TABLE Post_tags_Many ADD FOREIGN KEY (\"owner\") REFERENCES Post(\"id\");\nALTER TABLE Post_tags_Many ADD FOREIGN KEY (has) REFERENCES \"Tag\"(\"tag\");\n",
-        "sqlite": "CREATE TABLE Post_tags_Many (\n\"owner\" BLOB NOT NULL,\nhas TEXT NOT NULL,\nFOREIGN KEY (\"owner\") REFERENCES Post(\"id\")\nFOREIGN KEY (has) REFERENCES \"Tag\"(\"tag\")\n) STRICT;\nCREATE TABLE \"Tag\" (\n\"tag\" TEXT NOT NULL PRIMARY KEY\n) STRICT;\nCREATE TABLE Post__butane_tmp (\n\"id\" BLOB NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished INTEGER NOT NULL,\nblog BLOB NOT NULL,\nbyline TEXT,\nlikes INTEGER NOT NULL,\nFOREIGN KEY (blog) REFERENCES Blog(\"id\")\n) STRICT;\nINSERT INTO Post__butane_tmp SELECT \"id\", title, body, published, blog, byline, likes FROM Post;\nDROP TABLE Post;\nALTER TABLE Post__butane_tmp RENAME TO Post;\n"
+        "sqlite": "CREATE TABLE Post_tags_Many (\n\"owner\" BLOB NOT NULL,\nhas TEXT NOT NULL,\nFOREIGN KEY (\"owner\") REFERENCES Post(\"id\")\nFOREIGN KEY (has) REFERENCES \"Tag\"(\"tag\")\n) STRICT;\nCREATE TABLE \"Tag\" (\n\"tag\" TEXT NOT NULL PRIMARY KEY\n) STRICT;\nALTER TABLE Post DROP COLUMN tags;\n"
       }
     }
   },

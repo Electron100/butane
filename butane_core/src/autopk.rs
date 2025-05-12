@@ -88,6 +88,16 @@ impl<T: PrimaryKeyType> PartialEq for AutoPk<T> {
     }
 }
 
+impl<T: PrimaryKeyType> PartialEq<T> for AutoPk<T> {
+    fn eq(&self, other: &T) -> bool {
+        if !self.is_valid() || !other.is_valid() {
+            false
+        } else {
+            self.inner.as_ref().eq(&Some(other))
+        }
+    }
+}
+
 impl<T: PrimaryKeyType> FieldType for AutoPk<T> {
     const SQLTYPE: SqlType = T::SQLTYPE;
     /// Reference type. Used for ergonomics with String (which has

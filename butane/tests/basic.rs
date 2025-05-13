@@ -423,7 +423,7 @@ async fn date_as_pk(conn: ConnectionAsync) {
         .await
         .unwrap();
 
-    assert_eq!(holder.id, holder2.id);
+    assert_eq!(holder, holder2);
 }
 
 #[butane_test]

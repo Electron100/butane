@@ -405,7 +405,7 @@ async fn basic_time(conn: ConnectionAsync) {
 #[cfg(feature = "datetime")]
 #[model]
 #[derive(Debug, Default, PartialEq, Clone)]
-struct TimeHolderWithDatePk {
+struct DateHolder {
     pub id: NaiveDate,
 }
 
@@ -414,12 +414,12 @@ struct TimeHolderWithDatePk {
 async fn date_as_pk(conn: ConnectionAsync) {
     let now = Utc::now();
 
-    let mut holder = TimeHolderWithDatePk {
+    let mut holder = DateHolder {
         id: now.date_naive(),
     };
     holder.save(&conn).await.unwrap();
 
-    let holder2 = TimeHolderWithDatePk::get(&conn, now.date_naive())
+    let holder2 = DateHolder::get(&conn, now.date_naive())
         .await
         .unwrap();
 

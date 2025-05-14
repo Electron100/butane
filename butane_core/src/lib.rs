@@ -370,6 +370,9 @@ pub enum SqlType {
     /// String
     Text,
     #[cfg(feature = "datetime")]
+    /// Date
+    Date,
+    #[cfg(feature = "datetime")]
     /// Timestamp
     Timestamp,
     /// Blob
@@ -389,6 +392,8 @@ impl std::fmt::Display for SqlType {
             BigInt => "big int",
             Real => "float",
             Text => "string",
+            #[cfg(feature = "datetime")]
+            Date => "date",
             #[cfg(feature = "datetime")]
             Timestamp => "timestamp",
             Blob => "blob",

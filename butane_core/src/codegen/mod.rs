@@ -499,6 +499,7 @@ pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
                         return some_known(SqlType::Timestamp);
                     }
                 }
+                "NaiveDate" => return some_known(SqlType::Date),
                 _ => {}
             }
         }
@@ -588,6 +589,8 @@ fn sqltype_from_name(name: &Ident) -> Option<TypeIdentifier> {
         "Blob" => return some_id(SqlType::Blob),
         #[cfg(feature = "json")]
         "Json" => return some_id(SqlType::Json),
+        #[cfg(feature = "datetime")]
+        "Date" => return some_id(SqlType::Date),
         #[cfg(feature = "datetime")]
         "Timestamp" => return some_id(SqlType::Timestamp),
         _ => (),

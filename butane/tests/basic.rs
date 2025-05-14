@@ -419,9 +419,7 @@ async fn date_as_pk(conn: ConnectionAsync) {
     };
     holder.save(&conn).await.unwrap();
 
-    let holder2 = DateHolder::get(&conn, now.date_naive())
-        .await
-        .unwrap();
+    let holder2 = DateHolder::get(&conn, now.date_naive()).await.unwrap();
 
     assert_eq!(holder, holder2);
 }

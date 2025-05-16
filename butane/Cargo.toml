@@ -28,6 +28,8 @@ log = ["butane_core/log"]
 r2d2 = ["dep:r2d2"]
 tls = ["butane_core/tls"]
 uuid = ["butane_codegen/uuid", "butane_core/uuid"]
+# This feature is for testing only. It will delete the .butane directory. You probably don't want that.
+_auto_delete_dot_butane = []
 
 [dependencies]
 butane_codegen = { workspace = true }
@@ -36,6 +38,7 @@ r2d2 = { optional = true, workspace = true }
 deadpool = { optional = true, workspace = true }
 
 [dev-dependencies]
+butane = { features = ["_auto_delete_dot_butane"], workspace = true}
 butane_test_helper = { workspace = true, default-features = false, features = ["sqlite", "pg"] }
 butane_test_macros = { workspace = true }
 cfg-if = { workspace = true }

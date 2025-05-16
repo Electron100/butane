@@ -306,3 +306,16 @@ async fn query_autopk_by_integer(conn: ConnectionAsync) {
     let query_results = query!(HasAutopk, id == 1).load(&conn).await.unwrap();
     assert_eq!(&val1, query_results.first().unwrap());
 }
+
+#[butane_test]
+async fn query_in(conn: ConnectionAsync) {
+    blog::setup_blog(&conn).await;
+    let mut posts = query!(Post, title.is_in("The Tiger", "Sir Charles"))
+        .load(&conn)
+        .await
+        .unwrap();
+    assert_eq!(posts.len(), 2);
+    posts.sort_by(|p1, p2| p1.id.partial_cmp(&p2.id).unwrap());
+    assert_eq!(posts[0].title, "The Tiger");
+    assert_eq!(posts[1].title, "Sir Charles");
+}

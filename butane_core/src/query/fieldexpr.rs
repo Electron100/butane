@@ -64,11 +64,6 @@ where
     {
         BoolExpr::Like(self.name, Expr::Val(val.to_sql()))
     }
-
-    pub fn is_in<U>(&self, vals: Vec<SqlVal>) -> BoolExpr
-    {
-        BoolExpr::In(self.name, vals)
-    }
 }
 impl<F: DataObject> FieldExpr<ForeignKey<F>> {
     pub fn subfilter(&self, q: BoolExpr) -> BoolExpr {

@@ -256,6 +256,8 @@ pub enum Error {
     AlreadyInitialized,
     #[error("Migration error {0}")]
     MigrationError(String),
+    #[error("URI parse error {0}")]
+    UriParse(#[from] url::ParseError),
     #[error("Unknown backend {0}")]
     UnknownBackend(String),
     #[error("Range error")]
@@ -314,6 +316,12 @@ pub enum Error {
     #[cfg(feature = "async-adapter")]
     #[error("Crossbeam cannot send/recv, channel disconnected")]
     CrossbeamChannel,
+    #[error("SQLite version {0} is lower than minimum supported {1}")]
+    IncompatibleSQLite(&'static str, i32),
+    #[error("Table \"{0}\" not found in schema definitions")]
+    TableNotFound(String),
+    #[error("Column \"{0}\".\"{1}\" not found in schema definitions")]
+    ColumnNotFound(String, String),
 }
 
 #[cfg(feature = "sqlite")]
@@ -362,6 +370,9 @@ pub enum SqlType {
     /// String
     Text,
     #[cfg(feature = "datetime")]
+    /// Date
+    Date,
+    #[cfg(feature = "datetime")]
     /// Timestamp
     Timestamp,
     /// Blob
@@ -381,6 +392,8 @@ impl std::fmt::Display for SqlType {
             BigInt => "big int",
             Real => "float",
             Text => "string",
+            #[cfg(feature = "datetime")]
+            Date => "date",
             #[cfg(feature = "datetime")]
             Timestamp => "timestamp",
             Blob => "blob",

@@ -324,7 +324,8 @@ pub async fn pg_setup() -> PgSetupData {
     log::trace!("starting pg_setup");
     // By default we set up a temporary, local postgres server just
     // for this test. This can be overridden by the environment
-    // variable BUTANE_PG_CONNSTR
+    // variable BUTANE_PG_CONNSTR (which must be a PostgreSQL KV-style
+    // string, not a URL, e.g. "host=localhost user=postgres").
     let connstr = match std::env::var("BUTANE_PG_CONNSTR") {
         Ok(connstr) => connstr,
         Err(_) => {

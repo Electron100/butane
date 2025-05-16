@@ -8,7 +8,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
 #[cfg(feature = "datetime")]
-use chrono::{naive::NaiveDateTime, DateTime};
+use chrono::{
+    naive::{NaiveDate, NaiveDateTime},
+    DateTime,
+};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "pg")]
@@ -28,6 +31,8 @@ pub enum SqlValRef<'a> {
     #[cfg(feature = "json")]
     Json(serde_json::Value),
     #[cfg(feature = "datetime")]
+    Date(NaiveDate),
+    #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime), // NaiveDateTime is Copy
     Custom(SqlValRefCustom<'a>),
 }
@@ -41,6 +46,8 @@ impl SqlValRef<'_> {
             SqlValRef::BigInt(_) => Some(SqlType::BigInt),
             SqlValRef::Real(_) => Some(SqlType::Real),
             SqlValRef::Text(_) => Some(SqlType::Text),
+            #[cfg(feature = "datetime")]
+            SqlValRef::Date(_) => Some(SqlType::Date),
             #[cfg(feature = "datetime")]
             SqlValRef::Timestamp(_) => Some(SqlType::Timestamp),
             SqlValRef::Blob(_) => Some(SqlType::Blob),
@@ -78,6 +85,8 @@ pub enum SqlVal {
     Blob(Vec<u8>),
     #[cfg(feature = "json")]
     Json(serde_json::Value),
+    #[cfg(feature = "datetime")]
+    Date(NaiveDate),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime),
     Custom(Box<SqlValCustom>),
@@ -161,6 +170,8 @@ impl SqlVal {
             SqlVal::Real(_) => Some(SqlType::Real),
             SqlVal::Text(_) => Some(SqlType::Text),
             #[cfg(feature = "datetime")]
+            SqlVal::Date(_) => Some(SqlType::Date),
+            #[cfg(feature = "datetime")]
             SqlVal::Timestamp(_) => Some(SqlType::Timestamp),
             SqlVal::Blob(_) => Some(SqlType::Blob),
             #[cfg(feature = "json")]
@@ -187,6 +198,8 @@ impl fmt::Display for SqlVal {
             Blob(val) => f.write_str(&hex::encode(val)),
             #[cfg(feature = "json")]
             Json(val) => f.write_str(val.as_str().unwrap()),
+            #[cfg(feature = "datetime")]
+            Date(val) => val.format("%Y-%m-%d").fmt(f),
             #[cfg(feature = "datetime")]
             Timestamp(val) => val.format("%+").fmt(f),
             Custom(val) => val.fmt(f),
@@ -254,6 +267,8 @@ impl From<SqlValRef<'_>> for SqlVal {
             #[cfg(feature = "json")]
             Json(v) => SqlVal::Json(v),
             #[cfg(feature = "datetime")]
+            Date(v) => SqlVal::Date(v),
+            #[cfg(feature = "datetime")]
             Timestamp(v) => SqlVal::Timestamp(v),
             Custom(v) => SqlVal::Custom(Box::new(v.into())),
         }
@@ -273,6 +288,8 @@ impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
             Blob(v) => SqlValRef::Blob(v.as_ref()),
             #[cfg(feature = "json")]
             Json(v) => SqlValRef::Json(v.to_owned()),
+            #[cfg(feature = "datetime")]
+            Date(v) => SqlValRef::Date(*v),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlValRef::Timestamp(*v),
             Custom(v) => SqlValRef::Custom(v.as_valref()),
@@ -624,6 +641,28 @@ impl FieldType for DateTime<chrono::offset::Utc> {
 }
 #[cfg(feature = "datetime")]
 impl PrimaryKeyType for DateTime<chrono::offset::Utc> {}
+
+#[cfg(feature = "datetime")]
+impl_basic_from_sql!(NaiveDate, Date, Date);
+#[cfg(feature = "datetime")]
+impl ToSql for NaiveDate {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Date(*self)
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Date(*self)
+    }
+    fn into_sql(self) -> SqlVal {
+        SqlVal::Date(self)
+    }
+}
+#[cfg(feature = "datetime")]
+impl FieldType for NaiveDate {
+    const SQLTYPE: SqlType = SqlType::Date;
+    type RefType = str;
+}
+#[cfg(feature = "datetime")]
+impl PrimaryKeyType for NaiveDate {}
 
 impl ToSql for &str {
     fn to_sql(&self) -> SqlVal {

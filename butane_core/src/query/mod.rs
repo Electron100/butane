@@ -21,7 +21,7 @@ pub use fieldexpr::{DataOrd, FieldExpr, ManyFieldExpr};
 type TblName = Cow<'static, str>;
 
 /// Abstract representation of a database expression.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     /// A column, referenced by name.
     Column(&'static str),
@@ -34,7 +34,7 @@ pub enum Expr {
 }
 
 /// Abstract representation of a boolean expression.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BoolExpr {
     True,
     Eq(&'static str, Expr),
@@ -84,7 +84,7 @@ pub struct Order {
     pub column: &'static str,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Join {
     /// Inner join `join_table` where `col1` is equal to
     /// `col2`
@@ -95,7 +95,7 @@ pub enum Join {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Column {
     table: Option<TblName>,
     name: &'static str,

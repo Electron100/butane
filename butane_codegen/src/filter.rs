@@ -73,10 +73,14 @@ fn handle_call(fields: &impl ToTokens, mcall: &ExprMethodCall) -> TokenStream2 {
     }
 }
 
-fn handle_in<'a>(fields: &impl ToTokens, receiver: &Expr, exprs: impl Iterator<Item = &'a Expr>) -> TokenStream2 {
+fn handle_in<'a>(
+    fields: &impl ToTokens,
+    receiver: &Expr,
+    exprs: impl Iterator<Item = &'a Expr>,
+) -> TokenStream2 {
     let fex = fieldexpr(fields, receiver);
     let exprs_tokens = exprs.map(|expr| handle_expr(fields, expr));
-    quote!(#fex.inn(vec![#(butane::ToSql::to_sql(#exprs_tokens)),*]))
+    quote!(#fex.is_in(vec![#(#exprs_tokens),*]))
 }
 
 fn handle_matches(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStream2 {

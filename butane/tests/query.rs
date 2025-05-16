@@ -281,9 +281,6 @@ async fn offset(conn: ConnectionAsync) {
 #[butane_test]
 async fn query_in(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
-    Post::fields()
-        .title()
-        .is_in(vec!["The Tiger", "Sir Charles"]);
     let mut posts = query!(Post, title.is_in("The Tiger", "Sir Charles"))
         .load(&conn)
         .await

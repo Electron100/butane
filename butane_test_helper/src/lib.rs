@@ -34,6 +34,7 @@ use once_cell::sync::Lazy;
 #[cfg(feature = "pg")]
 use uuid::Uuid;
 
+// Re-export as they are used by the macros.
 pub use butane_core::db::{BackendConnection, BackendConnectionAsync, Connection, ConnectionAsync};
 pub use maybe_async_cfg;
 
@@ -59,11 +60,9 @@ impl BackendTestInstance for PgTestInstance {
         common_setup();
         let backend = PgBackend::new();
         let setup_data = pg_setup_sync();
-        let connstr = setup_data.connstr;
+        let connstr = setup_data.connection_string();
         log::info!("connecting to {}..", connstr);
-        let mut conn = backend
-            .connect(&connstr)
-            .expect("Could not connect backend");
+        let mut conn = backend.connect(connstr).expect("Could not connect backend");
         if migrate {
             setup_db(&mut conn);
         }
@@ -77,7 +76,7 @@ impl BackendTestInstance for PgTestInstance {
         common_setup();
         let backend = PgBackend::new();
         let setup_data = pg_setup().await;
-        let connstr = setup_data.connstr();
+        let connstr = setup_data.connection_string();
         log::info!("connecting to {}..", connstr);
         let mut conn = backend
             .connect_async(connstr)
@@ -133,7 +132,7 @@ impl BackendTestInstance for SQLiteTestInstance {
 pub trait SetupData {
     /// Return the connection string to use when establishing a
     /// database connection.
-    fn connstr(&self) -> &str;
+    fn connection_string(&self) -> &str;
 }
 
 /// Create a PostgreSQL [`Connection`].
@@ -197,12 +196,12 @@ impl Drop for PgServerState {
 #[derive(Clone, Debug)]
 pub struct PgSetupData {
     /// Connection string
-    pub connstr: String,
+    connection_string: String,
 }
 #[cfg(feature = "pg")]
 impl SetupData for PgSetupData {
-    fn connstr(&self) -> &str {
-        &self.connstr
+    fn connection_string(&self) -> &str {
+        &self.connection_string
     }
 }
 
@@ -297,25 +296,27 @@ pub fn pg_setup_sync() -> PgSetupData {
     // By default we set up a temporary, local postgres server just
     // for this test. This can be overridden by the environment
     // variable BUTANE_PG_CONNSTR
-    let connstr = match std::env::var("BUTANE_PG_CONNSTR") {
-        Ok(connstr) => connstr,
+    let mut connection_spec = match std::env::var("BUTANE_PG_CONNSTR") {
+        Ok(value) => ConnectionSpec::try_from(value).unwrap(),
         Err(_) => {
             let server_mguard = &TMP_SERVER.deref().lock().unwrap();
             let server: &PgServerState = server_mguard.as_ref().unwrap();
             let host = server.sockdir.path().to_str().unwrap();
-            format!("host={host} user=postgres")
+            ConnectionSpec::new("pg", format!("host={host} user=postgres"))
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     log::info!("new db is `{}`", &new_dbname);
 
-    let conn = connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
+    let conn = connect(&connection_spec).unwrap();
     log::debug!("closed is {}", BackendConnection::is_closed(&conn));
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .unwrap();
 
-    let connstr = format!("{connstr} dbname={new_dbname}");
-    PgSetupData { connstr }
+    connection_spec.add_query_param("dbname", &new_dbname);
+    PgSetupData {
+        connection_string: connection_spec.connection_string().clone(),
+    }
 }
 
 /// Create a running empty PostgreSQL database named `butane_test_<uuid>`.
@@ -326,21 +327,19 @@ pub async fn pg_setup() -> PgSetupData {
     // for this test. This can be overridden by the environment
     // variable BUTANE_PG_CONNSTR (which must be a PostgreSQL KV-style
     // string, not a URL, e.g. "host=localhost user=postgres").
-    let connstr = match std::env::var("BUTANE_PG_CONNSTR") {
-        Ok(connstr) => connstr,
+    let mut connection_spec = match std::env::var("BUTANE_PG_CONNSTR") {
+        Ok(value) => ConnectionSpec::try_from(value).unwrap(),
         Err(_) => {
             let server_mguard = &TMP_SERVER.deref().lock().unwrap();
             let server: &PgServerState = server_mguard.as_ref().unwrap();
             let host = server.sockdir.path().to_str().unwrap();
-            format!("host={host} user=postgres")
+            ConnectionSpec::new("pg", format!("host={host} user=postgres"))
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     log::info!("new db is `{}`", &new_dbname);
 
-    let conn = connect_async(&ConnectionSpec::new("pg", &connstr))
-        .await
-        .unwrap();
+    let conn = connect_async(&connection_spec).await.unwrap();
     log::debug!(
         "[async]closed is {}",
         BackendConnectionAsync::is_closed(&conn)
@@ -349,8 +348,10 @@ pub async fn pg_setup() -> PgSetupData {
         .await
         .unwrap();
 
-    let connstr = format!("{connstr} dbname={new_dbname}");
-    PgSetupData { connstr }
+    connection_spec.add_query_param("dbname", &new_dbname);
+    PgSetupData {
+        connection_string: connection_spec.connection_string().clone(),
+    }
 }
 
 /// Tear down PostgreSQL database created by [`pg_setup`].
@@ -362,7 +363,7 @@ pub fn pg_teardown(_data: PgSetupData) {
 /// Obtain the connection string for the PostgreSQL database.
 #[cfg(feature = "pg")]
 pub fn pg_connstr(data: &PgSetupData) -> String {
-    data.connstr.clone()
+    data.connection_string().to_string()
 }
 
 /// Create a [`MemMigrations`]` for the "current" migration.
@@ -427,7 +428,7 @@ pub struct SQLiteSetupData {}
 
 #[cfg(feature = "sqlite")]
 impl SetupData for SQLiteSetupData {
-    fn connstr(&self) -> &str {
+    fn connection_string(&self) -> &str {
         ":memory:"
     }
 }
@@ -460,7 +461,7 @@ pub async fn run_test_async<T, Fut, Fut2>(
     env_logger::try_init().ok();
     let backend = get_backend(backend_name).expect("Could not find backend");
     let setup_data = setup().await;
-    let connstr = setup_data.connstr();
+    let connstr = setup_data.connection_string();
     log::info!("connecting to {}..", connstr);
     let mut conn = backend
         .connect_async(connstr)

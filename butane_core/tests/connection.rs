@@ -199,10 +199,10 @@ fn uri_sqlite_absolute() {
     assert!(temp_absolute_path.contains(":\\"));
     #[cfg(not(target_os = "windows"))]
     assert!(temp_absolute_path.starts_with("/"));
-    let temp_relative_uri = format!("file:{temp_absolute_path}?cache=private");
-    let spec = ConnectionSpec::try_from(&temp_relative_uri).unwrap();
+    let temp_absolute_uri = format!("file:{temp_absolute_path}?cache=private");
+    let spec = ConnectionSpec::try_from(&temp_absolute_uri).unwrap();
     assert_eq!(spec.backend_name, "sqlite".to_string());
-    assert_eq!(spec.conn_str, temp_relative_uri);
+    assert_eq!(spec.conn_str, temp_absolute_uri);
     connect(&spec).unwrap();
 }
 
@@ -214,10 +214,10 @@ fn uri_sqlite_absolute_percent_encoding() {
     assert!(temp_absolute_path.contains(":\\"));
     #[cfg(not(target_os = "windows"))]
     assert!(temp_absolute_path.starts_with("/"));
-    let temp_relative_uri = format!("file:{temp_absolute_path}?cache=private").replace('-', "%2D");
-    let spec = ConnectionSpec::try_from(&temp_relative_uri).unwrap();
+    let temp_absolute_uri = format!("file:{temp_absolute_path}?cache=private").replace('-', "%2D");
+    let spec = ConnectionSpec::try_from(&temp_absolute_uri).unwrap();
     assert_eq!(spec.backend_name, "sqlite".to_string());
-    assert_eq!(spec.conn_str, temp_relative_uri);
+    assert_eq!(spec.conn_str, temp_absolute_uri);
     connect(&spec).unwrap();
 }
 
@@ -229,10 +229,10 @@ fn uri_sqlite_absolute_parameter_after_slash() {
     assert!(temp_absolute_path.contains(":\\"));
     #[cfg(not(target_os = "windows"))]
     assert!(temp_absolute_path.starts_with("/"));
-    let temp_relative_uri = format!("file:{temp_absolute_path}/?cache=private");
-    let spec = ConnectionSpec::try_from(&temp_relative_uri).unwrap();
+    let temp_absolute_uri = format!("file:{temp_absolute_path}/?cache=private");
+    let spec = ConnectionSpec::try_from(&temp_absolute_uri).unwrap();
     assert_eq!(spec.backend_name, "sqlite".to_string());
-    assert_eq!(spec.conn_str, temp_relative_uri);
+    assert_eq!(spec.conn_str, temp_absolute_uri);
     #[cfg(target_os = "windows")]
     {
         // Windows absolute paths confuse the sqlite connection string parser.
@@ -258,10 +258,10 @@ fn uri_sqlite_absolute_with_slashes() {
     assert!(temp_absolute_path.contains(":\\"));
     #[cfg(not(target_os = "windows"))]
     assert!(temp_absolute_path.starts_with("/"));
-    let temp_relative_uri = format!("file://{temp_absolute_path}?cache=private");
-    let spec = ConnectionSpec::try_from(&temp_relative_uri).unwrap();
+    let temp_absolute_uri = format!("file://{temp_absolute_path}?cache=private");
+    let spec = ConnectionSpec::try_from(&temp_absolute_uri).unwrap();
     assert_eq!(spec.backend_name, "sqlite".to_string());
-    assert_eq!(spec.conn_str, temp_relative_uri);
+    assert_eq!(spec.conn_str, temp_absolute_uri);
     #[cfg(target_os = "windows")]
     {
         // Windows absolute paths confuse the sqlite connection string parser.
@@ -287,10 +287,10 @@ fn uri_sqlite_absolute_with_localhost() {
     assert!(temp_absolute_path.contains(":\\"));
     #[cfg(not(target_os = "windows"))]
     assert!(temp_absolute_path.starts_with("/"));
-    let temp_relative_uri = format!("file://localhost/{temp_absolute_path}?cache=private");
-    let spec = ConnectionSpec::try_from(&temp_relative_uri).unwrap();
+    let temp_absolute_uri = format!("file://localhost/{temp_absolute_path}?cache=private");
+    let spec = ConnectionSpec::try_from(&temp_absolute_uri).unwrap();
     assert_eq!(spec.backend_name, "sqlite".to_string());
-    assert_eq!(spec.conn_str, temp_relative_uri);
+    assert_eq!(spec.conn_str, temp_absolute_uri);
     connect(&spec).unwrap();
 }
 
@@ -386,6 +386,18 @@ fn uri_pg_postgresql_scheme_ipv6() {
 // https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
 #[test]
 fn uri_pg_postgresql_scheme_abstract_namespace_unix_socket() {
+    let uri = "postgresql://@foo/database";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name, "pg".to_string());
+    assert_eq!(spec.conn_str, uri.to_string());
+}
+
+#[tokio::test]
+async fn uri_pg_postgresql_scheme_abstract_namespace_unix_socket_connect() {
+    let mut postgresql = postgresql_embedded::PostgreSQL::default();
+    postgresql.setup().await.unwrap();
+    postgresql.start().await.unwrap();
+
     let uri = "postgresql://@foo/database";
     let spec = ConnectionSpec::try_from(uri).unwrap();
     assert_eq!(spec.backend_name, "pg".to_string());

@@ -28,7 +28,8 @@ log = ["butane_core/log"]
 r2d2 = ["dep:r2d2"]
 tls = ["butane_core/tls"]
 uuid = ["butane_codegen/uuid", "butane_core/uuid"]
-# This feature is for testing only. It will delete the .butane directory. You probably don't want that.
+# This feature is for testing only. It will delete the .butane directory inside the butane crate, which only
+# exists when running tests.  It has no effect when running butane as a dependency.
 _auto_delete_dot_butane = []
 
 [dependencies]

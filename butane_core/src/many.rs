@@ -201,11 +201,13 @@ pub trait ManyOps<T: DataObject> {
     /// Used by macro-generated code. You do not need to call this directly.
     async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
-    /// Delete all references from the database, and any unsaved additions.
+    /// Delete all references from the backend, and any unsaved additions.
     async fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
-    /// Loads the values referred to by this many relationship from the
-    /// database if necessary and returns a reference to them.
+    /// Overwrite the references in the backend, and clears unsaved additions.
+    async fn set(&mut self, conn: &impl ConnectionMethods, values: Vec<T>) -> Result<()>;
+
+    /// Loads the values referred to by this many relationship from the backend.
     async fn load<'a>(
         &'a self,
         conn: &impl ConnectionMethods,
@@ -213,8 +215,7 @@ pub trait ManyOps<T: DataObject> {
     where
         T: 'a;
 
-    /// Loads and orders the values referred to by this many relationship from a
-    /// database if necessary and returns a reference to them.
+    /// Loads and orders the values referred to by this many relationship from the backend.
     async fn load_ordered<'a>(
         &'a self,
         conn: &impl ConnectionMethods,
@@ -271,6 +272,18 @@ impl<T: DataObject> ManyOps<T> for Many<T> {
         self.removed_values.clear();
         // all_values is now out of date, so empty it
         self.all_values = OnceLock::from(Vec::new());
+        Ok(())
+    }
+
+    async fn set(&mut self, conn: &impl ConnectionMethods, values: Vec<T>) -> Result<()> {
+        ManyOps::delete(self, conn).await?;
+
+        for value in &values {
+            self.add(value)?;
+        }
+        ManyOps::save(self, conn).await?;
+
+        self.all_values = OnceLock::from(values);
         Ok(())
     }
 

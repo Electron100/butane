@@ -384,26 +384,28 @@ pub fn pg_setup_sync() -> PgSetupData {
     // By default we set up a temporary, local postgres server just
     // for this test. This can be overridden by the environment
     // variable BUTANE_PG_CONNSTR
-    let connstr = match std::env::var("BUTANE_PG_CONNSTR") {
-        Ok(connstr) => connstr,
+    let mut connection_spec = match std::env::var("BUTANE_PG_CONNSTR") {
+        Ok(value) => ConnectionSpec::try_from(value).unwrap(),
         Err(_) => {
             let server_mguard = &TMP_SERVER.deref().lock().unwrap();
             let server: &PgServerState = server_mguard.as_ref().unwrap();
             let host = server.sockdir.path().to_str().unwrap();
-            format!("host={host} user=postgres")
+            ConnectionSpec::new("pg", format!("host={host} user=postgres"))
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     log::info!("new db is `{}`", &new_dbname);
 
-    let conn = connect(&ConnectionSpec::new("pg", &connstr)).unwrap();
+    let conn = connect(&connection_spec).unwrap();
     log::debug!("closed is {}", BackendConnection::is_closed(&conn));
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .unwrap();
 
-    let connstr = format!("{connstr} dbname={new_dbname}");
+    connection_spec
+        .add_parameter("dbname", &new_dbname)
+        .unwrap();
     PgSetupData {
-        connection_string: connstr,
+        connection_string: connection_spec.connection_string().clone(),
     }
 }
 
@@ -415,21 +417,19 @@ pub async fn pg_setup() -> PgSetupData {
     // for this test. This can be overridden by the environment
     // variable BUTANE_PG_CONNSTR (which must be a PostgreSQL KV-style
     // string, not a URL, e.g. "host=localhost user=postgres").
-    let connstr = match std::env::var("BUTANE_PG_CONNSTR") {
-        Ok(connstr) => connstr,
+    let mut connection_spec = match std::env::var("BUTANE_PG_CONNSTR") {
+        Ok(value) => ConnectionSpec::try_from(value).unwrap(),
         Err(_) => {
             let server_mguard = &TMP_SERVER.deref().lock().unwrap();
             let server: &PgServerState = server_mguard.as_ref().unwrap();
             let host = server.sockdir.path().to_str().unwrap();
-            format!("host={host} user=postgres")
+            ConnectionSpec::new("pg", format!("host={host} user=postgres"))
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
     log::info!("new db is `{}`", &new_dbname);
 
-    let conn = connect_async(&ConnectionSpec::new("pg", &connstr))
-        .await
-        .unwrap();
+    let conn = connect_async(&connection_spec).await.unwrap();
     log::debug!(
         "[async]closed is {}",
         BackendConnectionAsync::is_closed(&conn)
@@ -438,9 +438,11 @@ pub async fn pg_setup() -> PgSetupData {
         .await
         .unwrap();
 
-    let connstr = format!("{connstr} dbname={new_dbname}");
+    connection_spec
+        .add_parameter("dbname", &new_dbname)
+        .unwrap();
     PgSetupData {
-        connection_string: connstr,
+        connection_string: connection_spec.connection_string().clone(),
     }
 }
 

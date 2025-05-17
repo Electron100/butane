@@ -26,7 +26,7 @@ cfg-if.workspace = true
 env_logger.workspace = true
 log.workspace = true
 paste.workspace = true
-test-log = { version = "0.2", features = ["log", "trace"] }
+test-log.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 
 [package.metadata.release]

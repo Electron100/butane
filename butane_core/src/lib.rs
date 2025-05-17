@@ -260,6 +260,8 @@ pub enum Error {
     UriParse(#[from] url::ParseError),
     #[error("Unknown backend {0}")]
     UnknownBackend(String),
+    #[error("Unknown connect string {0}")]
+    UnknownConnectString(String),
     #[error("Range error")]
     OutOfRange,
     #[error("Internal logic error {0}")]

@@ -346,6 +346,7 @@ dependencies = [
  "tokio-postgres",
  "url",
  "uuid",
+ "whoami",
 ]
 
 [[package]]

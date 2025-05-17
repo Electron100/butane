@@ -244,6 +244,7 @@ checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 name = "butane"
 version = "0.8.0"
 dependencies = [
+ "butane",
  "butane_codegen",
  "butane_core",
  "butane_test_helper",

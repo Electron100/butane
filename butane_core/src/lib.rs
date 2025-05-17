@@ -154,9 +154,14 @@ pub trait DataObjectOps<T: DataObject> {
             .await?
             .into_iter()
             .nth(0))
-    }
-
-    /// Save the object to the database.
+    }    
+    
+    /// Save the object to the database, handling both inserts and updates.
+    /// 
+    /// If the object has an AutoPk that is unintialized, save will always
+    /// perform an insert. If the AutoPk is initialized or there is no AutoPk,
+    /// save will perform an upsert (insert or replace).
+    /// After saving the main object, many-to-many relationships it holds are also saved.
     async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>
     where
         Self: DataObject,

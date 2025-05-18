@@ -78,8 +78,11 @@ where
         self.all_values = OnceLock::new();
     }
 
-    /// Adds a value. Returns Err(ValueNotSaved) if the
-    /// provided value uses automatic primary keys and appears
+    /// Adds a value, yet to be performed in the backend.
+    ///
+    /// After invoking this, `get()` can not be used until `save()` is performed.
+    ///
+    /// Returns Err(ValueNotSaved) if the provided value uses automatic primary keys and appears
     /// to have an uninitialized one.
     pub fn add(&mut self, new_val: &T) -> Result<()> {
         // Check for uninitialized pk
@@ -93,14 +96,18 @@ where
         Ok(())
     }
 
-    /// Removes a value.
+    /// Removes a value, yet to be performed in the backend
+    ///
+    /// After invoking this, `get()` can not be used until `save()` is performed.
     pub fn remove(&mut self, val: &T) {
         // all_values is now out of date, so clear it
         self.all_values = OnceLock::new();
         self.removed_values.push(val.pk().to_sql())
     }
 
-    /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
+    /// Returns already loaded values.
+    ///
+    /// Returns [`Error::ValueNotLoaded`] if `load()` has not been invoked prior.
     pub fn get(&self) -> Result<impl Iterator<Item = &T>> {
         self.all_values
             .get()
@@ -108,8 +115,7 @@ where
             .map(|v| v.iter())
     }
 
-    /// Query the values referred to by this many relationship from the
-    /// database if necessary and returns a reference to them.
+    /// Provide a Query for the values referred to by this many relationship.
     fn query(&self) -> Result<Query<T>> {
         let owner: &SqlVal = match &self.owner {
             Some(o) => o,

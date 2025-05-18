@@ -198,16 +198,26 @@ where
     async(feature = "async")
 )]
 pub trait ManyOps<T: DataObject> {
+    /// Save all unsaved relation changes to the backend.
+    ///
     /// Used by macro-generated code. You do not need to call this directly.
+    ///
+    /// This will insert added values first, and then remove the removed values.
+    /// Use inside a transaction to provide atomicity.
     async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
     /// Delete all references from the backend, and any unsaved additions.
+    ///
+    /// This operation is atomic.
     async fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
     /// Overwrite the references in the backend, and clears unsaved additions.
+    ///
+    /// This will call `delete()` first, and then insert the items scheduled to be added.
+    /// Use inside a transaction to provide atomicity.
     async fn set(&mut self, conn: &impl ConnectionMethods, values: Vec<T>) -> Result<()>;
 
-    /// Loads the values referred to by this many relationship from the backend.
+    /// Loads the values referred to by this many relationship from the backend if necessary.
     async fn load<'a>(
         &'a self,
         conn: &impl ConnectionMethods,
@@ -215,7 +225,7 @@ pub trait ManyOps<T: DataObject> {
     where
         T: 'a;
 
-    /// Loads and orders the values referred to by this many relationship from the backend.
+    /// Loads and orders the values referred to by this many relationship from the backend if necessary.
     async fn load_ordered<'a>(
         &'a self,
         conn: &impl ConnectionMethods,

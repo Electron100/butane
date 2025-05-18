@@ -112,6 +112,7 @@ pub fn dataresult(args: TokenStream, input: TokenStream) -> TokenStream {
 ///   the following `tags.contains(tag == "cats"). If the expression
 ///   is single literal, it is assumed to be used to match the
 ///   primary key.
+/// * `is_in`: checks if a value is one of the provided parameters, e.g. `title.is_in("Foo", "Bar")`.
 ///
 /// # Examples
 /// ```ignore

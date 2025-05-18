@@ -164,6 +164,11 @@ async fn delete_all_from_many(conn: ConnectionAsync) {
 
     post.tags.delete(&conn).await.unwrap();
 
+    // Verify that the tags are deleted from the Many object
+    let tags: Vec<&Tag> = post.tags.get().unwrap().collect();
+    assert_eq!(tags.len(), 0);
+
+    // Verify that the tags are deleted from the database
     let post2 = Post::get(&conn, post.id).await.unwrap();
     assert_eq!(post2.tags.load(&conn).await.unwrap().count(), 0);
 }

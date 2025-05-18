@@ -269,8 +269,8 @@ impl<T: DataObject> ManyOps<T> for Many<T> {
         .await?;
         self.new_values.clear();
         self.removed_values.clear();
-        // all_values is now out of date, so clear it
-        self.all_values = OnceLock::new();
+        // all_values is now out of date, so empty it
+        self.all_values = OnceLock::from(Vec::new());
         Ok(())
     }
 

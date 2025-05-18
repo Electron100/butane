@@ -591,16 +591,16 @@ impl ConnectionSpec {
     }
 
     /// Add a query parameter to the connection string.
-    pub fn add_query_param(&mut self, key: &str, value: &str) {
+    pub fn add_parameter(&mut self, name: &str, value: &str) {
         if Self::is_pg_key_value_pairs(&self.conn_str) {
             // Append using PostgreSQL key-value pair syntax.
-            self.conn_str.push_str(&format!(" {}={}", key, value));
+            self.conn_str.push_str(&format!(" {}={}", name, value));
             return;
         }
         if self.conn_str.contains('?') {
-            self.conn_str.push_str(&format!("&{}={}", key, value));
+            self.conn_str.push_str(&format!("&{}={}", name, value));
         } else {
-            self.conn_str.push_str(&format!("?{}={}", key, value));
+            self.conn_str.push_str(&format!("?{}={}", name, value));
         }
     }
 }

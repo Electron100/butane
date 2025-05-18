@@ -395,7 +395,7 @@ pub fn pg_setup_sync() -> PgSetupData {
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .unwrap();
 
-    connection_spec.add_query_param("dbname", &new_dbname);
+    connection_spec.add_parameter("dbname", &new_dbname);
     PgSetupData {
         connection_string: connection_spec.connection_string().clone(),
     }
@@ -430,7 +430,7 @@ pub async fn pg_setup() -> PgSetupData {
         .await
         .unwrap();
 
-    connection_spec.add_query_param("dbname", &new_dbname);
+    connection_spec.add_parameter("dbname", &new_dbname);
     PgSetupData {
         connection_string: connection_spec.connection_string().clone(),
     }

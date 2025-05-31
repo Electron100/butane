@@ -526,6 +526,9 @@ pub trait Backend: Send + Sync + DynClone {
 
 dyn_clone::clone_trait_object!(Backend);
 
+/// Regular expression to match PostgreSQL key-value pairs in a connection string.
+const PG_KEY_PAIR_RE: &str = r"(hostaddr|host|dbname|user|port)\s*=";
+
 /// Connection specification. Contains the name of a database backend
 /// and the backend-specific connection string. See [`connect`]
 /// to make a [`Connection`] from a `ConnectionSpec`.
@@ -549,7 +552,7 @@ impl ConnectionSpec {
         contents.push('\n');
         f.write_all(contents.as_bytes()).map_err(|e| e.into())
     }
-    /// Load a previously saved connection spec
+    /// Load a previously saved connection spec.
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = conn_complete_if_dir(path.as_ref());
         serde_json::from_reader(fs::File::open(path)?).map_err(|e| e.into())
@@ -560,28 +563,115 @@ impl ConnectionSpec {
             None => Err(crate::Error::UnknownBackend(self.backend_name.clone())),
         }
     }
+    /// Get the backend name.
+    pub const fn backend_name(&self) -> &String {
+        &self.backend_name
+    }
+    /// Get the database connection string.
+    pub const fn connection_string(&self) -> &String {
+        &self.conn_str
+    }
+    /// Get the connection string URI if it is a URI.
+    /// Returns None if the connection string is not a URI.
+    pub fn connection_string_uri(&self) -> Option<url::Url> {
+        url::Url::parse(self.connection_string()).ok()
+    }
+
+    fn is_pg_key_value_pairs(connection_string: &str) -> bool {
+        // host and hostaddr are optional in Postgresql, however this prevents connecting
+        // without one of them: https://github.com/sfackler/rust-postgres/issues/1239
+        let re = regex::Regex::new(PG_KEY_PAIR_RE).unwrap();
+        re.is_match(connection_string)
+    }
+
+    /// Add a query parameter to the connection string.
+    pub fn add_parameter(&mut self, name: &str, value: &str) -> Result<()> {
+        if self.backend_name() == "pg" && Self::is_pg_key_value_pairs(&self.conn_str) {
+            // Append using PostgreSQL key-value pair syntax.
+            self.conn_str.push_str(&format!(" {}={}", name, value));
+            return Ok(());
+        }
+        if self.connection_string_uri().is_none() {
+            return Err(crate::Error::UnknownConnectString(
+                "Cannot add query parameter to connection string that is not a postgres or URI"
+                    .to_string(),
+            ));
+        }
+
+        if self.conn_str.contains('?') {
+            self.conn_str.push_str(&format!("&{}={}", name, value));
+        } else {
+            self.conn_str.push_str(&format!("?{}={}", name, value));
+        }
+        Ok(())
+    }
 }
 
+/// Convert a string to a connection spec.
+///
+/// The string may be any connection string supported by the database backend.
+/// If it is a URL with a scheme of "sqlite", the backend will be set to "sqlite",
+/// and the scheme will be set to "file" as required by the sqlite engine.
+/// If it is a URI with a scheme of "file", the backend will be set to "sqlite".
+/// If it does not have a scheme, it will be set to "pg" if it contains any of
+/// `host=`, `hostaddr=`, `dbname=`, or `user=`.
+/// Otherwise it will default to "sqlite".
 impl TryFrom<&str> for ConnectionSpec {
     type Error = crate::Error;
     fn try_from(value: &str) -> Result<Self> {
-        let parsed = url::Url::parse(value)?;
-        if parsed.scheme() == "sqlite" {
-            let path = value.trim_start_matches("sqlite://");
-            Ok(ConnectionSpec {
-                backend_name: "sqlite".to_string(),
-                conn_str: path.to_string(),
-            })
-        } else if ["postgres", "postgresql"].contains(&parsed.scheme()) {
-            Ok(ConnectionSpec {
-                backend_name: "pg".to_string(),
-                conn_str: value.to_string(),
-            })
-        } else {
-            Ok(ConnectionSpec {
-                backend_name: parsed.scheme().to_string(),
-                conn_str: value.to_string(),
-            })
+        match url::Url::parse(value) {
+            Ok(parsed) => {
+                match parsed.scheme() {
+                    "sqlite" => {
+                        // SQLite uses file: URLs, but we want to accept sqlite:
+                        // in order that the URIs are more expressive.
+                        let value = value.replacen("sqlite:", "file:", 1);
+                        Ok(ConnectionSpec {
+                            backend_name: "sqlite".to_string(),
+                            conn_str: value,
+                        })
+                    }
+                    "file" => Ok(ConnectionSpec {
+                        backend_name: "sqlite".to_string(),
+                        conn_str: value.to_string(),
+                    }),
+                    "postgres" | "postgresql" => Ok(ConnectionSpec {
+                        backend_name: "pg".to_string(),
+                        conn_str: value.to_string(),
+                    }),
+                    _ => Ok(ConnectionSpec {
+                        backend_name: parsed.scheme().to_string(),
+                        conn_str: value.to_string(),
+                    }),
+                }
+            }
+            Err(url::ParseError::InvalidPort) => {
+                // This occurs when using a PostgreSQL multi-host connection string.
+                if value.starts_with("postgres") {
+                    Ok(ConnectionSpec {
+                        backend_name: "pg".to_string(),
+                        conn_str: value.to_string(),
+                    })
+                } else {
+                    Ok(ConnectionSpec {
+                        backend_name: "sqlite".to_string(),
+                        conn_str: value.to_string(),
+                    })
+                }
+            }
+            Err(_) => {
+                // Spaces are allowed between the key and the equals sign in a PostgreSQL connection string.
+                if Self::is_pg_key_value_pairs(value) {
+                    return Ok(ConnectionSpec {
+                        backend_name: "pg".to_string(),
+                        conn_str: value.to_string(),
+                    });
+                }
+                Ok(ConnectionSpec {
+                    backend_name: "sqlite".to_string(),
+                    conn_str: value.to_string(),
+                })
+            }
         }
     }
 }

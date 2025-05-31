@@ -32,6 +32,7 @@ use butane_core::migrations::{self, MemMigrations, Migration, Migrations, Migrat
 #[cfg(feature = "pg")]
 use uuid::Uuid;
 
+// Re-export as they are used by the macros.
 pub use butane_core::db::{BackendConnection, BackendConnectionAsync, Connection, ConnectionAsync};
 pub use maybe_async_cfg;
 
@@ -57,11 +58,9 @@ impl BackendTestInstance for PgTestInstance {
         common_setup();
         let backend = PgBackend::new();
         let setup_data = pg_setup_sync();
-        let connstr = setup_data.connstr;
+        let connstr = setup_data.connection_string();
         log::info!("connecting to {}..", connstr);
-        let mut conn = backend
-            .connect(&connstr)
-            .expect("Could not connect backend");
+        let mut conn = backend.connect(connstr).expect("Could not connect backend");
         if migrate {
             setup_db(&mut conn);
         }
@@ -75,7 +74,7 @@ impl BackendTestInstance for PgTestInstance {
         common_setup();
         let backend = PgBackend::new();
         let setup_data = pg_setup().await;
-        let connstr = setup_data.connstr();
+        let connstr = setup_data.connection_string();
         log::info!("connecting to {}..", connstr);
         let mut conn = backend
             .connect_async(connstr)
@@ -131,7 +130,7 @@ impl BackendTestInstance for SQLiteTestInstance {
 pub trait SetupData {
     /// Return the connection string to use when establishing a
     /// database connection.
-    fn connstr(&self) -> &str;
+    fn connection_string(&self) -> &str;
 }
 
 /// Create a PostgreSQL [`Connection`].
@@ -152,6 +151,25 @@ pub async fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
     )
 }
 
+/// Options for creating a PostgreSQL server.
+#[cfg(feature = "pg")]
+#[derive(Clone, Debug, Default)]
+pub struct PgServerOptions {
+    /// The port to listen on. If None, only allow connections via unix sockets.
+    pub port: Option<u16>,
+    /// The user to connect as. If None, use the default user.
+    pub user: Option<String>,
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    /// Use abstract namespace for the socket.
+    ///
+    /// Postgres only supports this on Linux and Windows.
+    /// However rust-postgres does not yet support it.
+    /// <https://github.com/sfackler/rust-postgres/issues/1240>
+    pub abstract_namespace: bool,
+    /// Callback to run at exit.
+    pub atexit_callback: Option<extern "C" fn()>,
+}
+
 /// Server state for a test PostgreSQL server.
 #[cfg(feature = "pg")]
 #[derive(Debug)]
@@ -164,6 +182,8 @@ pub struct PgServerState {
     pub proc: std::process::Child,
     /// stderr from the test server
     pub stderr: BufReader<ChildStderr>,
+    /// Options used to create the server.
+    pub options: PgServerOptions,
 }
 #[cfg(feature = "pg")]
 impl Drop for PgServerState {
@@ -195,18 +215,32 @@ impl Drop for PgServerState {
 #[derive(Clone, Debug)]
 pub struct PgSetupData {
     /// Connection string
-    pub connstr: String,
+    connection_string: String,
 }
 #[cfg(feature = "pg")]
 impl SetupData for PgSetupData {
-    fn connstr(&self) -> &str {
-        &self.connstr
+    fn connection_string(&self) -> &str {
+        &self.connection_string
     }
 }
 
+/// Error related to the temporary PostgreSQL server.
+#[derive(Debug, thiserror::Error)]
+pub enum PgTemporaryServenError {
+    /// IO errors.
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
+}
+
 /// Create and start a temporary PostgreSQL server instance.
+///
+/// Fails on Windows CI due to:
+/// > The server must be started under an unprivileged user ID to prevent
+/// > possible system security compromises. ...
 #[cfg(feature = "pg")]
-pub fn create_tmp_server() -> PgServerState {
+pub fn pg_tmp_server_create(
+    options: PgServerOptions,
+) -> Result<PgServerState, PgTemporaryServenError> {
     let seed: u128 = rand::random::<u64>() as u128;
     let instance_id = BlockId::new(Alphabet::alphanumeric(), seed, 8)
         .encode_string(0)
@@ -218,14 +252,25 @@ pub fn create_tmp_server() -> PgServerState {
         .join(instance_id);
     std::fs::create_dir_all(&dir).unwrap();
 
+    let user = options
+        .user
+        .clone()
+        .unwrap_or_else(|| "postgres".to_string());
+
     // Run initdb to create a postgres cluster in our temporary director
-    let output = Command::new("initdb")
+    let result = Command::new("initdb")
         .arg("-D")
         .arg(&dir)
         .arg("-U")
-        .arg("postgres")
-        .output()
-        .expect("failed to run initdb; PostgreSQL may not be installed.");
+        .arg(user)
+        .output();
+    if let Err(e) = result {
+        eprintln!("failed to run initdb; PostgreSQL may not be installed");
+        return Err(e.into());
+    }
+
+    let output = result.unwrap();
+
     if !output.status.success() {
         std::io::stdout().write_all(&output.stdout).unwrap();
         std::io::stderr().write_all(&output.stderr).unwrap();
@@ -234,22 +279,50 @@ pub fn create_tmp_server() -> PgServerState {
 
     let sockdir = tempfile::TempDir::new().unwrap();
 
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    let socket_directory_arg = if options.abstract_namespace {
+        // Use abstract namespace for the socket
+        format!("@{}", sockdir.path().display())
+    } else {
+        // Use a normal socket
+        sockdir.path().display().to_string()
+    };
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    let socket_directory_arg = sockdir.path().display().to_string();
+
     // Run postgres to actually create the server
     // See https://www.postgresql.org/docs/current/app-postgres.html for CLI args.
     // PGOPTIONS can be used to set args.
     // PGDATA can be used instead of -D
-    let mut proc = Command::new("postgres")
+    let mut command = Command::new("postgres");
+    command
         .arg("-c")
         .arg("logging_collector=false")
         .arg("-D")
         .arg(&dir)
         .arg("-k")
-        .arg(sockdir.path())
-        .arg("-h")
-        .arg("")
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("failed to run postgres");
+        .arg(socket_directory_arg)
+        .stderr(Stdio::piped());
+
+    if let Some(port) = options.port {
+        command
+            .arg("-i")
+            .arg("-h")
+            .arg("localhost")
+            .arg("-p")
+            .arg(port.to_string());
+    } else {
+        // Set host='' to prevent postgres from trying to use TCP/IP
+        command.arg("-h").arg("");
+    }
+    let result = command.spawn();
+    if let Err(e) = result {
+        eprintln!("failed to run postgres");
+        return Err(e.into());
+    }
+
+    let mut proc = result.unwrap();
+
     let mut buf = String::new();
     let mut stderr = BufReader::new(proc.stderr.take().unwrap());
     loop {
@@ -266,27 +339,43 @@ pub fn create_tmp_server() -> PgServerState {
             panic!("postgres process died");
         }
     }
-    log::info!("created tmp pg server.");
-    unsafe {
-        // Try to delete all the pg files when the process exits
-        libc::atexit(proc_teardown);
+    log::info!("created tmp pg server {}", sockdir.path().display());
+    if let Some(cb) = options.atexit_callback {
+        // Register the callback to be called when the process exits
+        // This is not safe, but this is in a test context and the process will exit.
+        // Use `atexit` to ensure that the callback is called even if
+        // the process exits unexpectedly.
+        log::info!("registering atexit callback");
+        unsafe {
+            libc::atexit(cb);
+        }
     }
-    PgServerState {
+
+    Ok(PgServerState {
         dir,
         sockdir,
         proc,
         stderr,
-    }
+        options: options.clone(),
+    })
 }
 
 #[cfg(feature = "pg")]
-extern "C" fn proc_teardown() {
+/// Try to delete all the pg files when the process exits.
+extern "C" fn pg_tmp_server_proc_teardown() {
     drop(TMP_SERVER.deref().lock().unwrap().take());
 }
 
 #[cfg(feature = "pg")]
-static TMP_SERVER: LazyLock<Mutex<Option<PgServerState>>> =
-    LazyLock::new(|| Mutex::new(Some(create_tmp_server())));
+static TMP_SERVER: LazyLock<Mutex<Option<PgServerState>>> = LazyLock::new(|| {
+    Mutex::new(Some(
+        pg_tmp_server_create(PgServerOptions {
+            atexit_callback: Some(pg_tmp_server_proc_teardown),
+            ..Default::default()
+        })
+        .unwrap(),
+    ))
+});
 
 /// Create a running empty PostgreSQL database named `butane_test_<uuid>`.
 #[cfg(feature = "pg")]
@@ -313,7 +402,9 @@ pub fn pg_setup_sync() -> PgSetupData {
         .unwrap();
 
     let connstr = format!("{connstr} dbname={new_dbname}");
-    PgSetupData { connstr }
+    PgSetupData {
+        connection_string: connstr,
+    }
 }
 
 /// Create a running empty PostgreSQL database named `butane_test_<uuid>`.
@@ -348,7 +439,9 @@ pub async fn pg_setup() -> PgSetupData {
         .unwrap();
 
     let connstr = format!("{connstr} dbname={new_dbname}");
-    PgSetupData { connstr }
+    PgSetupData {
+        connection_string: connstr,
+    }
 }
 
 /// Tear down PostgreSQL database created by [`pg_setup`].
@@ -360,7 +453,7 @@ pub fn pg_teardown(_data: PgSetupData) {
 /// Obtain the connection string for the PostgreSQL database.
 #[cfg(feature = "pg")]
 pub fn pg_connstr(data: &PgSetupData) -> String {
-    data.connstr.clone()
+    data.connection_string().to_string()
 }
 
 /// Create a [`MemMigrations`]` for the "current" migration.
@@ -425,7 +518,7 @@ pub struct SQLiteSetupData {}
 
 #[cfg(feature = "sqlite")]
 impl SetupData for SQLiteSetupData {
-    fn connstr(&self) -> &str {
+    fn connection_string(&self) -> &str {
         ":memory:"
     }
 }
@@ -458,7 +551,7 @@ pub async fn run_test_async<T, Fut, Fut2>(
     env_logger::try_init().ok();
     let backend = get_backend(backend_name).expect("Could not find backend");
     let setup_data = setup().await;
-    let connstr = setup_data.connstr();
+    let connstr = setup_data.connection_string();
     log::info!("connecting to {}..", connstr);
     let mut conn = backend
         .connect_async(connstr)

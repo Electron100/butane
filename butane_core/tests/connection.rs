@@ -229,10 +229,25 @@ fn uri_sqlite_relative_no_scheme_with_params_doesnt_work() {
     let spec = ConnectionSpec::try_from(&temp_relative_path).unwrap();
     assert_eq!(spec.backend_name(), "sqlite");
     assert_eq!(spec.connection_string(), &temp_relative_path);
-    connect(&spec).unwrap();
 
-    // the path with `?mode=ro` needs to be deleted.
-    fs::remove_file(temp_relative_path).unwrap();
+    #[cfg(target_os = "windows")]
+    {
+        // Windows does not support creating files that start with a colon.
+        let connection_error = connect(&spec).unwrap_err();
+        // Rust tools can not yet detect that this variable is used in the macro below
+        let _expected_error = format!("iunable to open database file: {temp_relative_path}");
+        eprintln!("{connection_error:?}");
+        assert!(matches!(
+            connection_error,
+            Error::SQLite(rusqlite::Error::SqliteFailure(_, Some(_expected_error)))
+        ));
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        connect(&spec).unwrap();
+        // connect succeeded, but became a file.
+        fs::remove_file(uri).unwrap();
+    }
 }
 
 #[test]

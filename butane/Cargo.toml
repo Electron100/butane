@@ -11,6 +11,7 @@ license.workspace = true
 repository.workspace = true
 documentation = "https://docs.rs/butane/"
 build = "build.rs"
+rust-version.workspace = true
 
 [features]
 async = ["butane_core/async", "butane_codegen/async"]
@@ -53,7 +54,6 @@ nonempty.workspace = true
 quote = { workspace = true }
 maybe-async-cfg.workspace = true
 proc-macro2 = { workspace = true }
-once_cell = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 tokio-postgres = { features = ["with-geo-types-0_7"], workspace = true }
 tokio-test = { workspace = true }

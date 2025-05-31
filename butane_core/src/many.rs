@@ -16,11 +16,6 @@ use crate::util::get_or_init_once_lock;
 use crate::util::get_or_init_once_lock_async;
 use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 
-fn default_oc<T>() -> OnceLock<Vec<T>> {
-    // Same as impl Default for once_cell::unsync::OnceCell
-    OnceLock::new()
-}
-
 /// Used to implement a many-to-many relationship between models.
 ///
 /// Creates a new table with columns "owner" and "has" If type T has a
@@ -43,7 +38,7 @@ where
     #[serde(skip)]
     removed_values: Vec<SqlVal>,
     #[serde(skip)]
-    #[serde(default = "default_oc")]
+    #[serde(default = "OnceLock::new")]
     all_values: OnceLock<Vec<T>>,
 }
 impl<T> Many<T>

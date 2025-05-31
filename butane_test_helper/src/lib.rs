@@ -14,7 +14,7 @@ use std::path::PathBuf;
 #[cfg(feature = "pg")]
 use std::process::{ChildStderr, Command, Stdio};
 #[cfg(feature = "pg")]
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 #[cfg(feature = "pg")]
 use block_id::{Alphabet, BlockId};
@@ -29,8 +29,6 @@ use butane_core::db::{connect, connect_async, pg};
 use butane_core::db::{get_backend, Backend, ConnectionSpec};
 
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
-#[cfg(feature = "pg")]
-use once_cell::sync::Lazy;
 #[cfg(feature = "pg")]
 use uuid::Uuid;
 
@@ -287,8 +285,8 @@ extern "C" fn proc_teardown() {
 }
 
 #[cfg(feature = "pg")]
-static TMP_SERVER: Lazy<Mutex<Option<PgServerState>>> =
-    Lazy::new(|| Mutex::new(Some(create_tmp_server())));
+static TMP_SERVER: LazyLock<Mutex<Option<PgServerState>>> =
+    LazyLock::new(|| Mutex::new(Some(create_tmp_server())));
 
 /// Create a running empty PostgreSQL database named `butane_test_<uuid>`.
 #[cfg(feature = "pg")]

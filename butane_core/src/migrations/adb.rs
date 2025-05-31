@@ -6,7 +6,8 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[cfg(feature = "json")]
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
+
 use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Serialize};
 
 use crate::{Error, Result, SqlType, SqlVal};
@@ -15,7 +16,7 @@ use crate::{Error, Result, SqlType, SqlVal};
 pub const MANY_SUFFIX: &str = "_Many";
 
 #[cfg(feature = "json")]
-static JSON_MAP_PREFIXES: Lazy<Vec<String>> = Lazy::new(|| {
+static JSON_MAP_PREFIXES: LazyLock<Vec<String>> = LazyLock::new(|| {
     let map_type_names: [&str; 6] = [
         "HashMap",
         "collections::HashMap",

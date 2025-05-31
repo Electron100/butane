@@ -7,6 +7,7 @@ description = "Macros for Butane. Do not use this crate directly -- use the buta
 readme = "../README.md"
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
 
 [features]
 async = ["butane_core/async"]

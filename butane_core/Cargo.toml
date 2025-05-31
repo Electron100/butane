@@ -7,7 +7,7 @@ description = "Internals for Butane. Do not use this crate directly -- use the b
 readme = "../README.md"
 license.workspace = true
 repository.workspace = true
-
+rust-version.workspace = true
 
 [features]
 async-adapter = ["async", "crossbeam-channel"]
@@ -40,7 +40,6 @@ log = { optional = true, workspace = true }
 maybe-async-cfg = { workspace = true }
 native-tls = { version = "0.2", optional = true }
 nonempty.workspace = true
-once_cell = { workspace = true }
 pin-project = "1"
 tokio = {workspace = true, optional = true, features = ["rt", "sync", "rt-multi-thread"]}
 tokio-postgres = { optional = true, workspace = true }

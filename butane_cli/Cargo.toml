@@ -8,6 +8,7 @@ readme = "../README.md"
 license.workspace = true
 repository.workspace = true
 documentation = "https://docs.rs/butane/"
+rust-version.workspace = true
 
 [lib]
 doc = false

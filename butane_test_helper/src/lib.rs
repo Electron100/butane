@@ -166,7 +166,7 @@ pub struct PgServerOptions {
     ///
     /// Postgres only supports this on Linux and Windows.
     /// However rust-postgres does not yet support it.
-    /// https://github.com/sfackler/rust-postgres/issues/1240
+    /// <https://github.com/sfackler/rust-postgres/issues/1240>
     pub abstract_namespace: bool,
     /// Callback to run at exit.
     pub atexit_callback: Option<extern "C" fn()>,
@@ -403,7 +403,9 @@ pub fn pg_setup_sync() -> PgSetupData {
     conn.execute(format!("CREATE DATABASE {new_dbname};"))
         .unwrap();
 
-    connection_spec.add_parameter("dbname", &new_dbname);
+    connection_spec
+        .add_parameter("dbname", &new_dbname)
+        .unwrap();
     PgSetupData {
         connection_string: connection_spec.connection_string().clone(),
     }
@@ -438,7 +440,9 @@ pub async fn pg_setup() -> PgSetupData {
         .await
         .unwrap();
 
-    connection_spec.add_parameter("dbname", &new_dbname);
+    connection_spec
+        .add_parameter("dbname", &new_dbname)
+        .unwrap();
     PgSetupData {
         connection_string: connection_spec.connection_string().clone(),
     }

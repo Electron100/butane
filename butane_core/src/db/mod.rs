@@ -526,7 +526,8 @@ pub trait Backend: Send + Sync + DynClone {
 
 dyn_clone::clone_trait_object!(Backend);
 
-const PG_KEY_PAIR_RE: &'static str = r"(hostaddr|host|dbname|user|port)\s*=";
+/// Regular expression to match PostgreSQL key-value pairs in a connection string.
+const PG_KEY_PAIR_RE: &str = r"(hostaddr|host|dbname|user|port)\s*=";
 
 /// Connection specification. Contains the name of a database backend
 /// and the backend-specific connection string. See [`connect`]
@@ -584,17 +585,25 @@ impl ConnectionSpec {
     }
 
     /// Add a query parameter to the connection string.
-    pub fn add_parameter(&mut self, name: &str, value: &str) {
+    pub fn add_parameter(&mut self, name: &str, value: &str) -> Result<()> {
         if self.backend_name() == "pg" && Self::is_pg_key_value_pairs(&self.conn_str) {
             // Append using PostgreSQL key-value pair syntax.
             self.conn_str.push_str(&format!(" {}={}", name, value));
-            return;
+            return Ok(());
         }
+        if self.connection_string_uri().is_none() {
+            return Err(crate::Error::UnknownConnectString(
+                "Cannot add query parameter to connection string that is not a postgres or URI"
+                    .to_string(),
+            ));
+        }
+
         if self.conn_str.contains('?') {
             self.conn_str.push_str(&format!("&{}={}", name, value));
         } else {
             self.conn_str.push_str(&format!("?{}={}", name, value));
         }
+        Ok(())
     }
 }
 
@@ -610,7 +619,6 @@ impl ConnectionSpec {
 impl TryFrom<&str> for ConnectionSpec {
     type Error = crate::Error;
     fn try_from(value: &str) -> Result<Self> {
-        //url::Url::parse(value).unwrap();
         match url::Url::parse(value) {
             Ok(parsed) => {
                 match parsed.scheme() {

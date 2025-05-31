@@ -161,7 +161,12 @@ pub struct PgServerOptions {
     pub port: Option<u16>,
     /// The user to connect as. If None, use the default user.
     pub user: Option<String>,
-    /// Use abstract namespace for the socket.  Only woks on Linux and Windows.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    /// Use abstract namespace for the socket.
+    ///
+    /// Postgres only supports this on Linux and Windows.
+    /// However rust-postgres does not yet support it.
+    /// https://github.com/sfackler/rust-postgres/issues/1240
     pub abstract_namespace: bool,
     /// Callback to run at exit.
     pub atexit_callback: Option<extern "C" fn()>,
@@ -276,6 +281,7 @@ pub fn pg_tmp_server_create(
 
     let sockdir = tempfile::TempDir::new().unwrap();
 
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     let socket_directory_arg = if options.abstract_namespace {
         // Use abstract namespace for the socket
         format!("@{}", sockdir.path().display())
@@ -283,6 +289,8 @@ pub fn pg_tmp_server_create(
         // Use a normal socket
         sockdir.path().display().to_string()
     };
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    let socket_directory_arg = sockdir.path().display().to_string();
 
     // Run postgres to actually create the server
     // See https://www.postgresql.org/docs/current/app-postgres.html for CLI args.

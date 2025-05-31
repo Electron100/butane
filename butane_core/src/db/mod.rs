@@ -526,6 +526,8 @@ pub trait Backend: Send + Sync + DynClone {
 
 dyn_clone::clone_trait_object!(Backend);
 
+const PG_KEY_PAIR_RE: &'static str = r"(hostaddr|host|dbname|user|port)\s*=";
+
 /// Connection specification. Contains the name of a database backend
 /// and the backend-specific connection string. See [`connect`]
 /// to make a [`Connection`] from a `ConnectionSpec`.
@@ -577,22 +579,13 @@ impl ConnectionSpec {
     fn is_pg_key_value_pairs(connection_string: &str) -> bool {
         // host and hostaddr are optional in Postgresql, however this prevents connecting
         // without one of them: https://github.com/sfackler/rust-postgres/issues/1239
-        connection_string.contains('=')
-            && (connection_string.contains("host=")
-                || connection_string.contains("hostaddr=")
-                || connection_string.contains("port=")
-                || connection_string.contains("dbname=")
-                || connection_string.contains("user=")
-                || connection_string.contains("host =")
-                || connection_string.contains("hostaddr =")
-                || connection_string.contains("port =")
-                || connection_string.contains("dbname =")
-                || connection_string.contains("user ="))
+        let re = regex::Regex::new(PG_KEY_PAIR_RE).unwrap();
+        re.is_match(connection_string)
     }
 
     /// Add a query parameter to the connection string.
     pub fn add_parameter(&mut self, name: &str, value: &str) {
-        if Self::is_pg_key_value_pairs(&self.conn_str) {
+        if self.backend_name() == "pg" && Self::is_pg_key_value_pairs(&self.conn_str) {
             // Append using PostgreSQL key-value pair syntax.
             self.conn_str.push_str(&format!(" {}={}", name, value));
             return;
@@ -617,6 +610,7 @@ impl ConnectionSpec {
 impl TryFrom<&str> for ConnectionSpec {
     type Error = crate::Error;
     fn try_from(value: &str) -> Result<Self> {
+        //url::Url::parse(value).unwrap();
         match url::Url::parse(value) {
             Ok(parsed) => {
                 match parsed.scheme() {

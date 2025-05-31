@@ -30,6 +30,10 @@ fn uri_sqlite_temporary_file() {
 #[test]
 fn uri_sqlite_memory() {
     let uri = ":memory:";
+
+    // This sqlite connection string is not a valid URI.
+    url::Url::parse(uri).unwrap_err();
+
     let spec = ConnectionSpec::try_from(uri).unwrap();
     assert_eq!(spec.backend_name(), "sqlite");
     assert_eq!(spec.connection_string(), uri);
@@ -80,6 +84,7 @@ fn uri_sqlite_memory_file_scheme() {
 #[test]
 fn uri_sqlite_memory_file_scheme_parameters() {
     let uri = "file::memory:?cache=shared";
+
     let spec = ConnectionSpec::try_from(uri).unwrap();
     assert_eq!(spec.backend_name(), "sqlite");
     assert_eq!(spec.connection_string(), uri);
@@ -194,10 +199,39 @@ fn uri_sqlite_relative_no_scheme() {
     );
     assert!(temp_relative_path.starts_with(".tmp"));
 
+    // This sqlite connection string is not a valid URI.
+    url::Url::parse(&temp_relative_path).unwrap_err();
+
     let spec = ConnectionSpec::try_from(&temp_relative_path).unwrap();
     assert_eq!(spec.backend_name(), "sqlite");
     assert_eq!(spec.connection_string(), &temp_relative_path);
     connect(&spec).unwrap();
+    fs::remove_file(temp_relative_path).unwrap();
+}
+
+#[test]
+fn uri_sqlite_relative_no_scheme_with_params_doesnt_work() {
+    let current_directory = std::env::current_dir().unwrap();
+    let temp_dir = tempfile::TempDir::new_in(&current_directory).unwrap();
+    let temp_relative_path = format!(
+        "{}/sqlite-test.db?mode=ro",
+        temp_dir
+            .path()
+            .strip_prefix(&current_directory)
+            .unwrap()
+            .display()
+    );
+    assert!(temp_relative_path.starts_with(".tmp"));
+
+    // This sqlite connection string is not a valid URI.
+    url::Url::parse(&temp_relative_path).unwrap_err();
+
+    let spec = ConnectionSpec::try_from(&temp_relative_path).unwrap();
+    assert_eq!(spec.backend_name(), "sqlite");
+    assert_eq!(spec.connection_string(), &temp_relative_path);
+    connect(&spec).unwrap();
+
+    // the path with `?mode=ro` needs to be deleted.
     fs::remove_file(temp_relative_path).unwrap();
 }
 
@@ -528,7 +562,7 @@ fn pg_key_value_pairs_dbname_only() {
 }
 
 #[test]
-#[cfg(not(target_os = "windows"))]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 fn pg_key_value_pairs_abstract_namespace_unix_socket() {
     let pg_server = pg_tmp_server_create(PgServerOptions {
         #[cfg(not(target_os = "macos"))]
@@ -543,7 +577,8 @@ fn pg_key_value_pairs_abstract_namespace_unix_socket() {
     assert_eq!(spec.backend_name(), "pg");
     assert_eq!(spec.connection_string(), &pairs);
     // https://github.com/sfackler/rust-postgres/issues/1240
-    // connect(&spec).unwrap();
+    let err = connect(&spec).unwrap_err();
+    assert!(matches!(err, butane_core::Error::Postgres(_)));
 }
 
 #[test]
@@ -594,10 +629,9 @@ fn uri_pg_postgresql_scheme_ipv6() {
 // psql allows the formats here. tokio-postgres does not yet
 // due to https://github.com/sfackler/rust-postgres/issues/1240
 #[test]
-#[cfg(not(target_os = "windows"))]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 fn uri_pg_postgresql_scheme_abstract_namespace_unix_socket() {
     let pg_server = pg_tmp_server_create(PgServerOptions {
-        #[cfg(not(target_os = "macos"))]
         abstract_namespace: true,
         ..PgServerOptions::default()
     })
@@ -610,9 +644,8 @@ fn uri_pg_postgresql_scheme_abstract_namespace_unix_socket() {
     assert_eq!(spec.backend_name(), "pg");
     assert_eq!(spec.connection_string(), &uri);
 
-    // This feature is not supported on macOS.
-    // #[cfg(not(target_os = "macos"))]
-    // connect(&spec).unwrap();
+    let err = connect(&spec).unwrap_err();
+    assert!(matches!(err, butane_core::Error::Postgres(_)));
 
     // The host part needs to be percent encoded if put into the host of the URI.
     let host = host.replace('/', "%2F");

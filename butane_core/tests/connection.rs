@@ -246,7 +246,7 @@ fn uri_sqlite_relative_no_scheme_with_params_doesnt_work() {
     {
         connect(&spec).unwrap();
         // connect succeeded, but became a file.
-        fs::remove_file(uri).unwrap();
+        fs::remove_file(temp_relative_path).unwrap();
     }
 }
 
@@ -577,7 +577,7 @@ fn pg_key_value_pairs_dbname_only() {
 }
 
 #[test]
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "linux")]
 fn pg_key_value_pairs_abstract_namespace_unix_socket() {
     let pg_server = pg_tmp_server_create(PgServerOptions {
         #[cfg(not(target_os = "macos"))]
@@ -644,7 +644,7 @@ fn uri_pg_postgresql_scheme_ipv6() {
 // psql allows the formats here. tokio-postgres does not yet
 // due to https://github.com/sfackler/rust-postgres/issues/1240
 #[test]
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "linux")]
 fn uri_pg_postgresql_scheme_abstract_namespace_unix_socket() {
     let pg_server = pg_tmp_server_create(PgServerOptions {
         abstract_namespace: true,

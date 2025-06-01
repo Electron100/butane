@@ -283,7 +283,7 @@ async fn inline_json(conn: ConnectionAsync) {
 async fn r_hash_field_type_newtype_json(conn: ConnectionAsync) {
     #[derive(Clone, Debug, Default, FieldType, PartialEq, serde::Serialize, serde::Deserialize)]
     #[allow(non_camel_case_types)]
-    struct r#type {
+    pub struct r#type {
         r#type: String,
     }
 

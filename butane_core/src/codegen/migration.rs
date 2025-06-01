@@ -8,7 +8,22 @@ use crate::migrations::adb::{create_many_table, AColumn, ARef, ATable, DeferredS
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::Result;
 
+/// Writes the table definition to the current migration in the migrations store.
+#[deprecated(note = "Use `write_table_to_migrations` instead")]
+#[allow(dead_code)]
 pub fn write_table_to_disk<M>(
+    ms: &mut impl MigrationsMut<M = M>,
+    ast_struct: &ItemStruct,
+    config: &dbobj::Config,
+) -> Result<()>
+where
+    M: MigrationMut,
+{
+    write_table_to_migrations(ms, ast_struct, config)
+}
+
+/// Writes the table definition to the current migration in the migrations store.
+pub fn write_table_to_migrations<M>(
     ms: &mut impl MigrationsMut<M = M>,
     ast_struct: &ItemStruct,
     config: &dbobj::Config,
@@ -36,16 +51,18 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
         Some(n) => n.clone(),
         None => ast_struct.ident.to_string(),
     };
-    let mut table = ATable::new(name);
+    let name = name.strip_prefix("r#").unwrap_or(&name);
+    let mut table = ATable::new(name.to_string());
     let pk = pk_field(ast_struct)
         .expect("No primary key found. Expected 'id' field or field with #[pk] attribute.");
     let mut result: Vec<ATable> = Vec::new();
     for f in fields(ast_struct) {
-        let name = f
-            .ident
-            .clone()
-            .expect("db object fields must be named")
-            .to_string();
+        let name = if let Some(name) = f.ident.as_ref() {
+            name.to_string()
+        } else {
+            panic!("Fields must be named in the struct: {}", ast_struct.ident);
+        };
+        let name = name.strip_prefix("r#").unwrap_or(&name);
         if is_row_field(f) {
             let deferred_type = get_deferred_sql_type(&f.ty);
             let mut col = AColumn::new(
@@ -71,11 +88,12 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
 }
 
 fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> ATable {
-    let field_name = many_field
-        .ident
-        .clone()
-        .expect("fields must be named")
-        .to_string();
+    let field_name = if let Some(name) = many_field.ident.as_ref() {
+        name.to_string()
+    } else {
+        panic!("Many fields must be named");
+    };
+    let field_name = field_name.strip_prefix("r#").unwrap_or(&field_name);
     let many_field_type = get_many_sql_type(many_field)
         .unwrap_or_else(|| panic!("Misidentified Many field {field_name}"));
     let pk_field_name = pk_field
@@ -87,7 +105,7 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
 
     create_many_table(
         main_table_name,
-        &field_name,
+        field_name,
         many_field_type,
         &pk_field_name,
         pk_field_type,

@@ -54,7 +54,7 @@ where
 
     let vis = &ast_struct.vis;
 
-    migration::write_table_to_disk(ms, &ast_struct, &config).unwrap();
+    migration::write_table_to_migrations(ms, &ast_struct, &config).unwrap();
 
     let impltraits = dbobj::impl_dbobject(&ast_struct, &config);
     let fieldexprs = dbobj::add_fieldexprs(&ast_struct, &config);
@@ -195,8 +195,9 @@ where
 
 /// Create a [`struct@LitStr`] (UTF-8 string literal) from an [Ident].
 pub fn make_ident_literal_str(ident: &Ident) -> LitStr {
-    let as_str = format!("{ident}");
-    make_lit(&as_str)
+    let as_str = ident.to_string();
+    let as_str = as_str.strip_prefix("r#").unwrap_or(&as_str);
+    make_lit(as_str)
 }
 
 /// Create a [`struct@LitStr`] (UTF-8 string literal) from a `str`.

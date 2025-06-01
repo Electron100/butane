@@ -283,7 +283,8 @@ async fn inline_json(conn: ConnectionAsync) {
 async fn r_hash_field_type_newtype_json(conn: ConnectionAsync) {
     #[derive(Clone, Debug, Default, FieldType, PartialEq, serde::Serialize, serde::Deserialize)]
     #[allow(non_camel_case_types)]
-    pub struct r#type {
+    pub struct r#for {
+        id: u64,
         r#type: String,
     }
 
@@ -292,12 +293,13 @@ async fn r_hash_field_type_newtype_json(conn: ConnectionAsync) {
     pub struct StructWithReservedWordMember {
         id: String,
 
-        r#type: r#type,
+        r#type: r#for,
     }
 
     let mut foo = StructWithReservedWordMember::default();
     foo.id = "1".to_string();
-    let expected = r#type {
+    let expected = r#for {
+        id: 1,
         r#type: "test".to_string(),
     };
     foo.r#type = expected.clone();

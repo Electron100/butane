@@ -290,13 +290,13 @@ async fn r_hash_field_type_newtype_json(conn: ConnectionAsync) {
 
     #[model]
     #[derive(Debug, Default)]
-    pub struct StructWithReservedWordMember {
+    pub struct StructWithReservedWordMemberJson {
         id: String,
 
         r#type: r#for,
     }
 
-    let mut foo = StructWithReservedWordMember::default();
+    let mut foo = StructWithReservedWordMemberJson::default();
     foo.id = "1".to_string();
     let expected = r#for {
         id: 1,
@@ -305,6 +305,8 @@ async fn r_hash_field_type_newtype_json(conn: ConnectionAsync) {
     foo.r#type = expected.clone();
     foo.save(&conn).await.unwrap();
 
-    let retrieved = StructWithReservedWordMember::get(&conn, "1").await.unwrap();
+    let retrieved = StructWithReservedWordMemberJson::get(&conn, "1")
+        .await
+        .unwrap();
     assert_eq!(retrieved.r#type, expected);
 }

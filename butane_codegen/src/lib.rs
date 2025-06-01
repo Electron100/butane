@@ -238,6 +238,11 @@ fn migrations_dir() -> PathBuf {
 #[proc_macro_derive(FieldType)]
 pub fn derive_field_type(input: TokenStream) -> TokenStream {
     let derive_input = syn::parse_macro_input!(input as syn::DeriveInput);
+    derive_field_type_impl(derive_input).into()
+}
+
+/// Implementation of the `FieldType` derive macro.
+fn derive_field_type_impl(derive_input: syn::DeriveInput) -> TokenStream2 {
     let ident = &derive_input.ident;
     match derive_input.data {
         syn::Data::Struct(syn::DataStruct {
@@ -267,7 +272,7 @@ pub fn derive_field_type(input: TokenStream) -> TokenStream {
     }
 }
 
-fn derive_field_type_for_newtype(ident: &Ident, sqltype: SqlType) -> TokenStream {
+fn derive_field_type_for_newtype(ident: &Ident, sqltype: SqlType) -> TokenStream2 {
     let sqltype_name = serde_variant::to_variant_name(&sqltype).unwrap();
     let sqltype_ident = syn::Ident::new(sqltype_name, proc_macro2::Span::call_site());
 
@@ -302,10 +307,9 @@ fn derive_field_type_for_newtype(ident: &Ident, sqltype: SqlType) -> TokenStream
             const SQLTYPE: butane::SqlType = butane::SqlType:: #sqltype_ident;
         }
     )
-    .into()
 }
 
-fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenStream {
+fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenStream2 {
     if data_enum
         .variants
         .iter()
@@ -384,11 +388,10 @@ fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenS
             const SQLTYPE: butane::SqlType = butane::SqlType::Text;
         }
     )
-    .into()
 }
 
 #[cfg(feature = "json")]
-fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream {
+fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream2 {
     let mut migrations = migrations_for_dir();
 
     codegen::add_custom_type(
@@ -427,11 +430,10 @@ fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream {
             const SQLTYPE: butane::SqlType = butane::SqlType::Json;
         }
     )
-    .into()
 }
 
 #[cfg(not(feature = "json"))]
-fn derive_field_type_with_json(_struct_name: &Ident) -> TokenStream {
+fn derive_field_type_with_json(_struct_name: &Ident) -> TokenStream2 {
     panic!("Feature 'json' is required to derive FieldType")
 }
 
@@ -450,3 +452,7 @@ pub fn derive_primary_key_type(input: TokenStream) -> TokenStream {
     )
     .into()
 }
+
+#[cfg(test)]
+#[path = "./test_field_type.rs"]
+mod test_field_type;

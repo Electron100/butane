@@ -1,5 +1,5 @@
 use butane_core::codegen::{
-    get_deferred_sql_type, make_ident_literal_str, make_lit, model_with_migrations,
+    get_deferred_sql_type, get_primitive_sql_type, make_ident_literal_str, make_lit, model_with_migrations,
 };
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey, MANY_SUFFIX};
 use butane_core::migrations::{MemMigrations, Migration, MigrationsMut};
@@ -23,9 +23,48 @@ fn make_litstr_from_str() {
 }
 
 #[test]
-fn test_get_deferred_sql_type() {
-    // primitive type
+fn primitive_sql_type() {
     let type_path: syn::TypePath = syn::parse_quote!(i8);
+    let typ = syn::Type::Path(type_path);
+    let rv = get_primitive_sql_type(&typ).unwrap();
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Int);
+    } else {
+        panic!()
+    }
+
+    let type_path: syn::TypePath = syn::parse_quote!(r#i8);
+    let typ = syn::Type::Path(type_path);
+    let rv = get_primitive_sql_type(&typ).unwrap();
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Int);
+    } else {
+        panic!()
+    }
+
+    let type_path: syn::TypePath = syn::parse_quote!(Option<i8>);
+    let typ = syn::Type::Path(type_path);
+    let rv = get_primitive_sql_type(&typ).unwrap();
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Int);
+    } else {
+        panic!()
+    }
+}
+
+
+#[test]
+fn deferred_sql_type_primitive() {
+    let type_path: syn::TypePath = syn::parse_quote!(i8);
+    let typ = syn::Type::Path(type_path);
+    let rv = get_deferred_sql_type(&typ);
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Int);
+    } else {
+        panic!()
+    }
+
+    let type_path: syn::TypePath = syn::parse_quote!(r#i8);
     let typ = syn::Type::Path(type_path);
     let rv = get_deferred_sql_type(&typ);
     if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
@@ -42,7 +81,10 @@ fn test_get_deferred_sql_type() {
     } else {
         panic!()
     }
+}
 
+#[test]
+fn deferred_sql_type_user_defined_types() {
     // custom types
     let type_path: syn::TypePath = syn::parse_quote!(Foo);
     let typ = syn::Type::Path(type_path);
@@ -61,8 +103,10 @@ fn test_get_deferred_sql_type() {
     } else {
         panic!()
     }
+}
 
-    // foreign keys to custom types
+#[test]
+fn deferred_sql_type_fkey() {
     let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignType<Foo>);
     let typ = syn::Type::Path(type_path);
     let rv = get_deferred_sql_type(&typ);
@@ -80,7 +124,10 @@ fn test_get_deferred_sql_type() {
     } else {
         panic!()
     }
+}
 
+#[test]
+fn deferred_sql_type_many() {
     let type_path: syn::TypePath = syn::parse_quote!(butane::Many<Foo>);
     let typ = syn::Type::Path(type_path);
     let rv = get_deferred_sql_type(&typ);
@@ -168,4 +215,24 @@ fn r_hash_struct_name() {
     let table = adb.get_table("type").expect("Table type should exist");
     assert_eq!(table.columns[0].name(), "id");
     assert_eq!(table.columns[1].name(), "foo");
+
+    let fkey_item: syn::ItemStruct = parse_quote! {
+        pub struct fkey {
+            id: u32,
+            foo: ForeignType<r#type>,
+        }
+    };
+
+    let foo: r#bool = true;
+    let tokens = fkey_item.to_token_stream();
+    let _model = model_with_migrations(tokens, &mut migrations);
+    let migration = migrations.current();
+    let adb = migration.db().unwrap();
+    eprintln!("ADB: {adb:?}");
+    let table = adb.get_table("type").expect("Table type should exist");
+    assert_eq!(table.columns[0].name(), "id");
+    assert_eq!(table.columns[1].name(), "foo");
 }
+
+
+// TODO test with AutoKey

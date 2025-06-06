@@ -4,6 +4,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span, TokenTree};
 use quote::{quote, ToTokens};
 use regex::Regex;
+use syn::ext::IdentExt as _;
 use syn::parse_quote;
 use syn::{
     punctuated::Punctuated, Attribute, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta,
@@ -155,7 +156,7 @@ where
     let type_alias: syn::Result<ItemType> = syn::parse2(input.clone());
     if let Ok(type_alias) = type_alias {
         tyinfo = Some(CustomTypeInfo {
-            name: type_alias.ident.to_string(),
+            name: strip_ident_prefix(&type_alias.ident),
             ty: get_deferred_sql_type(&type_alias.ty),
         })
     }
@@ -168,12 +169,12 @@ where
         };
         if let Ok(item) = syn::parse2::<ItemStruct>(input.clone()) {
             tyinfo = Some(CustomTypeInfo {
-                name: item.ident.to_string(),
+                name: strip_ident_prefix(&item.ident),
                 ty: sqltype.into(),
             });
         } else if let Ok(item) = syn::parse2::<ItemEnum>(input.clone()) {
             tyinfo = Some(CustomTypeInfo {
-                name: item.ident.to_string(),
+                name: strip_ident_prefix(&item.ident),
                 ty: sqltype.into(),
             });
         }
@@ -193,11 +194,17 @@ where
     }
 }
 
+/// Strip the "r#" prefix if it exists.  It is valid in front of any identifier.
+fn strip_ident_prefix(ident: &Ident) -> String {
+    ident.unraw().to_string()
+    //.strip_prefix("r#").unwrap_or(&ident.to_string()).to_string()
+}
+
 /// Create a [`struct@LitStr`] (UTF-8 string literal) from an [Ident].
 pub fn make_ident_literal_str(ident: &Ident) -> LitStr {
-    let as_str = ident.to_string();
-    let as_str = as_str.strip_prefix("r#").unwrap_or(&as_str);
-    make_lit(as_str)
+    // let as_str = ident.to_string();
+    // let as_str = as_str.strip_prefix("r#").unwrap_or(&as_str);
+    make_lit(strip_ident_prefix(ident).as_str())
 }
 
 /// Create a [`struct@LitStr`] (UTF-8 string literal) from a `str`.
@@ -260,7 +267,7 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
         return Some(id_field.clone());
     }
     let pk_by_name = ast_struct.fields.iter().find(|f| match &f.ident {
-        Some(ident) => *ident == "id",
+        Some(ident) => ident.unraw() == "id",
         None => false,
     });
     pk_by_name.cloned()
@@ -350,7 +357,7 @@ fn is_same_path_ident(path1: &syn::Path, path2: &syn::Path) -> bool {
         .segments
         .iter()
         .zip(path2.segments.iter())
-        .all(|(a, b)| a.ident == b.ident)
+        .all(|(a, b)| a.ident.unraw() == b.ident.unraw())
 }
 
 /// Gets the type argument of a type.
@@ -393,6 +400,7 @@ fn get_foreign_sql_type(ty: &syn::Type, tynames: &[&'static str]) -> Option<Defe
                 .last()
                 .unwrap_or_else(|| panic!("{} must have an argument", tynames[0]))
                 .ident
+                .unraw()
                 .to_string(),
         ))
     })
@@ -407,6 +415,11 @@ pub fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
         .or_else(|| get_foreign_sql_type(ty, &FKEY_TYNAMES))
         .or_else(|| get_autopk_sql_type(ty))
         .unwrap_or_else(|| {
+            let name = ty.clone().into_token_stream().to_string();
+            eprintln!("ty: {name}");
+            if name.starts_with("r#") {
+                panic!(" {name}  .");
+            }
             DeferredSqlType::Deferred(TypeKey::CustomType(
                 ty.clone().into_token_stream().to_string().replace(' ', ""),
             ))
@@ -444,6 +457,8 @@ fn some_known(ty: SqlType) -> Option<DeferredSqlType> {
 
 /// If the field refers to a primitive, return its SqlType
 pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
+    assert!(matches!(ty, syn::Type::Path(_)));
+    // is this always a path?
     if *ty == parse_quote!(bool) {
         return some_known(SqlType::Bool);
     } else if *ty == parse_quote!(u8)

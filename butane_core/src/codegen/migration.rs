@@ -1,8 +1,9 @@
 use syn::{Field, ItemStruct};
+use syn::ext::IdentExt as _;
 
 use super::{
     dbobj, fields, get_default, get_deferred_sql_type, get_many_sql_type, is_auto, is_foreign_key,
-    is_many_to_many, is_option, is_row_field, is_unique, pk_field,
+    is_many_to_many, is_option, is_row_field, is_unique, pk_field, strip_ident_prefix
 };
 use crate::migrations::adb::{create_many_table, AColumn, ARef, ATable, DeferredSqlType, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
@@ -38,7 +39,7 @@ where
     if let Some(name) = &config.table_name {
         // Custom table name, need to also be able to map with the type name
         current_migration.add_type(
-            TypeKey::PK(ast_struct.ident.to_string()),
+            TypeKey::PK(strip_ident_prefix(&ast_struct.ident)),
             DeferredSqlType::Deferred(TypeKey::PK(name.clone())),
         )?;
     }
@@ -100,6 +101,7 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .ident
         .as_ref()
         .expect("fields must be named")
+        .unraw()
         .to_string();
     let pk_field_type = get_deferred_sql_type(&pk_field.ty);
 

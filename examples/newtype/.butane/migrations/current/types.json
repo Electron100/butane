@@ -1,1 +1,1 @@
-{"CT:BlogId":{"KnownId":{"Ty":"Blob"}},"CT:BlogName":{"KnownId":{"Ty":"Text"}},"CT:PostId":{"KnownId":{"Ty":"Blob"}},"CT:Tags":{"KnownId":{"Ty":"Json"}}}
+{"CT:BlogId":{"KnownId":{"Ty":"Json"}},"CT:BlogName":{"KnownId":{"Ty":"Text"}},"CT:PostId":{"KnownId":{"Ty":"Json"}},"CT:Tags":{"KnownId":{"Ty":"Json"}}}

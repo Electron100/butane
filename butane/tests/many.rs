@@ -45,6 +45,33 @@ struct AutoItem {
 }
 
 #[butane_test]
+async fn r_hash_struct_member_many(conn: ConnectionAsync) {
+    #[model]
+    #[derive(Debug, Default)]
+    pub struct StructWithReservedWordMemberMany {
+        id: String,
+
+        r#type: Many<Tag>,
+    }
+
+    let tag = create_tag(&conn, "reserved_rust_word").await;
+
+    let mut foo = StructWithReservedWordMemberMany::default();
+    foo.id = "1".to_string();
+    foo.r#type.add(&tag).unwrap();
+    foo.save(&conn).await.unwrap();
+
+    let retrieved = StructWithReservedWordMemberMany::get(&conn, "1")
+        .await
+        .unwrap();
+
+    assert_eq!(retrieved.r#type.load(&conn).await.unwrap().count(), 1);
+    let saved_tags: Vec<&Tag> = retrieved.r#type.get().unwrap().into_iter().collect();
+    assert_eq!(saved_tags.len(), 1);
+    assert_eq!(saved_tags[0].tag, "reserved_rust_word");
+}
+
+#[butane_test]
 async fn load_sorted_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();

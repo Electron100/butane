@@ -301,10 +301,9 @@ fn fieldexpr_func(
             )
         }
     };
-    let fnid = Ident::new(&format!("{fid}"), f.span());
     quote!(
         /// Create query expression.
-        #vis fn #fnid(&self) -> #field_expr_type {
+        #vis fn #fid(&self) -> #field_expr_type {
             #field_expr_ctor
         }
     )
@@ -324,7 +323,9 @@ fn field_ident_lit(f: &Field) -> TokenStream2 {
 }
 
 fn fields_type(tyname: &Ident) -> Ident {
-    Ident::new(&format!("{tyname}Fields"), Span::call_site())
+    let name = tyname.to_string();
+    let name = name.strip_prefix("r#").unwrap_or(&name);
+    Ident::new(&format!("{name}Fields"), Span::call_site())
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
@@ -371,16 +372,19 @@ where
 }
 
 fn many_table_lit(ast_struct: &ItemStruct, field: &Field, config: &Config) -> LitStr {
-    let ident = field
-        .ident
-        .clone()
-        .expect("Fields must be named for butane");
+    let field_name = if let Some(name) = &field.ident {
+        name.to_string()
+    } else {
+        panic!("Fields must be named for butane");
+    };
+    let field_name = field_name.strip_prefix("r#").unwrap_or(&field_name);
     let binding = ast_struct.ident.to_string();
     let tyname = match &config.table_name {
         Some(s) => s,
         None => &binding,
     };
-    make_lit(&format!("{}_{}{MANY_SUFFIX}", &tyname, &ident))
+    let table_name = tyname.strip_prefix("r#").unwrap_or(tyname);
+    make_lit(&format!("{table_name}_{field_name}{MANY_SUFFIX}"))
 }
 
 fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {

@@ -267,6 +267,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlparser",
+ "test-log",
  "tokio",
  "tokio-postgres",
  "tokio-test",

@@ -278,3 +278,35 @@ async fn inline_json(conn: ConnectionAsync) {
     let foo3 = OuterFoo::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
 }
+
+#[butane_test]
+async fn r_hash_field_type_newtype_json(conn: ConnectionAsync) {
+    #[derive(Clone, Debug, Default, FieldType, PartialEq, serde::Serialize, serde::Deserialize)]
+    #[allow(non_camel_case_types)]
+    pub struct r#for {
+        id: u64,
+        r#type: String,
+    }
+
+    #[model]
+    #[derive(Debug, Default)]
+    pub struct StructWithReservedWordMemberJson {
+        id: String,
+
+        r#type: r#for,
+    }
+
+    let mut foo = StructWithReservedWordMemberJson::default();
+    foo.id = "1".to_string();
+    let expected = r#for {
+        id: 1,
+        r#type: "test".to_string(),
+    };
+    foo.r#type = expected.clone();
+    foo.save(&conn).await.unwrap();
+
+    let retrieved = StructWithReservedWordMemberJson::get(&conn, "1")
+        .await
+        .unwrap();
+    assert_eq!(retrieved.r#type, expected);
+}

@@ -4,8 +4,8 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{spanned::Spanned, Field, ItemStruct, LitStr};
 
 use super::{
-    fields, get_autopk_sql_type, get_type_argument, is_auto, is_many_to_many, is_row_field,
-    make_ident_literal_str, make_lit, pk_field, MANY_TYNAMES,
+    extract_path_from_type, fields, get_autopk_sql_type, get_type_argument, is_auto,
+    is_many_to_many, is_row_field, make_ident_literal_str, make_lit, pk_field, MANY_TYNAMES,
 };
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
 use crate::SqlType;
@@ -391,7 +391,8 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
     let pk_field = pk_field.unwrap();
     for f in fields(ast_struct) {
         if is_auto(f) {
-            match get_autopk_sql_type(&f.ty) {
+            let path = extract_path_from_type(&f.ty);
+            match get_autopk_sql_type(path) {
                 Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Int))) => (),
                 Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::BigInt))) => (),
                 _ => {

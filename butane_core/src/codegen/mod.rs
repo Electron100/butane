@@ -1,4 +1,9 @@
-//! Code-generation backend
+//! Code-generation backend.
+//!
+//! Any public member is only for use in `butane_codegen` crate, and
+//! all members of this module are hidden from the documentation, and
+//! may change at any time without warning.
+#![doc(hidden)]
 
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span, TokenTree};
@@ -156,7 +161,7 @@ where
     if let Ok(type_alias) = type_alias {
         tyinfo = Some(CustomTypeInfo {
             name: type_alias.ident.to_string(),
-            ty: get_deferred_sql_type(&type_alias.ty),
+            ty: get_deferred_sql_type(extract_path_from_type(&type_alias.ty)),
         })
     }
 
@@ -280,45 +285,39 @@ fn fields(ast_struct: &ItemStruct) -> impl Iterator<Item = &Field> {
     ast_struct.fields.iter()
 }
 
-fn get_option_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    get_type_argument(ty, &OPTION_TYNAMES).map(|path| {
-        let inner_ty: syn::Type = syn::TypePath {
-            qself: None,
-            path: path.clone(),
+/// Extract the path from a type.
+///
+/// Requires that the type is a `TypePath` (e.g. `i8` or `Foo<T>`).
+pub fn extract_path_from_type(ty: &syn::Type) -> &syn::Path {
+    if let syn::Type::Path(type_path) = ty {
+        if type_path.qself.is_some() {
+            panic!("TypePath with qself is not supported by butane");
         }
-        .into();
+        &type_path.path
+    } else {
+        panic!("butane codegen only supports TypePath types");
+    }
+}
 
-        get_deferred_sql_type(&inner_ty)
-    })
+fn get_option_sql_type(path: &syn::Path) -> Option<DeferredSqlType> {
+    get_path_argument(path, &OPTION_TYNAMES).map(get_deferred_sql_type)
 }
 
 fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
     if let Some(inner_type_path) = get_type_argument(&field.ty, &OPTION_TYNAMES) {
-        let inner_ty: syn::Type = syn::TypePath {
-            qself: None,
-            path: inner_type_path.clone(),
-        }
-        .into();
-
-        return get_foreign_sql_type(&inner_ty, &FKEY_TYNAMES);
+        return get_foreign_sql_type(inner_type_path, &FKEY_TYNAMES);
     }
-    get_foreign_sql_type(&field.ty, &FKEY_TYNAMES)
+    let path = extract_path_from_type(&field.ty);
+    get_foreign_sql_type(path, &FKEY_TYNAMES)
 }
 
 fn get_many_sql_type(field: &Field) -> Option<DeferredSqlType> {
-    get_foreign_sql_type(&field.ty, &MANY_TYNAMES)
+    let path = extract_path_from_type(&field.ty);
+    get_foreign_sql_type(path, &MANY_TYNAMES)
 }
 
-fn get_autopk_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    get_type_argument(ty, &AUTOPK_TYNAMES).map(|path| {
-        let inner_ty: syn::Type = syn::TypePath {
-            qself: None,
-            path: path.clone(),
-        }
-        .into();
-
-        get_deferred_sql_type(&inner_ty)
-    })
+fn get_autopk_sql_type(path: &syn::Path) -> Option<DeferredSqlType> {
+    get_path_argument(path, &AUTOPK_TYNAMES).map(get_deferred_sql_type)
 }
 
 fn is_many_to_many(field: &Field) -> bool {
@@ -353,12 +352,18 @@ fn is_same_path_ident(path1: &syn::Path, path2: &syn::Path) -> bool {
 }
 
 /// Gets the type argument of a type.
-/// E.g. for Foo<T>, returns T
+/// E.g. for `Foo<T>`, returns `T`.
 fn get_type_argument<'a>(ty: &'a syn::Type, tynames: &[&'static str]) -> Option<&'a syn::Path> {
     let path = match ty {
         syn::Type::Path(path) => &path.path,
         _ => return None,
     };
+    get_path_argument(path, tynames)
+}
+
+/// Gets the type argument of a path.
+/// E.g. for `Foo<T>``, returns `T`.
+fn get_path_argument<'a>(path: &'a syn::Path, tynames: &[&'static str]) -> Option<&'a syn::Path> {
     if !tynames
         .iter()
         .any(|tyname| match syn::parse_str::<syn::Path>(tyname) {
@@ -383,9 +388,9 @@ fn get_type_argument<'a>(ty: &'a syn::Type, tynames: &[&'static str]) -> Option<
     }
 }
 
-fn get_foreign_sql_type(ty: &syn::Type, tynames: &[&'static str]) -> Option<DeferredSqlType> {
-    let typath = get_type_argument(ty, tynames);
-    typath.map(|typath| {
+fn get_foreign_sql_type(path: &syn::Path, tynames: &[&'static str]) -> Option<DeferredSqlType> {
+    let path = get_path_argument(path, tynames);
+    path.map(|typath| {
         DeferredSqlType::Deferred(TypeKey::PK(
             typath
                 .segments
@@ -400,21 +405,25 @@ fn get_foreign_sql_type(ty: &syn::Type, tynames: &[&'static str]) -> Option<Defe
 /// Determine whether a type refers to a data type that is supported directly by butane,
 /// or is a custom defined struct.
 /// It looks inside an [Option] or [crate::fkey::ForeignKey] to determine the inner type.
-pub fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
-    get_primitive_sql_type(ty)
-        .or_else(|| get_option_sql_type(ty))
-        .or_else(|| get_foreign_sql_type(ty, &FKEY_TYNAMES))
-        .or_else(|| get_autopk_sql_type(ty))
+pub fn get_deferred_sql_type(path: &syn::Path) -> DeferredSqlType {
+    get_primitive_sql_type(path)
+        .or_else(|| get_option_sql_type(path))
+        .or_else(|| get_foreign_sql_type(path, &FKEY_TYNAMES))
+        .or_else(|| get_autopk_sql_type(path))
         .unwrap_or_else(|| {
             DeferredSqlType::Deferred(TypeKey::CustomType(
-                ty.clone().into_token_stream().to_string().replace(' ', ""),
+                path.clone()
+                    .into_token_stream()
+                    .to_string()
+                    .replace(' ', ""),
             ))
         })
 }
 
-/// Defaults are used for fields added by later migrations
-/// Example
-/// #[default = 42]
+/// Defaults are used for fields added by later migrations.
+///
+/// Example:
+/// `#[default = 42]`
 fn get_default(field: &Field) -> std::result::Result<Option<SqlVal>, CompilerErrorMsg> {
     let attr: Option<&Attribute> = field
         .attrs
@@ -441,40 +450,47 @@ fn some_known(ty: SqlType) -> Option<DeferredSqlType> {
     Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(ty)))
 }
 
-/// If the field refers to a primitive, return its SqlType
-pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    if *ty == parse_quote!(bool) {
+/// If the field refers to a primitive, return its SqlType.
+pub fn get_primitive_sql_type(path: &syn::Path) -> Option<DeferredSqlType> {
+    if *path == parse_quote!(bool) {
         return some_known(SqlType::Bool);
-    } else if *ty == parse_quote!(u8)
-        || *ty == parse_quote!(i8)
-        || *ty == parse_quote!(u16)
-        || *ty == parse_quote!(i16)
-        || *ty == parse_quote!(u16)
-        || *ty == parse_quote!(i32)
+    } else if *path == parse_quote!(u8)
+        || *path == parse_quote!(i8)
+        || *path == parse_quote!(u16)
+        || *path == parse_quote!(i16)
+        || *path == parse_quote!(u16)
+        || *path == parse_quote!(i32)
     {
         return some_known(SqlType::Int);
-    } else if *ty == parse_quote!(u32) || *ty == parse_quote!(i64) {
+    } else if *path == parse_quote!(u32) || *path == parse_quote!(i64) {
         // Future improvement: better support unsigned integers
         // here. Sqlite has no u64, though Postgres does
         return some_known(SqlType::BigInt);
-    } else if *ty == parse_quote!(f32) || *ty == parse_quote!(f64) {
+    } else if *path == parse_quote!(f32) || *path == parse_quote!(f64) {
         return some_known(SqlType::Real);
-    } else if *ty == parse_quote!(String)
-        || *ty == parse_quote!(std::string::String)
-        || *ty == parse_quote!(::std::string::String)
+    } else if *path == parse_quote!(String)
+        || *path == parse_quote!(std::string::String)
+        || *path == parse_quote!(::std::string::String)
     {
         return some_known(SqlType::Text);
-    } else if *ty == parse_quote!(Vec<u8>)
-        || *ty == parse_quote!(std::vec::Vec<u8>)
-        || *ty == parse_quote!(::std::vec::Vec<u8>)
+    } else if *path == parse_quote!(Vec<u8>)
+        || *path == parse_quote!(std::vec::Vec<u8>)
+        || *path == parse_quote!(::std::vec::Vec<u8>)
     {
         return some_known(SqlType::Blob);
     }
 
     #[cfg(feature = "json")]
     {
-        if *ty == parse_quote!(serde_json::Value) || *ty == parse_quote!(Value) {
+        if *path == parse_quote!(serde_json::Value) || *path == parse_quote!(Value) {
             return some_known(SqlType::Json);
+        }
+    }
+
+    #[cfg(feature = "uuid")]
+    {
+        if *path == parse_quote!(Uuid) || *path == parse_quote!(uuid::Uuid) {
+            return some_known(SqlType::Blob);
         }
     }
 
@@ -485,7 +501,11 @@ pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         // is a strong argument for proc macros being the wrong time
         // to run the full migration generation. We expect these types
         // to come from chrono, but we don't really know for sure...
-        if let Some(syn::PathSegment { ident, arguments }) = last_path_segment(ty) {
+        let ty = syn::Type::Path(syn::TypePath {
+            path: path.clone(),
+            qself: None,
+        });
+        if let Some(syn::PathSegment { ident, arguments }) = last_path_segment(&ty) {
             match ident.to_string().as_str() {
                 "NaiveDateTime" => return some_known(SqlType::Timestamp),
                 "DateTime" => {
@@ -502,13 +522,6 @@ pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
                 "NaiveDate" => return some_known(SqlType::Date),
                 _ => {}
             }
-        }
-    }
-
-    #[cfg(feature = "uuid")]
-    {
-        if *ty == parse_quote!(Uuid) || *ty == parse_quote!(uuid::Uuid) {
-            return some_known(SqlType::Blob);
         }
     }
 

@@ -246,8 +246,9 @@ pub fn derive_field_type(input: TokenStream) -> TokenStream {
         }) => {
             if unnamed.len() == 1 {
                 let field = unnamed.first().unwrap();
+                let path = codegen::extract_path_from_type(&field.ty);
                 if let Some(DeferredSqlType::KnownId(TypeIdentifier::Ty(sqltype))) =
-                    codegen::get_primitive_sql_type(&field.ty)
+                    codegen::get_primitive_sql_type(path)
                 {
                     return derive_field_type_for_newtype(ident, sqltype);
                 }

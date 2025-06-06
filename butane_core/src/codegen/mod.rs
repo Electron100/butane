@@ -5,7 +5,6 @@ use proc_macro2::{Ident, Span, TokenTree};
 use quote::{quote, ToTokens};
 use regex::Regex;
 use syn::ext::IdentExt as _;
-use syn::parse_quote;
 use syn::{
     punctuated::Punctuated, Attribute, Field, ItemEnum, ItemStruct, ItemType, Lit, LitStr, Meta,
     MetaNameValue,
@@ -361,7 +360,7 @@ fn is_same_path_ident(path1: &syn::Path, path2: &syn::Path) -> bool {
 }
 
 /// Gets the type argument of a type.
-/// E.g. for Foo<T>, returns T
+/// E.g. for `Foo<T>``, returns `T`.
 fn get_type_argument<'a>(ty: &'a syn::Type, tynames: &[&'static str]) -> Option<&'a syn::Path> {
     let path = match ty {
         syn::Type::Path(path) => &path.path,
@@ -410,16 +409,13 @@ fn get_foreign_sql_type(ty: &syn::Type, tynames: &[&'static str]) -> Option<Defe
 /// or is a custom defined struct.
 /// It looks inside an [Option] or [crate::fkey::ForeignKey] to determine the inner type.
 pub fn get_deferred_sql_type(ty: &syn::Type) -> DeferredSqlType {
+    assert!(matches!(ty, syn::Type::Path(syn::TypePath { qself: None, .. })));
+
     get_primitive_sql_type(ty)
         .or_else(|| get_option_sql_type(ty))
         .or_else(|| get_foreign_sql_type(ty, &FKEY_TYNAMES))
         .or_else(|| get_autopk_sql_type(ty))
         .unwrap_or_else(|| {
-            let name = ty.clone().into_token_stream().to_string();
-            eprintln!("ty: {name}");
-            if name.starts_with("r#") {
-                panic!(" {name}  .");
-            }
             DeferredSqlType::Deferred(TypeKey::CustomType(
                 ty.clone().into_token_stream().to_string().replace(' ', ""),
             ))
@@ -457,41 +453,48 @@ fn some_known(ty: SqlType) -> Option<DeferredSqlType> {
 
 /// If the field refers to a primitive, return its SqlType
 pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
-    assert!(matches!(ty, syn::Type::Path(_)));
-    // is this always a path?
-    if *ty == parse_quote!(bool) {
-        return some_known(SqlType::Bool);
-    } else if *ty == parse_quote!(u8)
-        || *ty == parse_quote!(i8)
-        || *ty == parse_quote!(u16)
-        || *ty == parse_quote!(i16)
-        || *ty == parse_quote!(u16)
-        || *ty == parse_quote!(i32)
-    {
-        return some_known(SqlType::Int);
-    } else if *ty == parse_quote!(u32) || *ty == parse_quote!(i64) {
-        // Future improvement: better support unsigned integers
-        // here. Sqlite has no u64, though Postgres does
-        return some_known(SqlType::BigInt);
-    } else if *ty == parse_quote!(f32) || *ty == parse_quote!(f64) {
-        return some_known(SqlType::Real);
-    } else if *ty == parse_quote!(String)
-        || *ty == parse_quote!(std::string::String)
-        || *ty == parse_quote!(::std::string::String)
-    {
-        return some_known(SqlType::Text);
-    } else if *ty == parse_quote!(Vec<u8>)
-        || *ty == parse_quote!(std::vec::Vec<u8>)
-        || *ty == parse_quote!(::std::vec::Vec<u8>)
-    {
-        return some_known(SqlType::Blob);
-    }
+    assert!(matches!(ty, syn::Type::Path(syn::TypePath { qself: None, .. })));
 
-    #[cfg(feature = "json")]
+    let name = if let syn::Type::Path(syn::TypePath { qself: None, path }) = ty
     {
-        if *ty == parse_quote!(serde_json::Value) || *ty == parse_quote!(Value) {
+        if let Some(ident) = path.get_ident() {
+            ident.unraw().to_string()
+        } else {
+            return None; // No identifier, not a primitive
+        }
+    } else {
+        return None;
+    };
+    let name = name.as_str();
+
+    match name {
+        "bool" => return some_known(SqlType::Bool),
+        "i8" | "u8" | "i16" | "u16" | "i32" => {
+            return some_known(SqlType::Int);
+        }
+        "u32" | "i64" => {
+            // Future improvement: better support unsigned integers
+            // here. Sqlite has no u64, though Postgres does
+            return some_known(SqlType::BigInt);
+        }
+        "f32" | "f64" => {
+            return some_known(SqlType::Real);
+        }
+        "String" | "std::string::String" | "::std::string::String" => {
+            return some_known(SqlType::Text);
+        }
+        "Vec<u8>" | "std::vec::Vec<u8>" | "::std::vec::Vec<u8>" => {
+            return some_known(SqlType::Blob);
+        }
+        #[cfg(feature = "json")]
+        "Value"| "serde_json::Value" => {
             return some_known(SqlType::Json);
         }
+        #[cfg(feature = "uuid")]
+        "Uuid" | "uuid::Uuid" => {
+            return some_known(SqlType::Blob);
+        }
+        _ => {}
     }
 
     #[cfg(feature = "datetime")]
@@ -502,7 +505,7 @@ pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
         // to run the full migration generation. We expect these types
         // to come from chrono, but we don't really know for sure...
         if let Some(syn::PathSegment { ident, arguments }) = last_path_segment(ty) {
-            match ident.to_string().as_str() {
+            match ident.unraw().to_string().as_str() {
                 "NaiveDateTime" => return some_known(SqlType::Timestamp),
                 "DateTime" => {
                     // Only if the parameter is UTC, as we don't support attached
@@ -518,13 +521,6 @@ pub fn get_primitive_sql_type(ty: &syn::Type) -> Option<DeferredSqlType> {
                 "NaiveDate" => return some_known(SqlType::Date),
                 _ => {}
             }
-        }
-    }
-
-    #[cfg(feature = "uuid")]
-    {
-        if *ty == parse_quote!(Uuid) || *ty == parse_quote!(uuid::Uuid) {
-            return some_known(SqlType::Blob);
         }
     }
 

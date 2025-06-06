@@ -44,12 +44,7 @@ fn primitive_sql_type() {
 
     let type_path: syn::TypePath = syn::parse_quote!(Option<i8>);
     let typ = syn::Type::Path(type_path);
-    let rv = get_primitive_sql_type(&typ).unwrap();
-    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
-        assert_eq!(sql_type, SqlType::Int);
-    } else {
-        panic!()
-    }
+    assert!(get_primitive_sql_type(&typ).is_none())
 }
 
 
@@ -219,11 +214,10 @@ fn r_hash_struct_name() {
     let fkey_item: syn::ItemStruct = parse_quote! {
         pub struct fkey {
             id: u32,
-            foo: ForeignType<r#type>,
+            foo: ForeignKey<r#type>,
         }
     };
 
-    let foo: r#bool = true;
     let tokens = fkey_item.to_token_stream();
     let _model = model_with_migrations(tokens, &mut migrations);
     let migration = migrations.current();

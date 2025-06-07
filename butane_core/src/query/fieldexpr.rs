@@ -10,6 +10,7 @@ use crate::DataObject;
 
 macro_rules! binary_op {
     ($func_name:ident, $bound:path, $cond:ident) => {
+        /// Creates a [BoolExpr] which evalutes this column against `val`.
         pub fn $func_name<U>(&self, val: &U) -> BoolExpr
         where
             T: $bound,
@@ -27,6 +28,7 @@ impl<T> DataOrd<T> for Option<T> where T: PartialOrd<T> + FieldType {}
 impl<T> DataOrd<T> for T where T: PartialOrd<T> + FieldType {}
 
 /// Used to implement the `query!` and `filter!` macros.
+/// Manual use of this type is not recommended, but not prohibited.
 #[derive(Clone, Debug)]
 pub struct FieldExpr<T>
 where
@@ -40,6 +42,7 @@ impl<T> FieldExpr<T>
 where
     T: Into<SqlVal>,
 {
+    // Creates a `FieldExpr` from its name.
     pub fn new(name: &'static str) -> Self {
         FieldExpr {
             name,
@@ -47,6 +50,7 @@ where
         }
     }
 
+    /// Returns the name of this field.
     pub fn name(&self) -> &'static str {
         self.name
     }
@@ -58,6 +62,9 @@ where
     binary_op!(le, DataOrd<U>, Le);
     binary_op!(ge, DataOrd<U>, Ge);
 
+    /// Creates a [BoolExpr] which will evaluate to true if
+    /// the value of this field is "like" `val`, where
+    /// "like" is evaluated as the SQL LIKE operator.
     pub fn like<U>(&self, val: U) -> BoolExpr
     where
         U: ToSql,
@@ -65,6 +72,8 @@ where
         BoolExpr::Like(self.name, Expr::Val(val.to_sql()))
     }
 
+    /// Creates a [BoolExpr] which will evaluate to true if
+    /// the value of this field is contained in `vals`.
     pub fn is_in<U: ToSql>(&self, vals: Vec<U>) -> BoolExpr {
         BoolExpr::In(self.name, vals.into_iter().map(|v| v.to_sql()).collect())
     }

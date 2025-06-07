@@ -20,6 +20,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Electron100/butane"
 version = "0.8.0"
+rust-version = "1.80.0"
 
 [workspace.dependencies]
 async-trait = "0.1"
@@ -41,8 +42,8 @@ fake = "4.2"
 log = "0.4"
 maybe-async-cfg = { version = "0.2.5", default-features = false }
 nonempty = "0.11"
-once_cell = "1.5.2"
 paste = "1.0.11"
+postgres-native-tls = "0.5"
 pretty_assertions = "1.4"
 proc-macro2 = { version = "1.0", default-features = false }
 quote = { version = "1.0", default-features = false }
@@ -54,6 +55,7 @@ serde_json = "1.0"
 sqlparser = "0.56"
 syn = { version = "2", features = ["extra-traits", "full"] }
 tempfile = "3.10"
+test-log = { version = "0.2", features = ["log", "trace"] }
 thiserror = "2.0"
 tokio = { version = "1"}
 tokio-postgres = "0.7"

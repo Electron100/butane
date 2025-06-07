@@ -54,14 +54,20 @@ async fn load_sorted_from_many(conn: ConnectionAsync) {
         "This post is about a fast cat.",
         &cats_blog,
     );
+    post.save(&conn).await.unwrap();
+
     let tag_fast = create_tag(&conn, "fast").await;
     let tag_cat = create_tag(&conn, "cat").await;
     let tag_european = create_tag(&conn, "european").await;
+    let tags = vec![tag_fast, tag_cat, tag_european];
 
-    post.tags.add(&tag_fast).unwrap();
-    post.tags.add(&tag_cat).unwrap();
-    post.tags.add(&tag_european).unwrap();
-    post.save(&conn).await.unwrap();
+    post.tags.set(&conn, tags).await.unwrap();
+
+    let saved_tags: Vec<&Tag> = post.tags.get().unwrap().into_iter().collect();
+    assert_eq!(saved_tags.len(), 3);
+    assert_eq!(saved_tags[0].tag, "fast");
+    assert_eq!(saved_tags[1].tag, "cat");
+    assert_eq!(saved_tags[2].tag, "european");
 
     let post2 = Post::get(&conn, post.id).await.unwrap();
     let mut tag_iter = post2
@@ -72,6 +78,7 @@ async fn load_sorted_from_many(conn: ConnectionAsync) {
     assert_eq!(tag_iter.next().unwrap().tag, "cat");
     assert_eq!(tag_iter.next().unwrap().tag, "european");
     assert_eq!(tag_iter.next().unwrap().tag, "fast");
+    assert!(tag_iter.next().is_none());
 
     let post3 = Post::get(&conn, post.id).await.unwrap();
     let mut tag_iter = post3
@@ -82,6 +89,7 @@ async fn load_sorted_from_many(conn: ConnectionAsync) {
     assert_eq!(tag_iter.next().unwrap().tag, "fast");
     assert_eq!(tag_iter.next().unwrap().tag, "european");
     assert_eq!(tag_iter.next().unwrap().tag, "cat");
+    assert!(tag_iter.next().is_none());
 }
 
 #[butane_test]
@@ -164,6 +172,11 @@ async fn delete_all_from_many(conn: ConnectionAsync) {
 
     post.tags.delete(&conn).await.unwrap();
 
+    // Verify that the tags are deleted from the Many object
+    let tags: Vec<&Tag> = post.tags.get().unwrap().collect();
+    assert_eq!(tags.len(), 0);
+
+    // Verify that the tags are deleted from the database
     let post2 = Post::get(&conn, post.id).await.unwrap();
     assert_eq!(post2.tags.load(&conn).await.unwrap().count(), 0);
 }

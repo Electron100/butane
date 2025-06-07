@@ -16,11 +16,6 @@ use crate::util::get_or_init_once_lock;
 use crate::util::get_or_init_once_lock_async;
 use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlType, SqlVal, ToSql};
 
-fn default_oc<T>() -> OnceLock<Vec<T>> {
-    // Same as impl Default for once_cell::unsync::OnceCell
-    OnceLock::new()
-}
-
 /// Used to implement a many-to-many relationship between models.
 ///
 /// Creates a new table with columns "owner" and "has" If type T has a
@@ -43,7 +38,7 @@ where
     #[serde(skip)]
     removed_values: Vec<SqlVal>,
     #[serde(skip)]
-    #[serde(default = "default_oc")]
+    #[serde(default = "OnceLock::new")]
     all_values: OnceLock<Vec<T>>,
 }
 impl<T> Many<T>
@@ -78,8 +73,11 @@ where
         self.all_values = OnceLock::new();
     }
 
-    /// Adds a value. Returns Err(ValueNotSaved) if the
-    /// provided value uses automatic primary keys and appears
+    /// Adds a value, yet to be performed in the backend.
+    ///
+    /// After invoking this, `get()` can not be used until `save()` is performed.
+    ///
+    /// Returns Err(ValueNotSaved) if the provided value uses automatic primary keys and appears
     /// to have an uninitialized one.
     pub fn add(&mut self, new_val: &T) -> Result<()> {
         // Check for uninitialized pk
@@ -93,14 +91,18 @@ where
         Ok(())
     }
 
-    /// Removes a value.
+    /// Removes a value, yet to be performed in the backend
+    ///
+    /// After invoking this, `get()` can not be used until `save()` is performed.
     pub fn remove(&mut self, val: &T) {
         // all_values is now out of date, so clear it
         self.all_values = OnceLock::new();
         self.removed_values.push(val.pk().to_sql())
     }
 
-    /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
+    /// Returns already loaded values.
+    ///
+    /// Returns [`Error::ValueNotLoaded`] if `load()` has not been invoked prior.
     pub fn get(&self) -> Result<impl Iterator<Item = &T>> {
         self.all_values
             .get()
@@ -108,8 +110,7 @@ where
             .map(|v| v.iter())
     }
 
-    /// Query the values referred to by this many relationship from the
-    /// database if necessary and returns a reference to them.
+    /// Provide a Query for the values referred to by this many relationship.
     fn query(&self) -> Result<Query<T>> {
         let owner: &SqlVal = match &self.owner {
             Some(o) => o,
@@ -192,14 +193,26 @@ where
     async(feature = "async")
 )]
 pub trait ManyOps<T: DataObject> {
+    /// Save all unsaved relation changes to the backend.
+    ///
     /// Used by macro-generated code. You do not need to call this directly.
+    ///
+    /// This will insert added values first, and then remove the removed values.
+    /// Use inside a transaction to provide atomicity.
     async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
-    /// Delete all references from the database, and any unsaved additions.
+    /// Delete all references from the backend, and any unsaved additions.
+    ///
+    /// This operation is atomic.
     async fn delete(&mut self, conn: &impl ConnectionMethods) -> Result<()>;
 
-    /// Loads the values referred to by this many relationship from the
-    /// database if necessary and returns a reference to them.
+    /// Overwrite the references in the backend, and clears unsaved additions.
+    ///
+    /// This will call `delete()` first, and then insert the items scheduled to be added.
+    /// Use inside a transaction to provide atomicity.
+    async fn set(&mut self, conn: &impl ConnectionMethods, values: Vec<T>) -> Result<()>;
+
+    /// Loads the values referred to by this many relationship from the backend if necessary.
     async fn load<'a>(
         &'a self,
         conn: &impl ConnectionMethods,
@@ -207,8 +220,7 @@ pub trait ManyOps<T: DataObject> {
     where
         T: 'a;
 
-    /// Loads and orders the values referred to by this many relationship from a
-    /// database if necessary and returns a reference to them.
+    /// Loads and orders the values referred to by this many relationship from the backend if necessary.
     async fn load_ordered<'a>(
         &'a self,
         conn: &impl ConnectionMethods,
@@ -263,8 +275,20 @@ impl<T: DataObject> ManyOps<T> for Many<T> {
         .await?;
         self.new_values.clear();
         self.removed_values.clear();
-        // all_values is now out of date, so clear it
-        self.all_values = OnceLock::new();
+        // all_values is now out of date, so empty it
+        self.all_values = OnceLock::from(Vec::new());
+        Ok(())
+    }
+
+    async fn set(&mut self, conn: &impl ConnectionMethods, values: Vec<T>) -> Result<()> {
+        ManyOps::delete(self, conn).await?;
+
+        for value in &values {
+            self.add(value)?;
+        }
+        ManyOps::save(self, conn).await?;
+
+        self.all_values = OnceLock::from(values);
         Ok(())
     }
 

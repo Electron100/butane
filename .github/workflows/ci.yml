@@ -47,6 +47,7 @@ jobs:
         sudo cat /etc/postgresql/16/main/pg_hba.conf
         sudo service postgresql restart && sleep 3
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
+        echo "/usr/lib/postgresql/16/bin" >> $GITHUB_PATH
     - name: Setup PostgreSQL on MacOS
       if: runner.os == 'macOS'
       run: |
@@ -109,6 +110,8 @@ jobs:
       run: |
         set -ex
         make regenerate-example-migrations
+        # TODO: This file is created by one of the tests on Windows
+        rm -f butane_core/sqlite
         git add -A
         git diff --cached --exit-code
     - name: Run tests in examples

@@ -1,8 +1,8 @@
 use syn::{Field, ItemStruct};
 
 use super::{
-    dbobj, fields, get_default, get_deferred_sql_type, get_many_sql_type, is_auto, is_foreign_key,
-    is_many_to_many, is_option, is_row_field, is_unique, pk_field,
+    dbobj, extract_path_from_type, fields, get_default, get_deferred_sql_type, get_many_sql_type,
+    is_auto, is_foreign_key, is_many_to_many, is_option, is_row_field, is_unique, pk_field,
 };
 use crate::migrations::adb::{create_many_table, AColumn, ARef, ATable, DeferredSqlType, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
@@ -47,7 +47,8 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
             .expect("db object fields must be named")
             .to_string();
         if is_row_field(f) {
-            let deferred_type = get_deferred_sql_type(&f.ty);
+            let path = extract_path_from_type(&f.ty);
+            let deferred_type = get_deferred_sql_type(path);
             let mut col = AColumn::new(
                 name,
                 deferred_type.clone(),
@@ -83,7 +84,8 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .as_ref()
         .expect("fields must be named")
         .to_string();
-    let pk_field_type = get_deferred_sql_type(&pk_field.ty);
+    let pk_field_path = extract_path_from_type(&pk_field.ty);
+    let pk_field_type = get_deferred_sql_type(pk_field_path);
 
     create_many_table(
         main_table_name,

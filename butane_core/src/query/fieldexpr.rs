@@ -10,7 +10,7 @@ use crate::DataObject;
 
 macro_rules! binary_op {
     ($func_name:ident, $bound:path, $cond:ident) => {
-        /// Creates a [BoolExpr] which evalutes this column against `val`.
+        /// Creates a [BoolExpr] which evaluates this column against `val`.
         pub fn $func_name<U>(&self, val: &U) -> BoolExpr
         where
             T: $bound,

@@ -10,8 +10,10 @@ categories = ["database"]
 license.workspace = true
 repository.workspace = true
 documentation = "https://docs.rs/butane/"
+rust-version.workspace = true
 
 [features]
+bin = ["ctrlc"]
 default = ["sqlite", "pg"]
 sqlite = ["butane_core/sqlite", "butane_core/async-adapter"]
 sqlite-bundled = ["butane_core/sqlite-bundled"]
@@ -20,12 +22,13 @@ pg = ["butane_core/pg", "tokio-postgres"]
 [dependencies]
 block-id = "0.2"
 butane_core = { workspace = true }
+ctrlc = { version = "3.4", optional = true }
 env_logger.workspace = true
 libc = "0.2"
 log.workspace = true
 maybe-async-cfg.workspace = true
 nonempty.workspace = true
-once_cell = { workspace = true }
+thiserror.workspace = true
 tokio-postgres = { features = ["with-geo-types-0_7"], optional = true, workspace = true }
 rand.workspace = true
 tempfile.workspace = true
@@ -33,3 +36,10 @@ uuid = { features = ["v4"], workspace = true }
 
 [package.metadata.release]
 release = false
+
+[[bin]]
+bench = false
+name = "pg_tmp_server"
+path = "src/bin/pg_tmp_server.rs"
+required-features = ["bin", "pg"]
+test = false

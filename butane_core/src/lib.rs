@@ -156,7 +156,12 @@ pub trait DataObjectOps<T: DataObject> {
             .nth(0))
     }
 
-    /// Save the object to the database.
+    /// Save the object to the database, handling both inserts and updates.
+    ///
+    /// If the object has an AutoPk that is uninitialized, save will always
+    /// perform an insert. If the AutoPk is initialized or there is no AutoPk,
+    /// save will perform an upsert (insert or replace).
+    /// After saving the main object, many-to-many relationships it holds are also saved.
     async fn save(&mut self, conn: &impl ConnectionMethods) -> Result<()>
     where
         Self: DataObject,
@@ -260,6 +265,8 @@ pub enum Error {
     UriParse(#[from] url::ParseError),
     #[error("Unknown backend {0}")]
     UnknownBackend(String),
+    #[error("Unknown connect string {0}")]
+    UnknownConnectString(String),
     #[error("Range error")]
     OutOfRange,
     #[error("Internal logic error {0}")]

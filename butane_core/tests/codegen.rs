@@ -1,4 +1,6 @@
-use butane_core::codegen::{get_deferred_sql_type, make_ident_literal_str, make_lit};
+use butane_core::codegen::{
+    get_deferred_sql_type, get_primitive_sql_type, make_ident_literal_str, make_lit,
+};
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
 use butane_core::SqlType;
 use proc_macro2::Span;
@@ -19,67 +21,84 @@ fn make_litstr_from_str() {
 }
 
 #[test]
-fn test_get_deferred_sql_type() {
-    // primitive type
-    let type_path: syn::TypePath = syn::parse_quote!(i8);
-    let typ = syn::Type::Path(type_path);
-    let rv = get_deferred_sql_type(&typ);
+fn primitive_sql_type() {
+    let path: syn::Path = syn::parse_quote!(i8);
+    let rv = get_primitive_sql_type(&path).unwrap();
     if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
         assert_eq!(sql_type, SqlType::Int);
     } else {
         panic!()
     }
 
-    let type_path: syn::TypePath = syn::parse_quote!(Option<i8>);
-    let typ = syn::Type::Path(type_path);
-    let rv = get_deferred_sql_type(&typ);
+    let path: syn::Path = syn::parse_quote!(Option<i8>);
+    assert!(get_primitive_sql_type(&path).is_none());
+}
+
+#[test]
+fn deferred_sql_type_primitive() {
+    let path: syn::Path = syn::parse_quote!(i8);
+    let rv = get_deferred_sql_type(&path);
     if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
         assert_eq!(sql_type, SqlType::Int);
     } else {
         panic!()
     }
 
-    // custom types
-    let type_path: syn::TypePath = syn::parse_quote!(Foo);
-    let typ = syn::Type::Path(type_path);
-    let rv = get_deferred_sql_type(&typ);
+    let path: syn::Path = syn::parse_quote!(Option<i8>);
+    let rv = get_deferred_sql_type(&path);
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Int);
+    } else {
+        panic!()
+    }
+}
+
+#[test]
+fn deferred_sql_type_user_defined_types() {
+    let path: syn::Path = syn::parse_quote!(Foo);
+    let rv = get_deferred_sql_type(&path);
     if let DeferredSqlType::Deferred(TypeKey::CustomType(typ)) = rv {
         assert_eq!(typ, "Foo");
     } else {
         panic!()
     }
 
-    let type_path: syn::TypePath = syn::parse_quote!(Option<Foo>);
-    let typ = syn::Type::Path(type_path);
-    let rv = get_deferred_sql_type(&typ);
+    let path: syn::Path = syn::parse_quote!(Option<Foo>);
+    let rv = get_deferred_sql_type(&path);
     if let DeferredSqlType::Deferred(TypeKey::CustomType(typ)) = rv {
         assert_eq!(typ, "Foo");
     } else {
         panic!()
     }
+}
+#[test]
+fn deferred_sql_type_fkey() {
+    let path: syn::Path = syn::parse_quote!(butane::ForeignKey<Foo>);
+    let rv = get_deferred_sql_type(&path);
+    assert_eq!(
+        rv,
+        DeferredSqlType::Deferred(TypeKey::PK("Foo".to_string()))
+    );
 
-    // foreign keys to custom types
-    let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignType<Foo>);
-    let typ = syn::Type::Path(type_path);
-    let rv = get_deferred_sql_type(&typ);
-    if let DeferredSqlType::Deferred(TypeKey::CustomType(typ)) = rv {
-        assert_eq!(typ, "butane::ForeignType<Foo>");
-    } else {
-        panic!()
-    }
+    let path: syn::Path = syn::parse_quote!(Option<butane::ForeignKey<Foo>>);
+    let rv = get_deferred_sql_type(&path);
+    assert_eq!(
+        rv,
+        DeferredSqlType::Deferred(TypeKey::PK("Foo".to_string()))
+    );
 
-    let type_path: syn::TypePath = syn::parse_quote!(Option<butane::ForeignType<Foo>>);
-    let typ = syn::Type::Path(type_path);
-    let rv = get_deferred_sql_type(&typ);
-    if let DeferredSqlType::Deferred(TypeKey::CustomType(typ)) = rv {
-        assert_eq!(typ, "butane::ForeignType<Foo>");
-    } else {
-        panic!()
-    }
+    let path: syn::Path = syn::parse_quote!(butane::Many<Foo>);
+    let rv = get_deferred_sql_type(&path);
+    assert_eq!(
+        rv,
+        DeferredSqlType::Deferred(TypeKey::CustomType("butane::Many<Foo>".into()))
+    );
+}
 
-    let type_path: syn::TypePath = syn::parse_quote!(butane::Many<Foo>);
-    let typ = syn::Type::Path(type_path);
-    let rv = get_deferred_sql_type(&typ);
+#[test]
+fn deferred_sql_type_many() {
+    let path: syn::Path = syn::parse_quote!(butane::Many<Foo>);
+    let rv = get_deferred_sql_type(&path);
     if let DeferredSqlType::Deferred(TypeKey::CustomType(typ)) = rv {
         assert_eq!(typ, "butane::Many<Foo>");
     } else {

@@ -64,23 +64,19 @@ fn handle_call(fields: &impl ToTokens, mcall: &ExprMethodCall) -> TokenStream2 {
         }
         _ => (),
     };
+    let first_arg = || mcall.args.first().unwrap();
     match method.as_str() {
-        "matches" => handle_matches(fields, &mcall.receiver, mcall.args.first().unwrap()),
-        "contains" => handle_contains(fields, &mcall.receiver, mcall.args.first().unwrap()),
-        "like" => handle_like(fields, &mcall.receiver, mcall.args.first().unwrap()),
-        "is_in" => handle_in(fields, &mcall.receiver, mcall.args.iter()),
+        "matches" => handle_matches(fields, &mcall.receiver, first_arg()),
+        "contains" => handle_contains(fields, &mcall.receiver, first_arg()),
+        "like" => handle_like(fields, &mcall.receiver, first_arg()),
+        "is_in" => handle_in(fields, &mcall.receiver, first_arg()),
         _ => make_compile_error!("Unknown method call {}", method),
     }
 }
 
-fn handle_in<'a>(
-    fields: &impl ToTokens,
-    receiver: &Expr,
-    exprs: impl Iterator<Item = &'a Expr>,
-) -> TokenStream2 {
+fn handle_in(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStream2 {
     let fex = fieldexpr(fields, receiver);
-    let exprs_tokens = exprs.map(|expr| handle_expr(fields, expr));
-    quote!(#fex.is_in(vec![#(#exprs_tokens),*]))
+    quote!(#fex.is_in(#expr))
 }
 
 fn handle_matches(fields: &impl ToTokens, receiver: &Expr, expr: &Expr) -> TokenStream2 {

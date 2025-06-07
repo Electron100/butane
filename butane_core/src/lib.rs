@@ -158,7 +158,7 @@ pub trait DataObjectOps<T: DataObject> {
 
     /// Save the object to the database, handling both inserts and updates.
     ///
-    /// If the object has an AutoPk that is unintialized, save will always
+    /// If the object has an AutoPk that is uninitialized, save will always
     /// perform an insert. If the AutoPk is initialized or there is no AutoPk,
     /// save will perform an upsert (insert or replace).
     /// After saving the main object, many-to-many relationships it holds are also saved.

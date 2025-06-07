@@ -42,7 +42,7 @@ impl<T> FieldExpr<T>
 where
     T: Into<SqlVal>,
 {
-    // Creates a `FieldExpr` from its name.
+    /// Creates a `FieldExpr` from its name.
     pub fn new(name: &'static str) -> Self {
         FieldExpr {
             name,

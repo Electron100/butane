@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{spanned::Spanned, Field, ItemStruct, LitStr};
+use syn::{spanned::Spanned, Attribute, Field, ItemStruct, LitStr};
 
 use super::{
     extract_path_from_type, fields, get_autopk_sql_type, get_type_argument, is_auto,
@@ -159,7 +159,6 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
 /// Code generation to implement the DataResult trait for a model
 pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
     let rows = rows_for_from(ast_struct);
     let cols = columns(ast_struct, |_| true);
 
@@ -204,11 +203,12 @@ pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) ->
             ];
             fn from_row(row: &dyn butane::db::BackendRow) -> butane::Result<Self> {
                 use butane::DataObject;
-                if row.len() != #numdbfields {
+                if row.len() != Self::COLUMNS.len() {
                     return Err(butane::Error::BoundsError(
                         "Found unexpected number of columns in row for DataResult".to_string()
                     ));
                 }
+                let mut i = 0;
                 #from_row_body
             }
             fn query() -> butane::query::Query<Self> {
@@ -302,8 +302,10 @@ fn fieldexpr_func(
         }
     };
     let fnid = Ident::new(&format!("{fid}"), f.span());
+    let cfg_attr = cfg_attrs(&f.attrs);
     quote!(
         /// Create query expression.
+        #(#cfg_attr)*
         #vis fn #fnid(&self) -> #field_expr_type {
             #field_expr_ctor
         }
@@ -328,25 +330,38 @@ fn fields_type(tyname: &Ident) -> Ident {
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
-    let mut i: usize = 0;
     fields(ast_struct)
         .map(|f| {
             let ident = f.ident.clone().unwrap();
+            let cfg_attrs = cfg_attrs(&f.attrs);
             if is_row_field(f) {
-                let fty = &f.ty;
                 let ret = quote!(
-                    #ident: butane::FromSql::from_sql_ref(
-                        row.get(#i, <#fty as butane::FieldType>::SQLTYPE)?
-                    )?
+                    #(#cfg_attrs)*
+                    #ident: {
+                        let value = butane::FromSql::from_sql_ref(
+                            row.get(i, Self::COLUMNS[i].ty().clone())?
+                        )?;
+                        i += 1;
+                        value
+                    }
                 );
-                i += 1;
                 ret
             } else if is_many_to_many(f) {
-                quote!(#ident: butane::Many::new())
+                quote!(
+                    #(#cfg_attrs)*
+                    #ident: butane::Many::new()
+                )
             } else {
                 make_compile_error!(f.span()=> "Unexpected struct field")
             }
         })
+        .collect()
+}
+
+fn cfg_attrs(attrs: &[Attribute]) -> Vec<&Attribute> {
+    attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("cfg"))
         .collect()
 }
 
@@ -360,7 +375,11 @@ where
             Some(fname) => {
                 let ident = make_ident_literal_str(&fname);
                 let fty = &f.ty;
-                quote!(butane::db::Column::new(#ident, <#fty as butane::FieldType>::SQLTYPE),)
+                let attrs = cfg_attrs(&f.attrs);
+                quote!(
+                    #(#attrs)*
+                    butane::db::Column::new(#ident, <#fty as butane::FieldType>::SQLTYPE),
+                )
             }
             None => quote_spanned! {
                 f.span() =>
@@ -422,7 +441,11 @@ where
         .filter(|f| is_row_field(f) && !is_auto(f) && predicate(f))
         .map(|f| {
             let ident = f.ident.clone().unwrap();
-            quote!(values.push(butane::ToSql::to_sql_ref(&self.#ident));)
+            let cfg_attrs = cfg_attrs(&f.attrs);
+            quote!(
+                #(#cfg_attrs)*
+                values.push(butane::ToSql::to_sql_ref(&self.#ident));
+            )
         })
         .collect()
 }

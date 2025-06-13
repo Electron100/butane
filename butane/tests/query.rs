@@ -318,4 +318,12 @@ async fn query_in(conn: ConnectionAsync) {
     posts.sort_by(|p1, p2| p1.id.partial_cmp(&p2.id).unwrap());
     assert_eq!(posts[0].title, "The Tiger");
     assert_eq!(posts[1].title, "Sir Charles");
+
+    // Ensure we can do the same thing with a variable
+    let titles = vec!["The Tiger", "Sir Charles"];
+    posts = query!(Post, title.is_in({ titles }))
+        .load(&conn)
+        .await
+        .unwrap();
+    assert_eq!(posts.len(), 2);
 }

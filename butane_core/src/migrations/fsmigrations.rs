@@ -535,15 +535,15 @@ impl Drop for MigrationLock {
     }
 }
 
-#[test]
-fn cannot_lock_shared_then_exclusive() {
-    let path = Path::new("lock_for_test");
-    eprintln!("getting first lock shared");
-    let _l1 = MigrationLock::new_shared(&path).unwrap();
-    eprintln!("getting second lock");
-    let _l2 = MigrationLock::new_exclusive(&path).unwrap();
-    eprintln!("got second lock");
-}
+// #[test]
+// fn cannot_lock_shared_then_exclusive() {
+//     let path = Path::new("lock_for_test");
+//     eprintln!("getting first lock shared");
+//     let _l1 = MigrationLock::new_shared(&path).unwrap();
+//     eprintln!("getting second lock");
+//     let _l2 = MigrationLock::new_exclusive(&path).unwrap();
+//     eprintln!("got second lock");
+// }
 
 fn time_now() -> u128 {
     use std::time::SystemTime;

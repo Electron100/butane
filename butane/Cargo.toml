@@ -40,7 +40,7 @@ r2d2 = { optional = true, workspace = true }
 deadpool = { optional = true, workspace = true }
 
 [dev-dependencies]
-butane = { features = ["_auto_delete_dot_butane"], workspace = true}
+butane = { features = ["_auto_delete_dot_butane"], path = "." }
 butane_test_helper = { workspace = true, default-features = false, features = ["sqlite", "pg"] }
 butane_test_macros = { workspace = true }
 cfg-if = { workspace = true }

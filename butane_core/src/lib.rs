@@ -237,7 +237,7 @@ impl<T> DataObjectOpsAsync<T> for T where T: DataObject {}
 
 /// Butane errors.
 #[allow(missing_docs)]
-#[derive(Debug, ThisError)]
+#[derive(Debug, ThisError, PartialEq, Error)]
 pub enum Error {
     #[error("No such object exists")]
     NoSuchObject,

@@ -41,6 +41,7 @@ jobs:
     - name: Setup PostgreSQL on Linux
       if: runner.os == 'Linux'
       run: |
+        set -ex
         sudo apt-get update
         sudo apt-get install -y postgresql
         sudo sed -i "s/scram-sha-256/trust/" /etc/postgresql/16/main/pg_hba.conf
@@ -51,6 +52,7 @@ jobs:
     - name: Setup PostgreSQL on MacOS
       if: runner.os == 'macOS'
       run: |
+        set -ex
         brew install postgresql
         initdb -D /usr/local/var/postgres
         pg_ctl -D /usr/local/var/postgres start
@@ -59,8 +61,8 @@ jobs:
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
     - name: Install PostgreSQL on Windows
       if: runner.os == 'Windows'
-      shell: bash
       run: |
+        set -ex
         choco install postgresql12 --force --params '/Password:root'
         echo "C:\Program Files\PostgreSQL\12\bin" >> $GITHUB_PATH
         echo "C:\Program Files\PostgreSQL\12\lib" >> $GITHUB_PATH
@@ -72,7 +74,7 @@ jobs:
       run: |
         choco install sqlite
         cd /D C:\ProgramData\chocolatey\lib\SQLite\tools
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
         lib /machine:x64 /def:sqlite3.def /out:sqlite3.lib
         echo "C:\ProgramData\chocolatey\lib\SQLite\tools" >> $GITHUB_PATH
         echo "SQLITE3_LIB_DIR=C:\ProgramData\chocolatey\lib\SQLite\tools" >> $GITHUB_ENV
@@ -116,6 +118,7 @@ jobs:
         git diff --cached --exit-code
     - name: Run tests in examples
       run: |
+        set -ex
         cargo +stable test -p example --all-features
         cd examples
         for dir in *; do

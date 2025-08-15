@@ -117,7 +117,7 @@ pub trait BackendConnection: ConnectionMethods + Debug + Send {
 )]
 #[async_trait]
 impl BackendConnection for Box<dyn BackendConnection> {
-    async fn transaction(&mut self) -> Result<Transaction> {
+    async fn transaction(&mut self) -> Result<Transaction<'_>> {
         self.deref_mut().transaction().await
     }
     fn backend(&self) -> Box<dyn Backend> {
@@ -299,7 +299,7 @@ impl ConnectionAsync {
 )]
 #[async_trait]
 impl BackendConnection for Connection {
-    async fn transaction(&mut self) -> Result<Transaction> {
+    async fn transaction(&mut self) -> Result<Transaction<'_>> {
         self.conn.transaction().await
     }
     fn backend(&self) -> Box<dyn Backend> {
@@ -690,7 +690,7 @@ impl TryFrom<&String> for ConnectionSpec {
     }
 }
 
-fn conn_complete_if_dir(path: &Path) -> Cow<Path> {
+fn conn_complete_if_dir(path: &Path) -> Cow<'_, Path> {
     if path.is_dir() {
         Cow::from(path.join("connection.json"))
     } else {

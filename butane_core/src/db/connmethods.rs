@@ -91,7 +91,7 @@ impl Column {
 /// Backend-specific row abstraction. Only implementors of new
 /// backends need use this trait directly.
 pub trait BackendRow {
-    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef>;
+    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>>;
     fn len(&self) -> usize;
     // clippy wants this method to exist
     fn is_empty(&self) -> bool {
@@ -220,7 +220,7 @@ impl VecRow {
 
 #[cfg(feature = "async-adapter")]
 impl BackendRow for VecRow {
-    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef> {
+    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>> {
         self.values
             .get(idx)
             .ok_or_else(|| crate::Error::BoundsError("idx out of bounds".into()))

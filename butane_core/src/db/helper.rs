@@ -14,11 +14,11 @@ use crate::Error;
 use crate::{query, Result, SqlType, SqlVal};
 
 pub trait PlaceholderSource {
-    fn next_placeholder(&mut self) -> Cow<str>;
+    fn next_placeholder(&mut self) -> Cow<'_, str>;
 }
 
 /// Quotes the `word` if it is a reserved word.
-pub fn quote_reserved_word(word: &str) -> Cow<str> {
+pub fn quote_reserved_word(word: &str) -> Cow<'_, str> {
     if sqlparser::keywords::ALL_KEYWORDS.contains(&word.to_uppercase().as_str()) {
         format!("\"{}\"", word).into()
     } else {

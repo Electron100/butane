@@ -330,7 +330,7 @@ pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync {
 /// Trait for referencing the primary key for a given model. Used to
 /// implement ForeignKey equality tests.
 pub trait AsPrimaryKey<T: DataObject> {
-    fn as_pk(&self) -> Cow<<T as DataObject>::PKType>;
+    fn as_pk(&self) -> Cow<'_, <T as DataObject>::PKType>;
 }
 
 impl<P, T> AsPrimaryKey<T> for P
@@ -338,7 +338,7 @@ where
     P: PrimaryKeyType,
     T: DataObject<PKType = P>,
 {
-    fn as_pk(&self) -> Cow<P> {
+    fn as_pk(&self) -> Cow<'_, P> {
         Cow::Borrowed(self)
     }
 }

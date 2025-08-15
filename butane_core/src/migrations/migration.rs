@@ -19,12 +19,12 @@ pub trait Migration: Debug + PartialEq {
     fn db(&self) -> Result<ADB>;
 
     /// Get the name of the migration before this one (if any).
-    fn migration_from(&self) -> Result<Option<Cow<str>>>
+    fn migration_from(&self) -> Result<Option<Cow<'_, str>>>
     where
         Self: Sized;
 
     /// The name of this migration.
-    fn name(&self) -> Cow<str>;
+    fn name(&self) -> Cow<'_, str>;
 
     /// The backend-specific commands to apply this migration.
     fn up_sql(&self, backend_name: &str) -> Result<Option<String>>;

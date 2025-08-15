@@ -311,11 +311,11 @@ impl Migration for FsMigration {
         Ok(db)
     }
 
-    fn migration_from(&self) -> Result<Option<Cow<str>>> {
+    fn migration_from(&self) -> Result<Option<Cow<'_, str>>> {
         Ok(self.info()?.from_name.map(Cow::from))
     }
 
-    fn name(&self) -> Cow<str> {
+    fn name(&self) -> Cow<'_, str> {
         // There should be no way our root has no name portion
         self.root.file_name().unwrap().to_string_lossy()
     }

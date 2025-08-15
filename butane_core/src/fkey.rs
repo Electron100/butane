@@ -153,7 +153,7 @@ impl<T> AsPrimaryKey<T> for ForeignKey<T>
 where
     T: DataObject,
 {
-    fn as_pk(&self) -> Cow<T::PKType> {
+    fn as_pk(&self) -> Cow<'_, T::PKType> {
         Cow::Owned(self.pk())
     }
 }

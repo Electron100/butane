@@ -89,7 +89,7 @@ pub mod internal {
 
         /// Returns the Sql values of all columns except not any auto columns.
         /// Used internally. You are unlikely to need to call this directly.
-        fn non_auto_values(&self, include_pk: bool) -> Vec<SqlValRef>;
+        fn non_auto_values(&self, include_pk: bool) -> Vec<SqlValRef<'_>>;
     }
 }
 

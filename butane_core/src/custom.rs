@@ -33,7 +33,7 @@ pub enum SqlValCustom {
 }
 
 impl SqlValCustom {
-    pub fn as_valref(&self) -> SqlValRefCustom {
+    pub fn as_valref(&self) -> SqlValRefCustom<'_> {
         match self {
             #[cfg(feature = "pg")]
             SqlValCustom::Pg { ty, data } => SqlValRefCustom::PgBytes {

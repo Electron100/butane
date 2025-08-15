@@ -13,7 +13,9 @@ use crate::query::{BoolExpr::*, Expr, Join, Order, OrderDirection};
 use crate::Error;
 use crate::{query, Result, SqlType, SqlVal};
 
-pub trait PlaceholderSource {
+/// Trait for generating SQL placeholders.
+pub(crate) trait PlaceholderSource {
+    /// Returns the next placeholder for a parameterized query.
     fn next_placeholder(&mut self) -> Cow<'_, str>;
 }
 

@@ -111,7 +111,7 @@ pub trait BackendRows {
     fn mapped<F, B>(self, f: F) -> MapDeref<Self, F>
     where
         Self: Sized,
-        F: FnMut(&(dyn BackendRow)) -> Result<B>,
+        F: FnMut(&dyn BackendRow) -> Result<B>,
     {
         MapDeref { it: self, f }
     }
@@ -126,7 +126,7 @@ pub struct MapDeref<I, F> {
 impl<I, F, B> fallible_iterator::FallibleIterator for MapDeref<I, F>
 where
     I: BackendRows,
-    F: FnMut(&(dyn BackendRow)) -> Result<B>,
+    F: FnMut(&dyn BackendRow) -> Result<B>,
 {
     type Item = B;
     type Error = crate::Error;
@@ -171,23 +171,23 @@ impl<T> BackendRows for VecRows<T>
 where
     T: BackendRow,
 {
-    fn next(&mut self) -> Result<Option<&(dyn BackendRow)>> {
+    fn next(&mut self) -> Result<Option<&dyn BackendRow>> {
         let ret = self.rows.get(self.idx);
         self.idx += 1;
         Ok(ret.map(|row| row as &dyn BackendRow))
     }
 
-    fn current(&self) -> Option<&(dyn BackendRow)> {
+    fn current(&self) -> Option<&dyn BackendRow> {
         self.rows.get(self.idx).map(|row| row as &dyn BackendRow)
     }
 }
 
 impl BackendRows for Box<dyn BackendRows + '_> {
-    fn next(&mut self) -> Result<Option<&(dyn BackendRow)>> {
+    fn next(&mut self) -> Result<Option<&dyn BackendRow>> {
         BackendRows::next(self.deref_mut())
     }
 
-    fn current(&self) -> Option<&(dyn BackendRow)> {
+    fn current(&self) -> Option<&dyn BackendRow> {
         self.deref().current()
     }
 }
@@ -200,7 +200,7 @@ pub(crate) struct VecRow {
 
 #[cfg(feature = "async-adapter")]
 impl VecRow {
-    fn new(original: &(dyn BackendRow), columns: &[Column]) -> Result<Self> {
+    fn new(original: &dyn BackendRow, columns: &[Column]) -> Result<Self> {
         if original.len() != columns.len() {
             return Err(crate::Error::BoundsError(
                 "row length doesn't match columns specifier length".into(),

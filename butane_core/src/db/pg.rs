@@ -140,7 +140,7 @@ impl Debug for PgConnection {
     }
 }
 
-type DynToSqlPg<'a> = (dyn postgres::types::ToSql + Sync + 'a);
+type DynToSqlPg<'a> = dyn postgres::types::ToSql + Sync + 'a;
 
 fn sqlval_for_pg_query(v: &SqlVal) -> &dyn postgres::types::ToSql {
     v as &dyn postgres::types::ToSql

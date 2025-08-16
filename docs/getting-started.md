@@ -128,7 +128,6 @@ impl Post {
             tags: Many::default(),
             blog: blog.into(),
             byline: None,
-            likes: 0,
         }
     }
 }

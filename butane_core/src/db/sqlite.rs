@@ -569,7 +569,7 @@ impl<'a> QueryAdapterInner<'a> {
         Ok(rows.next()?)
     }
 
-    fn current(self: Pin<&Self>) -> Option<&rusqlite::Row> {
+    fn current(self: Pin<&Self>) -> Option<&rusqlite::Row<'_>> {
         let this = self.project_ref();
         this.rows.as_ref().unwrap().get()
     }
@@ -604,7 +604,7 @@ impl BackendRows for QueryAdapter<'_> {
 }
 
 impl BackendRow for rusqlite::Row<'_> {
-    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef> {
+    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>> {
         sql_valref_from_rusqlite(self.get_ref(idx)?, &ty)
     }
     fn len(&self) -> usize {
@@ -751,7 +751,7 @@ fn define_constraint(column: &AColumn) -> String {
     }
 }
 
-fn col_sqltype(col: &AColumn) -> Cow<str> {
+fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
     match col.typeid() {
         Ok(TypeIdentifier::Ty(ty)) => Cow::Borrowed(sqltype(&ty)),
         Ok(TypeIdentifier::Name(name)) => Cow::Owned(name),
@@ -911,7 +911,7 @@ impl SQLitePlaceholderSource {
     }
 }
 impl helper::PlaceholderSource for SQLitePlaceholderSource {
-    fn next_placeholder(&mut self) -> Cow<str> {
+    fn next_placeholder(&mut self) -> Cow<'_, str> {
         // sqlite placeholder is always a question mark.
         Cow::Borrowed("?")
     }

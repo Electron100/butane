@@ -91,7 +91,7 @@ impl Column {
 /// Backend-specific row abstraction. Only implementors of new
 /// backends need use this trait directly.
 pub trait BackendRow {
-    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef>;
+    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>>;
     fn len(&self) -> usize;
     // clippy wants this method to exist
     fn is_empty(&self) -> bool {
@@ -111,7 +111,7 @@ pub trait BackendRows {
     fn mapped<F, B>(self, f: F) -> MapDeref<Self, F>
     where
         Self: Sized,
-        F: FnMut(&(dyn BackendRow)) -> Result<B>,
+        F: FnMut(&dyn BackendRow) -> Result<B>,
     {
         MapDeref { it: self, f }
     }
@@ -126,7 +126,7 @@ pub struct MapDeref<I, F> {
 impl<I, F, B> fallible_iterator::FallibleIterator for MapDeref<I, F>
 where
     I: BackendRows,
-    F: FnMut(&(dyn BackendRow)) -> Result<B>,
+    F: FnMut(&dyn BackendRow) -> Result<B>,
 {
     type Item = B;
     type Error = crate::Error;
@@ -171,23 +171,23 @@ impl<T> BackendRows for VecRows<T>
 where
     T: BackendRow,
 {
-    fn next(&mut self) -> Result<Option<&(dyn BackendRow)>> {
+    fn next(&mut self) -> Result<Option<&dyn BackendRow>> {
         let ret = self.rows.get(self.idx);
         self.idx += 1;
         Ok(ret.map(|row| row as &dyn BackendRow))
     }
 
-    fn current(&self) -> Option<&(dyn BackendRow)> {
+    fn current(&self) -> Option<&dyn BackendRow> {
         self.rows.get(self.idx).map(|row| row as &dyn BackendRow)
     }
 }
 
 impl BackendRows for Box<dyn BackendRows + '_> {
-    fn next(&mut self) -> Result<Option<&(dyn BackendRow)>> {
+    fn next(&mut self) -> Result<Option<&dyn BackendRow>> {
         BackendRows::next(self.deref_mut())
     }
 
-    fn current(&self) -> Option<&(dyn BackendRow)> {
+    fn current(&self) -> Option<&dyn BackendRow> {
         self.deref().current()
     }
 }
@@ -200,7 +200,7 @@ pub(crate) struct VecRow {
 
 #[cfg(feature = "async-adapter")]
 impl VecRow {
-    fn new(original: &(dyn BackendRow), columns: &[Column]) -> Result<Self> {
+    fn new(original: &dyn BackendRow, columns: &[Column]) -> Result<Self> {
         if original.len() != columns.len() {
             return Err(crate::Error::BoundsError(
                 "row length doesn't match columns specifier length".into(),
@@ -220,7 +220,7 @@ impl VecRow {
 
 #[cfg(feature = "async-adapter")]
 impl BackendRow for VecRow {
-    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef> {
+    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>> {
         self.values
             .get(idx)
             .ok_or_else(|| crate::Error::BoundsError("idx out of bounds".into()))

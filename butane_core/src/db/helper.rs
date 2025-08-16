@@ -13,12 +13,14 @@ use crate::query::{BoolExpr::*, Expr, Join, Order, OrderDirection};
 use crate::Error;
 use crate::{query, Result, SqlType, SqlVal};
 
-pub trait PlaceholderSource {
-    fn next_placeholder(&mut self) -> Cow<str>;
+/// Trait for generating SQL placeholders.
+pub(crate) trait PlaceholderSource {
+    /// Returns the next placeholder for a parameterized query.
+    fn next_placeholder(&mut self) -> Cow<'_, str>;
 }
 
 /// Quotes the `word` if it is a reserved word.
-pub fn quote_reserved_word(word: &str) -> Cow<str> {
+pub fn quote_reserved_word(word: &str) -> Cow<'_, str> {
     if sqlparser::keywords::ALL_KEYWORDS.contains(&word.to_uppercase().as_str()) {
         format!("\"{}\"", word).into()
     } else {

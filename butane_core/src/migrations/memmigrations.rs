@@ -37,11 +37,11 @@ impl Migration for MemMigration {
         Ok(ret)
     }
 
-    fn migration_from(&self) -> Result<Option<Cow<str>>> {
+    fn migration_from(&self) -> Result<Option<Cow<'_, str>>> {
         Ok(self.from.as_ref().map(Cow::from))
     }
 
-    fn name(&self) -> Cow<str> {
+    fn name(&self) -> Cow<'_, str> {
         Cow::from(&self.name)
     }
 

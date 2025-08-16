@@ -375,7 +375,7 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
     fn pk_mut(&mut self) -> &mut impl PrimaryKeyType {
         &mut self.name
     }
-    fn non_auto_values(&self, include_pk: bool) -> Vec<SqlValRef> {
+    fn non_auto_values(&self, include_pk: bool) -> Vec<SqlValRef<'_>> {
         let mut values: Vec<SqlValRef<'_>> = Vec::with_capacity(2usize);
         if include_pk {
             values.push(self.name.to_sql_ref());

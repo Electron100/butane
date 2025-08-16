@@ -140,7 +140,7 @@ impl Debug for PgConnection {
     }
 }
 
-type DynToSqlPg<'a> = (dyn postgres::types::ToSql + Sync + 'a);
+type DynToSqlPg<'a> = dyn postgres::types::ToSql + Sync + 'a;
 
 fn sqlval_for_pg_query(v: &SqlVal) -> &dyn postgres::types::ToSql {
     v as &dyn postgres::types::ToSql
@@ -545,7 +545,7 @@ fn check_columns(row: &postgres::Row, cols: &[Column]) -> Result<()> {
 }
 
 impl BackendRow for postgres::Row {
-    fn get(&self, idx: usize, _ty: SqlType) -> Result<SqlValRef> {
+    fn get(&self, idx: usize, _ty: SqlType) -> Result<SqlValRef<'_>> {
         Ok(self.try_get(idx)?)
     }
     fn len(&self) -> usize {
@@ -695,7 +695,7 @@ fn drop_fkey_constraints(table: &ATable, column: &AColumn) -> Result<String> {
     modified_column.remove_reference();
     change_column(table, column, &modified_column)
 }
-fn col_sqltype(col: &AColumn) -> Result<Cow<str>> {
+fn col_sqltype(col: &AColumn) -> Result<Cow<'_, str>> {
     match col.typeid()? {
         TypeIdentifier::Name(name) => Ok(Cow::Owned(name)),
         TypeIdentifier::Ty(ty) => {
@@ -930,7 +930,7 @@ impl PgPlaceholderSource {
     }
 }
 impl helper::PlaceholderSource for PgPlaceholderSource {
-    fn next_placeholder(&mut self) -> Cow<str> {
+    fn next_placeholder(&mut self) -> Cow<'_, str> {
         let ret = Cow::Owned(format!("${}", self.n));
         self.n += 1;
         ret

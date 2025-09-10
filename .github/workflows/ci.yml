@@ -107,7 +107,14 @@ jobs:
     - name: Test CLI
       run: cd butane_cli && cargo +stable test --all-features
     - name: Test
-      run: cd butane && cargo +stable test --all-features
+      run: |
+        cd butane
+        # This activates the "no datetime" feature test across blog.rs and query.rs
+        cargo +stable test \
+                      -p butane --test query \
+                      --no-default-features --features sqlite,sqlite-bundled,async,async-adapter
+        # This runs all tests with all features on all backends
+        cargo +stable test --all-features
     - name: Check example migrations have been updated
       run: |
         set -ex

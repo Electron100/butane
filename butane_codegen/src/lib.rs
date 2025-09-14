@@ -9,11 +9,13 @@ use std::path::PathBuf;
 
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
 use butane_core::{codegen, make_compile_error, migrations, SqlType};
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::TokenTree;
 use quote::quote;
-use syn::{Expr, Ident};
+use syn::parse::{Parse, ParseStream};
+use syn::{punctuated::Punctuated, Expr, Ident, Token, Type};
 
 mod filter;
 
@@ -210,6 +212,41 @@ pub fn filter(input: TokenStream) -> TokenStream {
 pub fn butane_type(args: TokenStream, input: TokenStream) -> TokenStream {
     codegen::butane_type_with_migrations(args.into(), input.into(), &mut migrations_for_dir())
         .into()
+}
+
+struct DatabaseTypesList {
+    types: Vec<Type>,
+}
+
+impl Parse for DatabaseTypesList {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        let punctuated = Punctuated::<Type, Token![,]>::parse_terminated(input)?;
+        Ok(DatabaseTypesList {
+            types: punctuated.into_iter().collect(),
+        })
+    }
+}
+
+/// Macro to specify which models should be included in the
+/// database. Updates the current migration in the .butane directory in the cwd.
+#[proc_macro]
+pub fn butane_database(input: TokenStream) -> TokenStream {
+    let models = match syn::parse2::<DatabaseTypesList>(input.into()) {
+        Ok(dbtypes) => dbtypes.types,
+        Err(_) => return make_compile_error!("Unexpected tokens in database specification").into(),
+    };
+    let dir = migrations_dir();
+    let path = dir
+        .into_os_string()
+        .into_string()
+        .expect("Project directory must be representable in Unicode");
+
+    quote!({
+        let tables = std::vec![#( butane::migrations::adb::ATable::from(#models::fields()) ),*];
+        let ms = migrations::from_root(#path);
+        ms.current().add_modified_tables(tables)
+    })
+    .into()
 }
 
 fn migrations_for_dir() -> migrations::FsMigrations {

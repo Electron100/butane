@@ -89,6 +89,13 @@ pub trait MigrationMut: Migration {
     /// migration in this fashion, if they were modified in this migration.
     fn add_modified_table(&mut self, table: &ATable) -> Result<()>;
 
+    /// Like [self.add_modified_table] but adds several tables at once.
+    fn add_modified_tables(&mut self, tables: Vec<ATable>) -> Result<()> {
+        tables
+            .iter()
+            .try_for_each(|table| self.add_modified_table(table))
+    }
+
     /// Marks a table as not modified in this migration.
     /// Use instead of `add_modified_table`.
     #[allow(unused_variables)]

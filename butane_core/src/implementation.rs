@@ -6,7 +6,7 @@
 
 use super::*;
 
-/// Trait implemented by `[DataObject::Fields] for every model.
+/// Trait implemented by `[DataObject::Fields] which allows retrieving the definitions of all fields in a data object.
 pub trait DataObjectFields {
     /// Corresponding object type.
     type DBO: DataObject;

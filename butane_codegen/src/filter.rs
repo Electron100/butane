@@ -5,7 +5,10 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{spanned::Spanned, BinOp, Expr, ExprBinary, ExprMethodCall, ExprPath, Ident, LitStr};
 
 pub fn for_expr(dbres: &Ident, expr: &Expr) -> TokenStream2 {
-    handle_expr(&quote!(<#dbres as butane::DataResult>::DBO::fields()), expr)
+    handle_expr(
+        &quote!(<<#dbres as butane::DataResult>::DBO as butane::DataObject>::fields()),
+        expr,
+    )
 }
 
 pub fn handle_expr(fields: &impl ToTokens, expr: &Expr) -> TokenStream2 {

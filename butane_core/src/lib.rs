@@ -15,6 +15,7 @@ pub mod codegen;
 pub mod custom;
 pub mod db;
 pub mod fkey;
+pub mod implementation;
 pub mod many;
 pub mod migrations;
 pub mod query;
@@ -104,7 +105,7 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
     /// Link to a generated struct providing query helpers for each field.
-    type Fields: DataObjectFields<Self> + Default;
+    type Fields: implementation::DataObjectFields<Self> + Default;
     /// The name of the primary key column.
     const PKCOL: &'static str;
     /// The name of the table.
@@ -231,72 +232,21 @@ pub trait DataObjectOps<T: DataObject> {
     {
         conn.delete(T::TABLE, T::PKCOL, self.pk().to_sql()).await
     }
+
+    /// Provides access to information about fields (rows) of the data
+    /// object. Most library consumers do not need to call this
+    /// directly -- it is primarily called from macro-generated code.
+    fn fields() -> Self::Fields
+    where
+        Self: DataObject + Sized,
+    {
+        Self::Fields::default()
+    }
 }
 
 impl<T> DataObjectOpsSync<T> for T where T: DataObject {}
 #[cfg(feature = "async")]
 impl<T> DataObjectOpsAsync<T> for T where T: DataObject {}
-
-/// Trait implemented by `[DataObject::Fields] for every model.
-pub trait DataObjectFields<T: DataObject> {
-    /// Helper type for [field_defs] return type.  Since we don't have
-    /// https://rust-lang.github.io/impl-trait-initiative/explainer/rpit_trait.html
-    /// yet
-    type IntoFieldsIter<'a>: IntoIterator<Item = &'a DataObjectFieldDef<T>>
-    where
-        Self: 'a,
-        T: 'a;
-    /// Allows iterating over all field definitions.
-    fn field_defs(&'_ self) -> Self::IntoFieldsIter<'_>;
-}
-
-/// Definition for a single [DataObject] field.
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
-pub struct DataObjectFieldDef<T: DataObject> {
-    name: &'static str,
-    sqltype: SqlType,
-    nullable: bool,
-    #[builder(default = false)]
-    pk: bool,
-    #[builder(default = false)]
-    auto: bool,
-    #[builder(default = false)]
-    unique: bool,
-    #[builder(default)]
-    default: Option<SqlVal>,
-    #[builder(default)]
-    phantom: PhantomData<T>,
-}
-impl<T: DataObject> DataObjectFieldDef<T> {
-    /// Returns the name of the field.
-    pub fn name(&self) -> &str {
-        self.name
-    }
-    /// Returns whether the field is nullable.
-    pub fn is_nullable(&self) -> bool {
-        self.nullable
-    }
-    /// Returns whether values of the field must be unique.
-    pub fn unique(&self) -> bool {
-        self.unique
-    }
-    /// Returns whether the field is a primary key.
-    pub fn is_pk(&self) -> bool {
-        self.pk
-    }
-    /// Returns the default value for the field, if any.
-    pub fn default(&self) -> &Option<SqlVal> {
-        &self.default
-    }
-    /// Returns the sqltype of the field.
-    pub fn sqltype(&self) -> &SqlType {
-        &self.sqltype
-    }
-    /// Returns whether the field is auto-valued.
-    pub fn is_auto(&self) -> bool {
-        self.auto
-    }
-}
 
 /// Butane errors.
 #[allow(missing_docs)]

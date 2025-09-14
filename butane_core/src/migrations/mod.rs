@@ -13,8 +13,8 @@ use crate::db::{Backend, BackendConnection, BackendRows, Column, ConnectionMetho
 use crate::db::{ConnectionAsync, ConnectionMethodsAsync};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
 use crate::{
-    db, query, DataObject, DataObjectFieldDef, DataObjectFields, DataResult, Error, PrimaryKeyType,
-    Result, SqlType,
+    db, implementation::DataObjectFieldDef, implementation::DataObjectFields, query, DataObject,
+    DataResult, Error, PrimaryKeyType, Result, SqlType,
 };
 
 pub mod adb;

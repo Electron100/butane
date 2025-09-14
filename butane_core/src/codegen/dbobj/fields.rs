@@ -29,15 +29,9 @@ pub fn fields_type_tokens(ast_struct: &ItemStruct, config: &Config) -> TokenStre
         .map(|f| data_object_field_def_tokens(f, ast_struct))
         .collect();
     quote!(
-        impl #tyname {
-            /// Get fields.
-            pub fn fields() -> #fields_type {
-                #fields_type::default()
-            }
-        }
         /// Helper struct for butane model.
         #vis struct #fields_type {
-            defs: [butane::DataObjectFieldDef<#tyname>; #num_row_fields],
+            defs: [butane::implementation::DataObjectFieldDef<#tyname>; #num_row_fields],
         }
         impl #fields_type {
             #(#fieldexprs)*
@@ -51,8 +45,8 @@ pub fn fields_type_tokens(ast_struct: &ItemStruct, config: &Config) -> TokenStre
                 }
             }
         }
-        impl butane::DataObjectFields<#tyname> for #fields_type {
-            type IntoFieldsIter<'a> = &'a [butane::DataObjectFieldDef<#tyname>; #num_row_fields];
+        impl butane::implementation::DataObjectFields<#tyname> for #fields_type {
+            type IntoFieldsIter<'a> = &'a [butane::implementation::DataObjectFieldDef<#tyname>; #num_row_fields];
             fn field_defs(&self) -> Self::IntoFieldsIter<'_> {
                 &self.defs
             }
@@ -140,7 +134,7 @@ fn data_object_field_def_tokens(f: &Field, ast_struct: &ItemStruct) -> TokenStre
         .map(|lit| quote!(Some(butane::ToSql::to_sql(#lit))))
         .unwrap_or_else(|| quote!(None));
     quote!(
-        butane::DataObjectFieldDef::<#dbo>::builder()
+        butane::implementation::DataObjectFieldDef::<#dbo>::builder()
                         .name(#name)
                         .sqltype(#sqltype)
                         .nullable(#nullable)

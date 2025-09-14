@@ -105,7 +105,7 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
     /// The type of the primary key field.
     type PKType: PrimaryKeyType;
     /// Link to a generated struct providing query helpers for each field.
-    type Fields: implementation::DataObjectFields<Self> + Default;
+    type Fields: implementation::DataObjectFields<DBO = Self> + Default;
     /// The name of the primary key column.
     const PKCOL: &'static str;
     /// The name of the table.
@@ -116,6 +116,16 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
 
     /// Get the primary key
     fn pk(&self) -> &Self::PKType;
+
+    /// Provides access to information about fields (rows) of the data
+    /// object. Most library consumers do not need to call this
+    /// directly -- it is primarily called from macro-generated code.
+    fn fields() -> Self::Fields
+    where
+        Self: DataObject + Sized,
+    {
+        Self::Fields::default()
+    }
 }
 
 /// [`DataObject`] operations that require a live database connection.
@@ -231,16 +241,6 @@ pub trait DataObjectOps<T: DataObject> {
         Self: DataObject,
     {
         conn.delete(T::TABLE, T::PKCOL, self.pk().to_sql()).await
-    }
-
-    /// Provides access to information about fields (rows) of the data
-    /// object. Most library consumers do not need to call this
-    /// directly -- it is primarily called from macro-generated code.
-    fn fields() -> Self::Fields
-    where
-        Self: DataObject + Sized,
-    {
-        Self::Fields::default()
     }
 }
 

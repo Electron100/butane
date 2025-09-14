@@ -408,7 +408,8 @@ impl Default for ButaneMigrationFields {
     }
 }
 
-impl DataObjectFields<ButaneMigration> for ButaneMigrationFields {
+impl DataObjectFields for ButaneMigrationFields {
+    type DBO = ButaneMigration;
     type IntoFieldsIter<'a> = &'a [DataObjectFieldDef<ButaneMigration>; 1];
     fn field_defs(&self) -> Self::IntoFieldsIter<'_> {
         &self.defs

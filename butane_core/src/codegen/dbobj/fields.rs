@@ -1,4 +1,5 @@
-///! dbobj implementation dealing with DataObject::Fields
+//! dbobj implementation dealing with DataObject::Fields
+
 use super::{fields, get_type_argument, is_many_to_many, make_ident_literal_str, many_table_lit};
 use crate::codegen::{
     dbobj::Config, get_default_lit, is_auto, is_row_field, is_unique, pk_field, MANY_TYNAMES,
@@ -45,7 +46,8 @@ pub fn fields_type_tokens(ast_struct: &ItemStruct, config: &Config) -> TokenStre
                 }
             }
         }
-        impl butane::implementation::DataObjectFields<#tyname> for #fields_type {
+        impl butane::implementation::DataObjectFields for #fields_type {
+            type DBO = #tyname;
             type IntoFieldsIter<'a> = &'a [butane::implementation::DataObjectFieldDef<#tyname>; #num_row_fields];
             fn field_defs(&self) -> Self::IntoFieldsIter<'_> {
                 &self.defs
@@ -59,17 +61,17 @@ pub(super) fn fields_type(tyname: &Ident) -> Ident {
 }
 
 macro_rules! field_name {
-		($f:tt) => ({
-				match &$f.ident {
-						Some(fid) => fid,
-						None => {
-								return quote_spanned!(
-										$f.span() =>
-												compile_error!("Fields must be named for butane");
-								);
-						}
-				}
-		})
+    ($f:tt) => ({
+        match &$f.ident {
+            Some(fid) => fid,
+            None => {
+                return quote_spanned!(
+                    $f.span() =>
+                        compile_error!("Fields must be named for butane");
+                );
+            }
+        }
+    })
 }
 
 fn fieldexpr_func_regular(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {

@@ -7,13 +7,15 @@
 use super::*;
 
 /// Trait implemented by `[DataObject::Fields] for every model.
-pub trait DataObjectFields<T: DataObject> {
-    /// Helper type for [field_defs] return type. Since we don't have this yet
+pub trait DataObjectFields {
+    /// Corresponding object type.
+    type DBO: DataObject;
+    /// Helper type for `field_defs()` return type. Since we don't have this yet
     // https://rust-lang.github.io/impl-trait-initiative/explainer/rpit_trait.html
-    type IntoFieldsIter<'a>: IntoIterator<Item = &'a DataObjectFieldDef<T>>
+    type IntoFieldsIter<'a>: IntoIterator<Item = &'a DataObjectFieldDef<Self::DBO>>
     where
         Self: 'a,
-        T: 'a;
+        Self::DBO: 'a;
     /// Allows iterating over all field definitions.
     fn field_defs(&'_ self) -> Self::IntoFieldsIter<'_>;
 }
@@ -45,7 +47,7 @@ impl<T: DataObject> DataObjectFieldDef<T> {
         self.nullable
     }
     /// Returns whether values of the field must be unique.
-    pub fn unique(&self) -> bool {
+    pub fn is_unique(&self) -> bool {
         self.unique
     }
     /// Returns whether the field is a primary key.
@@ -53,8 +55,8 @@ impl<T: DataObject> DataObjectFieldDef<T> {
         self.pk
     }
     /// Returns the default value for the field, if any.
-    pub fn default(&self) -> &Option<SqlVal> {
-        &self.default
+    pub fn default(&self) -> Option<&SqlVal> {
+        self.default.as_ref()
     }
     /// Returns the sqltype of the field.
     pub fn sqltype(&self) -> &SqlType {

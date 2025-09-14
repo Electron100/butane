@@ -437,7 +437,7 @@ fn get_default_lit(field: &Field) -> std::result::Result<Option<Lit>, CompilerEr
         .iter()
         .find(|attr| attr.path().is_ident("default"));
     match attr {
-        None => return Ok(None),
+        None => Ok(None),
         Some(attr) => match &attr.meta {
             Meta::NameValue(MetaNameValue {
                 value: syn::Expr::Lit(expr_lit),

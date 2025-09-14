@@ -375,6 +375,11 @@ impl From<TypeIdentifier> for DeferredSqlType {
         DeferredSqlType::KnownId(id)
     }
 }
+impl From<SqlType> for DeferredSqlType {
+    fn from(ty: SqlType) -> Self {
+        DeferredSqlType::Known(ty)
+    }
+}
 
 /// Abstract representation of a database column reference constraint.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -687,4 +692,37 @@ fn diff_table(old: &ATable, new: &ATable) -> Vec<Operation> {
         ));
     }
     ops
+}
+
+use crate::implementation::{DataObjectFieldDef, DataObjectFields};
+use crate::DataObject;
+
+impl<T> From<T> for ATable
+where
+    T: DataObjectFields,
+{
+    fn from(fields: T) -> ATable {
+        ATable {
+            name: T::DBO::TABLE.to_string(),
+            columns: fields.field_defs().into_iter().map(AColumn::from).collect(),
+        }
+    }
+}
+
+impl<T> From<&DataObjectFieldDef<T>> for AColumn
+where
+    T: DataObject,
+{
+    fn from(def: &DataObjectFieldDef<T>) -> AColumn {
+        AColumn::new(
+            def.name(),
+            def.sqltype().clone().into(),
+            def.is_nullable(),
+            def.is_pk(),
+            def.is_auto(),
+            def.is_unique(),
+            def.default().cloned(),
+            None,
+        )
+    }
 }

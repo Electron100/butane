@@ -1,11 +1,14 @@
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Field, ItemStruct, LitStr};
+
+mod fields;
+pub use fields::fields_type_tokens;
 
 use super::{
     extract_path_from_type, fields, get_autopk_sql_type, get_type_argument, is_auto,
-    is_many_to_many, is_row_field, make_ident_literal_str, make_lit, pk_field, MANY_TYNAMES,
+    is_many_to_many, is_row_field, make_ident_literal_str, make_lit, pk_field,
 };
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
 use crate::SqlType;
@@ -20,7 +23,7 @@ pub struct Config {
 pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let tablelit = make_tablelit(config, tyname);
-    let fields_type = fields_type(tyname);
+    let fields_type = fields::fields_type(tyname);
 
     let err = verify_fields(ast_struct);
     if let Some(err) = err {
@@ -225,106 +228,6 @@ fn make_tablelit(config: &Config, tyname: &Ident) -> LitStr {
         Some(s) => make_lit(s),
         None => make_ident_literal_str(tyname),
     }
-}
-
-/// Help to generate field expressions for each `#[butane::model]`.
-pub fn add_fieldexprs(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
-    let tyname = &ast_struct.ident;
-    let vis = &ast_struct.vis;
-    let fieldexprs: Vec<TokenStream2> = fields(ast_struct)
-        .map(|f| {
-            if is_many_to_many(f) {
-                fieldexpr_func_many(f, ast_struct, config)
-            } else {
-                fieldexpr_func_regular(f, ast_struct)
-            }
-        })
-        .collect();
-
-    let fields_type = fields_type(tyname);
-    quote!(
-        impl #tyname {
-            /// Get fields.
-            pub fn fields() -> #fields_type {
-                #fields_type::default()
-            }
-        }
-        /// Helper struct for butane model.
-        #vis struct #fields_type;
-        impl #fields_type {
-            #(#fieldexprs)*
-        }
-        impl std::default::Default for #fields_type {
-            fn default() -> Self {
-                #fields_type{}
-            }
-        }
-    )
-}
-
-fn fieldexpr_func_regular(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
-    let fty = &f.ty;
-    let fidlit = field_ident_lit(f);
-    fieldexpr_func(
-        f,
-        ast_struct,
-        quote!(butane::query::FieldExpr<#fty>),
-        quote!(butane::query::FieldExpr::<#fty>::new(#fidlit)),
-    )
-}
-
-fn fieldexpr_func_many(f: &Field, ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
-    let tyname = &ast_struct.ident;
-    let fty = get_type_argument(&f.ty, &MANY_TYNAMES).expect("Many field misdetected");
-    let many_table_lit = many_table_lit(ast_struct, f, config);
-    fieldexpr_func(
-        f,
-        ast_struct,
-        quote!(butane::query::ManyFieldExpr<#tyname, #fty>),
-        quote!(butane::query::ManyFieldExpr::<#tyname, #fty>::new(#many_table_lit)),
-    )
-}
-
-fn fieldexpr_func(
-    f: &Field,
-    ast_struct: &ItemStruct,
-    field_expr_type: TokenStream2,
-    field_expr_ctor: TokenStream2,
-) -> TokenStream2 {
-    let vis = &ast_struct.vis;
-    let fid = match &f.ident {
-        Some(fid) => fid,
-        None => {
-            return quote_spanned!(
-                f.span() =>
-                    compile_error!("Fields must be named for butane");
-            )
-        }
-    };
-    let fnid = Ident::new(&format!("{fid}"), f.span());
-    quote!(
-        /// Create query expression.
-        #vis fn #fnid(&self) -> #field_expr_type {
-            #field_expr_ctor
-        }
-    )
-}
-
-fn field_ident_lit(f: &Field) -> TokenStream2 {
-    let fid = match &f.ident {
-        Some(fid) => fid,
-        None => {
-            return quote_spanned!(
-                f.span() =>
-                    compile_error!("Fields must be named for butane");
-            )
-        }
-    };
-    make_ident_literal_str(fid).into_token_stream()
-}
-
-fn fields_type(tyname: &Ident) -> Ident {
-    Ident::new(&format!("{tyname}Fields"), Span::call_site())
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {

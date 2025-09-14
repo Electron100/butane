@@ -15,8 +15,9 @@ pub use butane_core::query;
 #[cfg(feature = "async")]
 pub use butane_core::{fkey::ForeignKeyOpsAsync, many::ManyOpsAsync, DataObjectOpsAsync};
 pub use butane_core::{
-    AsPrimaryKey, AutoPk, DataObject, DataObjectOpsSync, DataResult, Error, FieldType, FromSql,
-    PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql,
+    AsPrimaryKey, AutoPk, DataObject, DataObjectFieldDef, DataObjectFields, DataObjectOpsSync,
+    DataResult, Error, FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef,
+    ToSql,
 };
 
 pub mod db;

@@ -54,6 +54,7 @@ serde_json = { workspace = true }
 sqlparser = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
+typed-builder = { workspace = true }
 url.workspace = true
 uuid = { workspace = true, optional = true }
 

@@ -1,6 +1,5 @@
 //! For working with migrations. If using the butane CLI tool, it is
 //! not necessary to use these types directly.
-
 #![allow(missing_docs)]
 
 use std::path::Path;
@@ -13,7 +12,10 @@ use crate::db::{Backend, BackendConnection, BackendRows, Column, ConnectionMetho
 #[cfg(feature = "async")]
 use crate::db::{ConnectionAsync, ConnectionMethodsAsync};
 use crate::sqlval::{FromSql, SqlValRef, ToSql};
-use crate::{db, query, DataObject, DataResult, Error, PrimaryKeyType, Result, SqlType};
+use crate::{
+    db, query, DataObject, DataObjectFieldDef, DataObjectFields, DataResult, Error, PrimaryKeyType,
+    Result, SqlType,
+};
 
 pub mod adb;
 use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeIdentifier, ADB};
@@ -361,7 +363,7 @@ impl DataResult for ButaneMigration {
 
 impl DataObject for ButaneMigration {
     type PKType = String;
-    type Fields = (); // we don't need Fields as we never filter
+    type Fields = ButaneMigrationFields;
     const PKCOL: &'static str = "name";
     const TABLE: &'static str = "butane_migrations";
     const AUTO_PK: bool = false;
@@ -388,5 +390,27 @@ impl crate::internal::DataObjectInternal for ButaneMigration {
     }
     fn save_many_to_many_sync(&mut self, _conn: &impl ConnectionMethods) -> Result<()> {
         Ok(()) // no-op
+    }
+}
+
+struct ButaneMigrationFields {
+    defs: [DataObjectFieldDef<ButaneMigration>; 1],
+}
+impl Default for ButaneMigrationFields {
+    fn default() -> Self {
+        let name_field = DataObjectFieldDef::<ButaneMigration>::builder()
+            .name("name")
+            .sqltype(SqlType::Text)
+            .nullable(false)
+            .pk(true)
+            .build();
+        Self { defs: [name_field] }
+    }
+}
+
+impl DataObjectFields<ButaneMigration> for ButaneMigrationFields {
+    type IntoFieldsIter<'a> = &'a [DataObjectFieldDef<ButaneMigration>; 1];
+    fn field_defs(&self) -> Self::IntoFieldsIter<'_> {
+        &self.defs
     }
 }

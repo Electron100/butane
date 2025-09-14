@@ -9,6 +9,7 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Default)]
 struct Blog {
     id: AutoPk<i64>,
+    #[default = "My Blog"]
     name: String,
 }
 

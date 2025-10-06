@@ -5,7 +5,7 @@ use syn::{spanned::Spanned, Field, ItemStruct, LitStr};
 
 use super::{
     extract_path_from_type, fields, get_autopk_sql_type, get_type_argument, is_auto,
-    is_many_to_many, is_row_field, make_ident_literal_str, make_lit, pk_field, MANY_TYNAMES,
+    is_many_to_many, is_row_field, make_ident_literal_str, make_lit, pk_field,
 };
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
 use crate::SqlType;
@@ -275,7 +275,7 @@ fn fieldexpr_func_regular(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
 
 fn fieldexpr_func_many(f: &Field, ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let fty = get_type_argument(&f.ty, &MANY_TYNAMES).expect("Many field misdetected");
+    let fty = get_type_argument(&f.ty, "Many").expect("Many field misdetected");
     let many_table_lit = many_table_lit(ast_struct, f, config);
     fieldexpr_func(
         f,

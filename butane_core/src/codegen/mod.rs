@@ -5,6 +5,8 @@
 //! may change at any time without warning.
 #![doc(hidden)]
 
+use desynt::{create_static_resolver, PathResolver};
+use phf::{phf_map, Map};
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span, TokenTree};
 use quote::{quote, ToTokens};
@@ -18,11 +20,6 @@ use syn::{
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
 use crate::migrations::{MigrationMut, MigrationsMut};
 use crate::{SqlType, SqlVal};
-
-const OPTION_TYNAMES: [&str; 3] = ["Option", "option::Option", "std::option::Option"];
-const MANY_TYNAMES: [&str; 2] = ["Many", "butane::Many"];
-const FKEY_TYNAMES: [&str; 2] = ["ForeignKey", "butane::ForeignKey"];
-const AUTOPK_TYNAMES: [&str; 2] = ["AutoPk", "butane::AutoPk"];
 
 /// Create a compiler error.
 #[macro_export]
@@ -39,6 +36,51 @@ macro_rules! make_compile_error {
 
 mod dbobj;
 mod migration;
+
+// Recursion error occurs when chrono items are each feature gated.
+// https://github.com/rust-phf/rust-phf/pull/342 is a recent feature.
+
+/// Butane type mappings.
+#[cfg(not(feature = "chrono"))]
+static PATH_MAPPINGS: Map<&'static str, &'static str> = phf_map! {
+    "butane::AutoPk" => "AutoPk",
+    "butane::ForeignKey" => "ForeignKey",
+    "butane::Many" => "Many",
+    "butane::autopk::AutoPk" => "AutoPk",
+    "butane::fkey::ForeignKey" => "ForeignKey",
+    "butane::many::Many" => "Many",
+    #[cfg(feature = "json")]
+    "serde_json::Value" => "Value",
+    #[cfg(feature = "uuid")]
+    "uuid::Uuid" => "Uuid",
+};
+
+/// Butane type mappings.
+#[cfg(feature = "chrono")]
+static PATH_MAPPINGS: Map<&'static str, &'static str> = phf_map! {
+    "butane::AutoPk" => "AutoPk",
+    "butane::ForeignKey" => "ForeignKey",
+    "butane::Many" => "Many",
+    "butane::autopk::AutoPk" => "AutoPk",
+    "butane::fkey::ForeignKey" => "ForeignKey",
+    "butane::many::Many" => "Many",
+    "chrono::DateTime" => "DateTime",
+    "chrono::NaiveDate" => "NaiveDate",
+    "chrono::NaiveDateTime" => "NaiveDateTime",
+    "chrono::Utc" => "Utc",
+    "chrono::datetime::DateTime" => "DateTime",
+    "chrono::naive::NaiveDate" => "NaiveDate",
+    "chrono::naive::NaiveDateTime" => "NaiveDateTime",
+    "chrono::offset::Utc" => "Utc",
+    #[cfg(feature = "json")]
+    "serde_json::Value" => "Value",
+    #[cfg(feature = "uuid")]
+    "uuid::Uuid" => "Uuid",
+};
+
+/// Path resolver for Butane types.
+const PATH_RESOLVER: PathResolver<&'static Map<&'static str, &'static str>> =
+    create_static_resolver(&PATH_MAPPINGS, true);
 
 /// Implementation of `#[butane::model]`.
 pub fn model_with_migrations<M>(
@@ -271,7 +313,7 @@ fn pk_field(ast_struct: &ItemStruct) -> Option<Field> {
 }
 
 fn is_auto(field: &Field) -> bool {
-    get_type_argument(&field.ty, &AUTOPK_TYNAMES).is_some()
+    get_type_argument(&field.ty, "AutoPk").is_some()
 }
 
 fn is_unique(field: &Field) -> bool {
@@ -300,24 +342,24 @@ pub fn extract_path_from_type(ty: &syn::Type) -> &syn::Path {
 }
 
 fn get_option_sql_type(path: &syn::Path) -> Option<DeferredSqlType> {
-    get_path_argument(path, &OPTION_TYNAMES).map(get_deferred_sql_type)
+    get_path_argument(path, "Option").map(get_deferred_sql_type)
 }
 
 fn get_foreign_key_sql_type(field: &Field) -> Option<DeferredSqlType> {
-    if let Some(inner_type_path) = get_type_argument(&field.ty, &OPTION_TYNAMES) {
-        return get_foreign_sql_type(inner_type_path, &FKEY_TYNAMES);
+    if let Some(inner_type_path) = get_type_argument(&field.ty, "Option") {
+        return get_foreign_sql_type(inner_type_path, "ForeignKey");
     }
     let path = extract_path_from_type(&field.ty);
-    get_foreign_sql_type(path, &FKEY_TYNAMES)
+    get_foreign_sql_type(path, "ForeignKey")
 }
 
 fn get_many_sql_type(field: &Field) -> Option<DeferredSqlType> {
     let path = extract_path_from_type(&field.ty);
-    get_foreign_sql_type(path, &MANY_TYNAMES)
+    get_foreign_sql_type(path, "Many")
 }
 
 fn get_autopk_sql_type(path: &syn::Path) -> Option<DeferredSqlType> {
-    get_path_argument(path, &AUTOPK_TYNAMES).map(get_deferred_sql_type)
+    get_path_argument(path, "AutoPk").map(get_deferred_sql_type)
 }
 
 fn is_many_to_many(field: &Field) -> bool {
@@ -329,7 +371,7 @@ fn is_foreign_key(field: &Field) -> bool {
 }
 
 fn is_option(field: &Field) -> bool {
-    get_type_argument(&field.ty, &OPTION_TYNAMES).is_some()
+    get_type_argument(&field.ty, "Option").is_some()
 }
 
 /// Check for special fields which won't correspond to rows and don't
@@ -338,64 +380,49 @@ fn is_row_field(f: &Field) -> bool {
     !is_many_to_many(f)
 }
 
-/// Test if the ident of each segment in two paths is the same without
-/// looking at the arguments.
-fn is_same_path_ident(path1: &syn::Path, path2: &syn::Path) -> bool {
-    if path1.segments.len() != path2.segments.len() {
-        return false;
-    }
-    path1
-        .segments
-        .iter()
-        .zip(path2.segments.iter())
-        .all(|(a, b)| a.ident == b.ident)
-}
-
 /// Gets the type argument of a type.
 /// E.g. for `Foo<T>`, returns `T`.
-fn get_type_argument<'a>(ty: &'a syn::Type, tynames: &[&'static str]) -> Option<&'a syn::Path> {
+fn get_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Option<&'a syn::Path> {
     let path = match ty {
         syn::Type::Path(path) => &path.path,
         _ => return None,
     };
-    get_path_argument(path, tynames)
+    get_path_argument(path, tyname)
 }
 
 /// Gets the type argument of a path.
 /// E.g. for `Foo<T>``, returns `T`.
-fn get_path_argument<'a>(path: &'a syn::Path, tynames: &[&'static str]) -> Option<&'a syn::Path> {
-    if !tynames
-        .iter()
-        .any(|tyname| match syn::parse_str::<syn::Path>(tyname) {
-            Ok(ty_path) => is_same_path_ident(path, &ty_path),
-            // Should only happen if there's a bug in butane
-            Err(_) => panic!("Cannot parse {tyname} as syn::Path"),
-        })
-    {
+fn get_path_argument<'a>(path: &'a syn::Path, tyname: &str) -> Option<&'a syn::Path> {
+    if let Some(resolved) = PATH_RESOLVER.resolve(path) {
+        if resolved != tyname {
+            return None;
+        }
+    } else {
         return None;
-    }
+    };
+
     let seg = path.segments.last().unwrap();
     let args = match &seg.arguments {
         syn::PathArguments::AngleBracketed(args) => &args.args,
         _ => return None,
     };
     if args.len() != 1 {
-        panic!("{} should have a single type argument", tynames[0])
+        panic!("{} should have a single type argument", tyname)
     }
     match args.last().unwrap() {
         syn::GenericArgument::Type(syn::Type::Path(typath)) => Some(&typath.path),
-        _ => panic!("{} argument should be a type.", tynames[0]),
+        _ => panic!("{} argument should be a type.", tyname),
     }
 }
 
-fn get_foreign_sql_type(path: &syn::Path, tynames: &[&'static str]) -> Option<DeferredSqlType> {
-    let path = get_path_argument(path, tynames);
+fn get_foreign_sql_type(path: &syn::Path, tyname: &str) -> Option<DeferredSqlType> {
+    let path = get_path_argument(path, tyname);
     path.map(|typath| {
         DeferredSqlType::Deferred(TypeKey::PK(
             typath
                 .segments
                 .last()
-                .unwrap_or_else(|| panic!("{} must have an argument", tynames[0]))
+                .unwrap_or_else(|| panic!("{} must have an argument", tyname))
                 .ident
                 .to_string(),
         ))
@@ -408,7 +435,7 @@ fn get_foreign_sql_type(path: &syn::Path, tynames: &[&'static str]) -> Option<De
 pub fn get_deferred_sql_type(path: &syn::Path) -> DeferredSqlType {
     get_primitive_sql_type(path)
         .or_else(|| get_option_sql_type(path))
-        .or_else(|| get_foreign_sql_type(path, &FKEY_TYNAMES))
+        .or_else(|| get_foreign_sql_type(path, "ForeignKey"))
         .or_else(|| get_autopk_sql_type(path))
         .unwrap_or_else(|| {
             DeferredSqlType::Deferred(TypeKey::CustomType(
@@ -649,13 +676,13 @@ mod tests {
 
         let type_path: syn::TypePath = syn::parse_quote!(Option<butane::ForeignKey<Foo>>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_type_argument(&typ, &OPTION_TYNAMES);
+        let rv = get_type_argument(&typ, "Option");
         assert!(rv.is_some());
         assert_eq!(rv.unwrap(), &expected_type_path);
 
         let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignKey<Foo>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_type_argument(&typ, &OPTION_TYNAMES);
+        let rv = get_type_argument(&typ, "Option");
 
         assert!(rv.is_none());
     }
@@ -666,13 +693,13 @@ mod tests {
 
         let type_path: syn::TypePath = syn::parse_quote!(butane::ForeignKey<Foo>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_type_argument(&typ, &FKEY_TYNAMES);
+        let rv = get_type_argument(&typ, "ForeignKey");
         assert!(rv.is_some());
         assert_eq!(rv.unwrap(), &expected_type_path);
 
         let type_path: syn::TypePath = syn::parse_quote!(Foo);
         let typ = syn::Type::Path(type_path);
-        let rv = get_type_argument(&typ, &FKEY_TYNAMES);
+        let rv = get_type_argument(&typ, "ForeignKey");
         assert!(rv.is_none());
     }
 
@@ -682,13 +709,13 @@ mod tests {
 
         let type_path: syn::TypePath = syn::parse_quote!(butane::Many<Foo>);
         let typ = syn::Type::Path(type_path);
-        let rv = get_type_argument(&typ, &MANY_TYNAMES);
+        let rv = get_type_argument(&typ, "Many");
         assert!(rv.is_some());
         assert_eq!(rv.unwrap(), &expected_type_path);
 
         let type_path: syn::TypePath = syn::parse_quote!(Foo);
         let typ = syn::Type::Path(type_path);
-        let rv = get_type_argument(&typ, &MANY_TYNAMES);
+        let rv = get_type_argument(&typ, "Many");
         assert!(rv.is_none());
     }
 

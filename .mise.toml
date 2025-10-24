@@ -1,0 +1,6 @@
+[tools]
+ephemeral-postgres = "latest"
+osv-scanner = "latest"
+rust = "stable"
+"cargo:timeout-cli" = "latest"
+typos = "latest"

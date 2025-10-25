@@ -33,7 +33,8 @@ fn error_when_initdb_not_found() {
         assert!(
             err_msg.contains("initdb")
                 || err_msg.contains("Failed to execute")
-                || err_msg.contains("No such file or directory"),
+                || err_msg.contains("No such file or directory")
+                || err_msg.contains("program not found"), // Windows error message
             "Error message should indicate binary not found: {}",
             err_msg
         );
@@ -93,6 +94,7 @@ fn error_when_postgres_not_found() {
 
 /// Test that we can create a custom postgres server using initdb
 #[test]
+#[cfg(not(target_os = "windows"))]
 fn server_creation() {
     if !is_initdb_available() || !is_postgres_available() {
         eprintln!("Skipping test: initdb or postgres not found in PATH");
@@ -125,6 +127,7 @@ fn server_creation() {
 
 /// Test that the directory structure is created correctly
 #[test]
+#[cfg(not(target_os = "windows"))]
 fn directory_structure() {
     if !is_initdb_available() || !is_postgres_available() {
         eprintln!("Skipping test: initdb or postgres not found in PATH");
@@ -193,6 +196,7 @@ fn multiple_servers() {
 
 /// Test that custom user option works
 #[test]
+#[cfg(not(target_os = "windows"))]
 fn custom_user() {
     if !is_initdb_available() || !is_postgres_available() {
         eprintln!("Skipping test: initdb or postgres not found in PATH");
@@ -215,6 +219,7 @@ fn custom_user() {
 
 /// Test that default user is 'postgres'
 #[test]
+#[cfg(not(target_os = "windows"))]
 fn default_user() {
     if !is_initdb_available() || !is_postgres_available() {
         eprintln!("Skipping test: initdb or postgres not found in PATH");
@@ -237,6 +242,7 @@ fn default_user() {
 
 /// Test that directory gets cleaned up on drop
 #[test]
+#[cfg(not(target_os = "windows"))]
 fn cleanup_on_drop() {
     if !is_initdb_available() || !is_postgres_available() {
         eprintln!("Skipping test: initdb or postgres not found in PATH");

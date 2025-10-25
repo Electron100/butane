@@ -36,7 +36,7 @@ async fn insert_data(connection: &Connection) {
     post.save(connection).await.unwrap();
 }
 
-#[butane_test(async, nomigrate)]
+#[butane_test(async, nomigrate, pg)]
 async fn migrate_and_unmigrate_async(mut connection: ConnectionAsync) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");

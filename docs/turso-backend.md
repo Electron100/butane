@@ -229,6 +229,33 @@ The planned fix involves:
 - `butane_core/src/db/helper.rs` lines 93-109: Where the SQL is generated
 - `butane_core/src/db/turso.rs` line 156+: Where Turso-specific query logic could be added
 
+### Table Rename Migration
+
+**Problem**: The newtype example fails when attempting to rename tables during migration with the error:
+
+```text
+table being renamed should be in schema
+```
+
+**Root Cause**: This appears to be a limitation in how Turso/libSQL handles table rename operations
+during migrations. The migration system expects the table to exist in the schema before renaming,
+but Turso may have different behavior compared to SQLite or PostgreSQL.
+
+**Affected Examples**:
+
+- `examples/newtype/` - Uses table renames in migrations
+
+**Workaround**: Avoid renaming tables when using the Turso backend. Instead:
+
+- Create new tables with the desired name
+- Copy data from old table to new table
+- Drop the old table
+
+**Status**: This is a known limitation that may require either:
+
+- Changes to Butane's migration system to handle Turso differently
+- Updates to libSQL to support standard table rename operations
+
 ## Performance
 
 Turso is designed for high performance with:

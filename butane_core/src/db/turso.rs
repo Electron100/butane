@@ -548,11 +548,15 @@ impl<'c> Drop for TursoTransaction<'c> {
                     let conn_clone = conn.conn.clone();
                     let _ = tokio::task::block_in_place(|| {
                         tokio::runtime::Handle::current().block_on(async move {
-                            conn_clone.execute("ROLLBACK", Vec::<turso::Value>::new()).await
+                            conn_clone
+                                .execute("ROLLBACK", Vec::<turso::Value>::new())
+                                .await
                         })
                     });
                 } else {
-                    eprintln!("Warning: TursoTransaction dropped without commit or rollback and no tokio runtime available");
+                    eprintln!(
+                        "Warning: TursoTransaction dropped without commit or rollback and no tokio runtime available"
+                    );
                 }
             }
         }
@@ -595,69 +599,114 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         SqlType::Bool => {
             let i = match val {
                 turso::Value::Integer(i) => *i,
-                _ => return Err(Error::Internal(format!("Expected integer for Bool, got {:?}", val))),
+                _ => {
+                    return Err(Error::Internal(format!(
+                        "Expected integer for Bool, got {:?}",
+                        val
+                    )))
+                }
             };
             SqlVal::Bool(i != 0)
-        },
+        }
         SqlType::Int => {
             let i = match val {
                 turso::Value::Integer(i) => *i,
-                _ => return Err(Error::Internal(format!("Expected integer for Int, got {:?}", val))),
+                _ => {
+                    return Err(Error::Internal(format!(
+                        "Expected integer for Int, got {:?}",
+                        val
+                    )))
+                }
             };
             SqlVal::Int(i as i32)
-        },
+        }
         SqlType::BigInt => {
             let i = match val {
                 turso::Value::Integer(i) => *i,
-                _ => return Err(Error::Internal(format!("Expected integer for BigInt, got {:?}", val))),
+                _ => {
+                    return Err(Error::Internal(format!(
+                        "Expected integer for BigInt, got {:?}",
+                        val
+                    )))
+                }
             };
             SqlVal::BigInt(i)
-        },
+        }
         SqlType::Real => {
             let r = match val {
                 turso::Value::Real(r) => *r,
-                _ => return Err(Error::Internal(format!("Expected real for Real, got {:?}", val))),
+                _ => {
+                    return Err(Error::Internal(format!(
+                        "Expected real for Real, got {:?}",
+                        val
+                    )))
+                }
             };
             SqlVal::Real(r)
-        },
+        }
         SqlType::Text => {
             let t = match val {
                 turso::Value::Text(t) => t.clone(),
-                _ => return Err(Error::Internal(format!("Expected text for Text, got {:?}", val))),
+                _ => {
+                    return Err(Error::Internal(format!(
+                        "Expected text for Text, got {:?}",
+                        val
+                    )))
+                }
             };
             SqlVal::Text(t)
-        },
+        }
         #[cfg(feature = "json")]
         SqlType::Json => {
             let t = match val {
                 turso::Value::Text(t) => t,
-                _ => return Err(Error::Internal(format!("Expected text for Json, got {:?}", val))),
+                _ => {
+                    return Err(Error::Internal(format!(
+                        "Expected text for Json, got {:?}",
+                        val
+                    )))
+                }
             };
             SqlVal::Json(serde_json::from_str(t)?)
-        },
+        }
         #[cfg(feature = "datetime")]
         SqlType::Date => {
             let t = match val {
                 turso::Value::Text(t) => t,
-                _ => return Err(Error::Internal(format!("Expected text for Date, got {:?}", val))),
+                _ => {
+                    return Err(Error::Internal(format!(
+                        "Expected text for Date, got {:?}",
+                        val
+                    )))
+                }
             };
             SqlVal::Date(NaiveDate::parse_from_str(t, TURSO_DATE_FORMAT)?)
-        },
+        }
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => {
             let t = match val {
                 turso::Value::Text(t) => t,
-                _ => return Err(Error::Internal(format!("Expected text for Timestamp, got {:?}", val))),
+                _ => {
+                    return Err(Error::Internal(format!(
+                        "Expected text for Timestamp, got {:?}",
+                        val
+                    )))
+                }
             };
             SqlVal::Timestamp(NaiveDateTime::parse_from_str(t, TURSO_DT_FORMAT)?)
-        },
+        }
         SqlType::Blob => {
             let b = match val {
                 turso::Value::Blob(b) => b.clone(),
-                _ => return Err(Error::Internal(format!("Expected blob for Blob, got {:?}", val))),
+                _ => {
+                    return Err(Error::Internal(format!(
+                        "Expected blob for Blob, got {:?}",
+                        val
+                    )))
+                }
             };
             SqlVal::Blob(b)
-        },
+        }
         SqlType::Custom(v) => return Err(Error::IncompatibleCustomT(v.clone(), BACKEND_NAME)),
     })
 }

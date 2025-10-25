@@ -4,7 +4,11 @@ This document describes the Turso backend integration for Butane ORM.
 
 ## Overview
 
-[Turso](https://github.com/tursodatabase/turso) is an in-process SQL database written in Rust, compatible with SQLite. The Turso backend for Butane leverages this SQLite compatibility while providing async-first database operations.
+[Turso](https://github.com/tursodatabase/turso) is an in-process SQL database written in Rust,
+compatible with SQLite.
+
+The Turso backend for Butane leverages this SQLite compatibility while providing async-first
+database operations.
 
 ## Features
 
@@ -164,7 +168,8 @@ Turso is designed for high performance with:
 
 ## Contributing
 
-Contributions to improve the Turso backend are welcome! Please see the main Butane repository for contribution guidelines.
+Contributions to improve the Turso backend are welcome! Please see the main Butane repository for
+contribution guidelines.
 
 ## Resources
 

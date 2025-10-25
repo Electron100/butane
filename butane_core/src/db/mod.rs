@@ -54,6 +54,9 @@ pub mod pg;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
+#[cfg(feature = "turso")]
+pub mod turso;
+
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
 
@@ -729,6 +732,8 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
         sqlite::BACKEND_NAME => Some(Box::new(sqlite::SQLiteBackend::new())),
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
+        #[cfg(feature = "turso")]
+        turso::BACKEND_NAME => Some(Box::new(turso::TursoBackend::default())),
         _ => None,
     }
 }

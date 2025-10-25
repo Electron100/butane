@@ -841,6 +841,8 @@ async fn debug_connection(conn: ConnectionAsync) {
     let debug_str = format!("{conn:?}");
     if backend_name == "pg" {
         assert!(debug_str.contains("conn: true"));
+    } else if backend_name == "turso" {
+        assert!(debug_str.contains("TursoConnection"));
     } else {
         assert!(debug_str.contains("path: Some(\"\")"));
     }
@@ -879,4 +881,61 @@ fn saves_invalid_connection_spec_to_missing_path() {
 
     let loaded_spec = ConnectionSpec::load(path).unwrap();
     assert_eq!(spec, loaded_spec);
+}
+
+// Turso tests
+#[cfg(feature = "turso")]
+#[test]
+fn uri_turso_memory() {
+    let uri = ":memory:";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    // :memory: defaults to sqlite, not turso
+    assert_eq!(spec.backend_name(), "sqlite");
+}
+
+#[cfg(feature = "turso")]
+#[test]
+fn uri_turso_scheme() {
+    let uri = "turso://localhost/test.db";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name(), "turso");
+    assert_eq!(spec.connection_string(), uri);
+
+    let parsed_uri = spec.connection_string_uri().unwrap();
+    assert_eq!(parsed_uri.scheme(), "turso");
+}
+
+#[cfg(feature = "turso")]
+#[test]
+fn uri_turso_libsql_scheme() {
+    let uri = "libsql://localhost:8080/test";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name(), "libsql");
+    assert_eq!(spec.connection_string(), uri);
+}
+
+#[cfg(feature = "turso")]
+#[test]
+fn uri_turso_file_path() {
+    let uri = "file:test.db";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    // file: scheme defaults to sqlite
+    assert_eq!(spec.backend_name(), "sqlite");
+}
+
+#[cfg(feature = "turso")]
+#[butane_test(nomigrate)]
+async fn turso_connection_not_closed(conn: ConnectionAsync) {
+    if conn.backend_name() == "turso" {
+        assert!(!conn.is_closed());
+    }
+}
+
+#[cfg(feature = "turso")]
+#[butane_test(nomigrate)]
+async fn turso_debug_connection(conn: ConnectionAsync) {
+    if conn.backend_name() == "turso" {
+        let debug_str = format!("{conn:?}");
+        assert!(debug_str.contains("TursoConnection"));
+    }
 }

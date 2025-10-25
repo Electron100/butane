@@ -108,8 +108,12 @@ jobs:
       run: make lint-ci
     - name: Run cargo-deny
       run: cargo deny check all
-    - name: Test Butane test helper
+    - name: Test Butane test helper with ephemeral-postgres
+      if: runner.os != 'Windows'
       run: cd butane_test_helper && mise exec ephemeral-postgres -- cargo +stable test --all-features
+    - name: Test Butane test helper without ephemeral-postgres
+      if: runner.os == 'Windows'
+      run: cd butane_test_helper && cargo +stable test --all-features
     - name: Test Core
       run: cd butane_core && cargo +stable test --all-features
     - name: Test Codegen

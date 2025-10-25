@@ -156,7 +156,7 @@ async fn load_sorted_from_many(conn: ConnectionAsync) {
     assert!(tag_iter.next().is_none());
 }
 
-#[butane_test]
+#[butane_test(pg)]
 async fn remove_one_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
@@ -183,7 +183,7 @@ async fn remove_one_from_many(conn: ConnectionAsync) {
     assert_eq!(post2.tags.load(&conn).await.unwrap().count(), 2);
 }
 
-#[butane_test]
+#[butane_test(pg)]
 async fn remove_multiple_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
@@ -213,7 +213,7 @@ async fn remove_multiple_from_many(conn: ConnectionAsync) {
     assert_eq!(post2.tags.load(&conn).await.unwrap().count(), 2);
 }
 
-#[butane_test]
+#[butane_test(pg)]
 async fn delete_all_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
@@ -245,7 +245,7 @@ async fn delete_all_from_many(conn: ConnectionAsync) {
     assert_eq!(post2.tags.load(&conn).await.unwrap().count(), 0);
 }
 
-#[butane_test]
+#[butane_test(pg)]
 async fn can_add_to_many_before_save(conn: ConnectionAsync) {
     // Verify that for an object with an auto-pk, we can add items to a Many field before we actually
     // save the original object (and thus get the actual pk);
@@ -259,7 +259,7 @@ async fn can_add_to_many_before_save(conn: ConnectionAsync) {
     assert_eq!(tags.count(), 2);
 }
 
-#[butane_test]
+#[butane_test(pg)]
 async fn cant_add_unsaved_to_many(_conn: ConnectionAsync) {
     let unsaved_item = AutoItem {
         id: AutoPk::uninitialized(),
@@ -273,7 +273,7 @@ async fn cant_add_unsaved_to_many(_conn: ConnectionAsync) {
     assert!(matches!(err, butane::Error::ValueNotSaved));
 }
 
-#[butane_test]
+#[butane_test(pg)]
 async fn can_add_to_many_with_custom_table_name(conn: ConnectionAsync) {
     let mut obj = RenamedAutoPkWithMany::new();
     obj.tags.add(&create_tag(&conn, "blue").await).unwrap();

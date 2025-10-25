@@ -586,24 +586,27 @@ impl ConnectionSpec {
 
     /// Add a query parameter to the connection string.
     pub fn add_parameter(&mut self, name: &str, value: &str) -> Result<()> {
+        // Check if it's a URI first (postgresql://, postgres://, etc.)
+        if self.connection_string_uri().is_some() {
+            // It's a URI, append using URI query parameter syntax
+            if self.conn_str.contains('?') {
+                self.conn_str.push_str(&format!("&{}={}", name, value));
+            } else {
+                self.conn_str.push_str(&format!("?{}={}", name, value));
+            }
+            return Ok(());
+        }
+
         if self.backend_name() == "pg" && Self::is_pg_key_value_pairs(&self.conn_str) {
             // Append using PostgreSQL key-value pair syntax.
             self.conn_str.push_str(&format!(" {}={}", name, value));
             return Ok(());
         }
-        if self.connection_string_uri().is_none() {
-            return Err(crate::Error::UnknownConnectString(
-                "Cannot add query parameter to connection string that is not a postgres or URI"
-                    .to_string(),
-            ));
-        }
 
-        if self.conn_str.contains('?') {
-            self.conn_str.push_str(&format!("&{}={}", name, value));
-        } else {
-            self.conn_str.push_str(&format!("?{}={}", name, value));
-        }
-        Ok(())
+        Err(crate::Error::UnknownConnectString(
+            "Cannot add query parameter to connection string that is not a postgres key-value format or URI"
+                .to_string(),
+        ))
     }
 }
 

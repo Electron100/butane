@@ -307,7 +307,7 @@ fn multithreaded_with_options() {
 
 /// Test that threads can create initdb servers with custom options
 #[test]
-fn test_multithreaded_initdb_with_options() {
+fn multithreaded_initdb_with_options() {
     if !is_initdb_available() || !is_postgres_available() {
         eprintln!("Skipping test: initdb or postgres not found in PATH");
         return;

@@ -141,12 +141,6 @@ pub fn cleanup_postgres_shared_memory(data_dir: &std::path::Path) -> bool {
     cleaned
 }
 
-#[cfg(not(target_os = "macos"))]
-pub fn cleanup_postgres_shared_memory(_data_dir: &std::path::Path) -> bool {
-    // Not needed on other platforms
-    false
-}
-
 impl Drop for PgServerState {
     fn drop(&mut self) {
         // Avoid using Child.kill on Unix, as it uses SIGKILL, which postgresql recommends against,

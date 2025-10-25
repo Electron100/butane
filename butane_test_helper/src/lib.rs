@@ -36,7 +36,6 @@ use butane_core::db::sqlite::SQLiteBackend;
 #[cfg(feature = "pg")]
 use butane_core::db::{connect, connect_async, pg as butane_pg};
 use butane_core::db::{get_backend, Backend, ConnectionSpec};
-
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 #[cfg(feature = "pg")]
 use uuid::Uuid;

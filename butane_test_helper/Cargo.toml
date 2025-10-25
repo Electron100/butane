@@ -37,6 +37,7 @@ which = "8.0"
 
 [dev-dependencies]
 pollster = "0.4"
+temp-env = "0.3"
 
 [package.metadata.release]
 release = false

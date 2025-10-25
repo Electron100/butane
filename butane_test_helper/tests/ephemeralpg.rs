@@ -1,11 +1,14 @@
 //! Integration tests for ephemeralpg support
 #![cfg(feature = "pg")]
 
-use butane_test_helper::{
-    pg_tmp_server_create_ephemeralpg, PgServerOptions, PgTemporaryServenError,
-};
 use std::sync::{Arc, Barrier};
 use std::thread;
+
+use temp_env::with_var;
+
+use butane_test_helper::{
+    pg_tmp_server_create_ephemeralpg, PgServerOptions, PgTemporaryServerError,
+};
 
 /// Helper to check if pg_tmp is available
 fn is_pg_tmp_available() -> bool {
@@ -15,25 +18,22 @@ fn is_pg_tmp_available() -> bool {
 /// Test that we can detect if pg_tmp is not available
 #[test]
 fn error_when_not_found() {
-    // Only run this test if pg_tmp is NOT available
-    if is_pg_tmp_available() {
-        eprintln!("Skipping test: pg_tmp is available");
-        return;
-    }
+    // Temporarily clear PATH to simulate pg_tmp not being available
+    with_var("PATH", None::<&str>, || {
+        let options = PgServerOptions::default();
 
-    let options = PgServerOptions::default();
+        let result = pg_tmp_server_create_ephemeralpg(options);
+        assert!(result.is_err(), "Should fail when pg_tmp is not available");
 
-    let result = pg_tmp_server_create_ephemeralpg(options);
-    assert!(result.is_err(), "Should fail when pg_tmp is not available");
-
-    if let Err(PgTemporaryServenError::EphemeralPgError(msg)) = result {
-        assert!(
-            msg.contains("pg_tmp") || msg.contains("ephemeralpg"),
-            "Error message should mention pg_tmp or ephemeralpg"
-        );
-    } else {
-        panic!("Expected EphemeralPgError");
-    }
+        if let Err(PgTemporaryServerError::EphemeralPgError(msg)) = result {
+            assert!(
+                msg.contains("pg_tmp") || msg.contains("ephemeralpg"),
+                "Error message should mention pg_tmp or ephemeralpg"
+            );
+        } else {
+            panic!("Expected EphemeralPgError");
+        }
+    });
 }
 
 /// Test that ephemeralpg creates a server with a valid URI

@@ -1,9 +1,12 @@
 //! Integration tests for initdb-based PostgreSQL server creation
 #![cfg(feature = "pg")]
 
-use butane_test_helper::{pg_tmp_server_create_using_initdb, PgServerOptions};
 use std::sync::{Arc, Barrier};
 use std::thread;
+
+use temp_env::with_var;
+
+use butane_test_helper::{pg_tmp_server_create_using_initdb, PgServerOptions};
 
 /// Helper to check if initdb is available
 fn is_initdb_available() -> bool {
@@ -13,6 +16,79 @@ fn is_initdb_available() -> bool {
 /// Helper to check if postgres is available
 fn is_postgres_available() -> bool {
     which::which("postgres").is_ok()
+}
+
+/// Test that we get a proper error when initdb is not available
+#[test]
+fn error_when_initdb_not_found() {
+    // Temporarily clear PATH to simulate initdb not being available
+    with_var("PATH", None::<&str>, || {
+        let options = PgServerOptions::default();
+        let result = pg_tmp_server_create_using_initdb(options);
+
+        assert!(result.is_err(), "Should fail when initdb is not available");
+
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(
+            err_msg.contains("initdb")
+                || err_msg.contains("Failed to execute")
+                || err_msg.contains("No such file or directory"),
+            "Error message should indicate binary not found: {}",
+            err_msg
+        );
+    });
+}
+
+/// Test that we get a proper error when postgres is not available
+/// (This test requires initdb to be available but postgres to be missing)
+#[test]
+fn error_when_postgres_not_found() {
+    if !is_initdb_available() {
+        eprintln!("Skipping test: initdb not found in PATH (needed to test postgres missing)");
+        return;
+    }
+
+    // Get the initdb directory
+    let initdb_path = which::which("initdb").ok().and_then(|p| {
+        p.parent()
+            .map(|parent| parent.to_string_lossy().to_string())
+    });
+
+    if initdb_path.is_none() {
+        eprintln!("Skipping test: could not determine initdb location");
+        return;
+    }
+
+    let initdb_dir = initdb_path.unwrap();
+
+    // Create a minimal PATH with just the initdb directory
+    // This assumes postgres is in a different location or can be excluded
+    with_var("PATH", Some(initdb_dir.as_str()), || {
+        // Check if postgres is still available (it might be in the same dir as initdb)
+        if which::which("postgres").is_ok() {
+            eprintln!("Skipping test: postgres is in the same directory as initdb");
+            return;
+        }
+
+        let options = PgServerOptions::default();
+        let result = pg_tmp_server_create_using_initdb(options);
+
+        assert!(
+            result.is_err(),
+            "Should fail when postgres is not available"
+        );
+
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(
+            err_msg.contains("postgres")
+                || err_msg.contains("Failed to execute")
+                || err_msg.contains("No such file or directory"),
+            "Error message should indicate postgres not found: {}",
+            err_msg
+        );
+    });
 }
 
 /// Test that we can create a custom postgres server using initdb

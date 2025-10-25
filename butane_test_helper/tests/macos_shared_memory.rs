@@ -8,10 +8,11 @@
 
 #![cfg(target_os = "macos")]
 
+use std::process::Command;
+
 use butane_test_helper::{
     cleanup_postgres_shared_memory, pg_tmp_server_create_using_initdb, PgServerOptions,
 };
-use std::process::Command;
 
 /// Check if initdb is available in PATH
 fn is_initdb_available() -> bool {

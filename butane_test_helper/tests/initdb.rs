@@ -278,6 +278,7 @@ fn cleanup_on_drop() {
 
 /// Test that pg_tmp_server_create_using_initdb always uses initdb
 #[test]
+#[cfg(not(target_os = "windows"))]
 fn explicit_function() {
     if !is_initdb_available() || !is_postgres_available() {
         eprintln!("Skipping test: initdb or postgres not found in PATH");
@@ -444,6 +445,7 @@ fn multithreaded_initdb_with_options() {
 
 /// Test that sequential thread creation works reliably with initdb
 #[test]
+#[cfg(not(target_os = "windows"))]
 fn sequential_thread_creation() {
     if !is_initdb_available() || !is_postgres_available() {
         eprintln!("Skipping test: initdb or postgres not found in PATH");

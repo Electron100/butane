@@ -486,7 +486,7 @@ pub async fn pg_setup() -> PgSetupData {
 
             // If using ephemeralpg, we need to connect to the default database
             // to create a new one for this test
-            if let Some(ref uri) = server.ephemeralpg_uri {
+            if let Some(uri) = &server.ephemeralpg_uri {
                 // Use the ephemeralpg URI as-is to connect to the default "test" database
                 ConnectionSpec::try_from(uri.clone()).unwrap()
             } else {

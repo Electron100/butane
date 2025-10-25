@@ -11,7 +11,7 @@
 use std::process::Command;
 
 use butane_test_helper::{
-    cleanup_postgres_shared_memory, pg_tmp_server_create_using_initdb, PgServerOptions,
+    cleanup_macos_postgres_shared_memory, pg_tmp_server_create_using_initdb, PgServerOptions,
 };
 
 /// Check if initdb is available in PATH
@@ -141,7 +141,7 @@ fn cleanup_function_with_running_server() {
 
     // Try manual cleanup while server is still running
     // This should find and clean up the shared memory
-    let cleaned = cleanup_postgres_shared_memory(&data_dir);
+    let cleaned = cleanup_macos_postgres_shared_memory(&data_dir);
     println!("Manual cleanup result: {}", cleaned);
 
     let after_cleanup_count = count_shared_memory_segments();
@@ -168,7 +168,7 @@ fn cleanup_function_with_running_server() {
 #[test]
 fn nonexistent_directory() {
     let fake_dir = std::path::PathBuf::from("/tmp/nonexistent_postgres_dir_12345");
-    let result = cleanup_postgres_shared_memory(&fake_dir);
+    let result = cleanup_macos_postgres_shared_memory(&fake_dir);
 
     // Should return false (no cleanup needed/possible)
     assert!(
@@ -181,7 +181,7 @@ fn nonexistent_directory() {
 #[test]
 fn directory_without_postmaster_pid() {
     let temp_dir = tempfile::TempDir::new().expect("Failed to create temp dir");
-    let result = cleanup_postgres_shared_memory(temp_dir.path());
+    let result = cleanup_macos_postgres_shared_memory(temp_dir.path());
 
     // Should return false (no postmaster.pid to read)
     assert!(

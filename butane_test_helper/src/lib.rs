@@ -16,17 +16,18 @@
 //! The library will automatically detect and prefer `pg_tmp` over `initdb`.
 #![deny(missing_docs)]
 
-extern crate alloc;
-
-#[cfg(feature = "pg")]
-mod pg;
-
 use std::future::Future;
+#[cfg(feature = "pg")]
+use std::io::{BufRead, BufReader, Read, Write};
 #[cfg(feature = "pg")]
 use std::ops::Deref;
 #[cfg(feature = "pg")]
+use std::process::{ChildStderr, Command, Stdio};
+#[cfg(feature = "pg")]
 use std::sync::{LazyLock, Mutex};
 
+#[cfg(feature = "pg")]
+use block_id::{Alphabet, BlockId};
 #[cfg(feature = "pg")]
 use butane_core::db::pg::PgBackend;
 #[cfg(feature = "sqlite")]
@@ -34,15 +35,24 @@ use butane_core::db::sqlite;
 #[cfg(feature = "sqlite")]
 use butane_core::db::sqlite::SQLiteBackend;
 #[cfg(feature = "pg")]
-use butane_core::db::{connect, connect_async, pg as butane_pg};
+use butane_core::db::{connect, connect_async};
 use butane_core::db::{get_backend, Backend, ConnectionSpec};
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 #[cfg(feature = "pg")]
 use uuid::Uuid;
 
+extern crate alloc;
+
 // Re-export as they are used by the macros.
 pub use butane_core::db::{BackendConnection, BackendConnectionAsync, Connection, ConnectionAsync};
 pub use maybe_async_cfg;
+
+#[cfg(feature = "pg")]
+mod pg;
+
+// Re-export types from pg module
+#[cfg(feature = "pg")]
+pub use crate::pg::{pg_tmp_server_create_ephemeralpg, PgTemporaryServerError};
 
 /// Trait for running a test.
 #[allow(async_fn_in_trait)] // Not truly public, only used in butane for testing.
@@ -144,7 +154,7 @@ pub trait SetupData {
 /// Create a PostgreSQL [`Connection`].
 #[cfg(feature = "pg")]
 pub fn pg_connection() -> (Connection, PgSetupData) {
-    let backend = get_backend(butane_pg::BACKEND_NAME).unwrap();
+    let backend = get_backend(butane_core::db::pg::BACKEND_NAME).unwrap();
     let data = pg_setup_sync();
     (backend.connect(&pg_connstr(&data)).unwrap(), data)
 }
@@ -154,21 +164,84 @@ pub fn pg_connection() -> (Connection, PgSetupData) {
 pub async fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
     let data = pg_setup().await;
     (
-        ConnectionSpec::new(butane_pg::BACKEND_NAME, pg_connstr(&data)),
+        ConnectionSpec::new(butane_core::db::pg::BACKEND_NAME, pg_connstr(&data)),
         data,
     )
 }
 
-// Re-export types from pg module
+/// Options for creating a PostgreSQL server.
 #[cfg(feature = "pg")]
-pub use pg::{
-    cleanup_postgres_shared_memory, pg_tmp_server_create, pg_tmp_server_create_ephemeralpg,
-    pg_tmp_server_create_using_initdb, PgServerOptions, PgServerState, PgTemporaryServerError,
-};
+#[derive(Clone, Debug, Default)]
+pub struct PgServerOptions {
+    /// The port to listen on. If None, only allow connections via unix sockets.
+    pub port: Option<u16>,
+    /// The user to connect as. If None, use the default user.
+    pub user: Option<String>,
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    /// Use abstract namespace for the socket.
+    ///
+    /// Postgres only supports this on Linux and Windows.
+    /// However rust-postgres does not yet support it.
+    /// <https://github.com/sfackler/rust-postgres/issues/1240>
+    pub abstract_namespace: bool,
+    /// Callback to run at exit.
+    pub atexit_callback: Option<extern "C" fn()>,
+    /// Wait time in seconds before automatic cleanup (for ephemeralpg).
+    /// If None, uses pg_tmp's default (60 seconds).
+    pub ephemeralpg_wait_seconds: Option<u32>,
+}
 
-// Backward compatibility alias for the old typo'd name
+/// Server state for a test PostgreSQL server.
 #[cfg(feature = "pg")]
-pub use pg::PgTemporaryServerError as PgTemporaryServenError;
+#[derive(Debug)]
+pub struct PgServerState {
+    /// Temporary directory containing the test server (not used for ephemeralpg)
+    pub dir: std::path::PathBuf,
+    /// Directory for the socket (not used for ephemeralpg)
+    pub sockdir: tempfile::TempDir,
+    /// Process of the test server
+    pub proc: std::process::Child,
+    /// stderr from the test server
+    pub stderr: BufReader<ChildStderr>,
+    /// Options used to create the server.
+    pub options: PgServerOptions,
+    /// Connection URI from pg_tmp (only set when using ephemeralpg)
+    pub ephemeralpg_uri: Option<String>,
+}
+
+#[cfg(feature = "pg")]
+impl Drop for PgServerState {
+    fn drop(&mut self) {
+        // Avoid using Child.kill on Unix, as it uses SIGKILL, which postgresql recommends against,
+        // and is known to cause shared memory leakage on macOS.
+        // See Notes section of https://www.postgresql.org/docs/current/app-postgres.html
+        #[cfg(windows)]
+        self.proc.kill().ok();
+        #[cfg(not(windows))]
+        unsafe {
+            libc::kill(self.proc.id() as i32, libc::SIGTERM);
+        }
+
+        // Wait for the process to exit
+        let mut buf = String::new();
+        self.stderr.read_to_string(&mut buf).unwrap();
+        if !buf.is_empty() {
+            log::warn!("pg shutdown error: {buf}");
+        }
+
+        // Clean up shared memory segments (macOS-specific issue)
+        #[cfg(target_os = "macos")]
+        if !self.dir.as_os_str().is_empty() {
+            pg::cleanup_macos_postgres_shared_memory(&self.dir);
+        }
+
+        // Only delete directory for custom postgres, not for ephemeralpg
+        if self.ephemeralpg_uri.is_none() && !self.dir.as_os_str().is_empty() {
+            log::info!("Deleting {}", self.dir.display());
+            std::fs::remove_dir_all(&self.dir).unwrap();
+        }
+    }
+}
 
 /// Connection spec for a test server.
 #[cfg(feature = "pg")]
@@ -182,6 +255,159 @@ impl SetupData for PgSetupData {
     fn connection_string(&self) -> &str {
         &self.connection_string
     }
+}
+
+/// Create and start a temporary PostgreSQL server instance.
+///
+/// This function automatically detects and prefers `pg_tmp` (ephemeralpg) if available,
+/// otherwise falls back to using `initdb` and `postgres` directly.
+///
+/// Fails on Windows CI due to:
+/// > The server must be started under an unprivileged user ID to prevent
+/// > possible system security compromises. ...
+#[cfg(feature = "pg")]
+pub fn pg_tmp_server_create(
+    options: PgServerOptions,
+) -> Result<PgServerState, PgTemporaryServerError> {
+    // Try pg_tmp first if available
+    if pg::is_pg_tmp_available() {
+        log::debug!("pg_tmp detected, using ephemeralpg");
+        pg_tmp_server_create_ephemeralpg(options)
+    } else if pg::is_initdb_available() {
+        log::debug!("pg_tmp not found, falling back to initdb");
+        pg_tmp_server_create_using_initdb(options)
+    } else {
+        Err(PgTemporaryServerError::EphemeralPgError(
+            "Neither pg_tmp nor initdb found in PATH. Please install ephemeralpg or PostgreSQL."
+                .to_string(),
+        ))
+    }
+}
+
+/// Create and start a temporary PostgreSQL server instance using initdb.
+#[cfg(feature = "pg")]
+pub fn pg_tmp_server_create_using_initdb(
+    options: PgServerOptions,
+) -> Result<PgServerState, PgTemporaryServerError> {
+    // Otherwise use the custom postgres implementation
+    let seed: u128 = rand::random::<u64>() as u128;
+    let instance_id = BlockId::new(Alphabet::alphanumeric(), seed, 8)
+        .encode_string(0)
+        .unwrap();
+    // create a temporary directory
+    let dir = std::env::current_dir()
+        .unwrap()
+        .join("tmp_pg")
+        .join(instance_id);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let user = options
+        .user
+        .clone()
+        .unwrap_or_else(|| "postgres".to_string());
+
+    // Run initdb to create a postgres cluster in our temporary director
+    let result = Command::new("initdb")
+        .arg("-D")
+        .arg(&dir)
+        .arg("-U")
+        .arg(user)
+        .output();
+    if let Err(e) = result {
+        eprintln!("failed to run initdb; PostgreSQL may not be installed");
+        return Err(e.into());
+    }
+
+    let output = result.unwrap();
+
+    if !output.status.success() {
+        std::io::stdout().write_all(&output.stdout).unwrap();
+        std::io::stderr().write_all(&output.stderr).unwrap();
+        panic!("PostgreSQL initdb failed")
+    }
+
+    let sockdir = tempfile::TempDir::new().unwrap();
+
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    let socket_directory_arg = if options.abstract_namespace {
+        // Use abstract namespace for the socket
+        format!("@{}", sockdir.path().display())
+    } else {
+        // Use a normal socket
+        sockdir.path().display().to_string()
+    };
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    let socket_directory_arg = sockdir.path().display().to_string();
+
+    // Run postgres to actually create the server
+    // See https://www.postgresql.org/docs/current/app-postgres.html for CLI args.
+    // PGOPTIONS can be used to set args.
+    // PGDATA can be used instead of -D
+    let mut command = Command::new("postgres");
+    command
+        .arg("-c")
+        .arg("logging_collector=false")
+        .arg("-D")
+        .arg(&dir)
+        .arg("-k")
+        .arg(socket_directory_arg)
+        .stderr(Stdio::piped());
+
+    if let Some(port) = options.port {
+        command
+            .arg("-i")
+            .arg("-h")
+            .arg("localhost")
+            .arg("-p")
+            .arg(port.to_string());
+    } else {
+        // Set host='' to prevent postgres from trying to use TCP/IP
+        command.arg("-h").arg("");
+    }
+    let result = command.spawn();
+    if let Err(e) = result {
+        eprintln!("failed to run postgres");
+        return Err(e.into());
+    }
+
+    let mut proc = result.unwrap();
+
+    let mut buf = String::new();
+    let mut stderr = BufReader::new(proc.stderr.take().unwrap());
+    loop {
+        buf.clear();
+        stderr.read_line(&mut buf).unwrap();
+        log::trace!("{buf}");
+        if buf.contains("ready to accept connections") {
+            break;
+        }
+        if proc.try_wait().unwrap().is_some() {
+            buf.clear();
+            stderr.read_to_string(&mut buf).unwrap();
+            log::error!("{buf}");
+            panic!("postgres process died");
+        }
+    }
+    log::info!("created tmp pg server {}", sockdir.path().display());
+    if let Some(cb) = options.atexit_callback {
+        // Register the callback to be called when the process exits
+        // This is not safe, but this is in a test context and the process will exit.
+        // Use `atexit` to ensure that the callback is called even if
+        // the process exits unexpectedly.
+        log::info!("registering atexit callback");
+        unsafe {
+            libc::atexit(cb);
+        }
+    }
+
+    Ok(PgServerState {
+        dir,
+        sockdir,
+        proc,
+        stderr,
+        options: options.clone(),
+        ephemeralpg_uri: None,
+    })
 }
 
 #[cfg(feature = "pg")]

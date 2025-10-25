@@ -118,10 +118,42 @@ impl FsMigration {
         if contents[contents.len() - 1] != b'\n' {
             contents.push(b'\n');
         }
+
+        // Use atomic write for types.json to prevent race conditions
+        if fname == TYPES_FILENAME {
+            self.write_contents_atomic(&path, &contents)?;
+            return Ok(());
+        }
+
         self.fs
             .write(&path)?
             .write_all(&contents)
             .map_err(<std::io::Error as Into<Error>>::into)?;
+
+        Ok(())
+    }
+
+    fn write_contents_atomic(&self, path: &Path, contents: &[u8]) -> Result<()> {
+        // Write to a temporary file first
+        // Create temp filename by appending .tmp: "types.json" -> "types.json.tmp"
+        let mut temp_filename = path
+            .file_name()
+            .ok_or(Error::MigrationError("Invalid file path".into()))?
+            .to_os_string();
+        temp_filename.push(".tmp");
+        let temp_path = path.with_file_name(temp_filename);
+
+        self.fs
+            .write(&temp_path)?
+            .write_all(contents)
+            .map_err(<std::io::Error as Into<Error>>::into)?;
+
+        // Atomically rename to the target file
+        // This ensures readers never see partial content
+        // Note: This uses std::fs::rename directly because the Filesystem trait
+        // doesn't have a rename operation. This is acceptable since the race
+        // condition primarily occurs with the real filesystem during compilation.
+        std::fs::rename(&temp_path, path)?;
 
         Ok(())
     }

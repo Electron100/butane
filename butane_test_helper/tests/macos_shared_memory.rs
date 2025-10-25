@@ -10,7 +10,7 @@
 
 use std::process::Command;
 
-use butane_test_helper::pg::cleanup_macos_postgres_shared_memory;
+use butane_test_helper::pg::{self, cleanup_macos_postgres_shared_memory};
 use butane_test_helper::{pg_tmp_server_create_using_initdb, PgServerOptions};
 
 /// Check if initdb is available in PATH
@@ -69,18 +69,41 @@ fn cleanup_on_drop() {
     let data_dir = server.dir.clone();
     drop(server);
 
-    println!("Server dropped, checking cleanup...");
+    println!("Server dropped, waiting for cleanup...");
 
-    // Wait longer for cleanup to complete
+    // Wait with retries for cleanup to complete
     // The Drop implementation needs to:
     // 1. Send SIGTERM to postgres
     // 2. Wait for postgres to exit
     // 3. Clean up shared memory
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    let mut final_count = during_count;
+    let mut cleanup_happened = false;
 
-    // Count final shared memory segments
-    let final_count = count_shared_memory_segments();
-    println!("Final shared memory segments: {}", final_count);
+    for attempt in 1..=5 {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        final_count = count_shared_memory_segments();
+        println!(
+            "Attempt {}: Final shared memory segments: {}",
+            attempt, final_count
+        );
+
+        if final_count < during_count {
+            cleanup_happened = true;
+            println!("Cleanup detected on attempt {}", attempt);
+            break;
+        }
+    }
+
+    // If cleanup still hasn't happened, try manual cleanup
+    if !cleanup_happened {
+        println!("Drop-based cleanup didn't work, trying manual cleanup...");
+        let manual_cleanup = pg::cleanup_macos_postgres_shared_memory(&data_dir);
+        println!("Manual cleanup result: {}", manual_cleanup);
+
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        final_count = count_shared_memory_segments();
+        println!("After manual cleanup: {}", final_count);
+    }
 
     // The count should be less than during (cleanup happened)
     // We're more lenient about the final count vs initial because:

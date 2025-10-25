@@ -110,6 +110,7 @@ pub struct TursoConnection {
 impl TursoConnection {
     async fn open(path: impl AsRef<str>) -> Result<Self> {
         let path_str = path.as_ref();
+
         let db = if path_str == ":memory:" {
             turso::Builder::new_local(":memory:")
                 .build()
@@ -123,6 +124,13 @@ impl TursoConnection {
         };
 
         let conn = db.connect().map_err(|e| Error::Internal(e.to_string()))?;
+
+        // Enable foreign key constraints using the SQL command
+        // Note: Turso uses libsql which is a fork of SQLite and should support
+        // foreign_keys pragma via regular SQL, not PRAGMA syntax
+        conn.execute("PRAGMA foreign_keys = 1", Vec::<turso::Value>::new())
+            .await
+            .ok(); // Ignore errors in case PRAGMA is not supported
 
         Ok(TursoConnection { conn })
     }
@@ -207,11 +215,11 @@ impl ConnectionMethods for TursoConnection {
         {
             // Convert turso row to VecRow
             let mut values = Vec::new();
-            for i in 0..columns.len() {
+            for (i, col) in columns.iter().enumerate() {
                 let val = row
                     .get_value(i)
                     .map_err(|e| Error::Internal(e.to_string()))?;
-                values.push(turso_value_to_sqlval(&val));
+                values.push(turso_value_to_sqlval_typed(&val, col.ty())?);
             }
             vec_rows.push(TursoRow { values });
         }
@@ -223,7 +231,7 @@ impl ConnectionMethods for TursoConnection {
         &self,
         table: &str,
         columns: &[Column],
-        _pkcol: &Column,
+        pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
         let mut sql = String::new();
@@ -261,7 +269,8 @@ impl ConnectionMethods for TursoConnection {
             let val = row
                 .get_value(0)
                 .map_err(|e| Error::Internal(e.to_string()))?;
-            Ok(turso_value_to_sqlval(&val))
+            // Use the pkcol type to ensure correct SqlVal type
+            Ok(turso_value_to_sqlval_typed(&val, pkcol.ty())?)
         } else {
             Err(Error::Internal(
                 "Failed to retrieve last insert rowid".to_string(),
@@ -531,10 +540,21 @@ impl<'c> BackendTransaction<'c> for TursoTransaction<'c> {
 
 impl<'c> Drop for TursoTransaction<'c> {
     fn drop(&mut self) {
-        if self.conn.is_some() && !self.committed {
-            // If transaction was not committed or rolled back, roll it back
-            // Note: We can't call async rollback here in drop
-            eprintln!("Warning: TursoTransaction dropped without commit or rollback");
+        if let Some(conn) = self.conn.take() {
+            if !self.committed {
+                // If transaction was not committed or rolled back, roll it back
+                // Use block_in_place to execute async rollback in a sync Drop context
+                if tokio::runtime::Handle::try_current().is_ok() {
+                    let conn_clone = conn.conn.clone();
+                    let _ = tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async move {
+                            conn_clone.execute("ROLLBACK", Vec::<turso::Value>::new()).await
+                        })
+                    });
+                } else {
+                    eprintln!("Warning: TursoTransaction dropped without commit or rollback and no tokio runtime available");
+                }
+            }
         }
     }
 }
@@ -566,14 +586,80 @@ fn sqlval_to_turso(val: &SqlValRef<'_>) -> turso::Value {
     }
 }
 
-fn turso_value_to_sqlval(val: &turso::Value) -> SqlVal {
-    match val {
-        turso::Value::Null => SqlVal::Null,
-        turso::Value::Integer(i) => SqlVal::BigInt(*i),
-        turso::Value::Real(r) => SqlVal::Real(*r),
-        turso::Value::Text(t) => SqlVal::Text(t.clone()),
-        turso::Value::Blob(b) => SqlVal::Blob(b.clone()),
+fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVal> {
+    if matches!(val, turso::Value::Null) {
+        return Ok(SqlVal::Null);
     }
+
+    Ok(match ty {
+        SqlType::Bool => {
+            let i = match val {
+                turso::Value::Integer(i) => *i,
+                _ => return Err(Error::Internal(format!("Expected integer for Bool, got {:?}", val))),
+            };
+            SqlVal::Bool(i != 0)
+        },
+        SqlType::Int => {
+            let i = match val {
+                turso::Value::Integer(i) => *i,
+                _ => return Err(Error::Internal(format!("Expected integer for Int, got {:?}", val))),
+            };
+            SqlVal::Int(i as i32)
+        },
+        SqlType::BigInt => {
+            let i = match val {
+                turso::Value::Integer(i) => *i,
+                _ => return Err(Error::Internal(format!("Expected integer for BigInt, got {:?}", val))),
+            };
+            SqlVal::BigInt(i)
+        },
+        SqlType::Real => {
+            let r = match val {
+                turso::Value::Real(r) => *r,
+                _ => return Err(Error::Internal(format!("Expected real for Real, got {:?}", val))),
+            };
+            SqlVal::Real(r)
+        },
+        SqlType::Text => {
+            let t = match val {
+                turso::Value::Text(t) => t.clone(),
+                _ => return Err(Error::Internal(format!("Expected text for Text, got {:?}", val))),
+            };
+            SqlVal::Text(t)
+        },
+        #[cfg(feature = "json")]
+        SqlType::Json => {
+            let t = match val {
+                turso::Value::Text(t) => t,
+                _ => return Err(Error::Internal(format!("Expected text for Json, got {:?}", val))),
+            };
+            SqlVal::Json(serde_json::from_str(t)?)
+        },
+        #[cfg(feature = "datetime")]
+        SqlType::Date => {
+            let t = match val {
+                turso::Value::Text(t) => t,
+                _ => return Err(Error::Internal(format!("Expected text for Date, got {:?}", val))),
+            };
+            SqlVal::Date(NaiveDate::parse_from_str(t, TURSO_DATE_FORMAT)?)
+        },
+        #[cfg(feature = "datetime")]
+        SqlType::Timestamp => {
+            let t = match val {
+                turso::Value::Text(t) => t,
+                _ => return Err(Error::Internal(format!("Expected text for Timestamp, got {:?}", val))),
+            };
+            SqlVal::Timestamp(NaiveDateTime::parse_from_str(t, TURSO_DT_FORMAT)?)
+        },
+        SqlType::Blob => {
+            let b = match val {
+                turso::Value::Blob(b) => b.clone(),
+                _ => return Err(Error::Internal(format!("Expected blob for Blob, got {:?}", val))),
+            };
+            SqlVal::Blob(b)
+        },
+        SqlType::Custom(v) => return Err(Error::IncompatibleCustomT(v.clone(), BACKEND_NAME)),
+    })
 }
 
 // Turso row wrapper that stores owned SqlVal values

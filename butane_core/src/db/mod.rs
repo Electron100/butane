@@ -733,7 +733,7 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         #[cfg(feature = "turso")]
-        turso::BACKEND_NAME => Some(Box::new(turso::TursoBackend::default())),
+        turso::BACKEND_NAME => Some(Box::new(turso::TursoBackend)),
         _ => None,
     }
 }

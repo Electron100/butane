@@ -254,7 +254,7 @@ impl ConnectionMethods for TursoConnection {
             .map_err(|e| Error::Internal(e.to_string()))?;
 
         // Get the last inserted rowid
-        let query = format!("SELECT last_insert_rowid()");
+        let query = "SELECT last_insert_rowid()".to_string();
         let mut rows = self
             .conn()?
             .query(&query, ())
@@ -431,7 +431,7 @@ impl<'c> TursoTransaction<'c> {
     }
 
     fn get(&self) -> Result<&'c TursoConnection> {
-        self.conn.ok_or_else(|| Self::already_consumed())
+        self.conn.ok_or_else(Self::already_consumed)
     }
 
     fn already_consumed() -> Error {
@@ -521,14 +521,14 @@ impl<'c> ConnectionMethods for TursoTransaction<'c> {
 #[async_trait]
 impl<'c> BackendTransaction<'c> for TursoTransaction<'c> {
     async fn commit(&mut self) -> Result<()> {
-        let conn = self.conn.take().ok_or_else(|| Self::already_consumed())?;
+        let conn = self.conn.take().ok_or_else(Self::already_consumed)?;
         conn.execute("COMMIT").await?;
         self.committed = true;
         Ok(())
     }
 
     async fn rollback(&mut self) -> Result<()> {
-        let conn = self.conn.take().ok_or_else(|| Self::already_consumed())?;
+        let conn = self.conn.take().ok_or_else(Self::already_consumed)?;
         conn.execute("ROLLBACK").await?;
         Ok(())
     }

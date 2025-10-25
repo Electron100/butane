@@ -10,9 +10,8 @@
 
 use std::process::Command;
 
-use butane_test_helper::{
-    cleanup_macos_postgres_shared_memory, pg_tmp_server_create_using_initdb, PgServerOptions,
-};
+use butane_test_helper::pg::cleanup_macos_postgres_shared_memory;
+use butane_test_helper::{pg_tmp_server_create_using_initdb, PgServerOptions};
 
 /// Check if initdb is available in PATH
 fn is_initdb_available() -> bool {
@@ -72,8 +71,12 @@ fn cleanup_on_drop() {
 
     println!("Server dropped, checking cleanup...");
 
-    // Wait a moment for cleanup to complete
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    // Wait longer for cleanup to complete
+    // The Drop implementation needs to:
+    // 1. Send SIGTERM to postgres
+    // 2. Wait for postgres to exit
+    // 3. Clean up shared memory
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
     // Count final shared memory segments
     let final_count = count_shared_memory_segments();

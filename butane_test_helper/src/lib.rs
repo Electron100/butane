@@ -1,5 +1,8 @@
 //! Test helpers to set up database connections.
+//!
 //! Macros depend on [`butane_core`], `env_logger` and [`log`].
+//! Public members of this crate should not be considered supported.
+//! This crate is not published to crates.io.
 //!
 //! # Using ephemeralpg
 //!
@@ -48,7 +51,7 @@ pub use butane_core::db::{BackendConnection, BackendConnectionAsync, Connection,
 pub use maybe_async_cfg;
 
 #[cfg(feature = "pg")]
-mod pg;
+pub mod pg;
 
 // Re-export types from pg module
 #[cfg(feature = "pg")]

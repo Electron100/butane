@@ -109,6 +109,29 @@ async fn r_hash_struct_name_with_many_field(conn: ConnectionAsync) {
 }
 
 #[butane_test]
+async fn basic_many_load(conn: ConnectionAsync) {
+    let mut cats_blog = Blog::new(1, "Cats");
+    cats_blog.save(&conn).await.unwrap();
+    let mut post = Post::new(
+        1,
+        "The Cheetah",
+        "This post is about a fast cat.",
+        &cats_blog,
+    );
+    post.save(&conn).await.unwrap();
+
+    let tag_fast = create_tag(&conn, "fast").await;
+    let tag_cat = create_tag(&conn, "cat").await;
+    post.tags.add(&tag_fast).unwrap();
+    post.tags.add(&tag_cat).unwrap();
+    post.save(&conn).await.unwrap();
+
+    // Load tags - this uses a subquery which needs EXISTS on Turso
+    let loaded_tags: Vec<&Tag> = post.tags.load(&conn).await.unwrap().collect();
+    assert_eq!(loaded_tags.len(), 2);
+}
+
+#[butane_test]
 async fn load_sorted_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
@@ -156,7 +179,7 @@ async fn load_sorted_from_many(conn: ConnectionAsync) {
     assert!(tag_iter.next().is_none());
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn remove_one_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
@@ -183,7 +206,7 @@ async fn remove_one_from_many(conn: ConnectionAsync) {
     assert_eq!(post2.tags.load(&conn).await.unwrap().count(), 2);
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn remove_multiple_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
@@ -213,7 +236,7 @@ async fn remove_multiple_from_many(conn: ConnectionAsync) {
     assert_eq!(post2.tags.load(&conn).await.unwrap().count(), 2);
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn delete_all_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();
@@ -245,7 +268,7 @@ async fn delete_all_from_many(conn: ConnectionAsync) {
     assert_eq!(post2.tags.load(&conn).await.unwrap().count(), 0);
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn can_add_to_many_before_save(conn: ConnectionAsync) {
     // Verify that for an object with an auto-pk, we can add items to a Many field before we actually
     // save the original object (and thus get the actual pk);
@@ -259,7 +282,7 @@ async fn can_add_to_many_before_save(conn: ConnectionAsync) {
     assert_eq!(tags.count(), 2);
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn cant_add_unsaved_to_many(_conn: ConnectionAsync) {
     let unsaved_item = AutoItem {
         id: AutoPk::uninitialized(),
@@ -273,7 +296,7 @@ async fn cant_add_unsaved_to_many(_conn: ConnectionAsync) {
     assert!(matches!(err, butane::Error::ValueNotSaved));
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn can_add_to_many_with_custom_table_name(conn: ConnectionAsync) {
     let mut obj = RenamedAutoPkWithMany::new();
     obj.tags.add(&create_tag(&conn, "blue").await).unwrap();

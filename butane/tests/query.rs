@@ -135,7 +135,7 @@ async fn rustval(conn: ConnectionAsync) {
     assert_eq!(post, post2);
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn fkey_match(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let blog: Blog = find_async!(Blog, name == "Cats", &conn).unwrap();
@@ -157,7 +157,7 @@ async fn fkey_match(conn: ConnectionAsync) {
     assert_eq!(posts, posts4);
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn many_load(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let post: Post = find_async!(Post, title == "The Tiger", &conn).unwrap();
@@ -168,7 +168,7 @@ async fn many_load(conn: ConnectionAsync) {
     assert_eq!(tags[1].tag, "danger");
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn many_serialize(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let post: Post = find_async!(Post, title == "The Tiger", &conn).unwrap();
@@ -181,7 +181,7 @@ async fn many_serialize(conn: ConnectionAsync) {
     assert_eq!(tags[1].tag, "danger");
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn many_objects_with_tag(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, tags.contains("danger"))
@@ -194,7 +194,7 @@ async fn many_objects_with_tag(conn: ConnectionAsync) {
     assert_eq!(posts[2].title, "Mt. Everest");
 }
 
-#[butane_test(pg)]
+#[butane_test]
 async fn many_objects_with_tag_explicit(conn: ConnectionAsync) {
     blog::setup_blog(&conn).await;
     let mut posts = query!(Post, tags.contains(tag == "danger"))

@@ -266,7 +266,7 @@ pub fn list_columns(columns: &[Column], w: &mut impl Write) {
     .unwrap();
 }
 
-fn sql_joins(joins: Vec<Join>, w: &mut impl Write) {
+pub(crate) fn sql_joins(joins: Vec<Join>, w: &mut impl Write) {
     for join in joins {
         match join {
             Join::Inner {
@@ -284,7 +284,7 @@ fn sql_joins(joins: Vec<Join>, w: &mut impl Write) {
     }
 }
 
-fn sql_column(col: query::Column, w: &mut impl Write) {
+pub(crate) fn sql_column(col: query::Column, w: &mut impl Write) {
     match col.table() {
         Some(table) => write!(
             w,

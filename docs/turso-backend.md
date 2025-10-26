@@ -162,72 +162,25 @@ Since Turso is SQLite-compatible, migrating from SQLite is straightforward:
 
 ### Relationship Queries
 
-**Problem**: Turso (libSQL) does not currently support the `IN (...subquery)` syntax in WHERE clauses.
+**Status**: ✅ **FIXED** - Many-to-many relationship queries now work correctly with the Turso backend.
 
-This causes failures when loading many-to-many relationships using the `.load()` method.
+**Solution**: The Turso backend now automatically transforms subquery expressions into equivalent queries that Turso supports. When loading many-to-many relationships, the backend executes the subquery first to get a list of IDs, then uses those IDs in an `IN (value1, value2, ...)` clause instead of `IN (...subquery)`.
 
-**Example Failing Code**:
+**Technical Details**: Turso/libSQL does not support subqueries in WHERE clauses (`IN (...subquery)` or `EXISTS (...)`). The fix intercepts `BoolExpr::Subquery` and `BoolExpr::SubqueryJoin` expressions before SQL generation and transforms them by:
+
+1. Executing the subquery separately to retrieve matching values
+2. Converting the result into a `BoolExpr::In` expression with concrete values
+3. Generating standard SQL with `IN (val1, val2, ...)` which Turso supports
+
+This transformation is transparent to user code - all many-to-many operations work as expected:
 
 ```rust
-// This will fail on Turso backend
+// This now works correctly on Turso backend
 let post_from_db = find_async!(Post, id == { post.id }, &conn).unwrap();
-let tags = post_from_db.tags.load(&conn).await.unwrap(); // ERROR here
+let tags = post_from_db.tags.load(&conn).await.unwrap(); // ✅ Works!
 ```
 
-**Error Message**:
-
-```text
-SQL execution failure: `Parse error: IN (...subquery) in WHERE clause is not supported`
-```
-
-**Root Cause**: When loading many-to-many relationships, Butane generates SQL like:
-
-```sql
-SELECT * FROM tag WHERE id IN (SELECT has FROM post_tag WHERE owner = ?)
-```
-
-This SQL pattern is not supported by Turso's current libSQL version.
-
-**Possible Workarounds**:
-
-Until this is fixed in Butane's Turso backend, consider these alternatives:
-
-1. **Manual JOIN Query**: Query the relationship manually using a JOIN:
-
-   ```rust
-   // Instead of post.tags.load(&conn).await
-   // Manually query with a join (requires custom SQL or query builder enhancement)
-   ```
-
-2. **Load IDs and Query Separately**:
-
-   ```rust
-   // Query the junction table first
-   // Then query the related objects with IN (values) instead of IN (subquery)
-   ```
-
-3. **Use EXISTS Instead**: A future fix could transform the query to:
-
-   ```sql
-   SELECT * FROM tag WHERE EXISTS (
-     SELECT 1 FROM post_tag
-     WHERE post_tag.has = tag.id AND post_tag.owner = ?
-   )
-   ```
-
-**Planned Solution**: The Butane maintainers are aware of this limitation.
-
-The planned fix involves:
-
-- Adding backend-specific SQL generation for Turso
-- Transforming `BoolExpr::Subquery` into a JOIN or EXISTS-based query for Turso
-- This will happen automatically without requiring changes to user code
-
-**Affected Code Locations** (for contributors):
-
-- `butane_core/src/many.rs` line 119: Where `BoolExpr::Subquery` is generated
-- `butane_core/src/db/helper.rs` lines 93-109: Where the SQL is generated
-- `butane_core/src/db/turso.rs` line 156+: Where Turso-specific query logic could be added
+**Implementation**: See `butane_core/src/db/turso.rs` - the `transform_subqueries` method handles the conversion.
 
 ### Table Rename Migration
 

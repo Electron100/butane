@@ -134,6 +134,135 @@ impl TursoConnection {
 
         Ok(TursoConnection { conn })
     }
+
+    /// Transform Subquery expressions into In expressions by executing the subquery first.
+    /// This is necessary because Turso/libSQL doesn't support subqueries in WHERE clauses.
+    async fn transform_subqueries(&self, expr: BoolExpr) -> Result<BoolExpr> {
+        use crate::query::BoolExpr::*;
+
+        match expr {
+            Subquery {
+                col,
+                tbl2,
+                tbl2_col,
+                expr: inner_expr,
+            } => {
+                // Execute the subquery to get the list of values
+                let mut sql = format!(
+                    "SELECT DISTINCT {} FROM {} WHERE ",
+                    helper::quote_reserved_word(tbl2_col),
+                    helper::quote_reserved_word(&tbl2)
+                );
+                let mut values: Vec<SqlVal> = Vec::new();
+                sql_for_expr(
+                    query::Expr::Condition(inner_expr),
+                    &mut values,
+                    &mut TursoPlaceholderSource::new(),
+                    &mut sql,
+                );
+
+                let params: Vec<turso::Value> = values
+                    .iter()
+                    .map(|v| sqlval_to_turso(&v.as_ref()))
+                    .collect();
+
+                let mut rows = self
+                    .conn()?
+                    .query(&sql, params)
+                    .await
+                    .map_err(|e| Error::Internal(e.to_string()))?;
+
+                // Collect all the values from the subquery result
+                let mut result_values = Vec::new();
+                while let Some(row) = rows
+                    .next()
+                    .await
+                    .map_err(|e| Error::Internal(e.to_string()))?
+                {
+                    let val = row
+                        .get_value(0)
+                        .map_err(|e| Error::Internal(e.to_string()))?;
+                    result_values.push(turso_value_to_sqlval_untyped(&val)?);
+                }
+
+                // Transform into an In expression
+                Ok(In(col, result_values))
+            }
+            SubqueryJoin {
+                col,
+                tbl2,
+                col2,
+                joins,
+                expr: inner_expr,
+            } => {
+                // Execute the subquery with joins to get the list of values
+                let mut sql = String::new();
+                write!(&mut sql, "SELECT DISTINCT ").unwrap();
+                helper::sql_column(col2.clone(), &mut sql);
+                write!(&mut sql, " FROM {} ", helper::quote_reserved_word(&tbl2)).unwrap();
+                helper::sql_joins(joins, &mut sql);
+                write!(&mut sql, " WHERE ").unwrap();
+
+                let mut values: Vec<SqlVal> = Vec::new();
+                sql_for_expr(
+                    query::Expr::Condition(inner_expr),
+                    &mut values,
+                    &mut TursoPlaceholderSource::new(),
+                    &mut sql,
+                );
+
+                let params: Vec<turso::Value> = values
+                    .iter()
+                    .map(|v| sqlval_to_turso(&v.as_ref()))
+                    .collect();
+
+                let mut rows = self
+                    .conn()?
+                    .query(&sql, params)
+                    .await
+                    .map_err(|e| Error::Internal(e.to_string()))?;
+
+                // Collect all the values from the subquery result
+                let mut result_values = Vec::new();
+                while let Some(row) = rows
+                    .next()
+                    .await
+                    .map_err(|e| Error::Internal(e.to_string()))?
+                {
+                    let val = row
+                        .get_value(0)
+                        .map_err(|e| Error::Internal(e.to_string()))?;
+                    result_values.push(turso_value_to_sqlval_untyped(&val)?);
+                }
+
+                // Transform into an In expression
+                Ok(In(col, result_values))
+            }
+            And(a, b) => {
+                let a = Box::pin(self.transform_subqueries(*a)).await?;
+                let b = Box::pin(self.transform_subqueries(*b)).await?;
+                Ok(And(Box::new(a), Box::new(b)))
+            }
+            Or(a, b) => {
+                let a = Box::pin(self.transform_subqueries(*a)).await?;
+                let b = Box::pin(self.transform_subqueries(*b)).await?;
+                Ok(Or(Box::new(a), Box::new(b)))
+            }
+            Not(a) => {
+                let a = Box::pin(self.transform_subqueries(*a)).await?;
+                Ok(Not(Box::new(a)))
+            }
+            AllOf(exprs) => {
+                let mut transformed = Vec::new();
+                for e in exprs {
+                    transformed.push(Box::pin(self.transform_subqueries(e)).await?);
+                }
+                Ok(AllOf(transformed))
+            }
+            // All other expressions pass through unchanged
+            other => Ok(other),
+        }
+    }
 }
 
 #[async_trait]
@@ -162,6 +291,13 @@ impl ConnectionMethods for TursoConnection {
         offset: Option<i32>,
         order: Option<&[Order]>,
     ) -> Result<RawQueryResult<'c>> {
+        // Transform Subquery expressions since Turso doesn't support them
+        let expr = if let Some(expr) = expr {
+            Some(self.transform_subqueries(expr).await?)
+        } else {
+            None
+        };
+
         let mut sqlquery = String::new();
         helper::sql_select(columns, table, &mut sqlquery);
         let mut values: Vec<SqlVal> = Vec::new();
@@ -711,6 +847,18 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
     })
 }
 
+/// Convert a Turso value to SqlVal without type information.
+/// This infers the SqlVal type from the Turso value type.
+fn turso_value_to_sqlval_untyped(val: &turso::Value) -> Result<SqlVal> {
+    Ok(match val {
+        turso::Value::Null => SqlVal::Null,
+        turso::Value::Integer(i) => SqlVal::BigInt(*i),
+        turso::Value::Real(r) => SqlVal::Real(*r),
+        turso::Value::Text(t) => SqlVal::Text(t.clone()),
+        turso::Value::Blob(b) => SqlVal::Blob(b.clone()),
+    })
+}
+
 // Turso row wrapper that stores owned SqlVal values
 struct TursoRow {
     values: Vec<SqlVal>,
@@ -985,6 +1133,8 @@ fn sql_for_expr(
     placeholder_source: &mut TursoPlaceholderSource,
     out: &mut impl Write,
 ) {
+    // Subqueries should already be transformed by transform_subqueries before reaching here
+    // So we can just use the default helper implementation
     helper::sql_for_expr(expr, sql_for_expr, values, placeholder_source, out)
 }
 

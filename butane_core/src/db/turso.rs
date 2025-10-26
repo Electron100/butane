@@ -927,6 +927,11 @@ fn change_column(
         Some(col) => new_table.replace_column(col.clone()),
         None => new_table.remove_column(old.name()),
     }
+    // NOTE: Turso has a known limitation with ALTER TABLE RENAME operations within transactions
+    // The error "table being renamed should be in schema" occurs because libSQL's schema
+    // tracking doesn't properly register tables created in the same transaction.
+    // For migrations that require column changes, consider skipping unmigrate for Turso.
+    // See docs/turso-backend.md for details.
     let stmts: [&str; 4] = [
         &create_table(&new_table, false),
         &copy_table(old_table, &new_table),

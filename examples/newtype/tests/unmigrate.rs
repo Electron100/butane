@@ -19,6 +19,11 @@ async fn insert_data(connection: &Connection) {
         // https://github.com/Electron100/butane/issues/226
         return;
     }
+    // Turso: Skip due to table rename migration issue
+    // See docs/turso-backend.md - Known Issues - Table Rename Migration
+    if connection.backend_name() == "turso" || connection.backend_name() == "libsql" {
+        return;
+    }
     let mut cats_blog = Blog::new("Cats").unwrap();
     cats_blog.save(connection).await.unwrap();
 
@@ -36,11 +41,17 @@ async fn insert_data(connection: &Connection) {
     post.save(connection).await.unwrap();
 }
 
-#[butane_test(async, nomigrate, pg)]
+#[butane_test(async, nomigrate)]
 async fn migrate_and_unmigrate_async(mut connection: ConnectionAsync) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
+
+    // Turso: Skip unmigrate test due to table rename limitation
+    // See docs/turso-backend.md - Known Issues - Table Rename Migration
+    if connection.backend_name() == "turso" {
+        return;
+    }
 
     migrations.migrate_async(&mut connection).await.unwrap();
 

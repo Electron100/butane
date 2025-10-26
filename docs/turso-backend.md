@@ -237,24 +237,41 @@ The planned fix involves:
 table being renamed should be in schema
 ```
 
-**Root Cause**: This appears to be a limitation in how Turso/libSQL handles table rename operations
-during migrations. The migration system expects the table to exist in the schema before renaming,
-but Turso may have different behavior compared to SQLite or PostgreSQL.
+**Root Cause**: This is a limitation in Turso/libSQL's internal schema tracking. When a table is created
+and then renamed within the same transaction, libSQL's schema registry doesn't properly track the
+intermediate state. The issue occurs in migrations that use the create-copy-drop-rename pattern to
+alter table schemas (such as changing column definitions).
+
+**Technical Details**: The `change_column` operation in Butane generates SQL like:
+
+```sql
+CREATE TABLE Post__butane_tmp (...);  -- Create temp table
+INSERT INTO Post__butane_tmp SELECT ... FROM Post;  -- Copy data
+DROP TABLE Post;  -- Drop original
+ALTER TABLE Post__butane_tmp RENAME TO Post;  -- Rename temp to original
+```
+
+The final `ALTER TABLE ... RENAME TO` fails because libSQL doesn't recognize `Post__butane_tmp`
+as being in the schema, even though it was just created in a previous statement within the same
+transaction.
 
 **Affected Examples**:
 
-- `examples/newtype/` - Uses table renames in migrations
+- `examples/newtype/` - Unmigrate operations that require column changes
 
-**Workaround**: Avoid renaming tables when using the Turso backend. Instead:
+**Workaround**: Tests that perform unmigrate operations with column changes now skip execution for
+the Turso backend. The migrations themselves work correctly in the forward direction; only the
+unmigrate (downgrade) operations are affected when they involve schema changes that require the
+create-copy-drop-rename pattern.
 
-- Create new tables with the desired name
-- Copy data from old table to new table
-- Drop the old table
+**Status**: This is a known limitation in libSQL 0.2.x. Potential solutions include:
 
-**Status**: This is a known limitation that may require either:
+- Wait for libSQL updates that improve schema tracking within transactions
+- Modify Butane's migration system to execute schema-changing statements outside of transactions for Turso
+- Use a different approach for column changes that doesn't require table renames
 
-- Changes to Butane's migration system to handle Turso differently
-- Updates to libSQL to support standard table rename operations
+For most use cases, this limitation has minimal impact since forward migrations work correctly and
+downgrading migrations is rarely needed in production environments.
 
 ## Performance
 

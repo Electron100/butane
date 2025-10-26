@@ -164,9 +164,14 @@ Since Turso is SQLite-compatible, migrating from SQLite is straightforward:
 
 **Status**: ✅ **FIXED** - Many-to-many relationship queries now work correctly with the Turso backend.
 
-**Solution**: The Turso backend now automatically transforms subquery expressions into equivalent queries that Turso supports. When loading many-to-many relationships, the backend executes the subquery first to get a list of IDs, then uses those IDs in an `IN (value1, value2, ...)` clause instead of `IN (...subquery)`.
+**Solution**: The Turso backend now automatically transforms subquery expressions into equivalent queries
+that Turso supports. When loading many-to-many relationships, the backend executes the subquery first
+to get a list of IDs, then uses those IDs in an `IN (value1, value2, ...)` clause instead of
+`IN (...subquery)`.
 
-**Technical Details**: Turso/libSQL does not support subqueries in WHERE clauses (`IN (...subquery)` or `EXISTS (...)`). The fix intercepts `BoolExpr::Subquery` and `BoolExpr::SubqueryJoin` expressions before SQL generation and transforms them by:
+**Technical Details**: Turso/libSQL does not support subqueries in WHERE clauses (`IN (...subquery)`
+or `EXISTS (...)`). The fix intercepts `BoolExpr::Subquery` and `BoolExpr::SubqueryJoin` expressions
+before SQL generation and transforms them by:
 
 1. Executing the subquery separately to retrieve matching values
 2. Converting the result into a `BoolExpr::In` expression with concrete values

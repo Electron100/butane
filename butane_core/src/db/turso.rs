@@ -28,9 +28,10 @@ const TURSO_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
 #[cfg(feature = "datetime")]
 const TURSO_DATE_FORMAT: &str = "%Y-%m-%d";
 
-/// The name of the turso backend.
+/// Backend name identifier for Turso.
 pub const BACKEND_NAME: &str = "turso";
-/// The internal row creation order field name (same as SQLite).
+
+/// Row ID column name used by Turso (same as SQLite).
 pub const ROW_ID_COLUMN_NAME: &str = "rowid";
 
 // Trait similar to PgConnectionLike for sharing behavior between Connection and Transaction
@@ -45,10 +46,48 @@ impl TursoConnectionLike for TursoConnection {
 }
 
 /// Turso backend
+///
+/// Provides an async-first database backend using Turso/libSQL, which is SQLite-compatible.
+/// Turso is written in Rust and designed for modern async I/O operations.
+///
+/// # Features
+///
+/// - **Async-only**: All operations are asynchronous
+/// - **SQLite-compatible**: Uses the same SQL dialect as SQLite
+/// - **Memory and file-based**: Supports both `:memory:` and file-based databases
+/// - **Foreign key support**: Enforces foreign key constraints by default
+/// - **Subquery transformation**: Automatically handles subqueries in WHERE clauses
+///
+/// # Limitations
+///
+/// - No synchronous operations (use SQLite backend if sync is required)
+/// - Subqueries in WHERE clauses are transformed into multiple queries
+/// - Table renames within transactions have limitations (see documentation)
+///
+/// # Example
+///
+/// ```no_run
+/// use butane_core::db::{Backend, turso::TursoBackend};
+///
+/// # async fn example() -> Result<(), butane_core::Error> {
+/// let backend = TursoBackend::new();
+/// let mut conn = backend.connect(":memory:");
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug, Default, Clone)]
 pub struct TursoBackend;
 
 impl TursoBackend {
+    /// Creates a new Turso backend instance.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use butane_core::db::turso::TursoBackend;
+    ///
+    /// let backend = TursoBackend::new();
+    /// ```
     pub fn new() -> TursoBackend {
         TursoBackend {}
     }
@@ -257,7 +296,7 @@ impl TursoConnection {
         Ok(result_values)
     }
 
-    /// Transform both sides of a binary boolean expression (And/Or).
+    /// Transform subqueries in both sides of a binary boolean expression.
     async fn transform_binary_expr(
         &self,
         a: Box<BoolExpr>,
@@ -565,7 +604,7 @@ impl BackendConnection for TursoConnection {
     }
 }
 
-/// Turso transaction
+/// Turso transaction.
 #[derive(Debug)]
 struct TursoTransaction<'c> {
     conn: Option<&'c TursoConnection>,
@@ -796,7 +835,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::Text => {
             let t = match val {
-                turso::Value::Text(t) => t.clone(),
+                turso::Value::Text(t) => t,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected text for Text, got {:?}",
@@ -804,7 +843,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
                     )))
                 }
             };
-            SqlVal::Text(t)
+            SqlVal::Text(t.clone())
         }
         #[cfg(feature = "json")]
         SqlType::Json => {

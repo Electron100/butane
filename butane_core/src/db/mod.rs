@@ -54,6 +54,7 @@ pub mod pg;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
+/// Turso database backend.
 #[cfg(feature = "turso")]
 pub mod turso;
 

@@ -72,6 +72,43 @@ async fn r_hash_struct_member_many(conn: ConnectionAsync) {
 }
 
 #[butane_test]
+async fn r_hash_struct_name_with_many_field(conn: ConnectionAsync) {
+    #[model]
+    #[derive(Debug, Default)]
+    #[expect(non_camel_case_types)]
+    pub struct r#struct {
+        id: String,
+        name: String,
+    }
+
+    #[model]
+    #[derive(Debug, Default)]
+    pub struct StructWithManyReservedWord {
+        id: String,
+        field: Many<r#struct>,
+    }
+
+    let mut item = r#struct::default();
+    item.id = "item1".to_string();
+    item.name = "test_item".to_string();
+    item.save(&conn).await.unwrap();
+
+    let mut container = StructWithManyReservedWord::default();
+    container.id = "container1".to_string();
+    container.field.add(&item).unwrap();
+    container.save(&conn).await.unwrap();
+
+    let retrieved = StructWithManyReservedWord::get(&conn, "container1")
+        .await
+        .unwrap();
+
+    assert_eq!(retrieved.field.load(&conn).await.unwrap().count(), 1);
+    let saved_items: Vec<&r#struct> = retrieved.field.get().unwrap().into_iter().collect();
+    assert_eq!(saved_items.len(), 1);
+    assert_eq!(saved_items[0].name, "test_item");
+}
+
+#[butane_test]
 async fn load_sorted_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();

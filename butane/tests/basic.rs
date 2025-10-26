@@ -538,7 +538,7 @@ async fn r_hash_struct_member(conn: ConnectionAsync) {
 async fn r_hash_struct_name(conn: ConnectionAsync) {
     #[model]
     #[derive(Debug, Default)]
-    #[allow(non_camel_case_types)]
+    #[expect(non_camel_case_types)]
     pub struct r#type {
         id: String,
 

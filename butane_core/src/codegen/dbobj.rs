@@ -302,10 +302,9 @@ fn fieldexpr_func(
             )
         }
     };
-    let fnid = fid.clone();
     quote!(
         /// Create query expression.
-        #vis fn #fnid(&self) -> #field_expr_type {
+        #vis fn #fid(&self) -> #field_expr_type {
             #field_expr_ctor
         }
     )

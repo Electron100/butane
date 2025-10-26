@@ -514,3 +514,42 @@ struct TypeVariantsTest {
     blob2: std::vec::Vec<u8>,
     blob3: ::std::vec::Vec<u8>,
 }
+
+#[butane_test]
+async fn r_hash_struct_member(conn: ConnectionAsync) {
+    #[model]
+    #[derive(Debug, Default)]
+    pub struct StructWithReservedWordMember {
+        id: String,
+
+        r#type: String,
+    }
+
+    let mut foo = StructWithReservedWordMember::default();
+    foo.id = "1".to_string();
+    foo.r#type = "test".to_string();
+    foo.save(&conn).await.unwrap();
+
+    let retrieved = StructWithReservedWordMember::get(&conn, "1").await.unwrap();
+    assert_eq!(retrieved.r#type, "test");
+}
+
+#[butane_test]
+async fn r_hash_struct_name(conn: ConnectionAsync) {
+    #[model]
+    #[derive(Debug, Default)]
+    #[allow(non_camel_case_types)]
+    pub struct r#type {
+        id: String,
+
+        foo: String,
+    }
+
+    let mut foo = r#type::default();
+    foo.id = "1".to_string();
+    foo.foo = "test".to_string();
+    foo.save(&conn).await.unwrap();
+
+    let retrieved = r#type::get(&conn, "1").await.unwrap();
+    assert_eq!(retrieved.foo, "test");
+}

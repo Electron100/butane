@@ -5,6 +5,7 @@ expand.rs
 butanevsc.code-workspace
 butane.code_workspace.code-workspace
 .vscode/tasks.json
+butane_codegen/.butane
 db.sqlite
 tmp_pg
 *.db

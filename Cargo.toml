@@ -37,7 +37,7 @@ chrono = { version = "0.4.25", default-features = false, features = [
 ] }
 crossbeam-channel = "0.5"
 deadpool = "0.12"
-desynt = { path = "../../mine/desynt" }
+desynt = "0.1"
 env_logger = "0.11"
 fake = "4.2"
 log = "0.4"

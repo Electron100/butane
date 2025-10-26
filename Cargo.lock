@@ -668,6 +668,8 @@ checksum = "092966b41edc516079bdf31ec78a2e0588d1d0c08f78b91d8307215928642b2b"
 [[package]]
 name = "desynt"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79c445b07814da61f5007cc50054ee3ea7d03a575f6eecbdd8234a0d243eb21b"
 dependencies = [
  "phf 0.13.1",
  "syn 2.0.106",

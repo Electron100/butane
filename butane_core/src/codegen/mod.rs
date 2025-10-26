@@ -5,7 +5,7 @@
 //! may change at any time without warning.
 #![doc(hidden)]
 
-use desynt::{create_static_resolver, PathResolver};
+use desynt::{create_static_resolver, PathResolver, StripRaw};
 use phf::{phf_map, Map};
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span, TokenTree};
@@ -202,7 +202,7 @@ where
     let type_alias: syn::Result<ItemType> = syn::parse2(input.clone());
     if let Ok(type_alias) = type_alias {
         tyinfo = Some(CustomTypeInfo {
-            name: type_alias.ident.to_string(),
+            name: type_alias.ident.strip_raw().to_string(),
             ty: get_deferred_sql_type(extract_path_from_type(&type_alias.ty)),
         })
     }
@@ -215,12 +215,12 @@ where
         };
         if let Ok(item) = syn::parse2::<ItemStruct>(input.clone()) {
             tyinfo = Some(CustomTypeInfo {
-                name: item.ident.to_string(),
+                name: item.ident.strip_raw().to_string(),
                 ty: sqltype.into(),
             });
         } else if let Ok(item) = syn::parse2::<ItemEnum>(input.clone()) {
             tyinfo = Some(CustomTypeInfo {
-                name: item.ident.to_string(),
+                name: item.ident.strip_raw().to_string(),
                 ty: sqltype.into(),
             });
         }
@@ -242,7 +242,7 @@ where
 
 /// Create a [`struct@LitStr`] (UTF-8 string literal) from an [Ident].
 pub fn make_ident_literal_str(ident: &Ident) -> LitStr {
-    let as_str = format!("{ident}");
+    let as_str = ident.strip_raw().to_string();
     make_lit(&as_str)
 }
 
@@ -424,6 +424,7 @@ fn get_foreign_sql_type(path: &syn::Path, tyname: &str) -> Option<DeferredSqlTyp
                 .last()
                 .unwrap_or_else(|| panic!("{} must have an argument", tyname))
                 .ident
+                .strip_raw()
                 .to_string(),
         ))
     })
@@ -439,7 +440,7 @@ pub fn get_deferred_sql_type(path: &syn::Path) -> DeferredSqlType {
         .or_else(|| get_autopk_sql_type(path))
         .unwrap_or_else(|| {
             DeferredSqlType::Deferred(TypeKey::CustomType(
-                path.clone()
+                path.strip_raw()
                     .into_token_stream()
                     .to_string()
                     .replace(' ', ""),
@@ -479,44 +480,45 @@ fn some_known(ty: SqlType) -> Option<DeferredSqlType> {
 
 /// If the field refers to a primitive, return its SqlType.
 pub fn get_primitive_sql_type(path: &syn::Path) -> Option<DeferredSqlType> {
-    if *path == parse_quote!(bool) {
+    let path = path.strip_raw();
+    if path == parse_quote!(bool) {
         return some_known(SqlType::Bool);
-    } else if *path == parse_quote!(u8)
-        || *path == parse_quote!(i8)
-        || *path == parse_quote!(u16)
-        || *path == parse_quote!(i16)
-        || *path == parse_quote!(u16)
-        || *path == parse_quote!(i32)
+    } else if path == parse_quote!(u8)
+        || path == parse_quote!(i8)
+        || path == parse_quote!(u16)
+        || path == parse_quote!(i16)
+        || path == parse_quote!(u16)
+        || path == parse_quote!(i32)
     {
         return some_known(SqlType::Int);
-    } else if *path == parse_quote!(u32) || *path == parse_quote!(i64) {
+    } else if path == parse_quote!(u32) || path == parse_quote!(i64) {
         // Future improvement: better support unsigned integers
         // here. Sqlite has no u64, though Postgres does
         return some_known(SqlType::BigInt);
-    } else if *path == parse_quote!(f32) || *path == parse_quote!(f64) {
+    } else if path == parse_quote!(f32) || path == parse_quote!(f64) {
         return some_known(SqlType::Real);
-    } else if *path == parse_quote!(String)
-        || *path == parse_quote!(std::string::String)
-        || *path == parse_quote!(::std::string::String)
+    } else if path == parse_quote!(String)
+        || path == parse_quote!(std::string::String)
+        || path == parse_quote!(::std::string::String)
     {
         return some_known(SqlType::Text);
-    } else if *path == parse_quote!(Vec<u8>)
-        || *path == parse_quote!(std::vec::Vec<u8>)
-        || *path == parse_quote!(::std::vec::Vec<u8>)
+    } else if path == parse_quote!(Vec<u8>)
+        || path == parse_quote!(std::vec::Vec<u8>)
+        || path == parse_quote!(::std::vec::Vec<u8>)
     {
         return some_known(SqlType::Blob);
     }
 
     #[cfg(feature = "json")]
     {
-        if *path == parse_quote!(serde_json::Value) || *path == parse_quote!(Value) {
+        if path == parse_quote!(serde_json::Value) || path == parse_quote!(Value) {
             return some_known(SqlType::Json);
         }
     }
 
     #[cfg(feature = "uuid")]
     {
-        if *path == parse_quote!(Uuid) || *path == parse_quote!(uuid::Uuid) {
+        if path == parse_quote!(Uuid) || path == parse_quote!(uuid::Uuid) {
             return some_known(SqlType::Blob);
         }
     }

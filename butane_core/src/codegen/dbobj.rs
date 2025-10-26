@@ -1,3 +1,4 @@
+use desynt::StripRaw;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned, ToTokens};
@@ -301,7 +302,7 @@ fn fieldexpr_func(
             )
         }
     };
-    let fnid = Ident::new(&format!("{fid}"), f.span());
+    let fnid = fid.clone();
     quote!(
         /// Create query expression.
         #vis fn #fnid(&self) -> #field_expr_type {
@@ -324,7 +325,8 @@ fn field_ident_lit(f: &Field) -> TokenStream2 {
 }
 
 fn fields_type(tyname: &Ident) -> Ident {
-    Ident::new(&format!("{tyname}Fields"), Span::call_site())
+    let stripped = tyname.strip_raw();
+    Ident::new(&format!("{stripped}Fields"), Span::call_site())
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
@@ -375,12 +377,12 @@ fn many_table_lit(ast_struct: &ItemStruct, field: &Field, config: &Config) -> Li
         .ident
         .clone()
         .expect("Fields must be named for butane");
-    let binding = ast_struct.ident.to_string();
+    let binding = ast_struct.ident.strip_raw().to_string();
     let tyname = match &config.table_name {
         Some(s) => s,
         None => &binding,
     };
-    make_lit(&format!("{}_{}{MANY_SUFFIX}", &tyname, &ident))
+    make_lit(&format!("{}_{}{MANY_SUFFIX}", &tyname, &ident.strip_raw()))
 }
 
 fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {

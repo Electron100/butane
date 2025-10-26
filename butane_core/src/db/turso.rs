@@ -147,46 +147,8 @@ impl TursoConnection {
                 tbl2_col,
                 expr: inner_expr,
             } => {
-                // Execute the subquery to get the list of values
-                let mut sql = format!(
-                    "SELECT DISTINCT {} FROM {} WHERE ",
-                    helper::quote_reserved_word(tbl2_col),
-                    helper::quote_reserved_word(&tbl2)
-                );
-                let mut values: Vec<SqlVal> = Vec::new();
-                sql_for_expr(
-                    query::Expr::Condition(inner_expr),
-                    &mut values,
-                    &mut TursoPlaceholderSource::new(),
-                    &mut sql,
-                );
-
-                let params: Vec<turso::Value> = values
-                    .iter()
-                    .map(|v| sqlval_to_turso(&v.as_ref()))
-                    .collect();
-
-                let mut rows = self
-                    .conn()?
-                    .query(&sql, params)
+                self.execute_simple_subquery(col, tbl2, tbl2_col, inner_expr)
                     .await
-                    .map_err(|e| Error::Internal(e.to_string()))?;
-
-                // Collect all the values from the subquery result
-                let mut result_values = Vec::new();
-                while let Some(row) = rows
-                    .next()
-                    .await
-                    .map_err(|e| Error::Internal(e.to_string()))?
-                {
-                    let val = row
-                        .get_value(0)
-                        .map_err(|e| Error::Internal(e.to_string()))?;
-                    result_values.push(turso_value_to_sqlval_untyped(&val)?);
-                }
-
-                // Transform into an In expression
-                Ok(In(col, result_values))
             }
             SubqueryJoin {
                 col,
@@ -195,73 +157,125 @@ impl TursoConnection {
                 joins,
                 expr: inner_expr,
             } => {
-                // Execute the subquery with joins to get the list of values
-                let mut sql = String::new();
-                write!(&mut sql, "SELECT DISTINCT ").unwrap();
-                helper::sql_column(col2.clone(), &mut sql);
-                write!(&mut sql, " FROM {} ", helper::quote_reserved_word(&tbl2)).unwrap();
-                helper::sql_joins(joins, &mut sql);
-                write!(&mut sql, " WHERE ").unwrap();
-
-                let mut values: Vec<SqlVal> = Vec::new();
-                sql_for_expr(
-                    query::Expr::Condition(inner_expr),
-                    &mut values,
-                    &mut TursoPlaceholderSource::new(),
-                    &mut sql,
-                );
-
-                let params: Vec<turso::Value> = values
-                    .iter()
-                    .map(|v| sqlval_to_turso(&v.as_ref()))
-                    .collect();
-
-                let mut rows = self
-                    .conn()?
-                    .query(&sql, params)
+                self.execute_join_subquery(col, tbl2, col2, joins, inner_expr)
                     .await
-                    .map_err(|e| Error::Internal(e.to_string()))?;
-
-                // Collect all the values from the subquery result
-                let mut result_values = Vec::new();
-                while let Some(row) = rows
-                    .next()
-                    .await
-                    .map_err(|e| Error::Internal(e.to_string()))?
-                {
-                    let val = row
-                        .get_value(0)
-                        .map_err(|e| Error::Internal(e.to_string()))?;
-                    result_values.push(turso_value_to_sqlval_untyped(&val)?);
-                }
-
-                // Transform into an In expression
-                Ok(In(col, result_values))
             }
-            And(a, b) => {
-                let a = Box::pin(self.transform_subqueries(*a)).await?;
-                let b = Box::pin(self.transform_subqueries(*b)).await?;
-                Ok(And(Box::new(a), Box::new(b)))
-            }
-            Or(a, b) => {
-                let a = Box::pin(self.transform_subqueries(*a)).await?;
-                let b = Box::pin(self.transform_subqueries(*b)).await?;
-                Ok(Or(Box::new(a), Box::new(b)))
-            }
+            And(a, b) => self.transform_binary_expr(a, b, And).await,
+            Or(a, b) => self.transform_binary_expr(a, b, Or).await,
             Not(a) => {
                 let a = Box::pin(self.transform_subqueries(*a)).await?;
                 Ok(Not(Box::new(a)))
             }
-            AllOf(exprs) => {
-                let mut transformed = Vec::new();
-                for e in exprs {
-                    transformed.push(Box::pin(self.transform_subqueries(e)).await?);
-                }
-                Ok(AllOf(transformed))
-            }
+            AllOf(exprs) => self.transform_all_of(exprs).await,
             // All other expressions pass through unchanged
             other => Ok(other),
         }
+    }
+
+    /// Execute a simple subquery and return the results as an In expression.
+    async fn execute_simple_subquery(
+        &self,
+        col: &'static str,
+        tbl2: std::borrow::Cow<'static, str>,
+        tbl2_col: &'static str,
+        inner_expr: Box<BoolExpr>,
+    ) -> Result<BoolExpr> {
+        let mut sql = format!(
+            "SELECT DISTINCT {} FROM {} WHERE ",
+            helper::quote_reserved_word(tbl2_col),
+            helper::quote_reserved_word(&tbl2)
+        );
+        let mut values: Vec<SqlVal> = Vec::new();
+        sql_for_expr(
+            query::Expr::Condition(inner_expr),
+            &mut values,
+            &mut TursoPlaceholderSource::new(),
+            &mut sql,
+        );
+
+        let result_values = self.execute_subquery_and_collect(&sql, values).await?;
+        Ok(BoolExpr::In(col, result_values))
+    }
+
+    /// Execute a subquery with joins and return the results as an In expression.
+    async fn execute_join_subquery(
+        &self,
+        col: &'static str,
+        tbl2: std::borrow::Cow<'static, str>,
+        col2: query::Column,
+        joins: Vec<query::Join>,
+        inner_expr: Box<BoolExpr>,
+    ) -> Result<BoolExpr> {
+        let mut sql = String::new();
+        write!(&mut sql, "SELECT DISTINCT ").unwrap();
+        helper::sql_column(col2, &mut sql);
+        write!(&mut sql, " FROM {} ", helper::quote_reserved_word(&tbl2)).unwrap();
+        helper::sql_joins(joins, &mut sql);
+        write!(&mut sql, " WHERE ").unwrap();
+
+        let mut values: Vec<SqlVal> = Vec::new();
+        sql_for_expr(
+            query::Expr::Condition(inner_expr),
+            &mut values,
+            &mut TursoPlaceholderSource::new(),
+            &mut sql,
+        );
+
+        let result_values = self.execute_subquery_and_collect(&sql, values).await?;
+        Ok(BoolExpr::In(col, result_values))
+    }
+
+    /// Execute a SQL query and collect the first column values.
+    async fn execute_subquery_and_collect(
+        &self,
+        sql: &str,
+        values: Vec<SqlVal>,
+    ) -> Result<Vec<SqlVal>> {
+        let params: Vec<turso::Value> = values
+            .iter()
+            .map(|v| sqlval_to_turso(&v.as_ref()))
+            .collect();
+
+        let mut rows = self
+            .conn()?
+            .query(sql, params)
+            .await
+            .map_err(|e| Error::Internal(e.to_string()))?;
+
+        let mut result_values = Vec::new();
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| Error::Internal(e.to_string()))?
+        {
+            let val = row
+                .get_value(0)
+                .map_err(|e| Error::Internal(e.to_string()))?;
+            result_values.push(turso_value_to_sqlval_untyped(&val)?);
+        }
+
+        Ok(result_values)
+    }
+
+    /// Transform both sides of a binary boolean expression (And/Or).
+    async fn transform_binary_expr(
+        &self,
+        a: Box<BoolExpr>,
+        b: Box<BoolExpr>,
+        constructor: fn(Box<BoolExpr>, Box<BoolExpr>) -> BoolExpr,
+    ) -> Result<BoolExpr> {
+        let a = Box::pin(self.transform_subqueries(*a)).await?;
+        let b = Box::pin(self.transform_subqueries(*b)).await?;
+        Ok(constructor(Box::new(a), Box::new(b)))
+    }
+
+    /// Transform all expressions in an AllOf list.
+    async fn transform_all_of(&self, exprs: Vec<BoolExpr>) -> Result<BoolExpr> {
+        let mut transformed = Vec::new();
+        for e in exprs {
+            transformed.push(Box::pin(self.transform_subqueries(e)).await?);
+        }
+        Ok(BoolExpr::AllOf(transformed))
     }
 }
 
@@ -833,7 +847,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::Blob => {
             let b = match val {
-                turso::Value::Blob(b) => b.clone(),
+                turso::Value::Blob(b) => b.to_vec(),
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected blob for Blob, got {:?}",
@@ -1096,6 +1110,7 @@ fn change_column(
     result
 }
 
+/// Write SQL that performs an insert or update.
 pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: &mut impl Write) {
     write!(w, "INSERT ").unwrap();
     write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();

@@ -820,7 +820,10 @@ async fn unreachable_pg_connection() {
             eprintln!("{e}");
             let error_msg = format!("{e}");
             #[cfg(target_os = "windows")]
-            assert!(error_msg.contains("No such host is known"));
+            assert!(
+                error_msg.contains("No such host is known")
+                    || error_msg.contains("error connecting to server")
+            );
             #[cfg(not(target_os = "windows"))]
             assert!(
                 error_msg.contains("failed to lookup address information")

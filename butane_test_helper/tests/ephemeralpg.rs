@@ -25,13 +25,13 @@ fn error_when_not_found() {
         let result = pg_tmp_server_create_ephemeralpg(options);
         assert!(result.is_err(), "Should fail when pg_tmp is not available");
 
-        if let Err(PgTemporaryServerError::EphemeralPgError(msg)) = result {
+        if let Err(PgTemporaryServerError::EphemeralPg(msg)) = result {
             assert!(
                 msg.contains("pg_tmp") || msg.contains("ephemeralpg"),
                 "Error message should mention pg_tmp or ephemeralpg"
             );
         } else {
-            panic!("Expected EphemeralPgError");
+            panic!("Expected EphemeralPg");
         }
     });
 }

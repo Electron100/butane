@@ -9,13 +9,13 @@ use std::io::{BufRead, BufReader, Read};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 
-//use block_id::{Alphabet, BlockId};
-
-// Global mutex to serialize pg_tmp calls to avoid race conditions
-// ephemeralpg's pg_tmp has internal state that can conflict when called concurrently
+/// Global mutex to serialize pg_tmp calls to avoid race conditions.
+///
+/// ephemeralpg's pg_tmp has internal state that can conflict when called concurrently.
 static PG_TMP_LOCK: Mutex<()> = Mutex::new(());
 
 /// Clean up shared memory segments associated with a PostgreSQL data directory.
+///
 /// This is needed on macOS where PostgreSQL can leave orphaned segments.
 ///
 /// Returns true if cleanup was attempted and succeeded, false if no cleanup was needed
@@ -107,13 +107,13 @@ pub fn cleanup_macos_postgres_shared_memory(data_dir: &std::path::Path) -> bool 
 pub enum PgTemporaryServerError {
     /// IO errors.
     #[error(transparent)]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
     /// Error parsing pg_tmp output.
     #[error("Failed to parse pg_tmp output: {0}")]
-    ParseError(String),
+    Parse(String),
     /// pg_tmp command failed.
     #[error("pg_tmp command failed: {0}")]
-    EphemeralPgError(String),
+    EphemeralPg(String),
 }
 
 /// Check if pg_tmp (ephemeralpg) is available in PATH.
@@ -152,7 +152,7 @@ pub fn pg_tmp_server_create_ephemeralpg(
 
     log::info!("spawning pg_tmp...");
     let mut proc = command.spawn().map_err(|e| {
-        PgTemporaryServerError::EphemeralPgError(format!(
+        PgTemporaryServerError::EphemeralPg(format!(
             "Failed to spawn pg_tmp (is ephemeralpg installed?): {}",
             e
         ))
@@ -162,22 +162,22 @@ pub fn pg_tmp_server_create_ephemeralpg(
     let mut stdout = BufReader::new(proc.stdout.take().unwrap());
     let mut uri = String::new();
     stdout.read_line(&mut uri).map_err(|e| {
-        PgTemporaryServerError::EphemeralPgError(format!("Failed to read pg_tmp output: {}", e))
+        PgTemporaryServerError::EphemeralPg(format!("Failed to read pg_tmp output: {}", e))
     })?;
 
     let uri = uri.trim();
     if uri.is_empty() {
         // Check if process died
-        if let Some(status) = proc.try_wait().map_err(PgTemporaryServerError::IoError)? {
+        if let Some(status) = proc.try_wait().map_err(PgTemporaryServerError::Io)? {
             let mut stderr = BufReader::new(proc.stderr.take().unwrap());
             let mut error_msg = String::new();
             stderr.read_to_string(&mut error_msg).ok();
-            return Err(PgTemporaryServerError::EphemeralPgError(format!(
+            return Err(PgTemporaryServerError::EphemeralPg(format!(
                 "pg_tmp exited with status {}: {}",
                 status, error_msg
             )));
         }
-        return Err(PgTemporaryServerError::ParseError(
+        return Err(PgTemporaryServerError::Parse(
             "pg_tmp returned empty URI".to_string(),
         ));
     }

@@ -198,17 +198,17 @@ pub struct PgServerOptions {
 #[cfg(feature = "pg")]
 #[derive(Debug)]
 pub struct PgServerState {
-    /// Temporary directory containing the test server (not used for ephemeralpg)
+    /// Temporary directory containing the test server (not used for ephemeralpg).
     pub dir: std::path::PathBuf,
-    /// Directory for the socket (not used for ephemeralpg)
+    /// Directory for the socket (not used for ephemeralpg).
     pub sockdir: tempfile::TempDir,
-    /// Process of the test server
+    /// Process of the test server.
     pub proc: std::process::Child,
-    /// stderr from the test server
+    /// stderr from the test server.
     pub stderr: BufReader<ChildStderr>,
     /// Options used to create the server.
     pub options: PgServerOptions,
-    /// Connection URI from pg_tmp (only set when using ephemeralpg)
+    /// Connection URI from pg_tmp (only set when using ephemeralpg).
     pub ephemeralpg_uri: Option<String>,
 }
 
@@ -280,7 +280,7 @@ pub fn pg_tmp_server_create(
         log::debug!("pg_tmp not found, falling back to initdb");
         pg_tmp_server_create_using_initdb(options)
     } else {
-        Err(PgTemporaryServerError::EphemeralPgError(
+        Err(PgTemporaryServerError::EphemeralPg(
             "Neither pg_tmp nor initdb found in PATH. Please install ephemeralpg or PostgreSQL."
                 .to_string(),
         ))

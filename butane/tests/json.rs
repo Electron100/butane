@@ -4,15 +4,17 @@ use std::collections::{BTreeMap, HashMap};
 
 use butane::model;
 use butane::{
+    butane_type,
     db::{Connection, ConnectionAsync},
     FieldType,
 };
 use butane_test_helper::*;
 use butane_test_macros::butane_test;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[model]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct FooJJ {
     id: i64,
     val: serde_json::Value,
@@ -76,7 +78,7 @@ async fn basic_json(conn: ConnectionAsync) {
 }
 
 #[model]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct FooHH {
     id: i64,
     val: HashMap<String, String>,
@@ -115,7 +117,7 @@ async fn basic_hashmap(conn: ConnectionAsync) {
 }
 
 #[model]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct FooFullPrefixHashMap {
     id: i64,
     val: std::collections::HashMap<String, String>,
@@ -154,7 +156,7 @@ async fn basic_hashmap_full_prefix(conn: ConnectionAsync) {
 }
 
 #[model]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct FooBTreeMap {
     id: i64,
     val: BTreeMap<String, String>,
@@ -192,14 +194,14 @@ async fn basic_btreemap(conn: ConnectionAsync) {
     assert_eq!(foo2, foo3);
 }
 
-#[derive(PartialEq, Eq, Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 struct HashedObject {
     x: i64,
     y: i64,
 }
 
 #[model]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct FooHHO {
     id: i64,
     val: HashMap<String, HashedObject>,
@@ -237,7 +239,7 @@ async fn hashmap_with_object_values(conn: ConnectionAsync) {
     assert_eq!(foo2, foo3);
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, FieldType, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, FieldType, PartialEq, Serialize)]
 struct InlineFoo {
     foo: i64,
     bar: u32,
@@ -249,7 +251,7 @@ impl InlineFoo {
 }
 
 #[model]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct OuterFoo {
     #[pk]
     id: i64,
@@ -277,4 +279,37 @@ async fn inline_json(conn: ConnectionAsync) {
     foo2.save(&conn).await.unwrap();
     let foo3 = OuterFoo::get(&conn, id).await.unwrap();
     assert_eq!(foo2, foo3);
+}
+
+#[butane_test]
+async fn r_hash_field_type_newtype_json(conn: ConnectionAsync) {
+    #[butane_type(Json)]
+    #[derive(Clone, Debug, Default, Deserialize, FieldType, PartialEq, Serialize)]
+    #[expect(non_camel_case_types)]
+    pub struct r#for {
+        id: u64,
+        r#type: String,
+    }
+
+    #[model]
+    #[derive(Debug, Default)]
+    pub struct StructWithReservedWordMemberJson {
+        id: String,
+
+        r#type: r#for,
+    }
+
+    let mut foo = StructWithReservedWordMemberJson::default();
+    foo.id = "1".to_string();
+    let expected = r#for {
+        id: 1,
+        r#type: "test".to_string(),
+    };
+    foo.r#type = expected.clone();
+    foo.save(&conn).await.unwrap();
+
+    let retrieved = StructWithReservedWordMemberJson::get(&conn, "1")
+        .await
+        .unwrap();
+    assert_eq!(retrieved.r#type, expected);
 }

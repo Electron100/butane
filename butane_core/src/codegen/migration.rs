@@ -1,3 +1,4 @@
+use desynt::StripRaw;
 use syn::{Field, ItemStruct};
 
 use super::{
@@ -23,7 +24,7 @@ where
     if let Some(name) = &config.table_name {
         // Custom table name, need to also be able to map with the type name
         current_migration.add_type(
-            TypeKey::PK(ast_struct.ident.to_string()),
+            TypeKey::PK(ast_struct.ident.strip_raw().to_string()),
             DeferredSqlType::Deferred(TypeKey::PK(name.clone())),
         )?;
     }
@@ -34,7 +35,7 @@ where
 fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable> {
     let name = match &config.table_name {
         Some(n) => n.clone(),
-        None => ast_struct.ident.to_string(),
+        None => ast_struct.ident.strip_raw().to_string(),
     };
     let mut table = ATable::new(name);
     let pk = pk_field(ast_struct)
@@ -45,6 +46,7 @@ fn create_atables(ast_struct: &ItemStruct, config: &dbobj::Config) -> Vec<ATable
             .ident
             .clone()
             .expect("db object fields must be named")
+            .strip_raw()
             .to_string();
         if is_row_field(f) {
             let path = extract_path_from_type(&f.ty);
@@ -76,6 +78,7 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .ident
         .clone()
         .expect("fields must be named")
+        .strip_raw()
         .to_string();
     let many_field_type = get_many_sql_type(many_field)
         .unwrap_or_else(|| panic!("Misidentified Many field {field_name}"));
@@ -83,6 +86,7 @@ fn many_table(main_table_name: &str, many_field: &Field, pk_field: &Field) -> AT
         .ident
         .as_ref()
         .expect("fields must be named")
+        .strip_raw()
         .to_string();
     let pk_field_path = extract_path_from_type(&pk_field.ty);
     let pk_field_type = get_deferred_sql_type(pk_field_path);

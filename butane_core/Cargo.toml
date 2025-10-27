@@ -22,13 +22,13 @@ sqlite = ["rusqlite"]
 sqlite-bundled = ["rusqlite/bundled"]
 tls = ["native-tls", "postgres-native-tls"]
 
-
 [dependencies]
 async-trait = { workspace = true}
 bytes = { version = "1.0", optional = true }
 cfg-if = { workspace = true }
 chrono = { optional = true, workspace = true }
-crossbeam-channel = { workspace = true, optional = true}
+crossbeam-channel = { workspace = true, optional = true }
+desynt.workspace = true
 dyn-clone = { version = "1.0" }
 fake = { workspace = true, optional = true }
 fallible-iterator = "0.3"
@@ -43,6 +43,7 @@ nonempty.workspace = true
 pin-project = "1"
 tokio = {workspace = true, optional = true, features = ["rt", "sync", "rt-multi-thread"]}
 tokio-postgres = { optional = true, workspace = true }
+phf.workspace = true
 postgres-native-tls = { optional = true, workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }

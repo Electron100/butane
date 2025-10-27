@@ -54,7 +54,7 @@ rand = "0.9"
 rusqlite = { version = "0.37", default-features = false }
 serde = { version = "1.0", default-features = false }
 serde_json = "1.0"
-sqlparser = "0.57"
+sqlparser = "0.59"
 syn = { version = "2", features = ["extra-traits", "full"] }
 tempfile = "3.10"
 test-log = { version = "0.2", features = ["log", "trace"] }

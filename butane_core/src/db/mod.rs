@@ -621,6 +621,8 @@ impl ConnectionSpec {
 /// If it is a URL with a scheme of "sqlite", the backend will be set to "sqlite",
 /// and the scheme will be set to "file" as required by the sqlite engine.
 /// If it is a URI with a scheme of "file", the backend will be set to "sqlite".
+/// If it is a URI with a scheme of "libsql", the backend will be set to "turso",
+/// and the scheme will be mapped to "turso".
 /// If it does not have a scheme, it will be set to "pg" if it contains any of
 /// `host=`, `hostaddr=`, `dbname=`, or `user=`.
 /// Otherwise it will default to "sqlite".
@@ -647,6 +649,14 @@ impl TryFrom<&str> for ConnectionSpec {
                         backend_name: "pg".to_string(),
                         conn_str: value.to_string(),
                     }),
+                    "libsql" => {
+                        // libsql:// is an alias for turso://
+                        let value = value.replacen("libsql:", "turso:", 1);
+                        Ok(ConnectionSpec {
+                            backend_name: "turso".to_string(),
+                            conn_str: value,
+                        })
+                    }
                     _ => Ok(ConnectionSpec {
                         backend_name: parsed.scheme().to_string(),
                         conn_str: value.to_string(),

@@ -910,8 +910,9 @@ fn uri_turso_scheme() {
 fn uri_turso_libsql_scheme() {
     let uri = "libsql://localhost:8080/test";
     let spec = ConnectionSpec::try_from(uri).unwrap();
-    assert_eq!(spec.backend_name(), "libsql");
-    assert_eq!(spec.connection_string(), uri);
+    assert_eq!(spec.backend_name(), "turso");
+    // libsql:// should be mapped to turso://
+    assert_eq!(spec.connection_string(), "turso://localhost:8080/test");
 }
 
 #[cfg(feature = "turso")]

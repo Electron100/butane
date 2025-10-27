@@ -64,6 +64,11 @@ name = "sqlite"
 path = "tests/sqlite.rs"
 required-features = ["sqlite"]
 
+[[test]]
+name = "turso"
+path = "tests/turso.rs"
+required-features = ["turso"]
+
 [[bin]]
 bench = false
 name = "pg_tmp_server"

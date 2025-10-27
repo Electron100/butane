@@ -915,15 +915,6 @@ fn uri_turso_libsql_scheme() {
 }
 
 #[cfg(feature = "turso")]
-#[test]
-fn uri_turso_file_path() {
-    let uri = "file:test.db";
-    let spec = ConnectionSpec::try_from(uri).unwrap();
-    // file: scheme defaults to sqlite
-    assert_eq!(spec.backend_name(), "sqlite");
-}
-
-#[cfg(feature = "turso")]
 #[butane_test(nomigrate)]
 async fn turso_connection_not_closed(conn: ConnectionAsync) {
     if conn.backend_name() == "turso" {

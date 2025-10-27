@@ -372,19 +372,13 @@ async fn fkey_same_type(conn: ConnectionAsync) {
 async fn cant_save_unsaved_fkey(conn: ConnectionAsync) {
     let foo = Foo::new(1);
     let mut bar = Bar::new("tarzan", foo);
+    #[cfg_attr(feature = "turso", expect(unused_variables))]
     let result = bar.save(&conn).await;
 
     // Skip assertion for turso - foreign key enforcement is not yet fully supported
     // in libsql/turso 0.2.x
     #[cfg(not(feature = "turso"))]
     assert!(result.is_err());
-
-    #[cfg(feature = "turso")]
-    {
-        // Turso: FK constraints are defined but not yet enforced in libsql 0.2
-        // This is a known limitation that should be fixed in future versions
-        let _ = result; // silence unused variable warning
-    }
 }
 
 #[cfg(feature = "datetime")]

@@ -30,7 +30,7 @@ butane_core = { version = "0.8", path = "butane_core" }
 butane_codegen = { version = "0.8", path = "butane_codegen" }
 butane_test_helper = { path = "butane_test_helper", default-features = false }
 butane_test_macros = { path = "butane_test_macros" }
-cfg-if = "^1.0"
+cfg-if = "1"
 chrono = { version = "0.4.25", default-features = false, features = [
   "serde",
   "std",
@@ -42,7 +42,7 @@ env_logger = "0.11"
 fake = "4.2"
 log = "0.4"
 maybe-async-cfg = { version = "0.2.5", default-features = false }
-nonempty = "0.11"
+nonempty = "0.12"
 phf = { version = "0.13", features = ['macros'] }
 paste = "1.0.11"
 postgres-native-tls = "0.5"
@@ -51,15 +51,15 @@ proc-macro2 = { version = "1.0", default-features = false }
 quote = { version = "1.0", default-features = false }
 r2d2 = "0.8"
 rand = "0.9"
-rusqlite = { version = "0.35", default-features = false }
+rusqlite = { version = "0.37", default-features = false }
 serde = { version = "1.0", default-features = false }
 serde_json = "1.0"
-sqlparser = "0.56"
+sqlparser = "0.57"
 syn = { version = "2", features = ["extra-traits", "full"] }
 tempfile = "3.10"
 test-log = { version = "0.2", features = ["log", "trace"] }
 thiserror = "2.0"
-tokio = { version = "1"}
+tokio = { version = "1" }
 tokio-postgres = "0.7"
 tokio-test = { version = "0.4"}
 url = "2.5"

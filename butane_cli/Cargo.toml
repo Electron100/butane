@@ -27,7 +27,7 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 [dependencies]
 anyhow = "1.0"
 butane.workspace = true
-cargo_metadata = "0.19"
+cargo_metadata = "0.23"
 chrono = { workspace = true }
 clap = { version = "4.1", features = ["derive", "string", "wrap_help"] }
 clap-verbosity-flag = "3.0"

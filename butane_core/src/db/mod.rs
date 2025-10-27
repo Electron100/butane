@@ -578,6 +578,10 @@ impl ConnectionSpec {
     }
 
     fn is_pg_key_value_pairs(connection_string: &str) -> bool {
+        // If it starts with a scheme (contains ://), it's a URI, not key-value pairs
+        if connection_string.contains("://") {
+            return false;
+        }
         // host and hostaddr are optional in Postgresql, however this prevents connecting
         // without one of them: https://github.com/sfackler/rust-postgres/issues/1239
         let re = regex::Regex::new(PG_KEY_PAIR_RE).unwrap();

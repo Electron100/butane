@@ -1,16 +1,29 @@
 //! Test helpers to set up database connections.
+//!
 //! Macros depend on [`butane_core`], `env_logger` and [`log`].
+//! Public members of this crate should not be considered supported.
+//! This crate is not published to crates.io.
+//!
+//! # Using ephemeralpg
+//!
+//! This crate supports using [ephemeralpg](https://github.com/eradman/ephemeralpg)
+//! as an alternative to the built-in PostgreSQL server management.
+//!
+//! The library will automatically detect and use `pg_tmp` if available, otherwise
+//! it will fall back to using `initdb` and `postgres` directly.
+//!
+//! To use ephemeralpg:
+//! 1. Install ephemeralpg (see <https://github.com/eradman/ephemeralpg>)
+//! 2. Ensure `pg_tmp` is in your PATH
+//!
+//! The library will automatically detect and prefer `pg_tmp` over `initdb`.
 #![deny(missing_docs)]
-
-extern crate alloc;
 
 use std::future::Future;
 #[cfg(feature = "pg")]
 use std::io::{BufRead, BufReader, Read, Write};
 #[cfg(feature = "pg")]
 use std::ops::Deref;
-#[cfg(feature = "pg")]
-use std::path::PathBuf;
 #[cfg(feature = "pg")]
 use std::process::{ChildStderr, Command, Stdio};
 #[cfg(feature = "pg")]
@@ -25,16 +38,24 @@ use butane_core::db::sqlite;
 #[cfg(feature = "sqlite")]
 use butane_core::db::sqlite::SQLiteBackend;
 #[cfg(feature = "pg")]
-use butane_core::db::{connect, connect_async, pg};
+use butane_core::db::{connect, connect_async};
 use butane_core::db::{get_backend, Backend, ConnectionSpec};
-
 use butane_core::migrations::{self, MemMigrations, Migration, Migrations, MigrationsMut};
 #[cfg(feature = "pg")]
 use uuid::Uuid;
 
+extern crate alloc;
+
 // Re-export as they are used by the macros.
 pub use butane_core::db::{BackendConnection, BackendConnectionAsync, Connection, ConnectionAsync};
 pub use maybe_async_cfg;
+
+#[cfg(feature = "pg")]
+pub mod pg;
+
+// Re-export types from pg module
+#[cfg(feature = "pg")]
+pub use crate::pg::{pg_tmp_server_create_ephemeralpg, PgTemporaryServerError};
 
 /// Trait for running a test.
 #[allow(async_fn_in_trait)] // Not truly public, only used in butane for testing.
@@ -136,7 +157,7 @@ pub trait SetupData {
 /// Create a PostgreSQL [`Connection`].
 #[cfg(feature = "pg")]
 pub fn pg_connection() -> (Connection, PgSetupData) {
-    let backend = get_backend(pg::BACKEND_NAME).unwrap();
+    let backend = get_backend(butane_core::db::pg::BACKEND_NAME).unwrap();
     let data = pg_setup_sync();
     (backend.connect(&pg_connstr(&data)).unwrap(), data)
 }
@@ -146,7 +167,7 @@ pub fn pg_connection() -> (Connection, PgSetupData) {
 pub async fn pg_connspec() -> (ConnectionSpec, PgSetupData) {
     let data = pg_setup().await;
     (
-        ConnectionSpec::new(pg::BACKEND_NAME, pg_connstr(&data)),
+        ConnectionSpec::new(butane_core::db::pg::BACKEND_NAME, pg_connstr(&data)),
         data,
     )
 }
@@ -168,23 +189,29 @@ pub struct PgServerOptions {
     pub abstract_namespace: bool,
     /// Callback to run at exit.
     pub atexit_callback: Option<extern "C" fn()>,
+    /// Wait time in seconds before automatic cleanup (for ephemeralpg).
+    /// If None, uses pg_tmp's default (60 seconds).
+    pub ephemeralpg_wait_seconds: Option<u32>,
 }
 
 /// Server state for a test PostgreSQL server.
 #[cfg(feature = "pg")]
 #[derive(Debug)]
 pub struct PgServerState {
-    /// Temporary directory containing the test server
-    pub dir: PathBuf,
-    /// Directory for the socket
+    /// Temporary directory containing the test server (not used for ephemeralpg).
+    pub dir: std::path::PathBuf,
+    /// Directory for the socket (not used for ephemeralpg).
     pub sockdir: tempfile::TempDir,
-    /// Process of the test server
+    /// Process of the test server.
     pub proc: std::process::Child,
-    /// stderr from the test server
+    /// stderr from the test server.
     pub stderr: BufReader<ChildStderr>,
     /// Options used to create the server.
     pub options: PgServerOptions,
+    /// Connection URI from pg_tmp (only set when using ephemeralpg).
+    pub ephemeralpg_uri: Option<String>,
 }
+
 #[cfg(feature = "pg")]
 impl Drop for PgServerState {
     fn drop(&mut self) {
@@ -205,8 +232,17 @@ impl Drop for PgServerState {
             log::warn!("pg shutdown error: {buf}");
         }
 
-        log::info!("Deleting {}", self.dir.display());
-        std::fs::remove_dir_all(&self.dir).unwrap();
+        // Clean up shared memory segments (macOS-specific issue)
+        #[cfg(target_os = "macos")]
+        if !self.dir.as_os_str().is_empty() {
+            pg::cleanup_macos_postgres_shared_memory(&self.dir);
+        }
+
+        // Only delete directory for custom postgres, not for ephemeralpg
+        if self.ephemeralpg_uri.is_none() && !self.dir.as_os_str().is_empty() {
+            log::info!("Deleting {}", self.dir.display());
+            std::fs::remove_dir_all(&self.dir).unwrap();
+        }
     }
 }
 
@@ -224,15 +260,10 @@ impl SetupData for PgSetupData {
     }
 }
 
-/// Error related to the temporary PostgreSQL server.
-#[derive(Debug, thiserror::Error)]
-pub enum PgTemporaryServenError {
-    /// IO errors.
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-}
-
 /// Create and start a temporary PostgreSQL server instance.
+///
+/// This function automatically detects and prefers `pg_tmp` (ephemeralpg) if available,
+/// otherwise falls back to using `initdb` and `postgres` directly.
 ///
 /// Fails on Windows CI due to:
 /// > The server must be started under an unprivileged user ID to prevent
@@ -240,7 +271,28 @@ pub enum PgTemporaryServenError {
 #[cfg(feature = "pg")]
 pub fn pg_tmp_server_create(
     options: PgServerOptions,
-) -> Result<PgServerState, PgTemporaryServenError> {
+) -> Result<PgServerState, PgTemporaryServerError> {
+    // Try pg_tmp first if available
+    if pg::is_pg_tmp_available() {
+        log::debug!("pg_tmp detected, using ephemeralpg");
+        pg_tmp_server_create_ephemeralpg(options)
+    } else if pg::is_initdb_available() {
+        log::debug!("pg_tmp not found, falling back to initdb");
+        pg_tmp_server_create_using_initdb(options)
+    } else {
+        Err(PgTemporaryServerError::EphemeralPg(
+            "Neither pg_tmp nor initdb found in PATH. Please install ephemeralpg or PostgreSQL."
+                .to_string(),
+        ))
+    }
+}
+
+/// Create and start a temporary PostgreSQL server instance using initdb.
+#[cfg(feature = "pg")]
+pub fn pg_tmp_server_create_using_initdb(
+    options: PgServerOptions,
+) -> Result<PgServerState, PgTemporaryServerError> {
+    // Otherwise use the custom postgres implementation
     let seed: u128 = rand::random::<u64>() as u128;
     let instance_id = BlockId::new(Alphabet::alphanumeric(), seed, 8)
         .encode_string(0)
@@ -357,6 +409,7 @@ pub fn pg_tmp_server_create(
         proc,
         stderr,
         options: options.clone(),
+        ephemeralpg_uri: None,
     })
 }
 
@@ -389,8 +442,16 @@ pub fn pg_setup_sync() -> PgSetupData {
         Err(_) => {
             let server_mguard = &TMP_SERVER.deref().lock().unwrap();
             let server: &PgServerState = server_mguard.as_ref().unwrap();
-            let host = server.sockdir.path().to_str().unwrap();
-            ConnectionSpec::new("pg", format!("host={host} user=postgres"))
+
+            // If using ephemeralpg, we need to connect to the default database
+            // to create a new one for this test
+            if let Some(uri) = &server.ephemeralpg_uri {
+                // Use the ephemeralpg URI as-is to connect to the default "test" database
+                ConnectionSpec::try_from(uri.clone()).unwrap()
+            } else {
+                let host = server.sockdir.path().to_str().unwrap();
+                ConnectionSpec::new("pg", format!("host={host} user=postgres"))
+            }
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
@@ -422,8 +483,16 @@ pub async fn pg_setup() -> PgSetupData {
         Err(_) => {
             let server_mguard = &TMP_SERVER.deref().lock().unwrap();
             let server: &PgServerState = server_mguard.as_ref().unwrap();
-            let host = server.sockdir.path().to_str().unwrap();
-            ConnectionSpec::new("pg", format!("host={host} user=postgres"))
+
+            // If using ephemeralpg, we need to connect to the default database
+            // to create a new one for this test
+            if let Some(uri) = &server.ephemeralpg_uri {
+                // Use the ephemeralpg URI as-is to connect to the default "test" database
+                ConnectionSpec::try_from(uri.clone()).unwrap()
+            } else {
+                let host = server.sockdir.path().to_str().unwrap();
+                ConnectionSpec::new("pg", format!("host={host} user=postgres"))
+            }
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());

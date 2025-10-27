@@ -478,7 +478,8 @@ fn pg_key_value_pairs() {
 #[test]
 #[cfg(not(target_os = "windows"))]
 fn pg_key_value_pairs_connect() {
-    let pg_server = pg_tmp_server_create(PgServerOptions::default()).unwrap();
+    // Use initdb explicitly because this test needs direct socket directory access
+    let pg_server = pg_tmp_server_create_using_initdb(PgServerOptions::default()).unwrap();
     let host = pg_server.sockdir.path().to_str().unwrap();
     assert!(pg_server.sockdir.path().exists());
 
@@ -494,7 +495,8 @@ fn pg_key_value_pairs_connect() {
 #[cfg(not(target_os = "windows"))]
 fn pg_key_value_pairs_host_only_unix_socket() {
     let username = whoami::username();
-    let pg_server = pg_tmp_server_create(PgServerOptions {
+    // Use initdb explicitly because this test needs direct socket directory access
+    let pg_server = pg_tmp_server_create_using_initdb(PgServerOptions {
         user: Some(username.clone()),
         ..PgServerOptions::default()
     })
@@ -598,8 +600,9 @@ fn pg_key_value_pairs_abstract_namespace_unix_socket() {
 
 #[test]
 #[cfg(not(target_os = "windows"))]
-fn uri_pg_postgres_scheme_without_databasae() {
-    let _pg_server = pg_tmp_server_create(PgServerOptions {
+fn uri_pg_postgres_scheme_without_database() {
+    // Use initdb explicitly because this test needs specific port control
+    let _pg_server = pg_tmp_server_create_using_initdb(PgServerOptions {
         port: Some(8000),
         ..PgServerOptions::default()
     })

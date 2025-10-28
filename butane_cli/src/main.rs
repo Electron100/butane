@@ -7,7 +7,7 @@ use butane_cli::{
     add_backend, base_dir, clean, clear_data, collapse_migrations, delete_table,
     describe_migration, detach_latest_migration, embed, get_migrations, handle_error, init,
     list_backends, list_migrations, make_migration, migrate, regenerate_migrations, remove_backend,
-    unmigrate,
+    squash_migration, unmigrate,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
@@ -71,6 +71,8 @@ However if the migration has been manually edited, it will need to be manually r
         /// Name to use for the new migration.
         name: String,
     },
+    /// Merge the most recent migration into the previous migration.
+    Squash,
     /// Embed migrations in the source code.
     Embed,
     /// Undo migrations. With no arguments, undoes the latest migration. If the name of a migration is specified, rolls back until that migration is the latest applied migration.
@@ -182,6 +184,7 @@ fn main() {
         Commands::Embed => handle_error(embed(&base_dir)),
         Commands::List => handle_error(list_migrations(&base_dir)),
         Commands::Collapse { name } => handle_error(collapse_migrations(&base_dir, Some(name))),
+        Commands::Squash => handle_error(squash_migration(&base_dir)),
         Commands::Clear { subcommand } => match subcommand {
             ClearCommands::Data => handle_error(clear_data(&base_dir)),
         },

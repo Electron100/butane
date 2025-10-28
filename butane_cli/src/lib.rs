@@ -635,6 +635,66 @@ pub fn collapse_migrations(base_dir: &PathBuf, new_initial_name: Option<&String>
     Ok(())
 }
 
+/// Squash the most recent migration into the previous migration.
+pub fn squash_migration(base_dir: &Path) -> Result<()> {
+    let mut ms = get_migrations(base_dir)?;
+
+    let all_migrations = ms.all_migrations().unwrap_or_else(|e| {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    });
+
+    if all_migrations.len() < 2 {
+        eprintln!("Cannot squash migration: need at least 2 migrations");
+        std::process::exit(1);
+    }
+
+    let latest_migration = ms.latest().expect("Latest should exist");
+    let second_to_last = &all_migrations[all_migrations.len() - 2];
+
+    // Store the names to construct paths for deletion
+    let latest_migration_name = latest_migration.name().to_string();
+    let second_to_last_name = second_to_last.name().to_string();
+
+    // Get the migration that comes before the second-to-last
+    let from_migration = if all_migrations.len() >= 3 {
+        Some(&all_migrations[all_migrations.len() - 3])
+    } else {
+        None
+    };
+
+    // Use the same backends as the latest migration
+    let backends = load_latest_migration_backends(base_dir)?;
+
+    // Get the database state from the latest migration (which includes all changes)
+    let target_db = latest_migration.db()?;
+
+    // Remove the two old migrations from the state first
+    // Note: We need to be careful about the order here
+    ms.detach_latest_migration()?; // Remove latest
+    ms.detach_latest_migration()?; // Remove second-to-last
+
+    // Create a new migration that represents the squashed state, using the name of the second-to-last migration
+    ms.create_migration_to(&backends, &second_to_last_name, from_migration, target_db)?;
+
+    // Delete the old migration directories from the filesystem
+    let migrations_root = base_dir.join("migrations");
+    let latest_migration_path = migrations_root.join(&latest_migration_name);
+
+    // Only delete the latest migration directory, since we're reusing the second-to-last name
+    if latest_migration_path.exists() {
+        std::fs::remove_dir_all(&latest_migration_path)?;
+    }
+
+    update_embedded(base_dir)?;
+
+    println!(
+        "Squashed latest migration '{}' into previous migration '{}'",
+        latest_migration_name, second_to_last_name
+    );
+    Ok(())
+}
+
 pub fn delete_table(base_dir: &Path, name: &str) -> Result<()> {
     let mut ms = get_migrations(base_dir)?;
     let current = ms.current();

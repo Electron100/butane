@@ -437,7 +437,7 @@ fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream2 {
 }
 
 #[cfg(not(feature = "json"))]
-fn derive_field_type_with_json(_struct_name: &Ident) -> TokenStream {
+fn derive_field_type_with_json(_struct_name: &Ident) -> TokenStream2 {
     panic!("Feature 'json' is required to derive FieldType")
 }
 

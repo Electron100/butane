@@ -58,7 +58,7 @@ impl AsyncAdapterEnv {
         'c: 'result,
     {
         // func itself must be `Send`, but we do not require &T to be
-        // Send (and thus don't reuire T to be Sync).  We do this by
+        // Send (and thus don't require T to be Sync).  We do this by
         // basically unsafely sending our raw context pointer over to
         // the worker thread anyway.  The key observation on why we
         // believe this to be sound is that we actually created the

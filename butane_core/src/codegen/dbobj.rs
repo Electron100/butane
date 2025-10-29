@@ -1,3 +1,4 @@
+use desynt::StripRaw;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned, ToTokens};
@@ -5,7 +6,7 @@ use syn::{spanned::Spanned, Field, ItemStruct, LitStr};
 
 use super::{
     extract_path_from_type, fields, get_autopk_sql_type, get_type_argument, is_auto,
-    is_many_to_many, is_row_field, make_ident_literal_str, make_lit, pk_field, MANY_TYNAMES,
+    is_many_to_many, is_row_field, make_ident_literal_str, make_lit, pk_field,
 };
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
 use crate::SqlType;
@@ -275,7 +276,7 @@ fn fieldexpr_func_regular(f: &Field, ast_struct: &ItemStruct) -> TokenStream2 {
 
 fn fieldexpr_func_many(f: &Field, ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
-    let fty = get_type_argument(&f.ty, &MANY_TYNAMES).expect("Many field misdetected");
+    let fty = get_type_argument(&f.ty, "Many").expect("Many field misdetected");
     let many_table_lit = many_table_lit(ast_struct, f, config);
     fieldexpr_func(
         f,
@@ -301,10 +302,9 @@ fn fieldexpr_func(
             )
         }
     };
-    let fnid = Ident::new(&format!("{fid}"), f.span());
     quote!(
         /// Create query expression.
-        #vis fn #fnid(&self) -> #field_expr_type {
+        #vis fn #fid(&self) -> #field_expr_type {
             #field_expr_ctor
         }
     )
@@ -324,7 +324,8 @@ fn field_ident_lit(f: &Field) -> TokenStream2 {
 }
 
 fn fields_type(tyname: &Ident) -> Ident {
-    Ident::new(&format!("{tyname}Fields"), Span::call_site())
+    let stripped = tyname.strip_raw();
+    Ident::new(&format!("{stripped}Fields"), Span::call_site())
 }
 
 fn rows_for_from(ast_struct: &ItemStruct) -> Vec<TokenStream2> {
@@ -375,12 +376,12 @@ fn many_table_lit(ast_struct: &ItemStruct, field: &Field, config: &Config) -> Li
         .ident
         .clone()
         .expect("Fields must be named for butane");
-    let binding = ast_struct.ident.to_string();
+    let binding = ast_struct.ident.strip_raw().to_string();
     let tyname = match &config.table_name {
         Some(s) => s,
         None => &binding,
     };
-    make_lit(&format!("{}_{}{MANY_SUFFIX}", &tyname, &ident))
+    make_lit(&format!("{}_{}{MANY_SUFFIX}", &tyname, &ident.strip_raw()))
 }
 
 fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {

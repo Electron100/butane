@@ -169,7 +169,7 @@ impl TursoConnection {
         // foreign_keys pragma via regular SQL, not PRAGMA syntax
         conn.execute("PRAGMA foreign_keys = 1", Vec::<turso::Value>::new())
             .await
-            .ok(); // Ignore errors in case PRAGMA is not supported
+            .map_err(|e| Error::Internal(e.to_string()))?;
 
         Ok(TursoConnection { conn })
     }

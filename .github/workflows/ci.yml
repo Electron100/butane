@@ -56,6 +56,7 @@ jobs:
         sudo service postgresql restart && sleep 3
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
         echo "/usr/lib/postgresql/16/bin" >> $GITHUB_PATH
+        sudo ln -s /usr/lib/x86_64-linux-gnu/libaio.so /usr/lib/x86_64-linux-gnu/libaio.so.1
     - name: Setup PostgreSQL on MacOS
       if: runner.os == 'macOS'
       run: |

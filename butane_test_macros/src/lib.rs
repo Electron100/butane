@@ -87,7 +87,12 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
     backends.push(("pg", "PgTestInstance"));
     if !options.contains(&TestOption::PgOnly) {
         backends.push(("sqlite", "SQLiteTestInstance"));
-        backends.push(("mysql", "MySqlTestInstance"));
+
+        // Only include MySQL if mysqld is available
+        if which::which("mysqld").is_ok() {
+            backends.push(("mysql", "MySqlTestInstance"));
+        }
+
         backends.push(("turso", "TursoTestInstance"));
     }
 

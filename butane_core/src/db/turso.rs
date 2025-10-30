@@ -965,18 +965,26 @@ fn create_table(table: &ATable, if_not_exists: bool) -> String {
         }
     }
     defs.append(&mut constraints);
-    if if_not_exists {
-        format!(
-            "CREATE TABLE IF NOT EXISTS {} ({});",
-            helper::quote_reserved_word(&table.name),
-            defs.join(", ")
-        )
+
+    let table_name = helper::quote_reserved_word(&table.name);
+    let prefix = if if_not_exists {
+        format!("CREATE TABLE IF NOT EXISTS {table_name} (")
     } else {
-        format!(
-            "CREATE TABLE {} ({});",
-            helper::quote_reserved_word(&table.name),
-            defs.join(", ")
-        )
+        format!("CREATE TABLE {table_name} (")
+    };
+
+    // Format with newlines if it would be longer than 120 characters
+    let single_line = format!("{}{});", prefix, defs.join(", "));
+    if single_line.len() <= 120 {
+        single_line
+    } else {
+        // Multi-line format with 4-space indentation
+        let formatted_defs = defs
+            .iter()
+            .map(|def| format!("    {}", def))
+            .collect::<Vec<_>>()
+            .join(",\n");
+        format!("{}\n{}\n);", prefix, formatted_defs)
     }
 }
 
@@ -1088,18 +1096,33 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String
 }
 
 fn copy_table(old: &ATable, new: &ATable) -> String {
-    let column_names = new
+    let column_names: Vec<Cow<str>> = new
         .columns
         .iter()
         .map(|col| helper::quote_reserved_word(col.name()))
-        .collect::<Vec<Cow<str>>>()
-        .join(", ");
-    format!(
+        .collect();
+
+    let column_list = column_names.join(", ");
+    let single_line = format!(
         "INSERT INTO {} SELECT {} FROM {};",
         helper::quote_reserved_word(&new.name),
-        column_names,
+        column_list,
         helper::quote_reserved_word(&old.name)
-    )
+    );
+
+    // If the single line is too long, format with line breaks
+    if single_line.len() <= 120 {
+        single_line
+    } else {
+        // Multi-line format
+        let formatted_columns = column_names.join(",\n    ");
+        format!(
+            "INSERT INTO {} SELECT\n    {}\nFROM {};",
+            helper::quote_reserved_word(&new.name),
+            formatted_columns,
+            helper::quote_reserved_word(&old.name)
+        )
+    }
 }
 
 fn tmp_table_name(name: &str) -> String {
@@ -1133,11 +1156,11 @@ fn change_column(
     // tracking doesn't properly register tables created in the same transaction.
     // For migrations that require column changes, consider skipping unmigrate for Turso.
     // See docs/turso-backend.md for details.
-    let stmts: [&str; 4] = [
-        &create_table(&new_table, false),
-        &copy_table(old_table, &new_table),
-        &drop_table(&old_table.name),
-        &format!(
+    let stmts: Vec<String> = vec![
+        create_table(&new_table, false),
+        copy_table(old_table, &new_table),
+        drop_table(&old_table.name),
+        format!(
             "ALTER TABLE {} RENAME TO {};",
             helper::quote_reserved_word(&new_table.name),
             helper::quote_reserved_word(tbl_name)

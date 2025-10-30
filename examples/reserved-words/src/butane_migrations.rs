@@ -200,7 +200,7 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       "up": {
         "pg": "CREATE TABLE Post (\n\"id\" SERIAL NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished BOOLEAN NOT NULL,\nbyline TEXT\n);\nALTER TABLE Post ADD FOREIGN KEY (byline) REFERENCES \"User\"(\"id\");\n",
         "sqlite": "CREATE TABLE Post (\n\"id\" INTEGER NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished INTEGER NOT NULL,\nbyline TEXT,\nFOREIGN KEY (byline) REFERENCES \"User\"(\"id\")\n) STRICT;\n",
-        "turso": "CREATE TABLE Post (\"id\" INTEGER NOT NULL PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL, published INTEGER NOT NULL, byline TEXT, FOREIGN KEY (byline) REFERENCES \"User\"(\"id\"));\n"
+        "turso": "CREATE TABLE Post (\n    \"id\" INTEGER NOT NULL PRIMARY KEY,\n    title TEXT NOT NULL,\n    body TEXT NOT NULL,\n    published INTEGER NOT NULL,\n    byline TEXT,\n    FOREIGN KEY (byline) REFERENCES \"User\"(\"id\")\n);\n"
       },
       "down": {
         "pg": "ALTER TABLE Post DROP CONSTRAINT Post_byline_fkey;\nDROP TABLE Post;\n",
@@ -382,7 +382,7 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       "up": {
         "pg": "CREATE TABLE Post_likes_Many (\n\"owner\" INTEGER NOT NULL,\nhas TEXT NOT NULL\n);\nALTER TABLE Post_likes_Many ADD FOREIGN KEY (\"owner\") REFERENCES Post(\"id\");\nALTER TABLE Post_likes_Many ADD FOREIGN KEY (has) REFERENCES \"User\"(\"id\");\n",
         "sqlite": "CREATE TABLE Post_likes_Many (\n\"owner\" INTEGER NOT NULL,\nhas TEXT NOT NULL,\nFOREIGN KEY (\"owner\") REFERENCES Post(\"id\")\nFOREIGN KEY (has) REFERENCES \"User\"(\"id\")\n) STRICT;\n",
-        "turso": "CREATE TABLE Post_likes_Many (\"owner\" INTEGER NOT NULL, has TEXT NOT NULL, FOREIGN KEY (\"owner\") REFERENCES Post(\"id\"), FOREIGN KEY (has) REFERENCES \"User\"(\"id\"));\n"
+        "turso": "CREATE TABLE Post_likes_Many (\n    \"owner\" INTEGER NOT NULL,\n    has TEXT NOT NULL,\n    FOREIGN KEY (\"owner\") REFERENCES Post(\"id\"),\n    FOREIGN KEY (has) REFERENCES \"User\"(\"id\")\n);\n"
       },
       "down": {
         "pg": "ALTER TABLE Post_likes_Many DROP CONSTRAINT Post_likes_Many_owner_fkey;\nALTER TABLE Post_likes_Many DROP CONSTRAINT Post_likes_Many_has_fkey;\nDROP TABLE Post_likes_Many;\n",

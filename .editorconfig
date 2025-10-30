@@ -42,9 +42,3 @@ indent_size = unset
 [LICENSE-APACHE.txt]
 indent_size = unset
 indent_style = unset
-
-[turso_up.sql]
-max_line_length = 1000
-
-[turso_down.sql]
-max_line_length = 1000

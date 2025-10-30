@@ -356,7 +356,7 @@ async fn basic_unique_field_error_on_non_unique(conn: ConnectionAsync) {
             if e.code() == Some(&postgres::error::SqlState::UNIQUE_VIOLATION) =>
             true,
         #[cfg(feature = "mysql")]
-        butane::Error::MySQL(mysql_async::Error::Server(ref err)) if err.code == 1062 => true, // MySQL duplicate entry error code
+        butane::Error::MySQL(mysql_async::Error::Server(ref err)) if err.code == 1062 => true,
         #[cfg(feature = "turso")]
         butane::Error::Internal(msg) if msg.contains("UNIQUE constraint failed") => true,
         _ => {

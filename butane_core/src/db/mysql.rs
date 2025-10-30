@@ -1128,13 +1128,22 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     let default: SqlVal = helper::column_default(col)?;
 
     // MySQL-specific handling: JSON columns can't have DEFAULT NULL when NOT NULL
-    let default_value = if matches!(col.typeid()?, TypeIdentifier::Ty(SqlType::Json))
-        && !col.nullable()
-        && matches!(default, SqlVal::Json(ref v) if v.is_null())
-    {
-        "('[]')".to_string() // Use empty JSON array as default
-    } else {
-        helper::sql_literal_value(&default)?
+    let default_value = {
+        #[cfg(feature = "json")]
+        {
+            if matches!(col.typeid()?, TypeIdentifier::Ty(SqlType::Json))
+                && !col.nullable()
+                && matches!(default, SqlVal::Json(ref v) if v.is_null())
+            {
+                "('[]')".to_string() // Use empty JSON array as default
+            } else {
+                helper::sql_literal_value(&default)?
+            }
+        }
+        #[cfg(not(feature = "json"))]
+        {
+            helper::sql_literal_value(&default)?
+        }
     };
 
     let mut stmts = vec![format!(

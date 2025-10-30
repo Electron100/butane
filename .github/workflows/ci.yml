@@ -114,18 +114,18 @@ jobs:
       run: cargo deny check all
     - name: Test Butane test helper with ephemeral-postgres
       if: runner.os != 'Windows'
-      run: cd butane_test_helper && mise exec ephemeral-postgres mise -- cargo +stable test --all-features
+      run: mise exec ephemeral-postgres mysql -- cargo +stable test -p butane_test_helper --all-features
     - name: Test Butane test helper without ephemeral-postgres
       if: runner.os == 'Windows'
       run: cd butane_test_helper && cargo +stable test --all-features
     - name: Test Core
-      run: mise exec ephemeral-postgres mise -- cargo +stable -p butane_core test --all-features
+      run: mise exec ephemeral-postgres mysql -- cargo +stable test -p butane_core --all-features
     - name: Test Codegen
       run: cd butane_codegen && cargo +stable test --all-features
     - name: Test CLI
       run: cd butane_cli && cargo +stable test --all-features
     - name: Test
-      run: mise exec ephemeral-postgres mise -- cargo +stable -p butane test --all-features
+      run: mise exec ephemeral-postgres mysql -- cargo +stable -p butane test --all-features
     - name: Check example migrations have been updated
       run: |
         set -ex

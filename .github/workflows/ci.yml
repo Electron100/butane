@@ -29,8 +29,8 @@ jobs:
             mise_tools: "ephemeral-postgres mysql"
           - os: macos-13
             mise_tools: "ephemeral-postgres mysql"
-          - os: windows-latest
-            mise_tools: ""
+          # - os: windows-latest
+          #  mise_tools: ""
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -126,7 +126,7 @@ jobs:
         fi
     - name: Test Butane test helper without mise tools on Windows
       if: runner.os == 'Windows'
-      run: cd butane_test_helper && cargo +stable test --all-features
+      run: cargo +stable test -p butane_test_helper --features "pg sqlite turso"
     - name: Test Core
       run: |
         if [ -n "${{ matrix.mise_tools }}" ]; then

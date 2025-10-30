@@ -63,6 +63,11 @@ path = "tests/macos_shared_memory.rs"
 required-features = ["pg"]
 
 [[test]]
+name = "mysql"
+path = "tests/mysql.rs"
+required-features = ["mysql"]
+
+[[test]]
 name = "sqlite"
 path = "tests/sqlite.rs"
 required-features = ["sqlite"]

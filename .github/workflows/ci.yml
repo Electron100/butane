@@ -24,10 +24,13 @@ jobs:
   build:
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-13
-          - windows-latest
+        include:
+          - os: ubuntu-latest
+            mise_tools: "ephemeral-postgres mysql"
+          - os: macos-13
+            mise_tools: "ephemeral-postgres mysql"
+          - os: windows-latest
+            mise_tools: ""
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -42,12 +45,12 @@ jobs:
     - uses: actions/checkout@v4
       # Postgresql setup adapted from Diesel CI
       # Disable ssl as server doesn't have a trusted cert
-    - name: Setup PostgreSQL on Linux
+    - name: Setup PostgreSQL & libaio1t64 on Linux
       if: runner.os == 'Linux'
       run: |
         set -ex
         sudo apt-get update
-        sudo apt-get install -y postgresql
+        sudo apt-get install -y libaio1t64 postgresql
         sudo sed -i "s/scram-sha-256/trust/" /etc/postgresql/16/main/pg_hba.conf
         sudo cat /etc/postgresql/16/main/pg_hba.conf
         sudo service postgresql restart && sleep 3
@@ -112,20 +115,35 @@ jobs:
       run: make lint-ci
     - name: Run cargo-deny
       run: cargo deny check all
-    - name: Test Butane test helper with ephemeral-postgres
+    - name: Test Butane test helper with ${{ matrix.mise_tools }}
       if: runner.os != 'Windows'
-      run: mise exec ephemeral-postgres mysql -- cargo +stable test -p butane_test_helper --all-features
-    - name: Test Butane test helper without ephemeral-postgres
+      run: |
+        if [ -n "${{ matrix.mise_tools }}" ]; then
+          mise exec ${{ matrix.mise_tools }} -- cargo +stable test -p butane_test_helper --all-features
+        else
+          cargo +stable test -p butane_test_helper --all-features
+        fi
+    - name: Test Butane test helper without mise tools on Windows
       if: runner.os == 'Windows'
       run: cd butane_test_helper && cargo +stable test --all-features
     - name: Test Core
-      run: mise exec ephemeral-postgres mysql -- cargo +stable test -p butane_core --all-features
+      run: |
+        if [ -n "${{ matrix.mise_tools }}" ]; then
+          mise exec ${{ matrix.mise_tools }} -- cargo +stable test -p butane_core --all-features
+        else
+          cargo +stable test -p butane_core --all-features
+        fi
     - name: Test Codegen
       run: cd butane_codegen && cargo +stable test --all-features
     - name: Test CLI
       run: cd butane_cli && cargo +stable test --all-features
     - name: Test
-      run: mise exec ephemeral-postgres mysql -- cargo +stable -p butane test --all-features
+      run: |
+        if [ -n "${{ matrix.mise_tools }}" ]; then
+          mise exec ${{ matrix.mise_tools }} -- cargo +stable -p butane test --all-features
+        else
+          cargo +stable -p butane test --all-features
+        fi
     - name: Check example migrations have been updated
       run: |
         set -ex
@@ -140,5 +158,9 @@ jobs:
         cargo +stable test -p example --all-features
         cd examples
         for dir in *; do
-          mise exec ephemeral-postgres mise -- cargo +stable test -p $dir --all-features
+          if [ -n "${{ matrix.mise_tools }}" ]; then
+            mise exec ${{ matrix.mise_tools }} -- cargo +stable test -p $dir --all-features
+          else
+            cargo +stable test -p $dir --all-features
+          fi
         done

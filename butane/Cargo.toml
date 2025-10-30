@@ -52,6 +52,7 @@ env_logger = { workspace = true }
 fake = { workspace = true, features = ["chrono", "derive", "uuid"] }
 geo-types = "0.7"
 log.workspace = true
+mysql_async = { workspace = true }
 nonempty.workspace = true
 quote = { workspace = true }
 maybe-async-cfg.workspace = true

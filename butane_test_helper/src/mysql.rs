@@ -34,7 +34,7 @@ pub struct MySqlSetupData {
     /// Socket file path (for Unix systems).
     socket: Option<PathBuf>,
     /// MySQL server process handle.
-    _server_process: Option<std::process::Child>,
+    server_process: Option<std::process::Child>,
 }
 
 impl MySqlSetupData {
@@ -228,7 +228,7 @@ pub fn mysql_tmp_server_create() -> Result<MySqlSetupData, MySqlTemporaryServerE
         _data_dir: data_dir,
         port,
         socket: Some(socket_path),
-        _server_process: Some(server_cmd),
+        server_process: Some(server_cmd),
     })
 }
 
@@ -243,12 +243,49 @@ fn find_available_port() -> u16 {
     port
 }
 
+/// Kill any orphaned MySQL test processes.
+/// This is a utility function to clean up any MySQL processes that weren't properly terminated.
+#[allow(dead_code)]
+pub fn cleanup_orphaned_mysql_processes() {
+    use std::process::Command;
+
+    log::info!("Cleaning up any orphaned MySQL test processes");
+
+    // Find MySQL processes running in temp directories
+    let output = Command::new("ps")
+        .args(["aux"])
+        .output();
+
+    if let Ok(output) = output {
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        let mysql_pids: Vec<u32> = output_str
+            .lines()
+            .filter(|line| line.contains("mysqld") && line.contains("/tmp"))
+            .filter_map(|line| {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() > 1 {
+                    parts[1].parse().ok()
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for pid in mysql_pids {
+            log::warn!("Killing orphaned MySQL process with PID: {}", pid);
+            let _ = Command::new("kill")
+                .args(["-9", &pid.to_string()])
+                .output();
+        }
+    }
+}
+
 impl Drop for MySqlSetupData {
     fn drop(&mut self) {
         log::info!("Shutting down temporary MySQL server on port {}", self.port);
 
-        // Try to shutdown MySQL gracefully
-        let _ = Command::new("mysqladmin")
+        // First try to shutdown MySQL gracefully
+        let graceful_shutdown = Command::new("mysqladmin")
             .args([
                 "shutdown",
                 "-h",
@@ -260,7 +297,29 @@ impl Drop for MySqlSetupData {
             ])
             .output();
 
-        // Give it a moment to shutdown
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        if let Ok(output) = graceful_shutdown {
+            if output.status.success() {
+                log::info!("MySQL server gracefully shut down");
+                // Give it a moment to shutdown
+                std::thread::sleep(std::time::Duration::from_millis(500));
+
+                // Check if process has exited
+                if let Some(ref mut process) = self.server_process {
+                    if let Ok(Some(_)) = process.try_wait() {
+                        log::info!("MySQL process has exited");
+                        return;
+                    }
+                }
+            }
+        }
+
+        // If graceful shutdown failed, forcefully kill the process
+        if let Some(ref mut process) = self.server_process {
+            log::warn!("Graceful shutdown failed, forcefully killing MySQL process");
+            let _ = process.kill();
+            // Wait for process to actually terminate
+            let _ = process.wait();
+            log::info!("MySQL process forcefully terminated");
+        }
     }
 }

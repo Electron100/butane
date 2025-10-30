@@ -162,7 +162,7 @@ trait MySqlConnectionLike {
         }
 
         if let Some(order) = order {
-            helper::sql_order(order, &mut sqlquery)
+            mysql_sql_order(order, &mut sqlquery)
         }
 
         if let Some(limit) = limit {
@@ -506,6 +506,17 @@ impl<'c> BackendTransaction<'c> for MySqlTransaction<'c> {
     }
 }
 
+impl<'c> Drop for MySqlTransaction<'c> {
+    fn drop(&mut self) {
+        // If the transaction hasn't been explicitly committed or rolled back, warn and mark as rolled back
+        if !self.committed_or_rolled_back.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            log::warn!("Transaction dropped without explicit commit or rollback - this may lead to uncommitted changes");
+            // Unfortunately, we can't perform async operations in Drop
+            // The user should explicitly call rollback() if they want to ensure rollback
+        }
+    }
+}
+
 fn sqlval_to_mysql_value(v: &SqlVal) -> mysql::Value {
     sqlvalref_to_mysql_value(&v.as_ref())
 }
@@ -552,6 +563,18 @@ fn mysql_value_to_sqlval(v: &mysql::Value, ty: &SqlType) -> Result<SqlVal> {
         (Int(i), SqlType::Bool) => Ok(SqlVal::Bool(*i != 0)),
         (Int(i), SqlType::Int) => Ok(SqlVal::Int(*i as i32)),
         (Int(i), SqlType::BigInt) => Ok(SqlVal::BigInt(*i)),
+        (Bytes(b), SqlType::BigInt) => {
+            // MySQL sometimes returns integers as bytes (especially for auto-increment)
+            let s = String::from_utf8(b.clone()).map_err(|e| Error::Internal(e.to_string()))?;
+            let i = s.parse::<i64>().map_err(|e| Error::Internal(e.to_string()))?;
+            Ok(SqlVal::BigInt(i))
+        },
+        (Bytes(b), SqlType::Int) => {
+            // MySQL sometimes returns integers as bytes
+            let s = String::from_utf8(b.clone()).map_err(|e| Error::Internal(e.to_string()))?;
+            let i = s.parse::<i32>().map_err(|e| Error::Internal(e.to_string()))?;
+            Ok(SqlVal::Int(i))
+        },
         (Float(f), SqlType::Real) => Ok(SqlVal::Real(*f as f64)),
         (Double(d), SqlType::Real) => Ok(SqlVal::Real(*d)),
         (Bytes(b), SqlType::Text) => Ok(SqlVal::Text(
@@ -696,12 +719,22 @@ fn mysql_sql_for_bool_expr<W>(
             write!(w, ")").unwrap();
         }
         Eq(col, expr) => {
-            write!(w, "{} = ", quote_mysql_identifier(col)).unwrap();
-            mysql_sql_for_expr(expr, values, pls, w);
+            // Handle NULL comparisons with IS NULL instead of = NULL
+            if let query::Expr::Val(SqlVal::Null) = expr {
+                write!(w, "{} IS NULL", quote_mysql_identifier(col)).unwrap();
+            } else {
+                write!(w, "{} = ", quote_mysql_identifier(col)).unwrap();
+                mysql_sql_for_expr(expr, values, pls, w);
+            }
         }
         Ne(col, expr) => {
-            write!(w, "{} != ", quote_mysql_identifier(col)).unwrap();
-            mysql_sql_for_expr(expr, values, pls, w);
+            // Handle NULL comparisons with IS NOT NULL instead of != NULL
+            if let query::Expr::Val(SqlVal::Null) = expr {
+                write!(w, "{} IS NOT NULL", quote_mysql_identifier(col)).unwrap();
+            } else {
+                write!(w, "{} != ", quote_mysql_identifier(col)).unwrap();
+                mysql_sql_for_expr(expr, values, pls, w);
+            }
         }
         Lt(col, expr) => {
             write!(w, "{} < ", quote_mysql_identifier(col)).unwrap();
@@ -793,7 +826,8 @@ fn mysql_sql_insert_with_placeholders(
         });
         write!(w, ")").unwrap();
     } else {
-        write!(w, "DEFAULT VALUES").unwrap();
+        // MySQL doesn't support DEFAULT VALUES, use () VALUES () instead
+        write!(w, "() VALUES ()").unwrap();
     }
 }
 
@@ -880,6 +914,19 @@ fn mysql_sql_offset(offset: i32, limit: Option<i32>, w: &mut impl Write) {
         // MySQL requires LIMIT when using OFFSET, use a very large number
         write!(w, " LIMIT 18446744073709551615 OFFSET {offset}").unwrap();
     }
+}
+
+// MySQL-specific ORDER BY handling using backticks for identifier quoting
+fn mysql_sql_order(order: &[query::Order], w: &mut impl Write) {
+    write!(w, " ORDER BY ").unwrap();
+    order.iter().fold("", |sep, o| {
+        let sql_dir = match o.direction {
+            query::OrderDirection::Ascending => "ASC",
+            query::OrderDirection::Descending => "DESC",
+        };
+        write!(w, "{}{} {}", sep, quote_mysql_identifier(o.column), sql_dir).unwrap();
+        ", "
+    });
 }
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
@@ -976,9 +1023,11 @@ fn define_fkey_constraint(table_name: &str, column: &AColumn) -> String {
         .expect("must have a references value");
     match reference {
         ARef::Literal(literal) => {
+            let constraint_name = format!("{}_{}_fkey", table_name, column.name());
             format!(
-                "ALTER TABLE {} ADD FOREIGN KEY ({}) REFERENCES {}({});",
+                "ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) REFERENCES {}({});",
                 quote_mysql_identifier(table_name),
+                quote_mysql_identifier(&constraint_name),
                 quote_mysql_identifier(column.name()),
                 quote_mysql_identifier(literal.table_name()),
                 quote_mysql_identifier(literal.column_name()),
@@ -1023,7 +1072,7 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<'_, str>> {
                     #[cfg(feature = "datetime")]
                     SqlType::Date => Cow::Borrowed("DATE"),
                     #[cfg(feature = "datetime")]
-                    SqlType::Timestamp => Cow::Borrowed("DATETIME"),
+                    SqlType::Timestamp => Cow::Borrowed("DATETIME(6)"), // Use microsecond precision
                     SqlType::Blob => {
                         // MySQL BLOB columns can't be used in unique constraints without key length
                         // Use VARBINARY(255) for unique/primary key columns, BLOB for others
@@ -1146,11 +1195,11 @@ fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String>
     if old.reference() != new.reference() {
         if old.reference().is_some() {
             // MySQL requires knowing the constraint name to drop it
+            let constraint_name = format!("{}_{}_fkey", tbl_name, old.name());
             stmts.push(format!(
-                "ALTER TABLE {} DROP FOREIGN KEY {}_{}_fkey;",
+                "ALTER TABLE {} DROP FOREIGN KEY {};",
                 quote_mysql_identifier(tbl_name),
-                tbl_name,
-                old.name()
+                quote_mysql_identifier(&constraint_name)
             ));
         }
         if new.reference().is_some() {
@@ -1189,11 +1238,11 @@ pub fn sql_insert_or_replace_with_placeholders(
                 if !first {
                     write!(w, ", ").unwrap();
                 }
-                write!(w, "{} = VALUES({})", c.name(), c.name()).unwrap();
+                write!(w, "{} = VALUES({})", quote_mysql_identifier(c.name()), quote_mysql_identifier(c.name())).unwrap();
                 false
             });
     } else {
-        write!(w, "{} = {}", pkcol.name(), pkcol.name()).unwrap();
+        write!(w, "{} = {}", quote_mysql_identifier(pkcol.name()), quote_mysql_identifier(pkcol.name())).unwrap();
     }
 }
 

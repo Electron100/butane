@@ -303,6 +303,7 @@ dependencies = [
  "geo-types",
  "log",
  "maybe-async-cfg",
+ "mysql_async",
  "nonempty",
  "paste",
  "proc-macro2",

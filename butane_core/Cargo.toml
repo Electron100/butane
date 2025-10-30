@@ -21,6 +21,7 @@ pg = ["async", "bytes", "tokio-postgres"]
 sqlite = ["rusqlite"]
 sqlite-bundled = ["rusqlite/bundled"]
 tls = ["native-tls", "postgres-native-tls"]
+turso = ["async", "dep:turso"]
 
 [dependencies]
 async-trait = { workspace = true}
@@ -55,12 +56,13 @@ serde_json = { workspace = true }
 sqlparser = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
+turso = { workspace = true, optional = true }
 url.workspace = true
 uuid = { workspace = true, optional = true }
 
 [dev-dependencies]
 assert_matches = "1.5"
-butane_test_helper = { workspace = true, default-features = false, features = ["sqlite", "pg"] }
+butane_test_helper = { workspace = true, default-features = false, features = ["pg", "sqlite", "turso"] }
 butane_test_macros.workspace = true
 env_logger = { workspace = true }
 paste = { workspace = true }

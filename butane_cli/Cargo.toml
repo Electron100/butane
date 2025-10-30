@@ -19,10 +19,11 @@ path = "src/main.rs"
 doc = false
 
 [features]
-default = ["pg", "sqlite"]
+default = ["pg", "sqlite", "turso"]
 pg = ["butane/pg"]
 sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]
+turso = ["butane/turso"]
 
 [dependencies]
 anyhow = "1.0"

@@ -7,6 +7,8 @@ use fake::{Fake, Faker};
 mod common;
 use common::blog::{Blog, Post, Tag};
 
+// Disabled for Turso and SQLite: Uses many-to-many .load() which generates IN (subquery) SQL.
+// This is not supported by libSQL/Turso. See docs/turso-backend.md for details.
 #[butane_test]
 async fn fake_blog_post(conn: ConnectionAsync) {
     let mut fake_blog: Blog = Faker.fake();

@@ -18,6 +18,7 @@ implementation detail to the API consumer.
   may be hand-tuned if necessary)
 * Ability to embed migrations in Rust code (so that a library may easily bundle its migrations)
 * SQLite and PostgreSQL backends
+* Turso (Sqlite compatible) backend - experimental
 * Write entirely or nearly entirely the same code regardless of database backend
 
 ## Getting Started

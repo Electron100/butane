@@ -22,10 +22,11 @@ doc = false
 doc = false
 
 [features]
-default = ["sqlite", "sqlite-bundled"]
+default = ["pg", "sqlite", "sqlite-bundled", "turso"]
 pg = ["butane/pg"]
 sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]
+turso = ["butane/turso"]
 
 [dependencies]
 butane.workspace = true
@@ -33,7 +34,7 @@ butane.workspace = true
 [dev-dependencies]
 butane_cli.workspace = true
 butane_core.workspace = true
-butane_test_helper = { workspace = true, default-features = false, features = ["sqlite", "pg"] }
+butane_test_helper = { workspace = true, default-features = false, features = ["pg", "sqlite", "turso"] }
 butane_test_macros.workspace = true
 cfg-if.workspace = true
 env_logger.workspace = true

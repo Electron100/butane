@@ -18,6 +18,7 @@ default = ["sqlite", "pg"]
 sqlite = ["butane_core/sqlite", "butane_core/async-adapter"]
 sqlite-bundled = ["butane_core/sqlite-bundled"]
 pg = ["butane_core/pg", "tokio-postgres"]
+turso = ["butane_core/turso"]
 
 [dependencies]
 block-id = "0.2"
@@ -62,6 +63,11 @@ required-features = ["pg"]
 name = "sqlite"
 path = "tests/sqlite.rs"
 required-features = ["sqlite"]
+
+[[test]]
+name = "turso"
+path = "tests/turso.rs"
+required-features = ["turso"]
 
 [[bin]]
 bench = false

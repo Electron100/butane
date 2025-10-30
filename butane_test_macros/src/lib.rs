@@ -87,6 +87,7 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
     backends.push(("pg", "PgTestInstance"));
     if !options.contains(&TestOption::PgOnly) {
         backends.push(("sqlite", "SQLiteTestInstance"));
+        backends.push(("turso", "TursoTestInstance"));
     }
 
     let tests = backends
@@ -139,7 +140,7 @@ fn make_async_test(
     quote! {
         cfg_if::cfg_if! {
             if #[cfg(feature = #backend_name)] {
-                #[tokio::test]
+                #[tokio::test(flavor = "multi_thread")]
                 pub async fn #fname_full () {
                     use butane_test_helper::*;
                     #instance_ident::run_test_async(#fname_async, #migrate).await;

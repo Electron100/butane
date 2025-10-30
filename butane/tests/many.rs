@@ -109,6 +109,29 @@ async fn r_hash_struct_name_with_many_field(conn: ConnectionAsync) {
 }
 
 #[butane_test]
+async fn basic_many_load(conn: ConnectionAsync) {
+    let mut cats_blog = Blog::new(1, "Cats");
+    cats_blog.save(&conn).await.unwrap();
+    let mut post = Post::new(
+        1,
+        "The Cheetah",
+        "This post is about a fast cat.",
+        &cats_blog,
+    );
+    post.save(&conn).await.unwrap();
+
+    let tag_fast = create_tag(&conn, "fast").await;
+    let tag_cat = create_tag(&conn, "cat").await;
+    post.tags.add(&tag_fast).unwrap();
+    post.tags.add(&tag_cat).unwrap();
+    post.save(&conn).await.unwrap();
+
+    // Load tags - this uses a subquery which needs EXISTS on Turso
+    let loaded_tags: Vec<&Tag> = post.tags.load(&conn).await.unwrap().collect();
+    assert_eq!(loaded_tags.len(), 2);
+}
+
+#[butane_test]
 async fn load_sorted_from_many(conn: ConnectionAsync) {
     let mut cats_blog = Blog::new(1, "Cats");
     cats_blog.save(&conn).await.unwrap();

@@ -871,6 +871,7 @@ fn change_column(
     result
 }
 
+/// Write SQL that performs an insert or update.
 pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: &mut impl Write) {
     write!(w, "INSERT ").unwrap();
     write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();

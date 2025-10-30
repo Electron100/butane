@@ -207,17 +207,17 @@ trait MySqlConnectionLike {
         let params: Vec<mysql::Value> = values.iter().map(sqlvalref_to_mysql_value).collect();
         self.conn_ref().lock().await.exec_drop(&sql, params).await?;
 
-        let last_id: Vec<mysql::Row> = self.conn_ref()
-            .lock().await
+        let last_id: Vec<mysql::Row> = self
+            .conn_ref()
+            .lock()
+            .await
             .query("SELECT LAST_INSERT_ID()")
             .await?;
 
         if let Some(row) = last_id.first() {
             mysql_value_to_sqlval(&row.get(0).unwrap(), pkcol.ty())
         } else {
-            Err(Error::Internal(
-                "could not get last insert id".to_string(),
-            ))
+            Err(Error::Internal("could not get last insert id".to_string()))
         }
     }
 
@@ -336,7 +336,8 @@ impl ConnectionMethods for MySqlConnection {
         offset: Option<i32>,
         order: Option<&[query::Order]>,
     ) -> Result<RawQueryResult<'a>> {
-        self.query_impl(table, columns, expr, limit, offset, order).await
+        self.query_impl(table, columns, expr, limit, offset, order)
+            .await
     }
     async fn insert_returning_pk(
         &self,
@@ -345,7 +346,8 @@ impl ConnectionMethods for MySqlConnection {
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
-        self.insert_returning_pk_impl(table, columns, pkcol, values).await
+        self.insert_returning_pk_impl(table, columns, pkcol, values)
+            .await
     }
     async fn insert_only(
         &self,
@@ -362,7 +364,8 @@ impl ConnectionMethods for MySqlConnection {
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<()> {
-        self.insert_or_replace_impl(table, columns, pkcol, values).await
+        self.insert_or_replace_impl(table, columns, pkcol, values)
+            .await
     }
     async fn update(
         &self,
@@ -387,7 +390,7 @@ impl ConnectionMethods for MySqlConnection {
 
 impl MySqlConnectionLike for MySqlTransaction<'_> {
     fn conn_ref(&self) -> &Mutex<mysql::Conn> {
-        &self.conn
+        self.conn
     }
 }
 
@@ -408,7 +411,8 @@ impl ConnectionMethods for MySqlTransaction<'_> {
         offset: Option<i32>,
         order: Option<&[query::Order]>,
     ) -> Result<RawQueryResult<'a>> {
-        self.query_impl(table, columns, expr, limit, offset, order).await
+        self.query_impl(table, columns, expr, limit, offset, order)
+            .await
     }
     async fn insert_returning_pk(
         &self,
@@ -417,7 +421,8 @@ impl ConnectionMethods for MySqlTransaction<'_> {
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
-        self.insert_returning_pk_impl(table, columns, pkcol, values).await
+        self.insert_returning_pk_impl(table, columns, pkcol, values)
+            .await
     }
     async fn insert_only(
         &self,
@@ -434,7 +439,8 @@ impl ConnectionMethods for MySqlTransaction<'_> {
         pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<()> {
-        self.insert_or_replace_impl(table, columns, pkcol, values).await
+        self.insert_or_replace_impl(table, columns, pkcol, values)
+            .await
     }
     async fn update(
         &self,
@@ -467,7 +473,9 @@ impl<'c> MySqlTransaction<'c> {
         conn.lock().await.query_drop("BEGIN").await?;
         Ok(MySqlTransaction {
             conn,
-            committed_or_rolled_back: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            committed_or_rolled_back: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(
+                false,
+            )),
         })
     }
 
@@ -487,7 +495,10 @@ impl Debug for MySqlTransaction<'_> {
 #[async_trait]
 impl<'c> BackendTransaction<'c> for MySqlTransaction<'c> {
     async fn commit(&mut self) -> Result<()> {
-        if self.committed_or_rolled_back.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        if self
+            .committed_or_rolled_back
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
             return Err(Self::already_consumed());
         }
         self.conn.lock().await.query_drop("COMMIT").await?;
@@ -495,7 +506,10 @@ impl<'c> BackendTransaction<'c> for MySqlTransaction<'c> {
     }
 
     async fn rollback(&mut self) -> Result<()> {
-        if self.committed_or_rolled_back.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        if self
+            .committed_or_rolled_back
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
             return Err(Self::already_consumed());
         }
         self.conn.lock().await.query_drop("ROLLBACK").await?;
@@ -509,8 +523,13 @@ impl<'c> BackendTransaction<'c> for MySqlTransaction<'c> {
 impl<'c> Drop for MySqlTransaction<'c> {
     fn drop(&mut self) {
         // If the transaction hasn't been explicitly committed or rolled back, warn and mark as rolled back
-        if !self.committed_or_rolled_back.swap(true, std::sync::atomic::Ordering::SeqCst) {
-            crate::warn!("Transaction dropped without explicit commit or rollback - this may lead to uncommitted changes");
+        if !self
+            .committed_or_rolled_back
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            crate::warn!(
+                "Transaction dropped without explicit commit or rollback - this may lead to uncommitted changes"
+            );
             // Unfortunately, we can't perform async operations in Drop
             // The user should explicitly call rollback() if they want to ensure rollback
         }
@@ -533,15 +552,7 @@ fn sqlvalref_to_mysql_value(v: &SqlValRef<'_>) -> mysql::Value {
         #[cfg(feature = "json")]
         Json(v) => mysql::Value::Bytes(v.to_string().as_bytes().to_vec()),
         #[cfg(feature = "datetime")]
-        Date(d) => mysql::Value::Date(
-            d.year() as u16,
-            d.month() as u8,
-            d.day() as u8,
-            0,
-            0,
-            0,
-            0,
-        ),
+        Date(d) => mysql::Value::Date(d.year() as u16, d.month() as u8, d.day() as u8, 0, 0, 0, 0),
         #[cfg(feature = "datetime")]
         Timestamp(dt) => mysql::Value::Date(
             dt.year() as u16,
@@ -566,15 +577,19 @@ fn mysql_value_to_sqlval(v: &mysql::Value, ty: &SqlType) -> Result<SqlVal> {
         (Bytes(b), SqlType::BigInt) => {
             // MySQL sometimes returns integers as bytes (especially for auto-increment)
             let s = String::from_utf8(b.clone()).map_err(|e| Error::Internal(e.to_string()))?;
-            let i = s.parse::<i64>().map_err(|e| Error::Internal(e.to_string()))?;
+            let i = s
+                .parse::<i64>()
+                .map_err(|e| Error::Internal(e.to_string()))?;
             Ok(SqlVal::BigInt(i))
-        },
+        }
         (Bytes(b), SqlType::Int) => {
             // MySQL sometimes returns integers as bytes
             let s = String::from_utf8(b.clone()).map_err(|e| Error::Internal(e.to_string()))?;
-            let i = s.parse::<i32>().map_err(|e| Error::Internal(e.to_string()))?;
+            let i = s
+                .parse::<i32>()
+                .map_err(|e| Error::Internal(e.to_string()))?;
             Ok(SqlVal::Int(i))
-        },
+        }
         (Float(f), SqlType::Real) => Ok(SqlVal::Real(*f as f64)),
         (Double(d), SqlType::Real) => Ok(SqlVal::Real(*d)),
         (Bytes(b), SqlType::Text) => Ok(SqlVal::Text(
@@ -612,9 +627,9 @@ fn mysql_value_to_sqlval(v: &mysql::Value, ty: &SqlType) -> Result<SqlVal> {
 
 impl BackendRow for mysql::Row {
     fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>> {
-        let value: mysql::Value = self.get(idx).ok_or_else(|| {
-            Error::Internal(format!("column index {} out of bounds", idx))
-        })?;
+        let value: mysql::Value = self
+            .get(idx)
+            .ok_or_else(|| Error::Internal(format!("column index {} out of bounds", idx)))?;
 
         let sqlval = mysql_value_to_sqlval(&value, &ty)?;
 
@@ -623,16 +638,10 @@ impl BackendRow for mysql::Row {
             SqlVal::Int(i) => Ok(SqlValRef::Int(i)),
             SqlVal::BigInt(i) => Ok(SqlValRef::BigInt(i)),
             SqlVal::Real(r) => Ok(SqlValRef::Real(r)),
-            SqlVal::Text(s) => {
-                Ok(SqlValRef::Text(Box::leak(s.into_boxed_str())))
-            }
-            SqlVal::Blob(b) => {
-                Ok(SqlValRef::Blob(Box::leak(b.into_boxed_slice())))
-            }
+            SqlVal::Text(s) => Ok(SqlValRef::Text(Box::leak(s.into_boxed_str()))),
+            SqlVal::Blob(b) => Ok(SqlValRef::Blob(Box::leak(b.into_boxed_slice()))),
             #[cfg(feature = "json")]
-            SqlVal::Json(v) => {
-                Ok(SqlValRef::Json(v))
-            }
+            SqlVal::Json(v) => Ok(SqlValRef::Json(v)),
             #[cfg(feature = "datetime")]
             SqlVal::Date(d) => Ok(SqlValRef::Date(d)),
             #[cfg(feature = "datetime")]
@@ -672,10 +681,10 @@ fn mysql_sql_for_expr<W>(
         },
         Expr::Placeholder => {
             w.write_str(&pls.next_placeholder()).unwrap();
-        },
+        }
         Expr::Condition(cond) => {
             mysql_sql_for_bool_expr(*cond, values, pls, w);
-        },
+        }
     }
 }
 
@@ -762,11 +771,14 @@ fn mysql_sql_for_bool_expr<W>(
             tbl2_col,
             expr,
         } => {
-            write!(w, "{} IN (SELECT {} FROM {} WHERE ",
+            write!(
+                w,
+                "{} IN (SELECT {} FROM {} WHERE ",
                 quote_mysql_identifier(col),
                 quote_mysql_identifier(tbl2_col),
                 quote_mysql_identifier(&tbl2)
-            ).unwrap();
+            )
+            .unwrap();
             mysql_sql_for_bool_expr(*expr, values, pls, w);
             write!(w, ")").unwrap();
         }
@@ -937,7 +949,19 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::RemoveTable(name) => Ok(drop_table(name)),
         Operation::RemoveTableConstraints(table) => remove_table_fkey_constraints(table),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
-        Operation::RemoveColumn(tbl, name) => Ok(remove_column(tbl, name)),
+        Operation::RemoveColumn(tbl, name) => {
+            // Check if the column has a foreign key constraint that needs to be dropped first
+            let has_fkey = if let Some(table) = current.get_table(tbl) {
+                if let Some(column) = table.column(name) {
+                    column.reference().is_some()
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            Ok(remove_column(tbl, name, has_fkey))
+        }
         Operation::ChangeColumn(tbl, old, new) => {
             let table = current.get_table(tbl);
             if let Some(table) = table {
@@ -1068,7 +1092,7 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<'_, str>> {
                         } else {
                             Cow::Borrowed("TEXT")
                         }
-                    },
+                    }
                     #[cfg(feature = "datetime")]
                     SqlType::Date => Cow::Borrowed("DATE"),
                     #[cfg(feature = "datetime")]
@@ -1082,7 +1106,7 @@ fn col_sqltype(col: &AColumn) -> Result<Cow<'_, str>> {
                         } else {
                             Cow::Borrowed("BLOB")
                         }
-                    },
+                    }
                     #[cfg(feature = "json")]
                     SqlType::Json => Cow::Borrowed("JSON"),
                     SqlType::Custom(_) => {
@@ -1115,12 +1139,28 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     Ok(result)
 }
 
-fn remove_column(tbl_name: &str, name: &str) -> String {
-    format!(
-        "ALTER TABLE {} DROP COLUMN {};",
-        quote_mysql_identifier(tbl_name),
-        quote_mysql_identifier(name)
-    )
+fn remove_column(tbl_name: &str, name: &str, has_fkey: bool) -> String {
+    if has_fkey {
+        // In MySQL, we need to drop foreign key constraints before dropping the column
+        // The constraint name follows the pattern: {table_name}_{column_name}_fkey
+        let constraint_name = format!("{}_{}_fkey", tbl_name, name);
+
+        // Drop the foreign key constraint first, then drop the column
+        format!(
+            "ALTER TABLE {} DROP FOREIGN KEY {};\nALTER TABLE {} DROP COLUMN {};",
+            quote_mysql_identifier(tbl_name),
+            quote_mysql_identifier(&constraint_name),
+            quote_mysql_identifier(tbl_name),
+            quote_mysql_identifier(name)
+        )
+    } else {
+        // No foreign key constraint, just drop the column
+        format!(
+            "ALTER TABLE {} DROP COLUMN {};",
+            quote_mysql_identifier(tbl_name),
+            quote_mysql_identifier(name)
+        )
+    }
 }
 
 fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String> {
@@ -1146,18 +1186,16 @@ fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String>
         ));
     }
 
-    if old.is_pk() != new.is_pk() {
-        if new.is_pk() {
-            stmts.push(format!(
-                "ALTER TABLE {} DROP PRIMARY KEY;",
-                quote_mysql_identifier(tbl_name)
-            ));
-            stmts.push(format!(
-                "ALTER TABLE {} ADD PRIMARY KEY ({});",
-                quote_mysql_identifier(tbl_name),
-                quote_mysql_identifier(new.name())
-            ));
-        }
+    if old.is_pk() != new.is_pk() && new.is_pk() {
+        stmts.push(format!(
+            "ALTER TABLE {} DROP PRIMARY KEY;",
+            quote_mysql_identifier(tbl_name)
+        ));
+        stmts.push(format!(
+            "ALTER TABLE {} ADD PRIMARY KEY ({});",
+            quote_mysql_identifier(tbl_name),
+            quote_mysql_identifier(new.name())
+        ));
     }
 
     if old.unique() != new.unique() {
@@ -1238,11 +1276,23 @@ pub fn sql_insert_or_replace_with_placeholders(
                 if !first {
                     write!(w, ", ").unwrap();
                 }
-                write!(w, "{} = VALUES({})", quote_mysql_identifier(c.name()), quote_mysql_identifier(c.name())).unwrap();
+                write!(
+                    w,
+                    "{} = VALUES({})",
+                    quote_mysql_identifier(c.name()),
+                    quote_mysql_identifier(c.name())
+                )
+                .unwrap();
                 false
             });
     } else {
-        write!(w, "{} = {}", quote_mysql_identifier(pkcol.name()), quote_mysql_identifier(pkcol.name())).unwrap();
+        write!(
+            w,
+            "{} = {}",
+            quote_mysql_identifier(pkcol.name()),
+            quote_mysql_identifier(pkcol.name())
+        )
+        .unwrap();
     }
 }
 

@@ -1,9 +1,7 @@
 //! Integration tests for MySQL support
 #![cfg(feature = "mysql")]
 
-use butane_test_helper::{
-    mysql_connspec, mysql_connstr, mysql_setup, mysql_teardown, SetupData,
-};
+use butane_test_helper::{mysql_connspec, mysql_connstr, mysql_setup, mysql_teardown, SetupData};
 
 /// Helper to check if mysqld is available
 fn is_mysqld_available() -> bool {
@@ -90,7 +88,10 @@ async fn multiple_servers() {
     let conn2 = mysql_connstr(&setup2);
 
     // Should have different ports or sockets
-    assert_ne!(conn1, conn2, "Each server should have unique connection details");
+    assert_ne!(
+        conn1, conn2,
+        "Each server should have unique connection details"
+    );
 
     println!("Server 1: {}", conn1);
     println!("Server 2: {}", conn2);

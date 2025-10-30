@@ -843,6 +843,8 @@ async fn debug_connection(conn: ConnectionAsync) {
         assert!(debug_str.contains("conn: true"));
     } else if backend_name == "turso" {
         assert!(debug_str.contains("TursoConnection"));
+    } else if backend_name == "mysql" {
+        assert!(debug_str.contains("MySqlConnection"));
     } else {
         assert!(debug_str.contains("path: Some(\"\")"));
     }
@@ -930,4 +932,103 @@ async fn turso_debug_connection(conn: ConnectionAsync) {
         let debug_str = format!("{conn:?}");
         assert!(debug_str.contains("TursoConnection"));
     }
+}
+
+#[cfg(feature = "mysql")]
+#[test]
+fn uri_mysql_basic() {
+    let uri = "mysql://root@localhost:3306/test";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name(), "mysql");
+    assert_eq!(spec.connection_string(), uri);
+
+    let uri = spec.connection_string_uri().unwrap();
+    assert_eq!(uri.scheme(), "mysql");
+    assert_eq!(uri.username(), "root");
+    assert_eq!(uri.host_str(), Some("localhost"));
+    assert_eq!(uri.port(), Some(3306));
+    assert_eq!(uri.path(), "/test");
+}
+
+#[cfg(feature = "mysql")]
+#[test]
+fn uri_mysql_with_password() {
+    let uri = "mysql://user:password@localhost:3306/mydb";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name(), "mysql");
+    assert_eq!(spec.connection_string(), uri);
+
+    let uri = spec.connection_string_uri().unwrap();
+    assert_eq!(uri.scheme(), "mysql");
+    assert_eq!(uri.username(), "user");
+    assert_eq!(uri.password(), Some("password"));
+    assert_eq!(uri.host_str(), Some("localhost"));
+    assert_eq!(uri.port(), Some(3306));
+    assert_eq!(uri.path(), "/mydb");
+}
+
+#[cfg(feature = "mysql")]
+#[test]
+fn uri_mysql_default_port() {
+    let uri = "mysql://root@localhost/test";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name(), "mysql");
+    assert_eq!(spec.connection_string(), uri);
+
+    let uri = spec.connection_string_uri().unwrap();
+    assert_eq!(uri.scheme(), "mysql");
+    assert_eq!(uri.username(), "root");
+    assert_eq!(uri.host_str(), Some("localhost"));
+    assert_eq!(uri.port(), None); // Default port not specified in URI
+    assert_eq!(uri.path(), "/test");
+}
+
+#[cfg(feature = "mysql")]
+#[test]
+fn uri_mysql_with_socket() {
+    let uri = "mysql://root@localhost/test?socket=/tmp/mysql.sock";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name(), "mysql");
+    assert_eq!(spec.connection_string(), uri);
+
+    let uri = spec.connection_string_uri().unwrap();
+    assert_eq!(uri.scheme(), "mysql");
+    assert_eq!(uri.username(), "root");
+    assert_eq!(uri.host_str(), Some("localhost"));
+    assert_eq!(uri.path(), "/test");
+
+    // Check that the socket parameter is preserved
+    let query_pairs: std::collections::HashMap<_, _> = uri.query_pairs().collect();
+    assert_eq!(
+        query_pairs.get("socket"),
+        Some(&std::borrow::Cow::Borrowed("/tmp/mysql.sock"))
+    );
+}
+
+#[cfg(feature = "mysql")]
+#[test]
+fn uri_mysql_with_options() {
+    let uri = "mysql://user:pass@host:3307/database?charset=utf8mb4&ssl_mode=required";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name(), "mysql");
+    assert_eq!(spec.connection_string(), uri);
+
+    let uri = spec.connection_string_uri().unwrap();
+    assert_eq!(uri.scheme(), "mysql");
+    assert_eq!(uri.username(), "user");
+    assert_eq!(uri.password(), Some("pass"));
+    assert_eq!(uri.host_str(), Some("host"));
+    assert_eq!(uri.port(), Some(3307));
+    assert_eq!(uri.path(), "/database");
+
+    // Check that options are preserved
+    let query_pairs: std::collections::HashMap<_, _> = uri.query_pairs().collect();
+    assert_eq!(
+        query_pairs.get("charset"),
+        Some(&std::borrow::Cow::Borrowed("utf8mb4"))
+    );
+    assert_eq!(
+        query_pairs.get("ssl_mode"),
+        Some(&std::borrow::Cow::Borrowed("required"))
+    );
 }

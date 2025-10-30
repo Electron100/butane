@@ -1,0 +1,3 @@
+CREATE TABLE RowidTest (
+`rowid` INT NOT NULL PRIMARY KEY
+);

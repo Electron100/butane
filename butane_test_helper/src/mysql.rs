@@ -46,10 +46,7 @@ impl MySqlSetupData {
     /// Get the connection string for this MySQL instance.
     pub fn connection_string(&self) -> String {
         if let Some(socket) = &self.socket {
-            format!(
-                "mysql://root@localhost/test?socket={}",
-                socket.display()
-            )
+            format!("mysql://root@localhost/test?socket={}", socket.display())
         } else {
             format!("mysql://root@localhost:{}/test", self.port)
         }
@@ -117,11 +114,15 @@ pub fn mysql_tmp_server_create() -> Result<MySqlSetupData, MySqlTemporaryServerE
     let port = find_available_port();
     let socket_path = data_path.join("mysql.sock");
 
-    log::info!("Starting MySQL server on port {} with socket {:?}", port, socket_path);
+    log::info!(
+        "Starting MySQL server on port {} with socket {:?}",
+        port,
+        socket_path
+    );
 
     // Start MySQL server
     let server_cmd = Command::new("mysqld")
-        .current_dir(data_path)  // Set working directory to data directory
+        .current_dir(data_path) // Set working directory to data directory
         .args([
             "--datadir",
             data_path.to_str().unwrap(),
@@ -248,7 +249,10 @@ fn find_available_port() -> u16 {
     use std::net::TcpListener;
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to port 0");
-    let port = listener.local_addr().expect("Failed to get local address").port();
+    let port = listener
+        .local_addr()
+        .expect("Failed to get local address")
+        .port();
     drop(listener);
     port
 }
@@ -262,9 +266,7 @@ pub fn cleanup_orphaned_mysql_processes() {
     log::info!("Cleaning up any orphaned MySQL test processes");
 
     // Find MySQL processes running in temp directories
-    let output = Command::new("ps")
-        .args(["aux"])
-        .output();
+    let output = Command::new("ps").args(["aux"]).output();
 
     if let Ok(output) = output {
         let output_str = String::from_utf8_lossy(&output.stdout);
@@ -273,15 +275,21 @@ pub fn cleanup_orphaned_mysql_processes() {
         let mysql_processes: Vec<(u32, String)> = output_str
             .lines()
             .filter(|line| {
-                line.contains("mysqld") &&
-                (line.contains("/tmp") || line.contains("/var/folders/") || line.contains(".tmp"))
+                line.contains("mysqld")
+                    && (line.contains("/tmp")
+                        || line.contains("/var/folders/")
+                        || line.contains(".tmp"))
             })
             .filter_map(|line| {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() > 1 {
                     if let Ok(pid) = parts[1].parse::<u32>() {
                         // Extract the full command line to get the data directory
-                        let command_line = line.split_whitespace().skip(10).collect::<Vec<_>>().join(" ");
+                        let command_line = line
+                            .split_whitespace()
+                            .skip(10)
+                            .collect::<Vec<_>>()
+                            .join(" ");
                         return Some((pid, command_line));
                     }
                 }
@@ -311,29 +319,33 @@ pub fn cleanup_orphaned_mysql_processes() {
             };
 
             if is_orphaned {
-                log::warn!("Killing orphaned MySQL process with PID: {} (data dir: {:?})", pid, data_dir);
+                log::warn!(
+                    "Killing orphaned MySQL process with PID: {} (data dir: {:?})",
+                    pid,
+                    data_dir
+                );
                 let _ = Command::new("kill")
-                    .args(["-TERM", &pid.to_string()])  // Try graceful termination first
+                    .args(["-TERM", &pid.to_string()]) // Try graceful termination first
                     .output();
 
                 // Give it a moment to terminate gracefully
                 std::thread::sleep(std::time::Duration::from_millis(100));
 
                 // Check if it's still running and force kill if necessary
-                let check_output = Command::new("ps")
-                    .args(["-p", &pid.to_string()])
-                    .output();
+                let check_output = Command::new("ps").args(["-p", &pid.to_string()]).output();
 
                 if let Ok(check) = check_output {
                     if check.status.success() {
                         log::warn!("Process {} still running, force killing", pid);
-                        let _ = Command::new("kill")
-                            .args(["-9", &pid.to_string()])
-                            .output();
+                        let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
                     }
                 }
             } else {
-                log::debug!("MySQL process {} appears to be active (data dir exists: {:?})", pid, data_dir);
+                log::debug!(
+                    "MySQL process {} appears to be active (data dir exists: {:?})",
+                    pid,
+                    data_dir
+                );
             }
         }
     }

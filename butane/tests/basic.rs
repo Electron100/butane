@@ -11,13 +11,13 @@ use chrono::{
     offset::Utc,
     DateTime,
 };
+#[cfg(feature = "mysql")]
+use mysql_async;
 #[cfg(feature = "sqlite")]
 use rusqlite;
 use std::ops::Deref;
 #[cfg(feature = "pg")]
 use tokio_postgres as postgres;
-#[cfg(feature = "mysql")]
-use mysql_async;
 
 #[butane_type]
 pub type Whatsit = String;
@@ -356,8 +356,7 @@ async fn basic_unique_field_error_on_non_unique(conn: ConnectionAsync) {
             if e.code() == Some(&postgres::error::SqlState::UNIQUE_VIOLATION) =>
             true,
         #[cfg(feature = "mysql")]
-        butane::Error::MySQL(mysql_async::Error::Server(ref err))
-            if err.code == 1062 => true, // MySQL duplicate entry error code
+        butane::Error::MySQL(mysql_async::Error::Server(ref err)) if err.code == 1062 => true, // MySQL duplicate entry error code
         #[cfg(feature = "turso")]
         butane::Error::Internal(msg) if msg.contains("UNIQUE constraint failed") => true,
         _ => {

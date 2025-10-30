@@ -1,0 +1,2 @@
+ALTER TABLE Post DROP FOREIGN KEY Post_byline_fkey;
+DROP TABLE Post;

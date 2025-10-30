@@ -31,10 +31,10 @@ use std::sync::{LazyLock, Mutex};
 
 #[cfg(feature = "pg")]
 use block_id::{Alphabet, BlockId};
-#[cfg(feature = "pg")]
-use butane_core::db::pg::PgBackend;
 #[cfg(feature = "mysql")]
 use butane_core::db::mysql::MySqlBackend;
+#[cfg(feature = "pg")]
+use butane_core::db::pg::PgBackend;
 #[cfg(feature = "sqlite")]
 use butane_core::db::sqlite;
 #[cfg(feature = "sqlite")]
@@ -68,7 +68,9 @@ pub use crate::pg::{pg_tmp_server_create_ephemeralpg, PgTemporaryServerError};
 
 // Re-export types from mysql module
 #[cfg(feature = "mysql")]
-pub use crate::mysql::{mysql_tmp_server_create, MySqlTemporaryServerError, cleanup_orphaned_mysql_processes};
+pub use crate::mysql::{
+    cleanup_orphaned_mysql_processes, mysql_tmp_server_create, MySqlTemporaryServerError,
+};
 
 /// Trait for running a test.
 #[allow(async_fn_in_trait)] // Not truly public, only used in butane for testing.
@@ -202,7 +204,9 @@ impl BackendTestInstance for MySqlTestInstance {
         let setup_data = mysql_setup_sync();
         let connstr = setup_data.connection_string();
         log::info!("connecting to {}..", connstr);
-        let mut conn = backend.connect(connstr).expect("Could not connect mysql backend");
+        let mut conn = backend
+            .connect(connstr)
+            .expect("Could not connect mysql backend");
         if migrate {
             setup_db(&mut conn);
         }

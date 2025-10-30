@@ -35,10 +35,17 @@ async fn insert_data(connection: &Connection) {
     }
 
     // This works because the table name is quoted.
-    connection
-        .execute("SELECT id, email from \"User\"")
-        .await
-        .unwrap();
+    if connection.backend_name() == "mysql" {
+        connection
+            .execute("SELECT id, email from `User`")
+            .await
+            .unwrap();
+    } else {
+        connection
+            .execute("SELECT id, email from \"User\"")
+            .await
+            .unwrap();
+    }
 
     let mut user = User::new("1", "Joe Bloggs", "bloggs@example.com");
     user.save(connection).await.unwrap();

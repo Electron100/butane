@@ -376,7 +376,7 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       },
       "from": "20240401_095709389_init",
       "up": {
-        "mysql": "ALTER TABLE Post_tags_Many DROP FOREIGN KEY Post_tags_Many_owner_fkey;\nALTER TABLE Post_tags_Many DROP FOREIGN KEY Post_tags_Many_has_fkey;\nDROP TABLE Post_tags_Many;\nDROP TABLE `Tag`;\nALTER TABLE Post ADD COLUMN tags JSON NOT NULL DEFAULT null;\n",
+        "mysql": "ALTER TABLE Post_tags_Many DROP FOREIGN KEY Post_tags_Many_owner_fkey;\nALTER TABLE Post_tags_Many DROP FOREIGN KEY Post_tags_Many_has_fkey;\nDROP TABLE Post_tags_Many;\nDROP TABLE `Tag`;\nALTER TABLE Post ADD COLUMN tags JSON NOT NULL DEFAULT ('[]');\n",
         "pg": "ALTER TABLE Post_tags_Many DROP CONSTRAINT Post_tags_Many_owner_fkey;\nALTER TABLE Post_tags_Many DROP CONSTRAINT Post_tags_Many_has_fkey;\nDROP TABLE Post_tags_Many;\nDROP TABLE \"Tag\";\nALTER TABLE Post ADD COLUMN tags JSONB NOT NULL DEFAULT null;\n",
         "sqlite": "DROP TABLE Post_tags_Many;\nDROP TABLE \"Tag\";\nALTER TABLE Post ADD COLUMN tags TEXT NOT NULL DEFAULT null;\n",
         "turso": "DROP TABLE Post_tags_Many;\nDROP TABLE \"Tag\";\nALTER TABLE Post ADD COLUMN tags TEXT NOT NULL DEFAULT null;\n"

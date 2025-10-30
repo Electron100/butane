@@ -51,6 +51,9 @@ mod macros;
 #[cfg(feature = "pg")]
 pub mod pg;
 
+#[cfg(feature = "mysql")]
+pub mod mysql;
+
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
@@ -743,6 +746,8 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
         sqlite::BACKEND_NAME => Some(Box::new(sqlite::SQLiteBackend::new())),
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
+        #[cfg(feature = "mysql")]
+        mysql::BACKEND_NAME => Some(Box::new(mysql::MySqlBackend::new())),
         #[cfg(feature = "turso")]
         turso::BACKEND_NAME => Some(Box::new(turso::TursoBackend)),
         _ => None,

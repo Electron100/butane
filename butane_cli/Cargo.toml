@@ -23,6 +23,7 @@ default = ["pg", "sqlite", "turso"]
 pg = ["butane/pg"]
 sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]
+mysql = ["butane/mysql"]
 turso = ["butane/turso"]
 
 [dependencies]

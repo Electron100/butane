@@ -32,6 +32,8 @@ async fn debug_transaction_before_consuming(mut conn: ConnectionAsync) {
         assert!(format!("{:?}", tr).contains("{ trans: true }"));
     } else if backend_name == "turso" {
         assert!(format!("{:?}", tr).contains("TursoTransaction"));
+    } else if backend_name == "mysql" {
+        assert!(format!("{:?}", tr).contains("MySqlTransaction"));
     } else {
         assert!(format!("{:?}", tr).contains("path: Some(\"\")"));
     }

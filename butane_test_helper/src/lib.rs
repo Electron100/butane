@@ -68,7 +68,7 @@ pub use crate::pg::{pg_tmp_server_create_ephemeralpg, PgTemporaryServerError};
 
 // Re-export types from mysql module
 #[cfg(feature = "mysql")]
-pub use crate::mysql::{mysql_tmp_server_create, MySqlTemporaryServerError};
+pub use crate::mysql::{mysql_tmp_server_create, MySqlTemporaryServerError, cleanup_orphaned_mysql_processes};
 
 /// Trait for running a test.
 #[allow(async_fn_in_trait)] // Not truly public, only used in butane for testing.

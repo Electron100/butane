@@ -510,7 +510,7 @@ impl<'c> Drop for MySqlTransaction<'c> {
     fn drop(&mut self) {
         // If the transaction hasn't been explicitly committed or rolled back, warn and mark as rolled back
         if !self.committed_or_rolled_back.swap(true, std::sync::atomic::Ordering::SeqCst) {
-            log::warn!("Transaction dropped without explicit commit or rollback - this may lead to uncommitted changes");
+            crate::warn!("Transaction dropped without explicit commit or rollback - this may lead to uncommitted changes");
             // Unfortunately, we can't perform async operations in Drop
             // The user should explicitly call rollback() if they want to ensure rollback
         }

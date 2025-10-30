@@ -51,6 +51,11 @@ async fn ordered_schema_field(conn: ConnectionAsync) {
 
 #[butane_test]
 async fn ordered_by_insertion(conn: ConnectionAsync) {
+    // Skip this test for MySQL - it doesn't have a built-in row ID column
+    if conn.backend_name() == "mysql" {
+        return;
+    }
+
     let backend = conn.backend();
     let insertion_id_column = backend.row_id_column().unwrap();
     blog::setup_blog(&conn).await;

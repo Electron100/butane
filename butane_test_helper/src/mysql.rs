@@ -95,6 +95,12 @@ pub fn mysql_tmp_server_create() -> Result<MySqlSetupData, MySqlTemporaryServerE
             "--initialize-insecure",
             "--datadir",
             data_path.to_str().unwrap(),
+            "--log-error-verbosity=1",
+            "--skip-log-error",
+            "--skip-log-bin",
+            "--skip-slow-query-log",
+            "--skip-general-log",
+            "--innodb-redo-log-capacity=0",
         ])
         .output()?;
 
@@ -134,6 +140,14 @@ pub fn mysql_tmp_server_create() -> Result<MySqlSetupData, MySqlTemporaryServerE
             data_path.join("mysql.pid").to_str().unwrap(),
             "--skip-networking=0",
             "--bind-address=127.0.0.1",
+            "--log-error-verbosity=1",
+            "--skip-log-error",
+            "--skip-log-bin",
+            "--skip-slow-query-log",
+            "--skip-general-log",
+            "--skip-grant-tables",
+            "--innodb-redo-log-capacity=0",
+            "--innodb-fast-shutdown=2",
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -186,25 +200,43 @@ pub fn mysql_tmp_server_create() -> Result<MySqlSetupData, MySqlTemporaryServerE
             )));
         }
 
-        // Try to connect using mysqladmin
-        let ping = Command::new("mysqladmin")
-            .args([
-                "ping",
-                "-h",
-                "127.0.0.1",
-                "-P",
-                &port.to_string(),
-                "-u",
-                "root",
-            ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+        // Try to connect using socket if available, otherwise TCP
+        let ping = if let Some(socket) = &socket_path.to_str() {
+            Command::new("mysql")
+                .args(["--socket", socket, "-u", "root", "-e", "SELECT 1"])
+                .output()
+        } else {
+            Command::new("mysql")
+                .args([
+                    "-h",
+                    "127.0.0.1",
+                    "-P",
+                    &port.to_string(),
+                    "-u",
+                    "root",
+                    "-e",
+                    "SELECT 1",
+                ])
+                .output()
+        };
 
-        if let Ok(status) = ping {
-            if status.success() {
-                log::info!("MySQL server is ready");
-                break;
+        match ping {
+            Ok(output) => {
+                if output.status.success() {
+                    log::info!("MySQL server is ready");
+                    break;
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    log::debug!("mysql ping failed: {}", stderr);
+                }
+            }
+            Err(e) => {
+                log::debug!(
+                    "mysql ping command failed: {}, attempt {}/{}",
+                    e,
+                    attempts + 1,
+                    max_attempts
+                );
             }
         }
 
@@ -212,19 +244,32 @@ pub fn mysql_tmp_server_create() -> Result<MySqlSetupData, MySqlTemporaryServerE
         attempts += 1;
     }
 
-    // Create test database
-    let create_db = Command::new("mysql")
-        .args([
-            "-h",
-            "127.0.0.1",
-            "-P",
-            &port.to_string(),
-            "-u",
-            "root",
-            "-e",
-            "CREATE DATABASE IF NOT EXISTS test;",
-        ])
-        .output()?;
+    // Create test database using the same connection method we used for health checks
+    let create_db = if let Some(socket) = &socket_path.to_str() {
+        Command::new("mysql")
+            .args([
+                "--socket",
+                socket,
+                "-u",
+                "root",
+                "-e",
+                "CREATE DATABASE IF NOT EXISTS test;",
+            ])
+            .output()?
+    } else {
+        Command::new("mysql")
+            .args([
+                "-h",
+                "127.0.0.1",
+                "-P",
+                &port.to_string(),
+                "-u",
+                "root",
+                "-e",
+                "CREATE DATABASE IF NOT EXISTS test;",
+            ])
+            .output()?
+    };
 
     if !create_db.status.success() {
         let stderr = String::from_utf8_lossy(&create_db.stderr);

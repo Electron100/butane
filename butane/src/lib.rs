@@ -7,6 +7,7 @@
 #![deny(missing_docs)]
 
 pub use butane_codegen::{butane_type, dataresult, model, FieldType, PrimaryKeyType};
+#[cfg(feature = "pg")]
 pub use butane_core::custom;
 pub use butane_core::fkey::{ForeignKey, ForeignKeyOpsSync};
 pub use butane_core::many::{Many, ManyOpsSync};

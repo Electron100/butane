@@ -535,6 +535,7 @@ fn sqlvalref_to_sqlite<'a>(valref: &SqlValRef<'a>) -> rusqlite::types::ToSqlOutp
             Owned(Value::Text(f.to_string()))
         }
         Null => Owned(Value::Null),
+        #[cfg(feature = "pg")]
         Custom(_) => panic!("Custom types not supported in sqlite"),
     }
 }
@@ -653,6 +654,7 @@ fn sql_valref_from_rusqlite<'a>(
             SQLITE_DT_FORMAT,
         )?),
         SqlType::Blob => SqlValRef::Blob(val.as_blob()?),
+        #[cfg(feature = "pg")]
         SqlType::Custom(v) => return Err(Error::IncompatibleCustomT(v.clone(), BACKEND_NAME)),
     })
 }
@@ -775,6 +777,7 @@ fn sqltype(ty: &SqlType) -> &'static str {
         SqlType::Date => "TEXT",
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => "TEXT",
+        #[cfg(feature = "pg")]
         SqlType::Custom(_) => panic!("Custom types not supported by sqlite backend"),
     }
 }

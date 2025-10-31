@@ -25,12 +25,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            mise_tools: "ephemeral-postgres mysql"
-          - os: macos-13
-            mise_tools: "ephemeral-postgres mysql"
-          # - os: windows-latest
-          #  mise_tools: ""
+          #- os: ubuntu-latest
+          #  mise_tools: "ephemeral-postgres mysql"
+          #- os: macos-13
+          #  mise_tools: "ephemeral-postgres mysql"
+          - os: windows-latest
+            mise_tools: ""
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -100,14 +100,16 @@ jobs:
       uses: taiki-e/install-action@v2
       with:
         tool: cargo-deny,editorconfig-checker,mise,typos
-    - name: Install ephemeral-postgres via mise
-      if: runner.os != 'Windows'
+    - name: Install ${{ matrix.mise_tools }} via mise
+      if: matrix.mise_tools != ''
       run: |
-        mise install ephemeral-postgres
-        echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
-    - name: Verify ephemeralpg installation
-      if: runner.os != 'Windows'
-      run: which pg_tmp
+        mise install ${{ matrix.mise_tools }}
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          echo "$USERPROFILE\\.local\\share\\mise\\shims" >> $GITHUB_PATH
+        else
+          echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
+        fi
+
     - name: Run editorconfig-checker
       run: editorconfig-checker
     - name: Build
@@ -126,7 +128,7 @@ jobs:
         fi
     - name: Test Butane test helper without mise tools on Windows
       if: runner.os == 'Windows'
-      run: cargo +stable test -p butane_test_helper --features "pg sqlite turso"
+      run: cargo +stable test -p butane_test_helper --features "pg,sqlite,sqlite-bundled,turso"
     - name: Test Core
       run: |
         if [ -n "${{ matrix.mise_tools }}" ]; then

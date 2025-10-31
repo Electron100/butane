@@ -21,6 +21,9 @@ struct Cli {
     path: PathBuf,
     #[command(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
+    #[cfg(feature = "clap-markdown")]
+    #[arg(long, hide = true)]
+    markdown_help: bool,
 }
 
 #[derive(Subcommand)]
@@ -137,6 +140,12 @@ enum DeleteCommands {
 
 fn main() {
     let cli = Cli::parse();
+
+    #[cfg(feature = "clap-markdown")]
+    if cli.markdown_help {
+        clap_markdown::print_help_markdown::<Cli>();
+        std::process::exit(0);
+    }
 
     env_logger::Builder::new()
         .filter_level(cli.verbose.log_level_filter())

@@ -42,3 +42,7 @@ indent_size = unset
 [LICENSE-APACHE.txt]
 indent_size = unset
 indent_style = unset
+
+[HELP.md]
+max_line_length = 400
+trim_trailing_whitespace = false

@@ -14,6 +14,7 @@ implementation detail to the API consumer.
 ## Features
 
 * Relational queries using Rust-like syntax (via `proc-macro`s)
+* CLI to manage and deploy migrations. See [HELP.md].
 * Automatic migrations without writing SQL (although the generated SQL
   may be hand-tuned if necessary)
 * Ability to embed migrations in Rust code (so that a library may easily bundle its migrations)

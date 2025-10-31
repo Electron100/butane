@@ -7,15 +7,16 @@ use crate::db::{BackendConnection, ConnectionMethods};
 use crate::query::{BoolExpr, Expr};
 use crate::{sqlval::ToSql, DataObject, DataResult, Error, Result};
 
-/// Type representing a database migration. A migration describes how
-/// to bring the database from state A to state B. In general, the
-/// methods on this type are persistent -- they read from and write to
-/// the filesystem.
+/// Type representing a database migration.
+///
+/// A migration describes how to bring the database from state A to state B.
+/// In general, the methods on this type are persistent -- they read from
+/// and write to the filesystem.
 ///
 /// A Migration cannot be constructed directly, only retrieved from
-/// [Migrations][crate::migrations::Migrations].
+/// [`Migrations`](crate::migrations::Migrations).
 pub trait Migration: Debug + PartialEq {
-    /// Retrieves the full abstract database state describing all tables
+    /// Retrieves the full abstract database state describing all tables.
     fn db(&self) -> Result<ADB>;
 
     /// Get the name of the migration before this one (if any).
@@ -35,9 +36,10 @@ pub trait Migration: Debug + PartialEq {
     /// The names of the backends this migration has sql for.
     fn sql_backends(&self) -> Result<Vec<String>>;
 
-    /// Apply the migration to a database connection. The connection
-    /// must be for the same type of database as this and the database
-    /// must be in the state of the migration prior to this one
+    /// Apply the migration to a database connection.
+    ///
+    /// The connection must be for the same type of database as this and the database
+    /// must be in the state of the migration prior to this one.
     fn apply(&self, conn: &mut impl BackendConnection) -> Result<()> {
         let backend_name = conn.backend_name();
         let tx = conn.transaction()?;
@@ -49,8 +51,9 @@ pub trait Migration: Debug + PartialEq {
         tx.commit()
     }
 
-    /// Mark the migration as being applied without doing any
-    /// work. Use carefully -- the caller must ensure that the
+    /// Mark the migration as being applied without doing any work.
+    ///
+    /// Use carefully -- the caller must ensure that the
     /// database schema already matches that expected by this
     /// migration.
     fn mark_applied(&self, conn: &impl ConnectionMethods) -> Result<()> {
@@ -61,9 +64,9 @@ pub trait Migration: Debug + PartialEq {
         )
     }
 
-    /// Un-apply (downgrade) the migration to a database
-    /// connection. The connection must be for the same type of
-    /// database as this and this must be the latest migration applied
+    /// Un-apply (downgrade) the migration to a database connection.
+    ///
+    /// The connection must be for the same type of database as this and this must be the latest migration applied
     /// to the database.
     fn downgrade(&self, conn: &mut impl BackendConnection) -> Result<()> {
         let backend_name = conn.backend_name();
@@ -81,10 +84,11 @@ pub trait Migration: Debug + PartialEq {
     }
 }
 
-/// A migration which can be modified
+/// Mutable migration.
 pub trait MigrationMut: Migration {
-    /// Adds an abstract table to the migration. The table state should
-    /// represent the expected state after the migration has been
+    /// Adds an abstract table to the migration.
+    ///
+    /// The table state should represent the expected state after the migration has been
     /// applied. It is expected that all tables will be added to the
     /// migration in this fashion, if they were modified in this migration.
     fn add_modified_table(&mut self, table: &ATable) -> Result<()>;

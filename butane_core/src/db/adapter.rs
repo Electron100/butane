@@ -42,8 +42,10 @@ impl AsyncAdapterEnv {
         }
     }
 
-    /// Invokes a blocking function `func` as if it were async. This
-    /// is implemented by running it on the special thread created when the `AsyncAdapterEnv` was created.
+    /// Invokes a blocking function `func` as if it were async.
+    ///
+    /// This is implemented by running it on the special thread created
+    /// when the `AsyncAdapterEnv` was created.
     async fn invoke<'c, 's, 'result, F, T, U>(
         &'s self,
         context: &SyncSendPtrMut<T>,
@@ -153,8 +155,9 @@ impl Drop for AsyncAdapterEnv {
     }
 }
 
-/// Wrapper around a raw pointer that we assert is [Send].  Needless to
-/// say, this requires care. See comments on `AsyncAdapterEnv::invoke`
+/// Wrapper around a raw pointer that we assert is [Send].
+///
+/// Needless to say, this requires care. See comments on `AsyncAdapterEnv::invoke`
 /// for why we believe this to be sound.
 struct SendPtr<T: ?Sized> {
     inner: *const T,
@@ -166,7 +169,7 @@ impl<T: ?Sized> SendPtr<T> {
 }
 unsafe impl<T: ?Sized> Send for SendPtr<T> {}
 
-/// Like [SendPtrMut] but we also assert that it is [Sync]
+/// Like [`SendPtrMut`] but we also assert that it is [Sync].
 struct SyncSendPtrMut<T: ?Sized> {
     inner: *mut T,
 }
@@ -205,7 +208,7 @@ pub(super) struct AsyncAdapter<T: ?Sized> {
 }
 
 impl<T: ?Sized> AsyncAdapter<T> {
-    /// Create a new AsyncAdapter with the given context and using the same `env` as self. Not a public method.
+    /// Create an AsyncAdapter with the given context using the same `env` as self.
     fn create_with_same_env<U: ?Sized>(&self, context_ptr: SyncSendPtrMut<U>) -> AsyncAdapter<U> {
         AsyncAdapter {
             env: self.env.clone(),
@@ -248,7 +251,7 @@ impl<T: ?Sized> AsyncAdapter<T> {
 }
 
 impl<T> AsyncAdapter<T> {
-    /// Create a new async adapter using `create_context` to create an instance of the inner type `T`.
+    /// Create an async adapter using `create_context` to create the inner type `T`.
     pub(super) fn new<F>(create_context: F) -> Result<Self>
     where
         Self: Sized,
@@ -389,8 +392,9 @@ where
         ok_or_panic_with_adapter_error(self.invoke_blocking(|conn| Ok(conn.backend_name())))
     }
 
-    /// Tests if the connection has been closed. Backends which do not
-    /// support this check should return false.
+    /// Tests if the connection has been closed.
+    ///
+    /// Backends which do not support this check should return false.
     fn is_closed(&self) -> bool {
         ok_or_panic_with_adapter_error(self.invoke_blocking(|conn| Ok(conn.is_closed())))
     }
@@ -442,8 +446,9 @@ where
     }
 }
 
-/// Create an async connection using the synchronous `connect` method of `backend`. Use this when authoring
-/// a backend which doesn't natively support async.
+/// Create an async connection via the synchronous `connect` method.
+///
+/// Use this when authoring a backend which doesn't natively support async.
 pub async fn connect_async_via_sync<B>(backend: &B, conn_str: &str) -> Result<ConnectionAsync>
 where
     B: Backend + Clone + 'static,

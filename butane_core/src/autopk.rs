@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql};
 
-/// Wrapper around a [PrimaryKeyType] to indicate the the primary key
-/// will be initialized automatically when the object is created in
+/// Wrapper around a [`PrimaryKeyType`] to indicate the primary key will be initialized automatically.
+///
+/// The primary key will be initialized automatically when the object is created in
 /// the database.
 /// Dereferences to an `Option<T>`.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -17,7 +18,7 @@ pub struct AutoPk<T: PrimaryKeyType> {
 }
 
 impl<T: PrimaryKeyType> AutoPk<T> {
-    /// Create an uninitialized value for an object which has not yet been saved.
+    /// Create an uninitialized value for unsaved objects.
     pub fn uninitialized() -> Self
     where
         T: Default,
@@ -25,8 +26,9 @@ impl<T: PrimaryKeyType> AutoPk<T> {
         Self::default()
     }
 
-    /// Create an initialized primary key value for a previously saved
-    /// object. You do not usually need to call this directly (it will
+    /// Create an initialized primary key value for a previously saved object.
+    ///
+    /// You do not usually need to call this directly (it will
     /// happen implicitly when you load from the database).
     fn with_value(val: T) -> Self {
         AutoPk { inner: Some(val) }
@@ -53,11 +55,12 @@ impl<T: PrimaryKeyType> FromSql for AutoPk<T> {
         Ok(AutoPk::with_value(T::from_sql_ref(val)?))
     }
 
-    /// Used to convert a SqlVal into another type. The default
-    /// implementation calls `Self::from_sql_ref(val.as_ref())`, which
-    /// may be inefficient. This method is chiefly used only for
-    /// primary keys: a more efficient implementation is unlikely to
-    /// provide benefits for types not used as primary keys.
+    /// Used to convert a SqlVal into another type.
+    ///
+    /// The default implementation calls `Self::from_sql_ref(val.as_ref())`,
+    /// which may be inefficient. This method is chiefly used only for primary
+    /// keys: a more efficient implementation is unlikely to provide benefits
+    /// for types not used as primary keys.
     fn from_sql(val: SqlVal) -> Result<Self>
     where
         Self: Sized,

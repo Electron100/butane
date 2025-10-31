@@ -45,10 +45,11 @@ impl<T> Many<T>
 where
     T: DataObject,
 {
-    /// Constructs a new Many. `init` must be called before it can be
-    /// loaded or saved (or those methods will return
-    /// `Error::NotInitialized`). `init` will automatically be called
-    /// when a [`DataObject`] with a `Many` field is loaded or saved.
+    /// Constructs a new Many.
+    ///
+    /// `init` must be called before it can be loaded or saved (or those
+    /// methods will return `Error::NotInitialized`). `init` will automatically
+    /// be called when a [`DataObject`] with a `Many` field is loaded or saved.
     ///
     /// [`DataObject`]: super::DataObject
     pub fn new() -> Self {
@@ -91,7 +92,7 @@ where
         Ok(())
     }
 
-    /// Removes a value, yet to be performed in the backend
+    /// Removes a value, yet to be performed in the backend.
     ///
     /// After invoking this, `get()` can not be used until `save()` is performed.
     pub fn remove(&mut self, val: &T) {
@@ -100,7 +101,7 @@ where
         self.removed_values.push(val.pk().to_sql())
     }
 
-    /// Returns already loaded values.
+    /// Return already loaded values.
     ///
     /// Returns [`Error::ValueNotLoaded`] if `load()` has not been invoked prior.
     pub fn get(&self) -> Result<impl Iterator<Item = &T>> {
@@ -138,8 +139,9 @@ where
     sync(),
     async(feature = "async")
 )]
-/// Loads the values referred to by this many relationship from a
-/// database query if necessary and returns a reference to them.
+/// Loads the values referred to by this many relationship from a database query.
+///
+/// If necessary and returns a reference to them.
 async fn load_query_uncached<'a, T>(
     many: &'a Many<T>,
     conn: &impl ConnectionMethods,
@@ -162,8 +164,9 @@ where
     Ok(vals)
 }
 
-/// Loads the values referred to by this many relationship from a
-/// database query if necessary and returns a reference to them.
+/// Loads the values referred to by this many relationship from a database query.
+///
+/// If necessary and returns a reference to them.
 #[maybe_async_cfg::maybe(
     idents(load_query_uncached(snake)),
     sync(),

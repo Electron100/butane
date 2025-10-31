@@ -14,14 +14,14 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "pg")]
 use tokio_postgres as postgres;
 
-/// For use with [SqlType::Custom](crate::SqlType)
+/// For use with [`SqlType::Custom`](crate::SqlType).
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlTypeCustom {
     #[cfg(feature = "pg")]
     Pg(#[serde(with = "pgtypeser")] tokio_postgres::types::Type),
 }
 
-/// For use with [SqlVal::Custom](crate::SqlVal)
+/// For use with [`SqlVal::Custom`](crate::SqlVal).
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SqlValCustom {
     #[cfg(feature = "pg")]
@@ -89,7 +89,7 @@ impl postgres::types::ToSql for SqlValCustom {
     postgres::types::to_sql_checked!();
 }
 
-/// For use with [SqlValRef::Custom](crate::SqlValRef)
+/// For use with [`SqlValRef::Custom`](crate::SqlValRef).
 #[derive(Clone, Debug)]
 pub enum SqlValRefCustom<'a> {
     /// Used with Postgres, but suitable only for input (e.g. input to

@@ -8,7 +8,7 @@ use super::{Migration, MigrationMut, Migrations, MigrationsMut};
 
 use crate::Result;
 
-/// A migration stored in memory.
+/// In-memory migration.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MemMigration {
     name: String,
@@ -45,12 +45,12 @@ impl Migration for MemMigration {
         Cow::from(&self.name)
     }
 
-    /// The backend-specific commands to apply this migration.
+    /// Return backend-specific commands to apply this migration.
     fn up_sql(&self, backend_name: &str) -> Result<Option<String>> {
         Ok(self.up.get(backend_name).map(|s| s.to_string()))
     }
 
-    /// The backend-specific commands to undo this migration.
+    /// Return backend-specific commands to undo this migration.
     fn down_sql(&self, backend_name: &str) -> Result<Option<String>> {
         Ok(self.down.get(backend_name).map(|s| s.to_string()))
     }
@@ -101,7 +101,7 @@ impl MigrationMut for MemMigration {
     }
 }
 
-/// A collection of migrations stored in memory.
+/// In-memory migrations collection.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MemMigrations {
     migrations: BTreeMap<String, MemMigration>,

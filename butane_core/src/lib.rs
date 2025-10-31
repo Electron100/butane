@@ -36,13 +36,10 @@ use db::ConnectionMethodsAsync;
 /// Result type that uses [`crate::Error`].
 pub type Result<T> = std::result::Result<T, crate::Error>;
 
-/// A type which may be the result of a database query.
+/// Type which may be the result of a database query.
 ///
-/// Every result type must have a corresponding object type and the
-/// columns of the result type must be a subset of the columns of the
-/// object type. The purpose of a result type which is not also an
-/// object type is to allow a query to retrieve a subset of an
-/// object's columns.
+/// Result types correspond to object types where columns are a subset.
+/// Use result types in queries to retrieve subsets of object columns.
 pub trait DataResult: Sized {
     /// Corresponding object type.
     type DBO: DataObject;
@@ -69,10 +66,10 @@ pub mod internal {
     /// WARNING: Semver exempt
     #[allow(async_fn_in_trait)] // Not really a public trait
     pub trait DataObjectInternal: DataResult<DBO = Self> {
-        /// Like [DataResult::COLUMNS] but omits [AutoPk].
+        /// Like [`DataResult::COLUMNS`] but omits [`AutoPk`].
         const NON_AUTO_COLUMNS: &'static [Column];
 
-        /// Get the primary key as mutable. Used internally in the case of [AutoPk].
+        /// Get the primary key as mutable. Used internally in the case of [`AutoPk`].
         fn pk_mut(&mut self) -> &mut impl PrimaryKeyType;
 
         /// Saves many-to-many relationships pointed to by fields on this model.
@@ -103,15 +100,14 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
     type PKType: PrimaryKeyType;
     /// Link to a generated struct providing query helpers for each field.
     type Fields: Default;
-    /// The name of the primary key column.
+    /// Primary key column name.
     const PKCOL: &'static str;
-    /// The name of the table.
+    /// Table name.
     const TABLE: &'static str;
-    /// Whether or not this model uses an automatic primary key set on
-    /// the first save.
+    /// Whether this model uses automatic primary keys.
     const AUTO_PK: bool;
 
-    /// Get the primary key
+    /// Get the primary key.
     fn pk(&self) -> &Self::PKType;
 }
 

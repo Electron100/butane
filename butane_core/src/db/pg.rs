@@ -23,9 +23,9 @@ use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, A
 use crate::query::{BoolExpr, Expr};
 use crate::{debug, query, warn, Error, Result, SqlType, SqlVal, SqlValRef};
 
-/// The name of the postgres backend.
+/// Postgres backend name.
 pub const BACKEND_NAME: &str = "pg";
-/// The internal row creation order field name.
+/// Internal row ordering field name.
 pub const ROW_ID_COLUMN_NAME: &str = "ctid";
 
 /// Postgres [`Backend`] implementation.
@@ -150,8 +150,9 @@ fn sqlvalref_for_pg_query<'a>(v: &'a SqlValRef<'a>) -> &'a dyn postgres::types::
     v as &dyn postgres::types::ToSql
 }
 
-/// Shared functionality between connection and
-/// transaction. Implementation detail. Semver exempt.
+/// Shared functionality between connection and transaction.
+///
+/// Implementation detail. Semver exempt.
 trait PgConnectionLike {
     type Client: postgres::GenericClient + Send;
     fn client(&self) -> Result<&Self::Client>;

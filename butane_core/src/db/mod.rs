@@ -509,7 +509,7 @@ impl<'bt> ConnectionMethods for Box<dyn BackendTransaction<'bt> + 'bt> {
 
 /// Database backend.
 ///
-/// A boxed implementation can be returned by name via [`crate::db::get_backend`].
+/// A boxed implementation can be returned by name via [`get_backend`].
 #[async_trait]
 pub trait Backend: Send + Sync + DynClone {
     /// Butane name for the backend.
@@ -584,7 +584,7 @@ impl ConnectionSpec {
     pub const fn connection_string(&self) -> &String {
         &self.conn_str
     }
-    /// Return the connection string URI if available.
+    /// Return the connection string URI if it is a URI.
     /// Returns None if the connection string is not a URI.
     pub fn connection_string_uri(&self) -> Option<url::Url> {
         url::Url::parse(self.connection_string()).ok()

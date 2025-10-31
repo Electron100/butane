@@ -213,6 +213,7 @@ pub trait ToSql {
     fn to_sql_ref(&self) -> SqlValRef<'_>;
     /// Convert self into SqlVal by value.
     ///
+    /// The default implementation simply calls `to_sql`.
     /// Override this implementation if greater efficiency can be
     /// realized by consuming self.
     fn into_sql(self) -> SqlVal

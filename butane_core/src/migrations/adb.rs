@@ -53,7 +53,7 @@ impl From<SqlType> for TypeIdentifier {
     }
 }
 
-/// Key used to help resolve `DeferredSqlType`.
+/// Key used to help resolve [`DeferredSqlType`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TypeKey {
     /// Represents a type which is the primary key for a table with the given name.
@@ -546,8 +546,7 @@ impl AColumn {
         self.auto
     }
 }
-
-/// Create a [`crate::many::Many`] relationship table.
+/// Create table for the [`crate::many::Many`] relationship.
 ///
 /// Should not be used directly, except in tests.
 pub fn create_many_table(

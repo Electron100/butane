@@ -139,9 +139,9 @@ where
     sync(),
     async(feature = "async")
 )]
-/// Loads the values referred to by this many relationship from a database query.
+/// Load the values referred to by this many relationship from a database query, if necessary.
 ///
-/// If necessary and returns a reference to them.
+/// Returns a reference to them.
 async fn load_query_uncached<'a, T>(
     many: &'a Many<T>,
     conn: &impl ConnectionMethods,
@@ -164,9 +164,9 @@ where
     Ok(vals)
 }
 
-/// Loads the values referred to by this many relationship from a database query.
+/// Load the values referred to by this many relationship from a database query, if necessary.
 ///
-/// If necessary and returns a reference to them.
+/// Returns a reference to them.
 #[maybe_async_cfg::maybe(
     idents(load_query_uncached(snake)),
     sync(),

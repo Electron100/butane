@@ -81,7 +81,7 @@ pub trait Migrations: Clone {
         }
     }
 
-    /// Retrieve the last applied migration or None.
+    /// Retrieve the last migration applied to the database.
     ///
     /// Returns None if no migrations have been applied.
     fn last_applied_migration(&self, conn: &impl ConnectionMethods) -> Result<Option<Self::M>> {

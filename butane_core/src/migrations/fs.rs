@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-/// Filesystem abstraction for `Migrations`.
+/// Filesystem abstraction for [`Migrations`].
 ///
 /// Primarily intended to allow bypassing the real filesystem during testing, but
 /// implementations that do not call through to the real filesystem

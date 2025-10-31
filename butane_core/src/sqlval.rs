@@ -181,7 +181,7 @@ impl SqlVal {
                 SqlValCustom::Pg { ty, .. } => Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone()))),
             },
             #[cfg(not(feature = "pg"))]
-            SqlVal::Custom(_) => None,
+            SqlVal::Custom(_) => unimplemented!("Custom data type requires pg backend"),
         }
     }
 }
@@ -202,7 +202,10 @@ impl fmt::Display for SqlVal {
             Date(val) => val.format("%Y-%m-%d").fmt(f),
             #[cfg(feature = "datetime")]
             Timestamp(val) => val.format("%+").fmt(f),
+            #[cfg(feature = "pg")]
             Custom(val) => val.fmt(f),
+            #[cfg(not(feature = "pg"))]
+            Custom(_) => unimplemented!("Custom data type requires pg backend"),
         }
     }
 }
@@ -270,7 +273,10 @@ impl From<SqlValRef<'_>> for SqlVal {
             Date(v) => SqlVal::Date(v),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlVal::Timestamp(v),
+            #[cfg(feature = "pg")]
             Custom(v) => SqlVal::Custom(Box::new(v.into())),
+            #[cfg(not(feature = "pg"))]
+            Custom(_) => unimplemented!("Custom data type requires pg backend"),
         }
     }
 }
@@ -292,7 +298,10 @@ impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
             Date(v) => SqlValRef::Date(*v),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlValRef::Timestamp(*v),
+            #[cfg(feature = "pg")]
             Custom(v) => SqlValRef::Custom(v.as_valref()),
+            #[cfg(not(feature = "pg"))]
+            Custom(_) => unimplemented!("Custom data type requires pg backend"),
         }
     }
 }

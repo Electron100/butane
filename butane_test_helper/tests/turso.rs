@@ -75,3 +75,11 @@ fn multiple_setups() {
 
     println!("Created and cleaned up 3 Turso test databases");
 }
+
+/// Test in-memory setup using async/await
+#[tokio::test]
+async fn test_in_memory_setup() {
+    let setup_data = turso_setup().await;
+    assert_eq!(setup_data.connection_string(), ":memory:");
+    turso_teardown(setup_data);
+}

@@ -88,6 +88,7 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
     if !options.contains(&TestOption::PgOnly) {
         backends.push(("sqlite", "SQLiteTestInstance"));
         backends.push(("turso", "TursoTestInstance"));
+        backends.push(("libsql", "LibsqlTestInstance"));
     }
 
     let tests = backends

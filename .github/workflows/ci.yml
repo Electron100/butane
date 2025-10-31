@@ -25,10 +25,10 @@ jobs:
     strategy:
       matrix:
         include:
-          #- os: ubuntu-latest
-          #  mise_tools: "ephemeral-postgres mysql"
-          #- os: macos-13
-          #  mise_tools: "ephemeral-postgres mysql"
+          - os: ubuntu-latest
+            mise_tools: "ephemeral-postgres mysql"
+          - os: macos-13
+            mise_tools: "ephemeral-postgres mysql"
           - os: windows-latest
             mise_tools: ""
     runs-on: ${{ matrix.os }}

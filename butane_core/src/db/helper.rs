@@ -171,9 +171,7 @@ pub fn sql_insert_with_placeholders(
     }
 }
 
-/// Writes to `w` the SQL of an UPDATE to `table` of `columns`.
-///
-/// Using values in `pls`, for the row uniquely identified by `pkcol`.
+/// Write to `w` a SQL UPDATE to `table` of `columns` using values in `pls`, for the row uniquely identified by `pkcol`.
 pub fn sql_update_with_placeholders(
     table: &str,
     pkcol: Column,
@@ -223,7 +221,7 @@ pub fn sql_order(order: &[Order], w: &mut impl Write) {
     });
 }
 
-/// Return the column default value.
+/// Return column default.
 pub fn column_default(col: &AColumn) -> Result<SqlVal> {
     if let Some(val) = col.default() {
         return Ok(val.clone());

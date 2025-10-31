@@ -413,7 +413,7 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
     None
 }
 
-/// Build code to push [`SqlVal`]s for each column into a `Vec` called `values`.
+/// Build code to push [`SqlVal`]s for each column satisfying `predicate` into a `Vec` called `values`.
 ///
 /// It excludes any auto values.
 fn push_values<P>(ast_struct: &ItemStruct, mut predicate: P) -> Vec<TokenStream2>

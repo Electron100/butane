@@ -212,8 +212,8 @@ impl ConnectionMethods for Box<dyn BackendConnection> {
 
 /// Database connection.
 ///
-/// May be a connection to any type of database as it is a boxed
-/// abstraction over a specific connection.
+/// May be a connection to any type of database
+/// as it is a boxed abstraction over a specific connection.
 #[maybe_async_cfg::maybe(
     idents(BackendConnection(sync = "BackendConnection")),
     sync(keep_self),
@@ -584,7 +584,8 @@ impl ConnectionSpec {
     pub const fn connection_string(&self) -> &String {
         &self.conn_str
     }
-    /// Return the connection string URI if it is a URI.
+    /// Return the connection string URI, if it is a URI.
+    ///
     /// Returns None if the connection string is not a URI.
     pub fn connection_string_uri(&self) -> Option<url::Url> {
         url::Url::parse(self.connection_string()).ok()

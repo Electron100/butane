@@ -73,7 +73,7 @@ pub trait Migrations: Clone {
         Ok(accum.into_iter().rev().collect())
     }
 
-    /// Retrieve the unapplied migrations for the database.
+    /// Retrieve the migrations not yet been applied to the database.
     fn unapplied_migrations(&self, conn: &impl ConnectionMethods) -> Result<Vec<Self::M>> {
         match self.last_applied_migration(conn)? {
             None => self.all_migrations(),
@@ -83,7 +83,7 @@ pub trait Migrations: Clone {
 
     /// Retrieve the last migration applied to the database.
     ///
-    /// Returns None if no migrations have been applied.
+    /// Returns `None` if no migrations have been applied.
     fn last_applied_migration(&self, conn: &impl ConnectionMethods) -> Result<Option<Self::M>> {
         if !conn.has_table(ButaneMigration::TABLE)? {
             return Ok(None);
@@ -220,7 +220,7 @@ where
 
     /// Create migration from `from` to `current` with given `name`.
     ///
-    /// `from` may be None, in which case the migration is created from an empty database.
+    /// `from` may be `None`, in which case the migration is created from an empty database.
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration(
         &mut self,
@@ -234,7 +234,7 @@ where
 
     /// Create migration from `from` to `to_db` with given `name`.
     ///
-    /// `from` may be None, in which case the migration is created from an empty database.
+    /// `from` may be `None`, in which case the migration is created from an empty database.
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration_to(
         &mut self,
@@ -317,7 +317,7 @@ pub fn migrations_table() -> ATable {
 /// Build a `Migrations` from the filesystem.
 ///
 /// The `#[model]` attribute will write migration information to a
-/// `butane/migrations` directory under the project directory.
+/// `.butane/migrations` directory under the project directory.
 pub fn from_root<P: AsRef<Path>>(path: P) -> FsMigrations {
     FsMigrations::new(path.as_ref().to_path_buf())
 }

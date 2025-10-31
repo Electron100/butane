@@ -349,7 +349,7 @@ pub struct FsMigrations {
     current: FsMigration,
 }
 impl FsMigrations {
-    /// Create a new FsMigrations instance.
+    /// Create a new instance.
     pub fn new(root: PathBuf) -> Self {
         let fs = std::sync::Arc::new(OsFilesystem {});
         let current = FsMigration {

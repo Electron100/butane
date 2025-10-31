@@ -157,7 +157,7 @@ impl Drop for AsyncAdapterEnv {
 
 /// Wrapper around a raw pointer that we assert is [`Send`].
 ///
-/// Needless to say, this requires care. See comments on `AsyncAdapterEnv::invoke`
+/// Needless to say, this requires care. See comments on `AsyncAdapterEnv::invoke`.
 /// for why we believe this to be sound.
 struct SendPtr<T: ?Sized> {
     inner: *const T,

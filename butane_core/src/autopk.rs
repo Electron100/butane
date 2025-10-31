@@ -18,7 +18,7 @@ pub struct AutoPk<T: PrimaryKeyType> {
 }
 
 impl<T: PrimaryKeyType> AutoPk<T> {
-    /// Create an uninitialized value for unsaved objects.
+    /// Create an uninitialized value for an object which has not yet been saved.
     pub fn uninitialized() -> Self
     where
         T: Default,
@@ -57,10 +57,10 @@ impl<T: PrimaryKeyType> FromSql for AutoPk<T> {
 
     /// Used to convert a SqlVal into another type.
     ///
-    /// The default implementation calls `Self::from_sql_ref(val.as_ref())`,
-    /// which may be inefficient. This method is chiefly used only for primary
-    /// keys: a more efficient implementation is unlikely to provide benefits
-    /// for types not used as primary keys.
+    /// The default implementation calls `Self::from_sql_ref(val.as_ref())`, which
+    /// may be inefficient. This method is chiefly used only
+    /// for primary keys: a more efficient implementation is unlikely to
+    /// provide benefits for types not used as primary keys.
     fn from_sql(val: SqlVal) -> Result<Self>
     where
         Self: Sized,

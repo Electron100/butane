@@ -137,6 +137,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
+name = "arrayvec"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
+
+[[package]]
 name = "assert_cmd"
 version = "2.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -269,6 +275,7 @@ checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 name = "butane"
 version = "0.8.1"
 dependencies = [
+ "arrayvec",
  "butane",
  "butane_codegen",
  "butane_core",
@@ -332,6 +339,7 @@ dependencies = [
 name = "butane_core"
 version = "0.8.1"
 dependencies = [
+ "arrayvec",
  "assert_matches",
  "async-trait",
  "butane_test_helper",

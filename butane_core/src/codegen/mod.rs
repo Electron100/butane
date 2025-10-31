@@ -49,6 +49,7 @@ static PATH_MAPPINGS: Map<&'static str, &'static str> = phf_map! {
     "butane::autopk::AutoPk" => "AutoPk",
     "butane::fkey::ForeignKey" => "ForeignKey",
     "butane::many::Many" => "Many",
+    "arrayvec::ArrayString" => "ArrayString",
     #[cfg(feature = "json")]
     "serde_json::Value" => "Value",
     #[cfg(feature = "uuid")]
@@ -64,6 +65,7 @@ static PATH_MAPPINGS: Map<&'static str, &'static str> = phf_map! {
     "butane::autopk::AutoPk" => "AutoPk",
     "butane::fkey::ForeignKey" => "ForeignKey",
     "butane::many::Many" => "Many",
+    "arrayvec::ArrayString" => "ArrayString",
     "chrono::DateTime" => "DateTime",
     "chrono::NaiveDate" => "NaiveDate",
     "chrono::NaiveDateTime" => "NaiveDateTime",
@@ -501,6 +503,25 @@ pub fn get_primitive_sql_type(path: &syn::Path) -> Option<DeferredSqlType> {
         || *path == parse_quote!(std::string::String)
         || *path == parse_quote!(::std::string::String)
     {
+        return some_known(SqlType::Text);
+    } else if path.segments.len() == 1
+        && path.segments[0].ident == "ArrayString"
+        && matches!(
+            path.segments[0].arguments,
+            syn::PathArguments::AngleBracketed(_)
+        )
+    {
+        // ArrayString<N> from arrayvec crate - fixed size strings stored as TEXT
+        return some_known(SqlType::Text);
+    } else if path.segments.len() == 2
+        && path.segments[0].ident == "arrayvec"
+        && path.segments[1].ident == "ArrayString"
+        && matches!(
+            path.segments[1].arguments,
+            syn::PathArguments::AngleBracketed(_)
+        )
+    {
+        // arrayvec::ArrayString<N> - fully qualified, fixed size strings stored as TEXT
         return some_known(SqlType::Text);
     } else if *path == parse_quote!(Vec<u8>)
         || *path == parse_quote!(std::vec::Vec<u8>)

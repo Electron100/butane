@@ -90,7 +90,18 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
 
         // Only include MySQL if mysqld is available
         if which::which("mysqld").is_ok() {
-            backends.push(("mysql", "MySqlTestInstance"));
+            // Skip MySQL on Windows CI as it's not yet set up for running tests
+            // Mysql is installed on GitHub Actions Windows, but CI does not yet set it up for running tests.
+            // https://github.com/actions/runner-images/blob/win25/20251021.67/images/windows/Windows2025-Readme.md
+            #[cfg(target_os = "windows")]
+            let add_mysql =
+                !(std::env::var("CI").is_ok() || std::env::var("GITHUB_ACTIONS").is_ok());
+            #[cfg(not(target_os = "windows"))]
+            let add_mysql = true;
+
+            if add_mysql {
+                backends.push(("mysql", "MySqlTestInstance"));
+            }
         }
 
         backends.push(("turso", "TursoTestInstance"));

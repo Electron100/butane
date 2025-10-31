@@ -12,7 +12,7 @@ use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Seriali
 
 use crate::{Error, Result, SqlType, SqlVal};
 
-/// Suffix added to [`crate::many::Many`] tables.
+/// Suffix added to [`Many`](crate::many::Many) tables.
 pub const MANY_SUFFIX: &str = "_Many";
 
 #[cfg(feature = "json")]
@@ -546,7 +546,7 @@ impl AColumn {
         self.auto
     }
 }
-/// Create table for the [`crate::many::Many`] relationship.
+/// Create table for the [`Many`](crate::many::Many) relationship.
 ///
 /// Should not be used directly, except in tests.
 pub fn create_many_table(

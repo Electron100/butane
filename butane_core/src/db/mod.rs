@@ -255,9 +255,9 @@ impl Connection {
 
     /// Runs the provided function with a synchronous wrapper around this asynchronous connection.
     ///
-    /// Because this relies on some (safe) memory gymnastics, there is a small
-    /// but nonzero risk that if certain tokio calls fail unexpectedly at the
-    /// wrong place the the connection will be poisoned -- all subsequent calls
+    /// Because this relies on some (safe) memory gymnastics,
+    /// there is a small but nonzero risk that if certain tokio calls fail unexpectedly at
+    /// the wrong place, the connection will be poisoned -- all subsequent calls
     /// to all methods will fail.
     #[maybe_async_cfg::only_if(key = "async")]
     pub async fn with_sync<F, T>(&mut self, f: F) -> Result<T>

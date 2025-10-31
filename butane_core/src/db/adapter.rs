@@ -251,7 +251,7 @@ impl<T: ?Sized> AsyncAdapter<T> {
 }
 
 impl<T> AsyncAdapter<T> {
-    /// Create an async adapter using `create_context` to create the inner type `T`.
+    /// Create an async adapter using `create_context` to create an instance of the inner type `T`.
     pub(super) fn new<F>(create_context: F) -> Result<Self>
     where
         Self: Sized,
@@ -446,7 +446,7 @@ where
     }
 }
 
-/// Create an async connection via the synchronous `connect` method.
+/// Create an async connection via the synchronous `connect` method of `backend`.
 ///
 /// Use this when authoring a backend which doesn't natively support async.
 pub async fn connect_async_via_sync<B>(backend: &B, conn_str: &str) -> Result<ConnectionAsync>

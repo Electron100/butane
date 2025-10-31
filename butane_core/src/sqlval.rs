@@ -160,7 +160,7 @@ impl SqlVal {
         }
     }
 
-    /// Return the most appropriate SqlType or None if this is Null.
+    /// Return the `SqlType` most appropriate to this value, or `None` if this is `Null`.
     pub fn sqltype(&self) -> Option<SqlType> {
         match self {
             SqlVal::Null => None,
@@ -312,11 +312,12 @@ pub trait FieldType: ToSql + FromSql {
 
 /// Marker trait for a type suitable for being a primary key.
 pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync {
-    /// Test if this object's pk is valid.
+    /// Test if this object's primary key is valid.
     ///
-    /// The only case in which this returns false is if the pk is an AutoPk and it's not yet valid.
+    /// The only case in which this returns false is if the primary key is an [`AutoPk`](crate::AutoPk)
+    /// and it's not yet valid.
     ///
-    /// If you're implementing [`PrimaryKeyType`], the default implementation returns true
+    /// If you're implementing `PrimaryKeyType`, the default implementation returns true
     /// and you do not need to change that unless you're doing something very unusual.
     fn is_valid(&self) -> bool {
         true
@@ -324,7 +325,8 @@ pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync {
 
     /// Initialize an invalid primary key with a value.
     ///
-    /// No-op if `self.is_valid()` is true. Used for types implementing [`PrimaryKeyType`].
+    /// No-op if `self.is_valid()` is true.
+    /// Only relevant for `AutoPk`
     fn set_val(&mut self, _val: Self) {}
     /// Only relevant for `AutoPk`.
     fn initialize(&mut self, value: SqlVal) -> Result<()> {

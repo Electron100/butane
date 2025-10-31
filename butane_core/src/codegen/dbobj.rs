@@ -17,7 +17,7 @@ pub struct Config {
     pub table_name: Option<String>,
 }
 
-/// Code generation to implement the DataObject trait for a model.
+/// Code generation to implement the [`DataObject`] trait for a model.
 pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let tablelit = make_tablelit(config, tyname);
@@ -413,7 +413,7 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
     None
 }
 
-/// Build code to push SqlVals for each column into a Vec called `values`.
+/// Build code to push [`SqlVal`]s for each column into a `Vec` called `values`.
 ///
 /// It excludes any auto values.
 fn push_values<P>(ast_struct: &ItemStruct, mut predicate: P) -> Vec<TokenStream2>

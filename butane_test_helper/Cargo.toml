@@ -18,6 +18,7 @@ default = ["sqlite", "pg"]
 sqlite = ["butane_core/sqlite", "butane_core/async-adapter"]
 sqlite-bundled = ["butane_core/sqlite-bundled"]
 pg = ["butane_core/pg", "tokio-postgres"]
+mysql = ["butane_core/mysql", "mysql_async"]
 turso = ["butane_core/turso"]
 
 [dependencies]
@@ -28,6 +29,7 @@ env_logger.workspace = true
 libc = "0.2"
 log.workspace = true
 maybe-async-cfg.workspace = true
+mysql_async = { optional = true, workspace = true }
 nonempty.workspace = true
 thiserror.workspace = true
 tokio-postgres = { features = ["with-geo-types-0_7"], optional = true, workspace = true }
@@ -39,6 +41,7 @@ which = "8.0"
 [dev-dependencies]
 pollster = "0.4"
 temp-env = "0.3"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [package.metadata.release]
 release = false
@@ -58,6 +61,11 @@ required-features = ["pg"]
 name = "macos_shared_memory"
 path = "tests/macos_shared_memory.rs"
 required-features = ["pg"]
+
+[[test]]
+name = "mysql"
+path = "tests/mysql.rs"
+required-features = ["mysql"]
 
 [[test]]
 name = "sqlite"

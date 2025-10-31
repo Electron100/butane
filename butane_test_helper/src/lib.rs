@@ -31,6 +31,8 @@ use std::sync::{LazyLock, Mutex};
 
 #[cfg(feature = "pg")]
 use block_id::{Alphabet, BlockId};
+#[cfg(feature = "mysql")]
+use butane_core::db::mysql::MySqlBackend;
 #[cfg(feature = "pg")]
 use butane_core::db::pg::PgBackend;
 #[cfg(feature = "sqlite")]
@@ -57,9 +59,18 @@ pub use maybe_async_cfg;
 #[cfg(feature = "pg")]
 pub mod pg;
 
+#[cfg(feature = "mysql")]
+pub mod mysql;
+
 // Re-export types from pg module
 #[cfg(feature = "pg")]
 pub use crate::pg::{pg_tmp_server_create_ephemeralpg, PgTemporaryServerError};
+
+// Re-export types from mysql module
+#[cfg(feature = "mysql")]
+pub use crate::mysql::{
+    cleanup_orphaned_mysql_processes, mysql_tmp_server_create, MySqlTemporaryServerError,
+};
 
 /// Trait for running a test.
 #[allow(async_fn_in_trait)] // Not truly public, only used in butane for testing.
@@ -180,6 +191,49 @@ impl BackendTestInstance for TursoTestInstance {
     }
 }
 
+/// Instance of a MySQL test.
+#[cfg(feature = "mysql")]
+#[derive(Default)]
+pub struct MySqlTestInstance {}
+
+#[cfg(feature = "mysql")]
+impl BackendTestInstance for MySqlTestInstance {
+    fn run_test_sync(test: impl FnOnce(Connection), migrate: bool) {
+        common_setup();
+        let backend = MySqlBackend::new();
+        let setup_data = mysql_setup_sync();
+        let connstr = setup_data.connection_string();
+        log::info!("connecting to {}..", connstr);
+        let mut conn = backend
+            .connect(connstr)
+            .expect("Could not connect mysql backend");
+        if migrate {
+            setup_db(&mut conn);
+        }
+        log::info!("running test on {}...", connstr);
+        test(conn);
+    }
+    async fn run_test_async<Fut>(test: impl FnOnce(ConnectionAsync) -> Fut, migrate: bool)
+    where
+        Fut: Future<Output = ()>,
+    {
+        common_setup();
+        let backend = MySqlBackend::new();
+        let setup_data = mysql_setup().await;
+        let connstr = setup_data.connection_string();
+        log::info!("connecting to {}..", connstr);
+        let mut conn = backend
+            .connect_async(connstr)
+            .await
+            .expect("Could not connect mysql backend");
+        if migrate {
+            setup_db_async(&mut conn).await;
+        }
+        log::info!("running test on {}...", connstr);
+        test(conn).await;
+    }
+}
+
 /// Used with `run_test` and `run_test_async`. Result of a backend-specific setup function.
 /// Provides a connection string, and also passed to the backend-specific teardown function.
 pub trait SetupData {
@@ -289,6 +343,22 @@ pub struct PgSetupData {
 }
 #[cfg(feature = "pg")]
 impl SetupData for PgSetupData {
+    fn connection_string(&self) -> &str {
+        &self.connection_string
+    }
+}
+
+/// Connection spec for a MySQL test server.
+#[cfg(feature = "mysql")]
+#[derive(Clone, Debug)]
+pub struct MySqlSetupData {
+    /// Connection string
+    connection_string: String,
+    /// Temporary server data (if created)
+    _server_data: Option<std::sync::Arc<crate::mysql::MySqlSetupData>>,
+}
+#[cfg(feature = "mysql")]
+impl SetupData for MySqlSetupData {
     fn connection_string(&self) -> &str {
         &self.connection_string
     }
@@ -559,6 +629,73 @@ pub fn pg_teardown(_data: PgSetupData) {
 #[cfg(feature = "pg")]
 pub fn pg_connstr(data: &PgSetupData) -> String {
     data.connection_string().to_string()
+}
+
+/// Create a running empty MySQL database for testing.
+#[cfg(feature = "mysql")]
+pub fn mysql_setup_sync() -> MySqlSetupData {
+    log::trace!("starting mysql_setup");
+
+    // Check if a connection string is provided via environment variable
+    match std::env::var("BUTANE_MYSQL_CONNSTR") {
+        Ok(connstr) => {
+            log::info!("Using MySQL connection from BUTANE_MYSQL_CONNSTR");
+            MySqlSetupData {
+                connection_string: connstr,
+                _server_data: None,
+            }
+        }
+        Err(_) => {
+            // Create a temporary MySQL server
+            let server_data = crate::mysql::mysql_tmp_server_create()
+                .expect("Failed to create temporary MySQL server");
+            let connstr = server_data.connection_string();
+            log::info!("Created temporary MySQL server: {}", connstr);
+
+            MySqlSetupData {
+                connection_string: connstr,
+                _server_data: Some(std::sync::Arc::new(server_data)),
+            }
+        }
+    }
+}
+
+/// Create a running empty MySQL database for testing (async version).
+#[cfg(feature = "mysql")]
+pub async fn mysql_setup() -> MySqlSetupData {
+    // For now, just call the sync version since mysql_tmp_server_create is sync
+    // In the future, we could make it truly async
+    mysql_setup_sync()
+}
+
+/// Tear down MySQL database created by [`mysql_setup`].
+#[cfg(feature = "mysql")]
+pub fn mysql_teardown(_data: MySqlSetupData) {
+    // All the work is done by the drop implementation
+}
+
+/// Obtain the connection string for the MySQL database.
+#[cfg(feature = "mysql")]
+pub fn mysql_connstr(data: &MySqlSetupData) -> String {
+    data.connection_string().to_string()
+}
+
+/// Create a MySQL [`Connection`].
+#[cfg(feature = "mysql")]
+pub fn mysql_connection() -> (Connection, MySqlSetupData) {
+    let backend = get_backend(butane_core::db::mysql::BACKEND_NAME).unwrap();
+    let data = mysql_setup_sync();
+    (backend.connect(&mysql_connstr(&data)).unwrap(), data)
+}
+
+/// Create a MySQL [`ConnectionSpec`].
+#[cfg(feature = "mysql")]
+pub async fn mysql_connspec() -> (ConnectionSpec, MySqlSetupData) {
+    let data = mysql_setup().await;
+    (
+        ConnectionSpec::new(butane_core::db::mysql::BACKEND_NAME, mysql_connstr(&data)),
+        data,
+    )
 }
 
 /// Create a [`MemMigrations`]` for the "current" migration.

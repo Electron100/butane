@@ -42,6 +42,7 @@ env_logger = "0.11"
 fake = "4.2"
 log = "0.4"
 maybe-async-cfg = { version = "0.2.5", default-features = false }
+mysql_async = "0.35"
 nonempty = "0.12"
 phf = { version = "0.13", features = ['macros'] }
 paste = "1.0.11"
@@ -62,7 +63,7 @@ thiserror = "2.0"
 tokio = { version = "1" }
 tokio-postgres = "0.7"
 tokio-test = { version = "0.4"}
-turso = { git = "https://github.com/tursodatabase/turso" }
+turso = { git = "https://github.com/tursodatabase/turso", tag = "v0.3.0-pre.6" }
 url = "2.5"
 uuid = "1.2"
 

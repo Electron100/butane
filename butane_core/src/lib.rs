@@ -304,6 +304,12 @@ pub enum Error {
     #[cfg(feature = "pg")]
     #[error("Postgres error {0}")]
     Postgres(#[from] tokio_postgres::Error),
+    #[cfg(feature = "mysql")]
+    #[error("MySQL error {0}")]
+    MySQL(#[from] mysql_async::Error),
+    #[cfg(feature = "mysql")]
+    #[error("MySQL URL parse error {0}")]
+    MySQLUrlParse(#[from] mysql_async::UrlError),
     #[cfg(feature = "datetime")]
     #[error("Chrono error {0}")]
     Chrono(#[from] chrono::ParseError),

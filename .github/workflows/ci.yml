@@ -24,10 +24,13 @@ jobs:
   build:
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-13
-          - windows-latest
+        include:
+          - os: ubuntu-latest
+            mise_tools: "ephemeral-postgres mysql"
+          - os: macos-13
+            mise_tools: "ephemeral-postgres mysql"
+          - os: windows-latest
+            mise_tools: ""
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -42,17 +45,18 @@ jobs:
     - uses: actions/checkout@v4
       # Postgresql setup adapted from Diesel CI
       # Disable ssl as server doesn't have a trusted cert
-    - name: Setup PostgreSQL on Linux
+    - name: Setup PostgreSQL & libaio1t64 on Linux
       if: runner.os == 'Linux'
       run: |
         set -ex
         sudo apt-get update
-        sudo apt-get install -y postgresql
+        sudo apt-get install -y libaio-dev postgresql
         sudo sed -i "s/scram-sha-256/trust/" /etc/postgresql/16/main/pg_hba.conf
         sudo cat /etc/postgresql/16/main/pg_hba.conf
         sudo service postgresql restart && sleep 3
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
         echo "/usr/lib/postgresql/16/bin" >> $GITHUB_PATH
+        sudo ln -s /usr/lib/x86_64-linux-gnu/libaio.so /usr/lib/x86_64-linux-gnu/libaio.so.1
     - name: Setup PostgreSQL on MacOS
       if: runner.os == 'macOS'
       run: |
@@ -96,14 +100,16 @@ jobs:
       uses: taiki-e/install-action@v2
       with:
         tool: cargo-deny,editorconfig-checker,mise,typos
-    - name: Install ephemeral-postgres via mise
-      if: runner.os != 'Windows'
+    - name: Install ${{ matrix.mise_tools }} via mise
+      if: matrix.mise_tools != ''
       run: |
-        mise install ephemeral-postgres
-        echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
-    - name: Verify ephemeralpg installation
-      if: runner.os != 'Windows'
-      run: which pg_tmp
+        mise install ${{ matrix.mise_tools }}
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          echo "$USERPROFILE\\.local\\share\\mise\\shims" >> $GITHUB_PATH
+        else
+          echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
+        fi
+
     - name: Run editorconfig-checker
       run: editorconfig-checker
     - name: Build
@@ -112,20 +118,35 @@ jobs:
       run: make lint-ci
     - name: Run cargo-deny
       run: cargo deny check all
-    - name: Test Butane test helper with ephemeral-postgres
+    - name: Test Butane test helper with ${{ matrix.mise_tools }}
       if: runner.os != 'Windows'
-      run: cd butane_test_helper && mise exec ephemeral-postgres -- cargo +stable test --all-features
-    - name: Test Butane test helper without ephemeral-postgres
+      run: |
+        if [ -n "${{ matrix.mise_tools }}" ]; then
+          mise exec ${{ matrix.mise_tools }} -- cargo +stable test -p butane_test_helper --all-features
+        else
+          cargo +stable test -p butane_test_helper --all-features
+        fi
+    - name: Test Butane test helper without mise tools on Windows
       if: runner.os == 'Windows'
-      run: cd butane_test_helper && cargo +stable test --all-features
+      run: cargo +stable test -p butane_test_helper --features "pg,sqlite,sqlite-bundled,turso"
     - name: Test Core
-      run: cd butane_core && cargo +stable test --all-features
+      run: |
+        if [ -n "${{ matrix.mise_tools }}" ]; then
+          mise exec ${{ matrix.mise_tools }} -- cargo +stable test -p butane_core --all-features
+        else
+          cargo +stable test -p butane_core --all-features
+        fi
     - name: Test Codegen
       run: cd butane_codegen && cargo +stable test --all-features
     - name: Test CLI
       run: cd butane_cli && cargo +stable test --all-features
     - name: Test
-      run: cd butane && cargo +stable test --all-features
+      run: |
+        if [ -n "${{ matrix.mise_tools }}" ]; then
+          mise exec ${{ matrix.mise_tools }} -- cargo +stable test -p butane --all-features
+        else
+          cargo +stable test -p butane --all-features
+        fi
     - name: Check example migrations have been updated
       run: |
         set -ex
@@ -140,5 +161,9 @@ jobs:
         cargo +stable test -p example --all-features
         cd examples
         for dir in *; do
-          cargo +stable test -p $dir --all-features
+          if [ -n "${{ matrix.mise_tools }}" ]; then
+            mise exec ${{ matrix.mise_tools }} -- cargo +stable test -p $dir --all-features
+          else
+            cargo +stable test -p $dir --all-features
+          fi
         done

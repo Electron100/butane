@@ -23,6 +23,7 @@ json = ["butane_codegen/json", "butane_core/json"]
 sqlite = ["butane_core/sqlite"]
 sqlite-bundled = ["butane_core/sqlite-bundled"]
 pg = ["async", "butane_core/pg"]
+mysql = ["async", "butane_core/mysql"]
 datetime = ["butane_codegen/datetime", "butane_core/datetime"]
 debug = ["butane_core/debug"]
 log = ["butane_core/log"]
@@ -42,7 +43,7 @@ deadpool = { optional = true, workspace = true }
 
 [dev-dependencies]
 butane = { features = ["_auto_delete_dot_butane"], path = "." }
-butane_test_helper = { workspace = true, default-features = false, features = ["pg", "sqlite", "turso"] }
+butane_test_helper = { workspace = true, default-features = false, features = ["pg", "sqlite", "mysql", "turso"] }
 butane_test_macros = { workspace = true }
 cfg-if = { workspace = true }
 paste = { workspace = true }
@@ -51,6 +52,7 @@ env_logger = { workspace = true }
 fake = { workspace = true, features = ["chrono", "derive", "uuid"] }
 geo-types = "0.7"
 log.workspace = true
+mysql_async = { workspace = true }
 nonempty.workspace = true
 quote = { workspace = true }
 maybe-async-cfg.workspace = true

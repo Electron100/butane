@@ -145,7 +145,7 @@ jobs:
         if [ -n "${{ matrix.mise_tools }}" ]; then
           mise exec ${{ matrix.mise_tools }} -- cargo +stable test -p butane --all-features
         else
-          cargo +stable -p butane test --all-features
+          cargo +stable test -p butane --all-features
         fi
     - name: Check example migrations have been updated
       run: |

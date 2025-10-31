@@ -38,8 +38,11 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 
 /// Type which may be the result of a database query.
 ///
-/// Result types correspond to object types where columns are a subset.
-/// Use result types in queries to retrieve subsets of object columns.
+/// Every result type must have a corresponding object type and the
+/// columns of the result type must be a subset of the columns of the
+/// object type. The purpose of a result type which is not also an
+/// object type is to allow a query to retrieve a subset of an
+/// object's columns.
 pub trait DataResult: Sized {
     /// Corresponding object type.
     type DBO: DataObject;
@@ -104,7 +107,7 @@ pub trait DataObject: DataResult<DBO = Self> + internal::DataObjectInternal + Sy
     const PKCOL: &'static str;
     /// Table name.
     const TABLE: &'static str;
-    /// Whether this model uses automatic primary keys.
+    /// Whether this model uses an automatic primary key set on the first save.
     const AUTO_PK: bool;
 
     /// Get the primary key.

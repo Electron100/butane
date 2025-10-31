@@ -59,6 +59,29 @@ pub fn default_name() -> String {
     Utc::now().format("%Y%m%d_%H%M%S%3f").to_string()
 }
 
+/// Parse comma-separated backend names and validate they exist.
+pub fn parse_backends(backends_str: &str) -> Result<NonEmpty<Box<dyn Backend>>> {
+    let backend_names: Vec<&str> = backends_str
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if backend_names.is_empty() {
+        return Err(anyhow::anyhow!("No backends specified"));
+    }
+
+    let mut backends: Vec<Box<dyn Backend>> = Vec::new();
+
+    for name in backend_names {
+        let backend =
+            db::get_backend(name).ok_or_else(|| anyhow::anyhow!("Unknown backend: {}", name))?;
+        backends.push(backend);
+    }
+
+    Ok(NonEmpty::from_vec(backends).unwrap())
+}
+
 pub fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) -> Result<()> {
     if db::get_backend(name).is_none() {
         eprintln!("Unknown backend {name}");
@@ -76,8 +99,13 @@ pub fn init(base_dir: &PathBuf, name: &str, connstr: &str, connect: bool) -> Res
 }
 
 /// Make a migration.
-/// The backends are selected from the existing migrations, or the initialised connection.
-pub fn make_migration(base_dir: &Path, name: Option<&String>) -> Result<()> {
+///
+/// The backends are selected from the CLI arg, existing migrations, or the initialised connection.
+pub fn make_migration(
+    base_dir: &Path,
+    name: Option<&String>,
+    cli_backends: Option<NonEmpty<Box<dyn Backend>>>,
+) -> Result<()> {
     let name = match name {
         Some(name) => format!("{}_{}", default_name(), name),
         None => default_name(),
@@ -87,7 +115,10 @@ pub fn make_migration(base_dir: &Path, name: Option<&String>) -> Result<()> {
         eprintln!("Migration {name} already exists");
         std::process::exit(1);
     }
-    let backends = load_backends(base_dir)?;
+    let backends = match cli_backends {
+        Some(backends) => backends,
+        None => load_backends(base_dir)?,
+    };
 
     let created = ms.create_migration(&backends, &name, ms.latest().as_ref())?;
     if created {

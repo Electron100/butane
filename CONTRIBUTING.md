@@ -1,12 +1,13 @@
 # Contributing to Butane
 
-Thank you for your interest in contributing to Butane! This guide will help you set up your development environment and get started.
+Thank you for your interest in contributing to Butane!
+This guide will help you set up your development environment and get started.
 
 ## Development Environment Setup
 
 ### Using mise (Recommended)
 
-This project uses [mise](https://mise.jdx.dev/) to manage development tools and dependencies. mise ensures all contributors use consistent versions of required tools.
+This project uses [mise](https://mise.jdx.dev/) to manage development tools needed for development.
 
 #### Installing mise
 
@@ -14,6 +15,7 @@ This project uses [mise](https://mise.jdx.dev/) to manage development tools and 
 
 mise is available in many package managers. Choose the one for your system:
 
+- **Nix/NixOS:** `nix-env -iA nixpkgs.mise`
 - **macOS (Homebrew):** `brew install mise`
 - **macOS (MacPorts):** `sudo port install mise`
 - **Windows (Chocolatey):** `choco install mise-en-place`
@@ -21,24 +23,23 @@ mise is available in many package managers. Choose the one for your system:
 - **Arch Linux:** `pacman -S mise`
 - **Alpine Linux:** `apk add mise`
 - **FreeBSD:** `pkg install mise`
-- **Void Linux:** `xbps-install mise`
-- **Nix/NixOS:** `nix-env -iA nixpkgs.mise`
 
-For a complete list of package managers and distributions, see [mise on Repology](https://repology.org/project/mise/versions).
+For a complete list of package managers and distributions,
+see [mise on Repology](https://repology.org/project/mise/versions).
 
 ##### Alternative: Install via Cargo
 
-If you have Rust installed, you can install mise using cargo:
+If you already have Rust installed, you can install mise using cargo:
 
 ```bash
 cargo install mise
 ```
 
-**Note:** When installing via cargo, you'll need to manually set up shell integration (see the [Shell Integration](#shell-integration) section below) after installation.
+**Note:** When installing via cargo, you'll need to manually set up its shell integration.
 
 ##### Alternative: Quick Install Script
 
-> ⚠️ **Security Warning:** Piping curl to shell (`curl | sh`) or downloading and executing PowerShell scripts downloads and executes code directly without verification. Only use this method if you trust the source. We recommend using a package manager instead.
+> ⚠️ **Security Warning:** This alternative is not secure. We recommend using a package manager instead.
 
 If you prefer the installation script:
 
@@ -56,34 +57,9 @@ irm https://mise.run | iex
 
 **For other installation methods**, see the [official mise documentation](https://mise.jdx.dev/getting-started.html).
 
-#### Shell Integration
-
-After installing mise, activate it in your shell:
-
-**Bash:**
-
-```bash
-echo 'eval "$(mise activate bash)"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-**Zsh:**
-
-```bash
-echo 'eval "$(mise activate zsh)"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-**Fish:**
-
-```fish
-echo 'mise activate fish | source' >> ~/.config/fish/config.fish
-source ~/.config/fish/config.fish
-```
-
 #### Installing Project Tools
 
-Once mise is installed and activated, navigate to the project directory and run:
+Once mise is installed and shell integration is activated, navigate to the project directory and run:
 
 ```bash
 mise install

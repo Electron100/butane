@@ -3,7 +3,7 @@ use butane::migrations::Migrations;
 use butane_test_helper::*;
 use butane_test_macros::butane_test;
 
-use fixed_string::{User, Product, Order, Config, Session};
+use fixed_string::{Config, Order, Product, Session, User};
 
 #[maybe_async_cfg::maybe(
     sync(),
@@ -29,7 +29,10 @@ async fn insert_data(connection: &Connection) {
     let saved_user = User::get(connection, user.id).await.unwrap();
     assert_eq!(saved_user.username.as_str(), "alice");
     assert_eq!(saved_user.email.as_str(), "alice@example.com");
-    assert_eq!(saved_user.display_name.as_ref().unwrap().as_str(), "Alice Smith");
+    assert_eq!(
+        saved_user.display_name.as_ref().unwrap().as_str(),
+        "Alice Smith"
+    );
     assert_eq!(saved_user.status.as_str(), "active");
 
     // Create a product with ArrayString primary key
@@ -51,31 +54,45 @@ async fn insert_data(connection: &Connection) {
 
     // Create a config entry with ArrayString primary key
     let mut config = Config::new("max_connections", "100").unwrap();
-    config = config.with_description("Maximum database connections").unwrap();
+    config = config
+        .with_description("Maximum database connections")
+        .unwrap();
     config.save(connection).await.unwrap();
 
     let saved_config = Config::get(connection, config.key.clone()).await.unwrap();
     assert_eq!(saved_config.value.as_str(), "100");
-    assert_eq!(saved_config.description.as_ref().unwrap().as_str(), "Maximum database connections");
+    assert_eq!(
+        saved_config.description.as_ref().unwrap().as_str(),
+        "Maximum database connections"
+    );
 
     // Create a session with ArrayString primary key
     let user_id_value = saved_user.id.expect("User ID should be set after saving");
-    
+
     let mut session = Session::new(
         "sess_1234567890abcdef",
         user_id_value,
         "192.168.1.1",
-        "Mozilla/5.0 (Test Browser)"
-    ).unwrap();
+        "Mozilla/5.0 (Test Browser)",
+    )
+    .unwrap();
     session = session.with_device_fingerprint("fp_device123").unwrap();
     session.save(connection).await.unwrap();
 
-    let saved_session = Session::get(connection, session.session_id.clone()).await.unwrap();
+    let saved_session = Session::get(connection, session.session_id.clone())
+        .await
+        .unwrap();
     assert_eq!(saved_session.user_id, user_id_value);
     assert_eq!(saved_session.ip_address.as_str(), "192.168.1.1");
-    assert_eq!(saved_session.user_agent.as_str(), "Mozilla/5.0 (Test Browser)");
+    assert_eq!(
+        saved_session.user_agent.as_str(),
+        "Mozilla/5.0 (Test Browser)"
+    );
     assert_eq!(saved_session.status.as_str(), "active");
-    assert_eq!(saved_session.device_fingerprint.as_ref().unwrap().as_str(), "fp_device123");
+    assert_eq!(
+        saved_session.device_fingerprint.as_ref().unwrap().as_str(),
+        "fp_device123"
+    );
 }
 
 #[test_log::test(butane_test(async, nomigrate, pg))]

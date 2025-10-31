@@ -5,4 +5,4 @@
 pub mod butane_migrations;
 pub mod models;
 
-pub use models::{User, Product, Order, Config, Session};
+pub use models::{Config, Order, Product, Session, User};

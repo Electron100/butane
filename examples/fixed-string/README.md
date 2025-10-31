@@ -1,6 +1,7 @@
 # Fixed-String Example
 
-This example demonstrates how to use [`ArrayString`](https://docs.rs/arrayvec/latest/arrayvec/struct.ArrayString.html) from the `arrayvec` crate with Butane for memory-efficient, fixed-size string fields.
+This example demonstrates how to use [`ArrayString`](https://docs.rs/arrayvec/latest/arrayvec/struct.ArrayString.html)
+from the `arrayvec` crate with Butane for memory-efficient, fixed-size string fields.
 
 ## Features Demonstrated
 

@@ -44,7 +44,10 @@ impl User {
     }
 
     /// Set the display name for this user.
-    pub fn with_display_name(mut self, display_name: &str) -> Result<Self, arrayvec::CapacityError> {
+    pub fn with_display_name(
+        mut self,
+        display_name: &str,
+    ) -> Result<Self, arrayvec::CapacityError> {
         let name = ArrayString::from(display_name).map_err(|_| arrayvec::CapacityError::new(()))?;
         self.display_name = Some(name);
         Ok(self)
@@ -126,7 +129,8 @@ impl Order {
     ) -> Result<Self, arrayvec::CapacityError> {
         Ok(Order {
             id: AutoPk::uninitialized(),
-            order_number: ArrayString::from(order_number).map_err(|_| arrayvec::CapacityError::new(()))?,
+            order_number: ArrayString::from(order_number)
+                .map_err(|_| arrayvec::CapacityError::new(()))?,
             user: user.into(),
             product: product.into(),
             quantity,
@@ -166,7 +170,8 @@ impl Config {
 
     /// Add a description to the configuration.
     pub fn with_description(mut self, description: &str) -> Result<Self, arrayvec::CapacityError> {
-        self.description = Some(ArrayString::from(description).map_err(|_| arrayvec::CapacityError::new(()))?);
+        self.description =
+            Some(ArrayString::from(description).map_err(|_| arrayvec::CapacityError::new(()))?);
         Ok(self)
     }
 }
@@ -199,18 +204,25 @@ impl Session {
         user_agent: &str,
     ) -> Result<Self, arrayvec::CapacityError> {
         Ok(Session {
-            session_id: ArrayString::from(session_id).map_err(|_| arrayvec::CapacityError::new(()))?,
+            session_id: ArrayString::from(session_id)
+                .map_err(|_| arrayvec::CapacityError::new(()))?,
             user_id,
-            ip_address: ArrayString::from(ip_address).map_err(|_| arrayvec::CapacityError::new(()))?,
-            user_agent: ArrayString::from(user_agent).map_err(|_| arrayvec::CapacityError::new(()))?,
+            ip_address: ArrayString::from(ip_address)
+                .map_err(|_| arrayvec::CapacityError::new(()))?,
+            user_agent: ArrayString::from(user_agent)
+                .map_err(|_| arrayvec::CapacityError::new(()))?,
             status: ArrayString::from("active").map_err(|_| arrayvec::CapacityError::new(()))?,
             device_fingerprint: None,
         })
     }
 
     /// Set the device fingerprint for this session.
-    pub fn with_device_fingerprint(mut self, fingerprint: &str) -> Result<Self, arrayvec::CapacityError> {
-        self.device_fingerprint = Some(ArrayString::from(fingerprint).map_err(|_| arrayvec::CapacityError::new(()))?);
+    pub fn with_device_fingerprint(
+        mut self,
+        fingerprint: &str,
+    ) -> Result<Self, arrayvec::CapacityError> {
+        self.device_fingerprint =
+            Some(ArrayString::from(fingerprint).map_err(|_| arrayvec::CapacityError::new(()))?);
         Ok(self)
     }
 

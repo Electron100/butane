@@ -105,7 +105,7 @@ pub trait BackendRow {
 /// Abstraction of rows returned from a query.
 ///
 /// Most users do not need to deal with this directly and should use
-/// the `query!` macro or [Query](crate::query::Query) type.
+/// the `query!` macro or [`Query`](crate::query::Query) type.
 pub trait BackendRows {
     // Advance to the next item and get it
     fn next<'a>(&'a mut self) -> Result<Option<&'a (dyn BackendRow + 'a)>>;

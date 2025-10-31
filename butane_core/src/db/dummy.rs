@@ -40,7 +40,7 @@ impl Backend for DummyBackend {
 /// Fails with [`Error::PoisonedConnection`]. [`ConnectionAsync`] provides a
 /// `with_sync` method which allows running a non-async function.
 ///
-/// Which takes synchronous [Connection]. This is implemented using std::mem::swap
+/// Which takes synchronous [`Connection`]. This is implemented using std::mem::swap
 /// to satisfy the borrow checker. The original async connection is replaced with
 /// a dummy one while the sync operation is being run.
 #[derive(Clone, Debug)]

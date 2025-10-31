@@ -240,7 +240,7 @@ where
     }
 }
 
-/// Create a [`struct@LitStr`] from an [Ident].
+/// Create a [`struct@LitStr`] (UTF-8 string literal)from an [`Ident`].
 pub fn make_ident_literal_str(ident: &Ident) -> LitStr {
     let as_str = ident.strip_raw().to_string();
     make_lit(&as_str)

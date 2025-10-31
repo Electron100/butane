@@ -155,7 +155,7 @@ impl Drop for AsyncAdapterEnv {
     }
 }
 
-/// Wrapper around a raw pointer that we assert is [Send].
+/// Wrapper around a raw pointer that we assert is [`Send`].
 ///
 /// Needless to say, this requires care. See comments on `AsyncAdapterEnv::invoke`
 /// for why we believe this to be sound.
@@ -169,7 +169,7 @@ impl<T: ?Sized> SendPtr<T> {
 }
 unsafe impl<T: ?Sized> Send for SendPtr<T> {}
 
-/// Like [`SendPtrMut`] but we also assert that it is [Sync].
+/// Like [`SendPtrMut`] but we also assert that it is [`Sync`].
 struct SyncSendPtrMut<T: ?Sized> {
     inner: *mut T,
 }
@@ -208,7 +208,7 @@ pub(super) struct AsyncAdapter<T: ?Sized> {
 }
 
 impl<T: ?Sized> AsyncAdapter<T> {
-    /// Create an AsyncAdapter with the given context using the same `env` as self.
+    /// Create an AsyncAdapter with the given context, using the same `env` as self.
     fn create_with_same_env<U: ?Sized>(&self, context_ptr: SyncSendPtrMut<U>) -> AsyncAdapter<U> {
         AsyncAdapter {
             env: self.env.clone(),

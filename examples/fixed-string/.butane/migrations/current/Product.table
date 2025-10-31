@@ -1,0 +1,70 @@
+{
+  "name": "Product",
+  "columns": [
+    {
+      "name": "sku",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": true,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "name",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "category",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "price_cents",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "BigInt"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "in_stock",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Bool"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

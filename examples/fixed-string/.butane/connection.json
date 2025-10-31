@@ -1,0 +1,4 @@
+{
+  "backend": "sqlite",
+  "path": ".butane/db.sqlite"
+}

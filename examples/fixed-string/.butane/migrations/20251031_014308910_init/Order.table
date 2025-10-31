@@ -1,0 +1,95 @@
+{
+  "name": "Order",
+  "columns": [
+    {
+      "name": "id",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "BigInt"
+        }
+      },
+      "nullable": false,
+      "pk": true,
+      "auto": true,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "order_number",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "user",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "BigInt"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null,
+      "reference": {
+        "Literal": {
+          "table_name": "User",
+          "column_name": "id"
+        }
+      }
+    },
+    {
+      "name": "product",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null,
+      "reference": {
+        "Literal": {
+          "table_name": "Product",
+          "column_name": "sku"
+        }
+      }
+    },
+    {
+      "name": "quantity",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Int"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "status",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

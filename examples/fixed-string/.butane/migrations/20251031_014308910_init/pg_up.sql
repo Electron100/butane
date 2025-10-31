@@ -1,0 +1,32 @@
+CREATE TABLE Config (
+"key" TEXT NOT NULL PRIMARY KEY,
+"value" TEXT NOT NULL,
+description TEXT
+);
+CREATE TABLE "Order" (
+"id" BIGSERIAL NOT NULL PRIMARY KEY,
+order_number TEXT NOT NULL,
+"user" BIGINT NOT NULL,
+product TEXT NOT NULL,
+quantity INTEGER NOT NULL,
+"status" TEXT NOT NULL
+);
+CREATE TABLE Product (
+sku TEXT NOT NULL PRIMARY KEY,
+"name" TEXT NOT NULL,
+category TEXT NOT NULL,
+price_cents BIGINT NOT NULL,
+in_stock BOOLEAN NOT NULL
+);
+CREATE TABLE "User" (
+"id" BIGSERIAL NOT NULL PRIMARY KEY,
+username TEXT NOT NULL,
+email TEXT NOT NULL,
+display_name TEXT,
+"status" TEXT NOT NULL
+);
+ALTER TABLE "Order" ADD FOREIGN KEY ("user") REFERENCES "User"("id");
+ALTER TABLE "Order" ADD FOREIGN KEY (product) REFERENCES Product(sku);
+CREATE TABLE IF NOT EXISTS butane_migrations (
+"name" TEXT NOT NULL PRIMARY KEY
+);

@@ -545,7 +545,9 @@ const PG_KEY_PAIR_RE: &str = r"(hostaddr|host|dbname|user|port)\s*=";
 /// a `ConnectionSpec`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectionSpec {
+    /// Backend name (e.g., "sqlite", "pg").
     pub backend_name: String,
+    /// Backend-specific connection string.
     pub conn_str: String,
 }
 impl ConnectionSpec {

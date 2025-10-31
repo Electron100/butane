@@ -540,9 +540,8 @@ const PG_KEY_PAIR_RE: &str = r"(hostaddr|host|dbname|user|port)\s*=";
 
 /// Connection specification.
 ///
-/// Contains the name of a database backend and the backend-specific
-/// connection string. See [`connect`] to make a [`Connection`] from
-/// a `ConnectionSpec`.
+/// Contains the name of a database backend and the backend-specific connection string.
+/// See [`connect`] to make a [`Connection`] from a `ConnectionSpec`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectionSpec {
     /// Backend name (e.g., "sqlite", "pg").

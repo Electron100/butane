@@ -18,13 +18,12 @@ use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlTyp
 
 /// Used to implement a many-to-many relationship between models.
 ///
-/// Creates a new table with columns "owner" and "has" If type T has a
-/// many-to-many relationship with U, owner type is T::PKType, has is
-/// U::PKType. Table name is T_foo_Many where foo is the name of
-/// the Many field
+/// Creates a new table with columns "owner" and "has" if type `T` has a
+/// many-to-many relationship with `U`, "owner" type is `T::PKType`, "has" is
+/// `U::PKType`. Table name is `T_foo_Many` where `foo` is the name of
+/// the `Many` field.
 ///
 /// See [`ManyOpsSync`] and [`ManyOpsAsync`] for operations requiring a live database connection.
-//
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Many<T>
 where

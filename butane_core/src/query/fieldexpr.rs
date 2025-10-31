@@ -62,7 +62,7 @@ where
     binary_op!(le, DataOrd<U>, Le);
     binary_op!(ge, DataOrd<U>, Ge);
 
-    /// Create a [`BoolExpr`] to evaluate to `true` when field is "like" val.
+    /// Create a [`BoolExpr`] to evaluate to `true` when field value is "like" val.
     ///
     /// "like" is evaluated as the SQL LIKE operator.
     pub fn like<U>(&self, val: U) -> BoolExpr
@@ -72,7 +72,7 @@ where
         BoolExpr::Like(self.name, Expr::Val(val.to_sql()))
     }
 
-    /// Create a [`BoolExpr`] evaluating to `true` when the value of this field is contained in `vals`.
+    /// Create a [`BoolExpr`] evaluating to `true` when field value is contained in `vals`.
     pub fn is_in<U: ToSql>(&self, vals: Vec<U>) -> BoolExpr {
         BoolExpr::In(self.name, vals.into_iter().map(|v| v.to_sql()).collect())
     }

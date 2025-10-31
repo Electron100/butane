@@ -242,7 +242,7 @@ pub trait FromSql {
     where
         Self: Sized;
 
-    /// Used to convert a SqlVal into another type.
+    /// Used to convert a `SqlVal` into another type.
     ///
     /// The default implementation calls `Self::from_sql_ref(val.as_ref())`, which
     /// may be inefficient. This method is chiefly used only for

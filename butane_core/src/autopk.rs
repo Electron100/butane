@@ -7,10 +7,10 @@ use serde::{Deserialize, Serialize};
 
 use super::{FieldType, FromSql, PrimaryKeyType, Result, SqlType, SqlVal, SqlValRef, ToSql};
 
+/// Used to implement a primary key that is automatically populated by the backend.
+///
 /// Wrapper around a [`PrimaryKeyType`] to indicate the primary key will be initialized automatically.
 ///
-/// The primary key will be initialized automatically when the object is created in
-/// the database.
 /// Dereferences to an `Option<T>`.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AutoPk<T: PrimaryKeyType> {
@@ -55,7 +55,7 @@ impl<T: PrimaryKeyType> FromSql for AutoPk<T> {
         Ok(AutoPk::with_value(T::from_sql_ref(val)?))
     }
 
-    /// Used to convert a SqlVal into another type.
+    /// Used to convert a `SqlVal` into another type.
     ///
     /// The default implementation calls `Self::from_sql_ref(val.as_ref())`, which
     /// may be inefficient. This method is chiefly used only

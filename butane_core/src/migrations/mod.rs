@@ -213,9 +213,7 @@ where
     /// - it will never be returned by `latest`, `migrations_since`, `all_migrations` or other similar methods.
     fn current(&mut self) -> &mut Self::M;
 
-    /// Clears the current state.
-    ///
-    /// Clears the state as would be returned by the `current` method.
+    /// Clear the current state, as would be returned by the `current` method.
     fn clear_current(&mut self) -> Result<()>;
 
     /// Create migration from `from` to `current` with given `name`.

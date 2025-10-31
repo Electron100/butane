@@ -38,8 +38,8 @@ pub trait Migration: Debug + PartialEq {
 
     /// Apply the migration to a database connection.
     ///
-    /// The connection must be for the same type of database as this and the database
-    /// must be in the state of the migration prior to this one.
+    /// The connection must be for the same type of database as this,
+    /// and the database must be in the state of the migration prior to this one.
     fn apply(&self, conn: &mut impl BackendConnection) -> Result<()> {
         let backend_name = conn.backend_name();
         let tx = conn.transaction()?;
@@ -66,8 +66,8 @@ pub trait Migration: Debug + PartialEq {
 
     /// Un-apply (downgrade) the migration to a database connection.
     ///
-    /// The connection must be for the same type of database as this and this must be the latest migration applied
-    /// to the database.
+    /// The connection must be for the same type of database as this,
+    /// and this must be the latest migration applied to the database.
     fn downgrade(&self, conn: &mut impl BackendConnection) -> Result<()> {
         let backend_name = conn.backend_name();
         let tx = conn.transaction()?;

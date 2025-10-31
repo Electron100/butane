@@ -189,7 +189,7 @@ impl<T: DataResult> Query<T> {
     }
 }
 
-// Explicit impl so that Clone is implemented even if T is not Clone
+// Explicit impl so that Clone is implemented even if `T` is not `Clone`.
 impl<T: DataResult> Clone for Query<T> {
     fn clone(&self) -> Self {
         Query {

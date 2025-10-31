@@ -208,7 +208,7 @@ pub(super) struct AsyncAdapter<T: ?Sized> {
 }
 
 impl<T: ?Sized> AsyncAdapter<T> {
-    /// Create an AsyncAdapter with the given context, using the same `env` as self.
+    /// Create an `AsyncAdapter` with the given context, using the same `env` as self.
     fn create_with_same_env<U: ?Sized>(&self, context_ptr: SyncSendPtrMut<U>) -> AsyncAdapter<U> {
         AsyncAdapter {
             env: self.env.clone(),
@@ -394,7 +394,7 @@ where
 
     /// Tests if the connection has been closed.
     ///
-    /// Backends which do not support this check should return false.
+    /// Backends which do not support this check should return `false`.
     fn is_closed(&self) -> bool {
         ok_or_panic_with_adapter_error(self.invoke_blocking(|conn| Ok(conn.is_closed())))
     }

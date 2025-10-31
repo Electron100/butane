@@ -53,7 +53,7 @@ impl<T: DataObject> ForeignKey<T> {
     }
     /// Return a reference to the value, that must have already been loaded.
     ///
-    /// If not already loaded, returns Error::ValueNotLoaded.
+    /// If not already loaded, returns [`Error::ValueNotLoaded`].
     pub fn get(&self) -> Result<&T> {
         self.val
             .get()

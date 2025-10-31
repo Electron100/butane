@@ -52,7 +52,7 @@ Manages butane database migrations.
 
 * `-p`, `--path <PATH>`
 
-  Default value: `/Users/jayvdb/rust/butane`
+  Default value: `<detected project containing .butane directory>`
 * `-v`, `--verbose` — Increase logging verbosity
 * `-q`, `--quiet` — Decrease logging verbosity
 

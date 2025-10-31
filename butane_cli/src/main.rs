@@ -4,10 +4,9 @@
 use std::path::PathBuf;
 
 use butane_cli::{
-    add_backend, base_dir, clean, clear_data, collapse_migrations, delete_table,
-    describe_migration, detach_latest_migration, embed, get_migrations, handle_error, init,
-    list_backends, list_migrations, make_migration, migrate, regenerate_migrations, remove_backend,
-    unmigrate,
+    add_backend, clean, clear_data, collapse_migrations, delete_table, describe_migration,
+    detach_latest_migration, embed, get_migrations, handle_error, init, list_backends,
+    list_migrations, make_migration, migrate, regenerate_migrations, remove_backend, unmigrate,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
@@ -17,7 +16,15 @@ use clap::{ArgAction, Parser, Subcommand};
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    #[arg(short = 'p', long, default_value=base_dir().into_os_string())]
+    #[cfg(not(feature = "clap-markdown"))]
+    #[arg(short = 'p', long, default_value=butane_cli::base_dir().into_os_string())]
+    path: PathBuf,
+    #[cfg(feature = "clap-markdown")]
+    #[arg(
+        short = 'p',
+        long,
+        default_value = "<detected project containing .butane directory>"
+    )]
     path: PathBuf,
     #[command(flatten)]
     verbose: clap_verbosity_flag::Verbosity,

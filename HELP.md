@@ -50,11 +50,11 @@ Manages butane database migrations.
 
 ###### **Options:**
 
+* `-v`, `--verbose` — Increase logging verbosity
+* `-q`, `--quiet` — Decrease logging verbosity
 * `-p`, `--path <PATH>`
 
   Default value: `<detected project containing .butane directory>`
-* `-v`, `--verbose` — Increase logging verbosity
-* `-q`, `--quiet` — Decrease logging verbosity
 
 
 

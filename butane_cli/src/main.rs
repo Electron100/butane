@@ -16,15 +16,7 @@ use clap::{ArgAction, Parser, Subcommand};
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    #[cfg(not(feature = "clap-markdown"))]
     #[arg(short = 'p', long, default_value=butane_cli::base_dir().into_os_string())]
-    path: PathBuf,
-    #[cfg(feature = "clap-markdown")]
-    #[arg(
-        short = 'p',
-        long,
-        default_value = "<detected project containing .butane directory>"
-    )]
     path: PathBuf,
     #[command(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
@@ -150,7 +142,13 @@ fn main() {
 
     #[cfg(feature = "clap-markdown")]
     if cli.markdown_help {
-        clap_markdown::print_help_markdown::<Cli>();
+        use clap::CommandFactory;
+        let command = Cli::command();
+
+        let command = command.mut_arg("path", |arg| {
+            arg.default_value("<detected project containing .butane directory>")
+        });
+        clap_markdown::print_help_markdown_command(&command);
         std::process::exit(0);
     }
 

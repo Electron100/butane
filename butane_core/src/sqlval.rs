@@ -327,8 +327,6 @@ pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync {
     ///
     /// No-op if `self.is_valid()` is true.
     /// Only relevant for `AutoPk`
-    fn set_val(&mut self, _val: Self) {}
-    /// Only relevant for `AutoPk`.
     fn initialize(&mut self, value: SqlVal) -> Result<()> {
         if !self.is_valid() {
             *self = Self::from_sql(value)?;

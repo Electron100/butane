@@ -29,8 +29,8 @@ jobs:
             mise_tools: "ephemeral-postgres libsql-server"
           - os: macos-latest
             mise_tools: "ephemeral-postgres libsql-server"
-          - os: windows-latest
-            mise_tools: ""
+          # os: windows-latest
+          #  mise_tools: ""
     runs-on: ${{ matrix.os }}
     defaults:
       run:

@@ -135,7 +135,7 @@ impl SqldServer {
         // If not found, try to install it
         log::warn!("sqld not found, attempting to install via cargo...");
         let install_output = std::process::Command::new("cargo")
-            .args(&["install", "libsql-server", "--bin", "sqld"])
+            .args(["install", "libsql-server", "--bin", "sqld"])
             .output()?;
 
         if !install_output.status.success() {
@@ -224,7 +224,7 @@ impl Drop for SqldServer {
 
 /// Create a libsql [`ConnectionSpec`] for a sqld server.
 pub fn libsql_connspec(server: &SqldServer) -> ConnectionSpec {
-    ConnectionSpec::new(BACKEND_NAME, &server.connection_url())
+    ConnectionSpec::new(BACKEND_NAME, server.connection_url())
 }
 
 /// Concrete [SetupData] for libSQL with sqld server.

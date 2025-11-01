@@ -37,7 +37,7 @@ check-fmt :
 	editorconfig-checker
 
 update-help-md :
-	$(CARGO) run -p butane_cli --features clap-markdown -q -- --markdown-help list > HELP.md
+	$(CARGO) run -p butane_cli --features clap-markdown,sqlite-bundled -q -- --markdown-help list > HELP.md
 
 check-help-md :
 	git diff --exit-code HELP.md

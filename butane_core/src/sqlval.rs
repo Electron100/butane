@@ -68,7 +68,7 @@ impl SqlValRef<'_> {
     }
 }
 
-/// A database value.
+/// Database value.
 ///
 /// For conversion between `SqlVal` and other types, see [`FromSql`] and [`ToSql`].
 ///
@@ -146,8 +146,9 @@ impl SqlVal {
         }
     }
 
-    /// Tests if this sqlval is compatible with the given
-    /// `SqlType`. There are no implicit type conversions (i.e. if
+    /// Tests if this sqlval is compatible with the given `SqlType`.
+    ///
+    /// There are no implicit type conversions (i.e. if
     /// this is a `SqlVal::Bool`, it is only compatible with
     /// `SqlType::Bool`, not with `SqlType::Int`, even though an int
     /// contains enough information to encode a bool.
@@ -159,8 +160,7 @@ impl SqlVal {
         }
     }
 
-    // Returns the SqlType most appropriate to this value or None
-    // if this is Null
+    /// Return the `SqlType` most appropriate to this value, or `None` if this is `Null`.
     pub fn sqltype(&self) -> Option<SqlType> {
         match self {
             SqlVal::Null => None,
@@ -211,8 +211,10 @@ impl fmt::Display for SqlVal {
 pub trait ToSql {
     fn to_sql(&self) -> SqlVal;
     fn to_sql_ref(&self) -> SqlValRef<'_>;
-    /// The default implementation simply calls `to_sql`. Provide an
-    /// alternative implementation if greater efficiency can be
+    /// Convert self into SqlVal by value.
+    ///
+    /// The default implementation simply calls `to_sql`.
+    /// Override this implementation if greater efficiency can be
     /// realized by consuming self.
     fn into_sql(self) -> SqlVal
     where
@@ -240,8 +242,9 @@ pub trait FromSql {
     where
         Self: Sized;
 
-    /// Used to convert a SqlVal into another type. The default
-    /// implementation calls `Self::from_sql_ref(val.as_ref())`, which
+    /// Used to convert a `SqlVal` into another type.
+    ///
+    /// The default implementation calls `Self::from_sql_ref(val.as_ref())`, which
     /// may be inefficient. This method is chiefly used only for
     /// primary keys: a more efficient implementation is unlikely to
     /// provide benefits for types not used as primary keys.
@@ -300,23 +303,28 @@ impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
 /// Type suitable for being a database column.
 pub trait FieldType: ToSql + FromSql {
     const SQLTYPE: SqlType;
-    /// Reference type. Used for ergonomics with String (which has
-    /// reference type str). For most, it is Self
+    /// Reference type.
+    ///
+    /// Used for ergonomics with String (which has
+    /// reference type str). For most, it is Self.
     type RefType: ?Sized + ToSql;
 }
 
-/// Marker trait for a type suitable for being a primary key
+/// Marker trait for a type suitable for being a primary key.
 pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync {
-    /// Test if this object's pk is valid. The only case in which this
-    /// returns false is if the pk is an AutoPk and it's not yet valid.
+    /// Test if this object's primary key is valid.
     ///
-    /// If you're implementing [PrimaryKeyType], the default implementation returns true
+    /// The only case in which this returns false is if the primary key is an [`AutoPk`](crate::AutoPk)
+    /// and it's not yet valid.
+    ///
+    /// If you're implementing `PrimaryKeyType`, the default implementation returns true
     /// and you do not need to change that unless you're doing something very unusual.
     fn is_valid(&self) -> bool {
         true
     }
 
     /// Initialize an invalid primary key with a value.
+    ///
     /// No-op if `self.is_valid()` is true.
     /// Only relevant for `AutoPk`
     fn initialize(&mut self, value: SqlVal) -> Result<()> {
@@ -327,8 +335,9 @@ pub trait PrimaryKeyType: FieldType + Clone + PartialEq + Sync {
     }
 }
 
-/// Trait for referencing the primary key for a given model. Used to
-/// implement ForeignKey equality tests.
+/// Trait for referencing the primary key for a given model.
+///
+/// Used to implement ForeignKey equality tests.
 pub trait AsPrimaryKey<T: DataObject> {
     fn as_pk(&self) -> Cow<'_, <T as DataObject>::PKType>;
 }

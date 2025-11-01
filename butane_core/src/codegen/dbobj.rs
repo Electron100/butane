@@ -11,13 +11,13 @@ use super::{
 use crate::migrations::adb::{DeferredSqlType, TypeIdentifier, MANY_SUFFIX};
 use crate::SqlType;
 
-/// Configuration that can be specified with attributes to override default behavior
+/// Configuration that can be specified with attributes to override default behavior.
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     pub table_name: Option<String>,
 }
 
-/// Code generation to implement the DataObject trait for a model
+/// Code generation to implement the [`DataObject`] trait for a model.
 pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let tablelit = make_tablelit(config, tyname);
@@ -157,7 +157,7 @@ pub fn impl_dbobject(ast_struct: &ItemStruct, config: &Config) -> TokenStream2 {
     )
 }
 
-/// Code generation to implement the DataResult trait for a model
+/// Code generation to implement the DataResult trait for a model.
 pub fn impl_dataresult(ast_struct: &ItemStruct, dbo: &Ident, config: &Config) -> TokenStream2 {
     let tyname = &ast_struct.ident;
     let numdbfields = fields(ast_struct).filter(|f| is_row_field(f)).count();
@@ -413,8 +413,9 @@ fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {
     None
 }
 
-/// Builds code for pushing SqlVals for each column satisfying predicate into a vec called `values`
-/// that excludes any auto values.
+/// Build code to push [`SqlVal`]s for each column satisfying `predicate` into a `Vec` called `values`.
+///
+/// It excludes any auto values.
 fn push_values<P>(ast_struct: &ItemStruct, mut predicate: P) -> Vec<TokenStream2>
 where
     P: FnMut(&Field) -> bool,

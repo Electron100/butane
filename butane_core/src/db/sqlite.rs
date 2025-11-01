@@ -29,12 +29,12 @@ const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
 #[cfg(feature = "datetime")]
 const SQLITE_DATE_FORMAT: &str = "%Y-%m-%d";
 
-/// The minimum SQLite version required by this backend.
+/// Minimum required SQLite version.
 pub const SQLITE_MIN_VERSION: i32 = 3035000;
 
-/// The name of the sqlite backend.
+/// Sqlite backend name.
 pub const BACKEND_NAME: &str = "sqlite";
-/// The internal row creation order field name.
+/// Internal row ordering field name.
 pub const ROW_ID_COLUMN_NAME: &str = "rowid";
 
 #[cfg(feature = "log")]

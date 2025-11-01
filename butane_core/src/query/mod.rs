@@ -130,9 +130,9 @@ pub struct Query<T: DataResult> {
     phantom: PhantomData<T>,
 }
 impl<T: DataResult> Query<T> {
-    /// Creates a query which matches all objects in `table`. The set
-    /// of matched objects can be restricted with `filter` and
-    /// `limit`.
+    /// Create a query matching all objects in `table`.
+    ///
+    /// The set of matched objects can be restricted with `filter` and `limit`.
     pub fn new(table: &'static str) -> Query<T> {
         Query {
             table: Cow::Borrowed(table),
@@ -144,49 +144,52 @@ impl<T: DataResult> Query<T> {
         }
     }
 
-    /// Restricts the query to matching only objects for which `expr`
-    /// is true. Returns `self` as this method is expected to be
-    /// chained.
+    /// Restricts the query to matching only objects for which `expr` is true.
+    ///
+    /// Returns `self` as this method is expected to be chained.
     pub fn filter(mut self, expr: BoolExpr) -> Query<T> {
         self.filter = Some(expr);
         self
     }
 
-    /// Limits the query to matching the first `lim` objects. Returns
-    /// `self` as this method is expected to be chained.
+    /// Limits the query to matching the first `lim` objects.
+    ///
+    /// Returns `self` as this method is expected to be chained.
     pub fn limit(mut self, lim: i32) -> Query<T> {
         self.limit = Some(lim);
         self
     }
 
-    ///Skips the first `off` objects before returning them. Returns
-    /// `self` as this method is expected to be chained.
+    /// Skips the first `off` objects before returning them.
+    ///
+    /// Returns `self` as this method is expected to be chained.
     pub fn offset(mut self, off: i32) -> Query<T> {
         self.offset = Some(off);
         self
     }
 
-    /// Order the query results by the given column. Multiple calls to
-    /// this method may be made, with earlier calls taking precedence.
-    /// It is recommended to use the `colname!`
-    /// macro to construct the column name in a type-safe manner.
+    /// Order the query results by the given column.
+    ///
+    /// Multiple calls to this method may be made, with earlier calls taking
+    /// precedence. It is recommended to use the `colname!` macro to construct
+    /// the column name in a type-safe manner.
     pub fn order(mut self, column: &'static str, direction: OrderDirection) -> Query<T> {
         self.sort.push(Order { direction, column });
         self
     }
 
-    /// Shorthand for `order(column, OrderDirection::Ascending)`
+    /// Shorthand for `order(column, OrderDirection::Ascending)`.
     pub fn order_asc(self, column: &'static str) -> Query<T> {
         self.order(column, OrderDirection::Ascending)
     }
 
-    /// Shorthand for `order(column, OrderDirection::Descending)`
+    /// Shorthand for `order(column, OrderDirection::Descending)`.
     pub fn order_desc(self, column: &'static str) -> Query<T> {
         self.order(column, OrderDirection::Descending)
     }
 }
 
-// Explicit impl so that Clone is implemented even if T is not Clone
+// Explicit impl so that Clone is implemented even if `T` is not `Clone`.
 impl<T: DataResult> Clone for Query<T> {
     fn clone(&self) -> Self {
         Query {

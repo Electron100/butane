@@ -40,7 +40,7 @@ pub trait Migrations: Clone {
     /// no migrations have been created.
     fn latest(&self) -> Option<Self::M>;
 
-    /// Returns migrations since the given migration.
+    /// Retrieve migrations since the given migration.
     fn migrations_since(&self, since: &Self::M) -> Result<Vec<Self::M>> {
         let mut last = self.latest();
         let mut accum: Vec<Self::M> = Vec::new();
@@ -59,7 +59,7 @@ pub trait Migrations: Clone {
         Err(Error::MigrationError("Migration not in chain".to_string()))
     }
 
-    /// Returns all migrations
+    /// Retrieve all migrations.
     fn all_migrations(&self) -> Result<Vec<Self::M>> {
         let mut last = self.latest();
         let mut accum: Vec<Self::M> = Vec::new();
@@ -73,7 +73,7 @@ pub trait Migrations: Clone {
         Ok(accum.into_iter().rev().collect())
     }
 
-    /// Get migrations which have not yet been applied to the database
+    /// Retrieve the migrations not yet been applied to the database.
     fn unapplied_migrations(&self, conn: &impl ConnectionMethods) -> Result<Vec<Self::M>> {
         match self.last_applied_migration(conn)? {
             None => self.all_migrations(),
@@ -81,8 +81,9 @@ pub trait Migrations: Clone {
         }
     }
 
-    /// Get the last migration that has been applied to the database or None
-    /// if no migrations have been applied
+    /// Retrieve the last migration applied to the database.
+    ///
+    /// Returns `None` if no migrations have been applied.
     fn last_applied_migration(&self, conn: &impl ConnectionMethods) -> Result<Option<Self::M>> {
         if !conn.has_table(ButaneMigration::TABLE)? {
             return Ok(None);
@@ -190,18 +191,20 @@ where
     /// nor is any other data removed. Use carefully.
     fn delete_migrations(&mut self) -> Result<()>;
 
-    /// Clears all migrations -- deleting them from this object (and
-    /// any storage backing it) and deleting the record of their
-    /// existence/application from the database. The database schema
-    /// is not modified, nor is any other data removed. Use carefully.
+    /// Clears all migrations.
+    ///
+    /// Deleting them from this object (and any storage backing it) and deleting
+    /// the record of their existence/application from the database. The database
+    /// schema is not modified, nor is any other data removed. Use carefully.
     fn clear_migrations(&mut self, conn: &impl ConnectionMethods) -> Result<()> {
         self.delete_migrations()?;
         conn.delete_where(ButaneMigration::TABLE, query::BoolExpr::True)?;
         Ok(())
     }
 
-    /// Get a pseudo-migration representing the current state as
-    /// determined by the last build of models. This does not
+    /// Get a pseudo-migration representing the current state.
+    ///
+    /// This is determined by the last build of models. This does not
     /// necessarily match the current state of the database if
     /// migrations have not yet been applied.
     ///
@@ -210,11 +213,12 @@ where
     /// - it will never be returned by `latest`, `migrations_since`, `all_migrations` or other similar methods.
     fn current(&mut self) -> &mut Self::M;
 
-    /// Clears the current state (as would be returned by the `current` method).
+    /// Clear the current state, as would be returned by the `current` method.
     fn clear_current(&mut self) -> Result<()>;
 
-    /// Create a migration `from` -> `current` named `name`. From may be None, in which
-    /// case the migration is created from an empty database.
+    /// Create migration from `from` to `current` with given `name`.
+    ///
+    /// `from` may be `None`, in which case the migration is created from an empty database.
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration(
         &mut self,
@@ -226,8 +230,9 @@ where
         self.create_migration_to(backends, name, from, to_db)
     }
 
-    /// Create a migration `from` -> `to_db` named `name`. From may be None, in which
-    /// case the migration is created from an empty database.
+    /// Create migration from `from` to `to_db` with given `name`.
+    ///
+    /// `from` may be `None`, in which case the migration is created from an empty database.
     /// Returns true if a migration was created, false if `from` and `current` represent identical states.
     fn create_migration_to(
         &mut self,
@@ -290,7 +295,7 @@ where
     }
 }
 
-/// Returns [`ATable`] describing the migration metadata.
+/// Build an [`ATable`] describing the migration metadata.
 pub fn migrations_table() -> ATable {
     let mut table = ATable::new("butane_migrations".to_string());
     let col = AColumn::new(
@@ -307,9 +312,10 @@ pub fn migrations_table() -> ATable {
     table
 }
 
-/// Create a `Migrations` from a filesystem location. The `#[model]`
-/// attribute will write migration information to a
-/// `butane/migrations` directory under the project directory.
+/// Build a `Migrations` from the filesystem.
+///
+/// The `#[model]` attribute will write migration information to a
+/// `.butane/migrations` directory under the project directory.
 pub fn from_root<P: AsRef<Path>>(path: P) -> FsMigrations {
     FsMigrations::new(path.as_ref().to_path_buf())
 }

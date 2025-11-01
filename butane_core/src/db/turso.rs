@@ -45,7 +45,7 @@ impl TursoConnectionLike for TursoConnection {
     }
 }
 
-/// Turso backend
+/// Turso backend.
 ///
 /// Provides an async-first database backend using Turso/libSQL, which is SQLite-compatible.
 /// Turso is written in Rust and designed for modern async I/O operations.
@@ -77,9 +77,8 @@ impl TursoConnectionLike for TursoConnection {
 /// ```
 #[derive(Debug, Default, Clone)]
 pub struct TursoBackend;
-
 impl TursoBackend {
-    /// Creates a new Turso backend instance.
+    /// Create a Turso backend instance.
     ///
     /// # Example
     ///

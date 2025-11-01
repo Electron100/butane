@@ -12,8 +12,9 @@ use crate::{Error, Result, SqlVal, SqlValRef};
 #[derive(Clone, Debug)]
 struct DummyBackend {}
 
-/// Provides a backend implementation which fails all operations with [Error::PoisonedConnection].
-/// Exists so that it can be returned from the [BackendConnection] implementation of [DummyConnection].
+/// Provides a backend implementation which fails all operations with [`Error::PoisonedConnection`].
+///
+/// Exists so that it can be returned from the [`BackendConnection`] implementation of [`DummyConnection`].
 #[async_trait]
 impl Backend for DummyBackend {
     fn name(&self) -> &'static str {
@@ -33,10 +34,11 @@ impl Backend for DummyBackend {
     }
 }
 
-/// Provides a connection implementation which fails all operations with [Error::PoisonedConnection].
+/// Provides a connection implementation which fails all operations with [`Error::PoisonedConnection`].
 ///
-/// [ConnectionAsync] provides a `with_sync` method which allows running a non-async function
-/// which takes synchronous [Connection]. This is implemented using std::mem::swap to satisfy the borrow checker.
+/// [`ConnectionAsync`] provides a `with_sync` method which allows running a non-async function.
+/// which takes synchronous [`Connection`]. This is implemented using [`std::mem::swap`] to satisfy the borrow checker.
+///
 /// The original async connection is replaced with a dummy one while the sync operation is being run.
 #[derive(Clone, Debug)]
 pub(crate) struct DummyConnection {}

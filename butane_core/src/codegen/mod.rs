@@ -240,7 +240,7 @@ where
     }
 }
 
-/// Create a [`struct@LitStr`] (UTF-8 string literal) from an [Ident].
+/// Create a [`struct@LitStr`] (UTF-8 string literal) from an [`Ident`].
 pub fn make_ident_literal_str(ident: &Ident) -> LitStr {
     let as_str = ident.strip_raw().to_string();
     make_lit(&as_str)
@@ -374,13 +374,13 @@ fn is_option(field: &Field) -> bool {
     get_type_argument(&field.ty, "Option").is_some()
 }
 
-/// Check for special fields which won't correspond to rows and don't
-/// implement FieldType
+/// Check for special fields which won't correspond to rows and don't implement [`FieldType`].
 fn is_row_field(f: &Field) -> bool {
     !is_many_to_many(f)
 }
 
-/// Gets the type argument of a type.
+/// Get the type argument of a type.
+///
 /// E.g. for `Foo<T>`, returns `T`.
 fn get_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Option<&'a syn::Path> {
     let path = match ty {
@@ -390,7 +390,8 @@ fn get_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Option<&'a 
     get_path_argument(path, tyname)
 }
 
-/// Gets the type argument of a path.
+/// Get the type argument of a path.
+///
 /// E.g. for `Foo<T>``, returns `T`.
 fn get_path_argument<'a>(path: &'a syn::Path, tyname: &str) -> Option<&'a syn::Path> {
     if let Some(resolved) = PATH_RESOLVER.resolve(path) {
@@ -430,9 +431,9 @@ fn get_foreign_sql_type(path: &syn::Path, tyname: &str) -> Option<DeferredSqlTyp
     })
 }
 
-/// Determine whether a type refers to a data type that is supported directly by butane,
-/// or is a custom defined struct.
-/// It looks inside an [Option] or [crate::fkey::ForeignKey] to determine the inner type.
+/// Determine whether a type refers to a data type that is supported directly by butane, or is a custom defined struct.
+///
+/// It looks inside an `Option` or [`ForeignKey`](crate::fkey::ForeignKey) to determine the inner type.
 pub fn get_deferred_sql_type(path: &syn::Path) -> DeferredSqlType {
     get_primitive_sql_type(path)
         .or_else(|| get_option_sql_type(path))

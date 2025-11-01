@@ -12,7 +12,7 @@ use serde::{de::Deserializer, de::Visitor, ser::Serializer, Deserialize, Seriali
 
 use crate::{Error, Result, SqlType, SqlVal};
 
-/// Suffix added to [`crate::many::Many`] tables.
+/// Suffix added to [`Many`](crate::many::Many) tables.
 pub const MANY_SUFFIX: &str = "_Many";
 
 #[cfg(feature = "json")]
@@ -36,8 +36,10 @@ static JSON_MAP_PREFIXES: LazyLock<Vec<String>> = LazyLock::new(|| {
     prefixes
 });
 
-/// Identifier for a type as used in a database column. Supports both
-/// [`SqlType`] and identifiers known only by name.
+/// Identifier for a type as used in a database column.
+///
+/// Supports both [`SqlType`] and identifiers known only by name.
+///
 /// The latter is used for custom types. `SqlType::Custom` cannot easily be used
 /// directly at compile time when the proc macro serializing type information runs.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -51,10 +53,10 @@ impl From<SqlType> for TypeIdentifier {
     }
 }
 
-/// Key used to help resolve `DeferredSqlType`
+/// Key used to help resolve [`DeferredSqlType`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TypeKey {
-    /// Represents a type which is the primary key for a table with the given name
+    /// Represents a type which is the primary key for a table with the given name.
     PK(String),
     /// Represents a type which is not natively known to butane but
     /// which butane will be made aware of with the `#\[butane_type\]` macro
@@ -203,8 +205,7 @@ impl ADB {
         self.extra_types.insert(key, sqltype);
     }
 
-    /// Fixup as many DeferredSqlType::Deferred instances as possible
-    /// into DeferredSqlType::Known
+    /// Fixup as many [`DeferredSqlType::Deferred`] instances as possible into [`DeferredSqlType::Known`].
     pub fn resolve_types(&mut self) -> Result<()> {
         let mut resolver = TypeResolver::new();
         let mut changed = true;
@@ -395,18 +396,18 @@ pub struct ARefLiteral {
 }
 
 impl ARefLiteral {
-    /// Create new literal reference to a table and column.
+    /// Create a literal reference to a table and column.
     pub fn new(table_name: impl Into<String>, column_name: impl Into<String>) -> Self {
         ARefLiteral {
             table_name: table_name.into(),
             column_name: column_name.into(),
         }
     }
-    /// Get table name.
+    /// Return the table name.
     pub fn table_name(&self) -> &str {
         &self.table_name
     }
-    /// Get column name.
+    /// Return the column name.
     pub fn column_name(&self) -> &str {
         &self.column_name
     }
@@ -435,7 +436,7 @@ pub struct AColumn {
     reference: Option<ARef>,
 }
 impl AColumn {
-    /// Create new column.
+    /// Create a column.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: impl Into<String>,
@@ -458,7 +459,7 @@ impl AColumn {
             reference,
         }
     }
-    /// Simple column that is non-null, non-auto, non-pk, non-unique with no default
+    /// Simple column that is non-null, non-auto, non-pk, non-unique with no default.
     pub fn new_simple(name: impl Into<String>, sqltype: DeferredSqlType) -> Self {
         Self::new(name, sqltype, false, false, false, false, None, None)
     }
@@ -477,7 +478,7 @@ impl AColumn {
     pub fn default(&self) -> &Option<SqlVal> {
         &self.default
     }
-    /// Returns whether this column refers to another column.
+    /// Return whether this column refers to another column.
     pub fn reference(&self) -> &Option<ARef> {
         &self.reference
     }
@@ -489,7 +490,7 @@ impl AColumn {
     pub fn remove_reference(&mut self) {
         self.reference = None;
     }
-    /// Get the type identifier.
+    /// Return the type identifier.
     pub fn typeid(&self) -> Result<TypeIdentifier> {
         match &self.sqltype {
             DeferredSqlType::KnownId(t) => Ok(t.clone()),
@@ -497,7 +498,7 @@ impl AColumn {
             DeferredSqlType::Deferred(t) => Err(crate::Error::UnknownSqlType(t.to_string())),
         }
     }
-    /// Returns true if the type was previously unresolved but is now resolved
+    /// Return true if the type was previously unresolved but is now resolved.
     fn resolve_type(&mut self, resolver: &'_ TypeResolver) -> bool {
         if self.sqltype.is_known() {
             // Already resolved, nothing to do
@@ -545,8 +546,8 @@ impl AColumn {
         self.auto
     }
 }
-
-/// Create a table for the [crate::many::Many] relationship.
+/// Create table for the [`Many`](crate::many::Many) relationship.
+///
 /// Should not be used directly, except in tests.
 pub fn create_many_table(
     main_table_name: &str,

@@ -8,10 +8,11 @@ use async_trait::async_trait;
 use crate::query::{BoolExpr, Expr, Order};
 use crate::{Result, SqlType, SqlVal, SqlValRef};
 
-/// Methods available on a database connection. Most users do not need
-/// to call these methods directly and will instead use methods on
-/// [DataObject][crate::DataObject] or the `query!` macro. This trait is
-/// implemented by both database connections and transactions.
+/// Methods available on a database connection.
+///
+/// Most users do not need to call these methods directly and will instead
+/// use methods on [`DataObject`][`crate::DataObject`] or the `query!` macro.
+/// This trait is implemented by both database connections and transactions.
 #[maybe_async_cfg::maybe(
     sync(keep_self),
     async(feature = "async", self = "ConnectionMethodsAsync"),
@@ -69,8 +70,9 @@ pub trait ConnectionMethods: super::internal::AsyncRequiresSync {
     async fn has_table(&self, table: &str) -> Result<bool>;
 }
 
-/// Represents a database column. Most users do not need to use this
-/// directly.
+/// Represents a database column.
+///
+/// Most users do not need to use this directly.
 #[derive(Clone, Debug)]
 pub struct Column {
     name: &'static str,
@@ -88,8 +90,9 @@ impl Column {
     }
 }
 
-/// Backend-specific row abstraction. Only implementors of new
-/// backends need use this trait directly.
+/// Backend-specific row abstraction.
+///
+/// Only implementors of new backends need use this trait directly.
 pub trait BackendRow {
     fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>>;
     fn len(&self) -> usize;
@@ -99,9 +102,10 @@ pub trait BackendRow {
     }
 }
 
-/// Abstraction of rows returned from a query. Most users do not need
-/// to deal with this directly and should use the `query!` macro or
-/// [Query](crate::query::Query) type.
+/// Abstraction of rows returned from a query.
+///
+/// Most users do not need to deal with this directly and should use
+/// the `query!` macro or [`Query`](crate::query::Query) type.
 pub trait BackendRows {
     // Advance to the next item and get it
     fn next<'a>(&'a mut self) -> Result<Option<&'a (dyn BackendRow + 'a)>>;

@@ -210,7 +210,9 @@ impl ConnectionMethods for Box<dyn BackendConnection> {
     }
 }
 
-/// Database connection. May be a connection to any type of database
+/// Database connection.
+///
+/// May be a connection to any type of database
 /// as it is a boxed abstraction over a specific connection.
 #[maybe_async_cfg::maybe(
     idents(BackendConnection(sync = "BackendConnection")),
@@ -241,6 +243,7 @@ impl Connection {
     }
 
     /// Consume this connection and convert it into an async one.
+    ///
     /// Note that the under the hood this adds an adapter layer which runs
     /// the synchronous connection on a separate thread -- it is not "natively"
     /// async.
@@ -254,7 +257,7 @@ impl Connection {
     ///
     /// Because this relies on some (safe) memory gymnastics,
     /// there is a small but nonzero risk that if certain tokio calls fail unexpectedly at
-    /// the wrong place the the connection will be poisoned -- all subsequent calls
+    /// the wrong place, the connection will be poisoned -- all subsequent calls
     /// to all methods will fail.
     #[maybe_async_cfg::only_if(key = "async")]
     pub async fn with_sync<F, T>(&mut self, f: F) -> Result<T>
@@ -285,6 +288,7 @@ impl Connection {
 #[cfg(feature = "async")]
 impl ConnectionAsync {
     /// Consume this connection and convert it into a synchronous one.
+    ///
     /// Note that the under the hood this adds an adapter layer which drives
     /// the async connection  -- the async machinery is not eliminated.
     pub fn into_sync(self) -> Result<Connection> {
@@ -342,8 +346,7 @@ pub(super) trait BackendTransaction<'c>:
 
 /// Database transaction.
 ///
-/// Begin a transaction using the `BackendConnection`
-/// [`transaction`][crate::db::BackendConnection::transaction] method.
+/// Begin a transaction using `BackendConnection` [`transaction`](crate::db::BackendConnection::transaction) method.
 #[maybe_async_cfg::maybe(
     idents(BackendTransaction(sync = "BackendTransaction")),
     sync(self = "Transaction"),
@@ -504,7 +507,9 @@ impl<'bt> ConnectionMethods for Box<dyn BackendTransaction<'bt> + 'bt> {
     }
 }
 
-/// Database backend. A boxed implementation can be returned by name via [get_backend][crate::db::get_backend].
+/// Database backend.
+///
+/// A boxed implementation can be returned by name via [`get_backend`].
 #[async_trait]
 pub trait Backend: Send + Sync + DynClone {
     /// Butane name for the backend.
@@ -533,12 +538,15 @@ dyn_clone::clone_trait_object!(Backend);
 /// Regular expression to match PostgreSQL key-value pairs in a connection string.
 const PG_KEY_PAIR_RE: &str = r"(hostaddr|host|dbname|user|port)\s*=";
 
-/// Connection specification. Contains the name of a database backend
-/// and the backend-specific connection string. See [`connect`]
-/// to make a [`Connection`] from a `ConnectionSpec`.
+/// Connection specification.
+///
+/// Contains the name of a database backend and the backend-specific connection string.
+/// See [`connect`] to make a [`Connection`] from a `ConnectionSpec`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectionSpec {
+    /// Backend name (e.g., "sqlite", "pg").
     pub backend_name: String,
+    /// Backend-specific connection string.
     pub conn_str: String,
 }
 impl ConnectionSpec {
@@ -567,15 +575,16 @@ impl ConnectionSpec {
             None => Err(crate::Error::UnknownBackend(self.backend_name.clone())),
         }
     }
-    /// Get the backend name.
+    /// Return the backend name.
     pub const fn backend_name(&self) -> &String {
         &self.backend_name
     }
-    /// Get the database connection string.
+    /// Return the database connection string.
     pub const fn connection_string(&self) -> &String {
         &self.conn_str
     }
-    /// Get the connection string URI if it is a URI.
+    /// Return the connection string URI, if it is a URI.
+    ///
     /// Returns None if the connection string is not a URI.
     pub fn connection_string_uri(&self) -> Option<url::Url> {
         url::Url::parse(self.connection_string()).ok()

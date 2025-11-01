@@ -2,14 +2,15 @@ use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-/// Filesystem abstraction for `Migrations`. Primarily intended to
-/// allow bypassing the real filesystem during testing, but
+/// Filesystem abstraction for [`Migrations`].
+///
+/// Primarily intended to allow bypassing the real filesystem during testing, but
 /// implementations that do not call through to the real filesystem
 /// are supported in production.
 pub trait Filesystem: Debug {
-    /// Ensure a directory exists, recursively creating missing components
+    /// Ensure a directory exists, recursively creating missing components.
     fn ensure_dir(&self, path: &Path) -> std::io::Result<()>;
-    /// List all paths in a directory
+    /// List all paths in a directory.
     fn list_dir(&self, path: &Path) -> std::io::Result<Vec<PathBuf>>;
     /// Opens a file for writing. Creates it if it does not exist. Truncates it otherwise.
     fn write(&self, path: &Path) -> std::io::Result<Box<dyn Write>>;
@@ -19,7 +20,7 @@ pub trait Filesystem: Debug {
     fn delete(&self, path: &Path) -> std::io::Result<()>;
 }
 
-/// `[Filesystem`] implementation using [`std::fs`].
+/// Implementation of [`Filesystem`] using [`std::fs`].
 #[derive(Debug)]
 pub struct OsFilesystem;
 

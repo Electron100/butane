@@ -45,13 +45,15 @@ where
     valpk: OnceLock<SqlVal>,
 }
 impl<T: DataObject> ForeignKey<T> {
-    /// Create a value from a reference to the primary key of the value
+    /// Create a value from a reference to the primary key of the value.
     pub fn from_pk(pk: T::PKType) -> Self {
         let ret = Self::new_raw();
         ret.valpk.set(pk.into_sql()).unwrap();
         ret
     }
-    /// Returns a reference to the value. It must have already been loaded. If not, returns Error::ValueNotLoaded
+    /// Return a reference to the value, that must have already been loaded.
+    ///
+    /// If not already loaded, returns [`Error::ValueNotLoaded`].
     pub fn get(&self) -> Result<&T> {
         self.val
             .get()
@@ -59,7 +61,7 @@ impl<T: DataObject> ForeignKey<T> {
             .ok_or(Error::ValueNotLoaded)
     }
 
-    /// Returns a reference to the primary key of the value.
+    /// Return a reference to the primary key of the value.
     pub fn pk(&self) -> T::PKType {
         match self.val.get() {
             Some(v) => v.pk().clone(),

@@ -28,8 +28,10 @@ pub fn quote_reserved_word(word: &str) -> Cow<'_, str> {
     }
 }
 
-/// Writes to `w` the SQL to express the expression given in `expr`. Values contained in `expr` are rendered
-/// as placeholders in the SQL string and the actual values are added to `values`.
+/// Writes to `w` the SQL to express the expression given in `expr`.
+///
+/// Values contained in `expr` are rendered as placeholders in the SQL
+/// string and the actual values are added to `values`.
 pub fn sql_for_expr<F, P, W>(expr: Expr, f: F, values: &mut Vec<SqlVal>, pls: &mut P, w: &mut W)
 where
     F: Fn(Expr, &mut Vec<SqlVal>, &mut P, &mut W),
@@ -169,8 +171,7 @@ pub fn sql_insert_with_placeholders(
     }
 }
 
-/// Writes to `w` the SQL of an UPDATE to `table` of `columns` using values in `pls`,
-/// for the row uniquely identified by `pkcol`.
+/// Write to `w` a SQL UPDATE to `table` of `columns` using values in `pls`, for the row uniquely identified by `pkcol`.
 pub fn sql_update_with_placeholders(
     table: &str,
     pkcol: Column,

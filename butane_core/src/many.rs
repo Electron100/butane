@@ -18,13 +18,12 @@ use crate::{sqlval::PrimaryKeyType, DataObject, Error, FieldType, Result, SqlTyp
 
 /// Used to implement a many-to-many relationship between models.
 ///
-/// Creates a new table with columns "owner" and "has" If type T has a
-/// many-to-many relationship with U, owner type is T::PKType, has is
-/// U::PKType. Table name is T_foo_Many where foo is the name of
-/// the Many field
+/// Creates a new table with columns "owner" and "has" if type `T` has a
+/// many-to-many relationship with `U`, "owner" type is `T::PKType`, "has" is
+/// `U::PKType`. Table name is `T_foo_Many` where `foo` is the name of
+/// the `Many` field.
 ///
 /// See [`ManyOpsSync`] and [`ManyOpsAsync`] for operations requiring a live database connection.
-//
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Many<T>
 where
@@ -45,10 +44,11 @@ impl<T> Many<T>
 where
     T: DataObject,
 {
-    /// Constructs a new Many. `init` must be called before it can be
-    /// loaded or saved (or those methods will return
-    /// `Error::NotInitialized`). `init` will automatically be called
-    /// when a [`DataObject`] with a `Many` field is loaded or saved.
+    /// Constructs a new Many.
+    ///
+    /// `init` must be called before it can be loaded or saved (or those
+    /// methods will return `Error::NotInitialized`). `init` will automatically
+    /// be called when a [`DataObject`] with a `Many` field is loaded or saved.
     ///
     /// [`DataObject`]: super::DataObject
     pub fn new() -> Self {
@@ -91,7 +91,7 @@ where
         Ok(())
     }
 
-    /// Removes a value, yet to be performed in the backend
+    /// Removes a value, yet to be performed in the backend.
     ///
     /// After invoking this, `get()` can not be used until `save()` is performed.
     pub fn remove(&mut self, val: &T) {
@@ -100,7 +100,7 @@ where
         self.removed_values.push(val.pk().to_sql())
     }
 
-    /// Returns already loaded values.
+    /// Return already loaded values.
     ///
     /// Returns [`Error::ValueNotLoaded`] if `load()` has not been invoked prior.
     pub fn get(&self) -> Result<impl Iterator<Item = &T>> {
@@ -138,8 +138,9 @@ where
     sync(),
     async(feature = "async")
 )]
-/// Loads the values referred to by this many relationship from a
-/// database query if necessary and returns a reference to them.
+/// Load the values referred to by this many relationship from a database query, if necessary.
+///
+/// Returns a reference to them.
 async fn load_query_uncached<'a, T>(
     many: &'a Many<T>,
     conn: &impl ConnectionMethods,
@@ -162,8 +163,9 @@ where
     Ok(vals)
 }
 
-/// Loads the values referred to by this many relationship from a
-/// database query if necessary and returns a reference to them.
+/// Load the values referred to by this many relationship from a database query, if necessary.
+///
+/// Returns a reference to them.
 #[maybe_async_cfg::maybe(
     idents(load_query_uncached(snake)),
     sync(),

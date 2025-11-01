@@ -42,7 +42,7 @@ impl<T> FieldExpr<T>
 where
     T: Into<SqlVal>,
 {
-    /// Creates a `FieldExpr` from its name.
+    /// Create a `FieldExpr` from its name.
     pub fn new(name: &'static str) -> Self {
         FieldExpr {
             name,
@@ -50,7 +50,7 @@ where
         }
     }
 
-    /// Returns the name of this field.
+    /// Return the name of this field.
     pub fn name(&self) -> &'static str {
         self.name
     }
@@ -62,8 +62,8 @@ where
     binary_op!(le, DataOrd<U>, Le);
     binary_op!(ge, DataOrd<U>, Ge);
 
-    /// Creates a [BoolExpr] which will evaluate to true if
-    /// the value of this field is "like" `val`, where
+    /// Create a [`BoolExpr`] to evaluate to `true` when field value is "like" val.
+    ///
     /// "like" is evaluated as the SQL LIKE operator.
     pub fn like<U>(&self, val: U) -> BoolExpr
     where
@@ -72,8 +72,7 @@ where
         BoolExpr::Like(self.name, Expr::Val(val.to_sql()))
     }
 
-    /// Creates a [BoolExpr] which will evaluate to true if
-    /// the value of this field is contained in `vals`.
+    /// Create a [`BoolExpr`] evaluating to `true` when field value is contained in `vals`.
     pub fn is_in<U: ToSql>(&self, vals: Vec<U>) -> BoolExpr {
         BoolExpr::In(self.name, vals.into_iter().map(|v| v.to_sql()).collect())
     }

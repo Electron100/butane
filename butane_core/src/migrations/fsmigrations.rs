@@ -51,7 +51,7 @@ impl MigrationsState {
     }
 }
 
-/// A migration stored in the filesystem.
+/// Filesystem-backed migration.
 #[derive(Clone, Debug)]
 pub struct FsMigration {
     fs: std::sync::Arc<dyn Filesystem + Send + Sync>,
@@ -147,8 +147,9 @@ impl FsMigration {
         MigrationLock::new_shared(&self.root.join("lock"))
     }
 
-    /// Delete all of the files except info.json which is recreated
-    /// with only `from_name` set to allow migration series traversal.
+    /// Delete all of the files except `info.json` which is recreated.
+    ///
+    /// `info.json` is created with only `from_name` set to allow migration series traversal.
     pub fn delete_db(&self) -> Result<()> {
         let entries = self.fs.list_dir(&self.root)?;
         for entry in entries {
@@ -340,7 +341,7 @@ impl PartialEq for FsMigration {
 }
 impl Eq for FsMigration {}
 
-/// A collection of migrations stored in the filesystem.
+/// Filesystem-backed migrations collection.
 #[derive(Clone, Debug)]
 pub struct FsMigrations {
     fs: std::sync::Arc<dyn Filesystem + Send + Sync>,
@@ -383,8 +384,9 @@ impl FsMigrations {
         contents.push('\n');
         f.write_all(contents.as_bytes()).map_err(|e| e.into())
     }
-    /// Detach the latest migration from the list of migrations,
-    /// leaving the migration on the filesystem.
+    /// Detach the latest migration from the list of migrations.
+    ///
+    /// Leaves the migration on the filesystem.
     pub fn detach_latest_migration(&mut self) -> Result<()> {
         let latest = self
             .latest()

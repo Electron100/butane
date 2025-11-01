@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use butane_cli::{
     add_backend, base_dir, clean, clear_data, collapse_migrations, delete_table,
     describe_migration, detach_latest_migration, embed, get_migrations, handle_error, init,
-    list_backends, list_migrations, make_migration, migrate, regenerate_migrations, remove_backend,
-    unmigrate,
+    list_backends, list_migrations, make_migration, migrate, parse_backends, regenerate_migrations,
+    remove_backend, unmigrate,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
@@ -37,6 +37,9 @@ enum Commands {
     MakeMigration {
         /// Name to use for the migration.
         name: String,
+        /// Comma-separated list of backends to use (e.g., "sqlite,pg")
+        #[arg(short = 'b', long)]
+        backends: Option<String>,
     },
     /// Detach the latest migration.
     #[command(
@@ -173,7 +176,19 @@ fn main() {
             BackendCommands::Remove { name } => handle_error(remove_backend(&base_dir, name)),
             BackendCommands::List => handle_error(list_backends(&base_dir)),
         },
-        Commands::MakeMigration { name } => handle_error(make_migration(&base_dir, Some(name))),
+        Commands::MakeMigration { name, backends } => {
+            let parsed_backends = match backends {
+                Some(backends_str) => match parse_backends(backends_str) {
+                    Ok(backends) => Some(backends),
+                    Err(e) => {
+                        handle_error(Err(e));
+                        return;
+                    }
+                },
+                None => None,
+            };
+            handle_error(make_migration(&base_dir, Some(name), parsed_backends))
+        }
         Commands::DescribeMigration { name } => handle_error(describe_migration(&base_dir, name)),
         Commands::Regenerate => handle_error(regenerate_migrations(&base_dir)),
         Commands::DetachMigration => handle_error(detach_latest_migration(&base_dir)),

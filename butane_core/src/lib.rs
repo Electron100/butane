@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
 
 pub mod codegen;
+#[cfg(feature = "pg")]
 pub mod custom;
 pub mod db;
 pub mod fkey;
@@ -25,6 +26,7 @@ mod autopk;
 mod util;
 
 pub use autopk::AutoPk;
+#[cfg(feature = "pg")]
 use custom::SqlTypeCustom;
 use db::{BackendRow, Column, ConnectionMethods};
 pub use query::Query;
@@ -278,10 +280,13 @@ pub enum Error {
     NoCustomDefault,
     #[error("No enum variant named '{0}'")]
     UnknownEnumVariant(String),
+    #[cfg(feature = "pg")]
     #[error("Backend {1} is not compatible with custom SqlVal {0:?}")]
     IncompatibleCustom(custom::SqlValCustom, &'static str),
+    #[cfg(feature = "pg")]
     #[error("Backend {1} is not compatible with custom SqlType {0:?}")]
     IncompatibleCustomT(custom::SqlTypeCustom, &'static str),
+    #[cfg(feature = "pg")]
     #[error("Literal values for custom types are currently unsupported.")]
     LiteralForCustomUnsupported(custom::SqlValCustom),
     #[error("This DataObject doesn't support determining whether it has been saved.")]
@@ -386,7 +391,8 @@ pub enum SqlType {
     #[cfg(feature = "json")]
     /// JSON
     Json,
-    /// Custom SQL type
+    /// Custom SQL type.
+    #[cfg(feature = "pg")]
     Custom(SqlTypeCustom),
 }
 impl std::fmt::Display for SqlType {
@@ -405,6 +411,7 @@ impl std::fmt::Display for SqlType {
             Blob => "blob",
             #[cfg(feature = "json")]
             Json => "json",
+            #[cfg(feature = "pg")]
             Custom(_) => "custom",
         }
         .fmt(f)

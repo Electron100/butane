@@ -774,6 +774,7 @@ fn sqlval_to_turso(val: &SqlValRef<'_>) -> turso::Value {
             turso::Value::Text(f.to_string())
         }
         Null => turso::Value::Null,
+        #[cfg(feature = "pg")]
         Custom(_) => panic!("Custom types not supported in turso"),
     }
 }
@@ -895,6 +896,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
             };
             SqlVal::Blob(b)
         }
+        #[cfg(feature = "pg")]
         SqlType::Custom(v) => return Err(Error::IncompatibleCustomT(v.clone(), BACKEND_NAME)),
     })
 }
@@ -1057,6 +1059,7 @@ fn sqltype(ty: &SqlType) -> &'static str {
         SqlType::Date => "TEXT",
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => "TEXT",
+        #[cfg(feature = "pg")]
         SqlType::Custom(_) => panic!("Custom types not supported by turso backend"),
     }
 }

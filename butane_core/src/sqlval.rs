@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "pg")]
 use crate::custom::SqlTypeCustom;
+#[cfg(feature = "pg")]
 use crate::custom::{SqlValCustom, SqlValRefCustom};
 use crate::{DataObject, Error::CannotConvertSqlVal, Result, SqlType};
 
@@ -34,6 +35,7 @@ pub enum SqlValRef<'a> {
     Date(NaiveDate),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime), // NaiveDateTime is Copy
+    #[cfg(feature = "pg")]
     Custom(SqlValRefCustom<'a>),
 }
 impl SqlValRef<'_> {
@@ -62,8 +64,6 @@ impl SqlValRef<'_> {
                     Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone())))
                 }
             },
-            #[cfg(not(feature = "pg"))]
-            SqlValRef::Custom(_) => None,
         }
     }
 }
@@ -89,6 +89,7 @@ pub enum SqlVal {
     Date(NaiveDate),
     #[cfg(feature = "datetime")]
     Timestamp(NaiveDateTime),
+    #[cfg(feature = "pg")]
     Custom(Box<SqlValCustom>),
 }
 impl SqlVal {
@@ -180,8 +181,6 @@ impl SqlVal {
             SqlVal::Custom(c) => match c.as_ref() {
                 SqlValCustom::Pg { ty, .. } => Some(SqlType::Custom(SqlTypeCustom::Pg(ty.clone()))),
             },
-            #[cfg(not(feature = "pg"))]
-            SqlVal::Custom(_) => None,
         }
     }
 }
@@ -202,6 +201,7 @@ impl fmt::Display for SqlVal {
             Date(val) => val.format("%Y-%m-%d").fmt(f),
             #[cfg(feature = "datetime")]
             Timestamp(val) => val.format("%+").fmt(f),
+            #[cfg(feature = "pg")]
             Custom(val) => val.fmt(f),
         }
     }
@@ -273,6 +273,7 @@ impl From<SqlValRef<'_>> for SqlVal {
             Date(v) => SqlVal::Date(v),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlVal::Timestamp(v),
+            #[cfg(feature = "pg")]
             Custom(v) => SqlVal::Custom(Box::new(v.into())),
         }
     }
@@ -295,6 +296,7 @@ impl<'a> From<&'a SqlVal> for SqlValRef<'a> {
             Date(v) => SqlValRef::Date(*v),
             #[cfg(feature = "datetime")]
             Timestamp(v) => SqlValRef::Timestamp(*v),
+            #[cfg(feature = "pg")]
             Custom(v) => SqlValRef::Custom(v.as_valref()),
         }
     }

@@ -48,9 +48,16 @@ pub use connmethods::{
 };
 mod helper;
 mod macros;
+
+/// Libsql database backend.
+#[cfg(feature = "libsql")]
+pub mod libsql;
+
+/// PostgreSQL database backend.
 #[cfg(feature = "pg")]
 pub mod pg;
 
+/// SQLite database backend.
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
@@ -630,9 +637,10 @@ impl ConnectionSpec {
 /// If it is a URL with a scheme of "sqlite", the backend will be set to "sqlite",
 /// and the scheme will be set to "file" as required by the sqlite engine.
 /// If it is a URI with a scheme of "file", the backend will be set to "sqlite".
-/// If it is a URI with a scheme of "libsql", the backend will be set to "turso",
-/// and the scheme will be mapped to "turso".
-/// If it does not have a scheme, it will be set to "pg" if it contains any of
+/// If it is a URI with a scheme of "libsql+http", the backend will be set to "libsql",
+/// and the libsql backend will use HTTP.
+/// Any other scheme will set the backend name to the scheme, even if it is not a recognized backend.
+/// If it does not have a scheme, it will be set to "pg", if it contains any of
 /// `host=`, `hostaddr=`, `dbname=`, or `user=`.
 /// Otherwise it will default to "sqlite".
 impl TryFrom<&str> for ConnectionSpec {
@@ -658,11 +666,10 @@ impl TryFrom<&str> for ConnectionSpec {
                         backend_name: "pg".to_string(),
                         conn_str: value.to_string(),
                     }),
-                    "libsql" => {
-                        // libsql:// is an alias for turso://
-                        let value = value.replacen("libsql:", "turso:", 1);
+                    "libsql+http" => {
+                        let value = value.replacen("libsql+http:", "http:", 1);
                         Ok(ConnectionSpec {
-                            backend_name: "turso".to_string(),
+                            backend_name: "libsql".to_string(),
                             conn_str: value,
                         })
                     }
@@ -748,6 +755,8 @@ impl Backend for Box<dyn Backend> {
 /// Find a backend by name.
 pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
+        #[cfg(feature = "libsql")]
+        libsql::BACKEND_NAME => Some(Box::new(libsql::LibsqlBackend)),
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         #[cfg(feature = "sqlite")]

@@ -24,10 +24,10 @@ use crate::query::{BoolExpr, Order};
 use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 
 #[cfg(feature = "datetime")]
-const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
+pub(crate) const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
 
 #[cfg(feature = "datetime")]
-const SQLITE_DATE_FORMAT: &str = "%Y-%m-%d";
+pub(crate) const SQLITE_DATE_FORMAT: &str = "%Y-%m-%d";
 
 /// Minimum required SQLite version.
 pub const SQLITE_MIN_VERSION: i32 = 3035000;
@@ -36,6 +36,9 @@ pub const SQLITE_MIN_VERSION: i32 = 3035000;
 pub const BACKEND_NAME: &str = "sqlite";
 /// Internal row ordering field name.
 pub const ROW_ID_COLUMN_NAME: &str = "rowid";
+/// SQL query to check if a table exists in the database.
+pub(crate) const HAS_TABLE_SQL: &str =
+    "SELECT name FROM sqlite_master WHERE type='table' AND name=?";
 
 #[cfg(feature = "log")]
 fn log_callback(error_code: std::ffi::c_int, message: &str) {
@@ -86,7 +89,7 @@ impl Backend for SQLiteBackend {
         let mut lines = ops
             .into_iter()
             .map(|o| {
-                let sql = sql_for_op(&mut current, &o);
+                let sql = sql_for_op(&mut current, &o, true);
                 current.transform_with(o);
                 sql
             })
@@ -389,8 +392,7 @@ impl ConnectionMethods for rusqlite::Connection {
         Ok(cnt)
     }
     fn has_table(&self, table: &str) -> Result<bool> {
-        let mut stmt =
-            self.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?;")?;
+        let mut stmt = self.prepare(HAS_TABLE_SQL)?;
         let mut rows = stmt.query([table])?;
         Ok(rows.next()?.is_some())
     }
@@ -613,7 +615,7 @@ impl BackendRow for rusqlite::Row<'_> {
     }
 }
 
-fn sql_for_expr<W>(
+pub(crate) fn sql_for_expr<W>(
     expr: query::Expr,
     values: &mut Vec<SqlVal>,
     pls: &mut SQLitePlaceholderSource,
@@ -659,20 +661,29 @@ fn sql_valref_from_rusqlite<'a>(
     })
 }
 
-fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
+/// Generate SQLite DDL.
+///
+/// `strict` indicates whether to add the STRICT modifier to CREATE TABLE statements.
+/// Only Turso does not support STRICT.
+pub(crate) fn sql_for_op(current: &mut ADB, op: &Operation, strict: bool) -> Result<String> {
     match op {
-        Operation::AddTable(table) => Ok(create_table(table, false)),
-        Operation::AddTableConstraints(_table) => Ok("".to_owned()),
-        Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)),
+        Operation::AddTable(table) => Ok(create_table(table, false, strict)),
+        Operation::AddTableIfNotExists(table) => Ok(create_table(table, true, strict)),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
-        Operation::RemoveTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
-        Operation::RemoveColumn(tbl, name) => remove_column(current, tbl, name),
-        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new))),
+        Operation::RemoveColumn(tbl, name) => remove_column(current, tbl, name, strict),
+        Operation::ChangeColumn(tbl, old, new) => {
+            Ok(change_column(current, tbl, old, Some(new), strict))
+        }
+        // Sqlite doesn't support adding/removing constraints separately
+        // They must be included when creating the table.
+        Operation::AddTableConstraints(_) | Operation::RemoveTableConstraints(_) => {
+            Ok("".to_owned())
+        }
     }
 }
 
-fn create_table(table: &ATable, allow_exists: bool) -> String {
+pub(crate) fn create_table(table: &ATable, allow_exists: bool, strict: bool) -> String {
     let coldefs = table
         .columns
         .iter()
@@ -684,12 +695,14 @@ fn create_table(table: &ATable, allow_exists: bool) -> String {
     if !constraints.is_empty() {
         constraints = ",\n".to_owned() + &constraints;
     }
+    let strict_suffix = if strict { " STRICT" } else { "" };
     format!(
-        "CREATE TABLE {}{} (\n{}{}\n) STRICT;",
+        "CREATE TABLE {}{} (\n{}{}\n){};",
         modifier,
         helper::quote_reserved_word(&table.name),
         coldefs,
-        constraints
+        constraints,
+        strict_suffix
     )
 }
 
@@ -703,7 +716,7 @@ fn create_table_constraints(table: &ATable) -> String {
         .join("\n")
 }
 
-fn define_column(col: &AColumn) -> String {
+pub(crate) fn define_column(col: &AColumn) -> String {
     let mut constraints: Vec<String> = Vec::new();
     if !col.nullable() {
         constraints.push("NOT NULL".to_string());
@@ -735,7 +748,7 @@ fn define_column(col: &AColumn) -> String {
     }
 }
 
-fn define_constraint(column: &AColumn) -> String {
+pub(crate) fn define_constraint(column: &AColumn) -> String {
     let reference = column
         .reference()
         .as_ref()
@@ -753,7 +766,7 @@ fn define_constraint(column: &AColumn) -> String {
     }
 }
 
-fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
+pub(crate) fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
     match col.typeid() {
         Ok(TypeIdentifier::Ty(ty)) => Cow::Borrowed(sqltype(&ty)),
         Ok(TypeIdentifier::Name(name)) => Cow::Owned(name),
@@ -763,7 +776,7 @@ fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
     }
 }
 
-fn sqltype(ty: &SqlType) -> &'static str {
+pub(crate) fn sqltype(ty: &SqlType) -> &'static str {
     match ty {
         SqlType::Bool => "INTEGER",
         SqlType::Int => "INTEGER",
@@ -782,11 +795,11 @@ fn sqltype(ty: &SqlType) -> &'static str {
     }
 }
 
-fn drop_table(name: &str) -> String {
+pub(crate) fn drop_table(name: &str) -> String {
     format!("DROP TABLE {};", helper::quote_reserved_word(name))
 }
 
-fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
+pub(crate) fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     let default: SqlVal = helper::column_default(col)?;
     Ok(format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
@@ -796,7 +809,12 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     ))
 }
 
-fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String> {
+pub(crate) fn remove_column(
+    current: &mut ADB,
+    tbl_name: &str,
+    name: &str,
+    strict: bool,
+) -> Result<String> {
     let current_clone = current.clone();
     let table = current_clone
         .get_table(tbl_name)
@@ -807,7 +825,7 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String
     // "ALTER TABLE b DROP COLUMN fkey;" fails due to sqlite not being
     // able to remove the attached constraint.
     if col.reference().is_some() {
-        Ok(change_column(current, tbl_name, col, None))
+        Ok(change_column(current, tbl_name, col, None, strict))
     } else {
         Ok(format!(
             "ALTER TABLE {} DROP COLUMN {};",
@@ -817,13 +835,14 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String
     }
 }
 
-fn copy_table(old: &ATable, new: &ATable) -> String {
+pub(crate) fn copy_table(old: &ATable, new: &ATable) -> String {
     let column_names = new
         .columns
         .iter()
         .map(|col| helper::quote_reserved_word(col.name()))
         .collect::<Vec<Cow<str>>>()
         .join(", ");
+
     format!(
         "INSERT INTO {} SELECT {} FROM {};",
         helper::quote_reserved_word(&new.name),
@@ -832,15 +851,16 @@ fn copy_table(old: &ATable, new: &ATable) -> String {
     )
 }
 
-fn tmp_table_name(name: &str) -> String {
+pub(crate) fn tmp_table_name(name: &str) -> String {
     format!("{name}__butane_tmp")
 }
 
-fn change_column(
+pub(crate) fn change_column(
     current: &mut ADB,
     tbl_name: &str,
     old: &AColumn,
     new: Option<&AColumn>,
+    strict: bool,
 ) -> String {
     let table = current.get_table(tbl_name);
     if table.is_none() {
@@ -859,7 +879,7 @@ fn change_column(
         None => new_table.remove_column(old.name()),
     }
     let stmts: [&str; 4] = [
-        &create_table(&new_table, false),
+        &create_table(&new_table, false, strict),
         &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
         &format!(
@@ -885,7 +905,12 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: 
         ", "
     });
     write!(w, ")").unwrap();
-    write!(w, " ON CONFLICT ({}) DO ", pkcol.name()).unwrap();
+    write!(
+        w,
+        " ON CONFLICT ({}) DO ",
+        helper::quote_reserved_word(pkcol.name())
+    )
+    .unwrap();
     if columns.len() > 1 {
         write!(w, "UPDATE SET (").unwrap();
         helper::list_columns(columns, w);
@@ -908,9 +933,9 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: 
 }
 
 #[derive(Debug)]
-struct SQLitePlaceholderSource;
+pub(crate) struct SQLitePlaceholderSource;
 impl SQLitePlaceholderSource {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         SQLitePlaceholderSource {}
     }
 }

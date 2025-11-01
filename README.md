@@ -19,7 +19,7 @@ implementation detail to the API consumer.
   may be hand-tuned if necessary)
 * Ability to embed migrations in Rust code (so that a library may easily bundle its migrations)
 * SQLite and PostgreSQL backends
-* Turso (Sqlite compatible) backend - experimental
+* Experimental SQLite compatible backends Turso and libsql
 * Write entirely or nearly entirely the same code regardless of database backend
 * Experimental WASM support for `butane_core` only currently.
 

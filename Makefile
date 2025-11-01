@@ -62,3 +62,9 @@ regenerate-example-migrations :
 		(cd $$dir; cargo +stable run -p butane_cli --all-features -- regenerate; \
 		cargo +stable run -p butane_cli --all-features -- embed); \
 	done
+
+# Keeping this here as an example of how to add a backend to all examples
+examples-migrations-add-libsql-backend :
+	for dir in examples/*; do \
+		(cd $$dir; cargo +stable run -p butane_cli --all-features -- backend add libsql || true;) \
+	done

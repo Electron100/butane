@@ -1,6 +1,7 @@
 [tools]
 editorconfig-checker = "latest"
 ephemeral-postgres = "latest"
+libsql-server = "latest"
 osv-scanner = "latest"
 rust = "stable"
 "cargo:pep257" = "latest"

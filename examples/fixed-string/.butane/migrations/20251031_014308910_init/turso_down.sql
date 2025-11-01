@@ -1,0 +1,4 @@
+DROP TABLE Config;
+DROP TABLE "Order";
+DROP TABLE Product;
+DROP TABLE "User";

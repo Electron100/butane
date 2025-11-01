@@ -1,0 +1,70 @@
+{
+  "name": "User",
+  "columns": [
+    {
+      "name": "id",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "BigInt"
+        }
+      },
+      "nullable": false,
+      "pk": true,
+      "auto": true,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "username",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "email",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "display_name",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": true,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "status",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

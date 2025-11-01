@@ -228,3 +228,112 @@ fn r_hash_struct_name() {
     assert_eq!(table.columns[0].name(), "id");
     assert_eq!(table.columns[1].name(), "foo");
 }
+
+#[test]
+fn array_string_primitive_sql_type() {
+    // Test basic ArrayString<N> type
+    let path: syn::Path = syn::parse_quote!(ArrayString<32>);
+    let rv = get_primitive_sql_type(&path).unwrap();
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Text);
+    } else {
+        panic!(
+            "Expected ArrayString<32> to map to SqlType::Text, got: {:?}",
+            rv
+        );
+    }
+
+    // Test fully qualified ArrayString type
+    let path: syn::Path = syn::parse_quote!(arrayvec::ArrayString<64>);
+    let rv = get_primitive_sql_type(&path).unwrap();
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Text);
+    } else {
+        panic!(
+            "Expected arrayvec::ArrayString<64> to map to SqlType::Text, got: {:?}",
+            rv
+        );
+    }
+}
+
+#[test]
+fn array_string_deferred_sql_type() {
+    // Test basic ArrayString<N> type through deferred resolver
+    let path: syn::Path = syn::parse_quote!(ArrayString<16>);
+    let rv = get_deferred_sql_type(&path);
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Text);
+    } else {
+        panic!(
+            "Expected ArrayString<16> to map to SqlType::Text, got: {:?}",
+            rv
+        );
+    }
+
+    // Test Option<ArrayString<N>>
+    let path: syn::Path = syn::parse_quote!(Option<ArrayString<128>>);
+    let rv = get_deferred_sql_type(&path);
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Text);
+    } else {
+        panic!(
+            "Expected Option<ArrayString<128>> to map to SqlType::Text, got: {:?}",
+            rv
+        );
+    }
+
+    // Test fully qualified with Option
+    let path: syn::Path = syn::parse_quote!(Option<arrayvec::ArrayString<256>>);
+    let rv = get_deferred_sql_type(&path);
+    if let DeferredSqlType::KnownId(TypeIdentifier::Ty(sql_type)) = rv {
+        assert_eq!(sql_type, SqlType::Text);
+    } else {
+        panic!(
+            "Expected Option<arrayvec::ArrayString<256>> to map to SqlType::Text, got: {:?}",
+            rv
+        );
+    }
+}
+
+#[test]
+fn array_string_model_generation() {
+    let mut migrations = MemMigrations::new();
+
+    let item: syn::ItemStruct = parse_quote! {
+        #[model]
+        pub struct FixedStringModel {
+            id: u32,
+            name: ArrayString<32>,
+            description: Option<ArrayString<255>>,
+            qualified_name: arrayvec::ArrayString<64>,
+        }
+    };
+
+    let tokens = item.to_token_stream();
+    let _model = model_with_migrations(tokens, &mut migrations);
+    let migration = migrations.current();
+    let adb = migration.db().unwrap();
+
+    // Try common table name variants
+    let table = adb
+        .get_table("fixed_string_model")
+        .or_else(|| adb.get_table("fixedstringmodel"))
+        .or_else(|| adb.get_table("FixedStringModel"))
+        .expect("Table should exist with some name variant");
+
+    // Verify columns exist and have correct names
+    assert_eq!(table.columns.len(), 4);
+    assert_eq!(table.columns[0].name(), "id");
+    assert_eq!(table.columns[1].name(), "name");
+    assert_eq!(table.columns[2].name(), "description");
+    assert_eq!(table.columns[3].name(), "qualified_name");
+
+    // All columns should be resolvable to some type
+    // (The detailed type checking is done in the primitive_sql_type tests)
+    for (i, column) in table.columns.iter().enumerate() {
+        match column.typeid() {
+            Ok(_) => {} // Good, the type was resolved
+            Err(_) => panic!("Column {} ({}) type was not resolved", i, column.name()),
+        }
+    }
+}

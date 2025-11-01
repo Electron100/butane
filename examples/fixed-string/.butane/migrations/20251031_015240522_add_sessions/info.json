@@ -1,0 +1,14 @@
+{
+  "from_name": "20251031_014308910_init",
+  "table_bases": {
+    "Config": "20251031_014308910_init",
+    "Order": "20251031_014308910_init",
+    "Product": "20251031_014308910_init",
+    "User": "20251031_014308910_init"
+  },
+  "backends": [
+    "sqlite",
+    "pg",
+    "turso"
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "name": "Order",
+  "columns": [
+    {
+      "name": "id",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "BigInt"
+        }
+      },
+      "nullable": false,
+      "pk": true,
+      "auto": true,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "order_number",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "user",
+      "sqltype": {
+        "Deferred": "PK:User"
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null,
+      "reference": {
+        "Deferred": {
+          "Deferred": "PK:User"
+        }
+      }
+    },
+    {
+      "name": "product",
+      "sqltype": {
+        "Deferred": "PK:Product"
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null,
+      "reference": {
+        "Deferred": {
+          "Deferred": "PK:Product"
+        }
+      }
+    },
+    {
+      "name": "quantity",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Int"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    },
+    {
+      "name": "status",
+      "sqltype": {
+        "KnownId": {
+          "Ty": "Text"
+        }
+      },
+      "nullable": false,
+      "pk": false,
+      "auto": false,
+      "unique": false,
+      "default": null
+    }
+  ]
+}

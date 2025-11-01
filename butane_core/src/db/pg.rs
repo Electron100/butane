@@ -795,10 +795,17 @@ fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String>
 
         if new.is_pk() {
             // Drop the old primary key
+            // Constraint name needs quoting if table name needs quoting
+            let constraint_name = format!("{}_pkey", tbl_name);
+            let quoted_constraint = if tbl_name != &quote_reserved_word(tbl_name) {
+                format!("\"{}\"", constraint_name)
+            } else {
+                constraint_name
+            };
             stmts.push(format!(
-                "ALTER TABLE {} DROP CONSTRAINT IF EXISTS {}_pkey;",
+                "ALTER TABLE {} DROP CONSTRAINT IF EXISTS {};",
                 quote_reserved_word(tbl_name),
-                tbl_name
+                quoted_constraint
             ));
 
             // add the new primary key
@@ -822,11 +829,17 @@ fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String>
             ));
         } else {
             // Standard constraint naming scheme
+            // Constraint name needs quoting if table name needs quoting
+            let constraint_name = format!("{}_{}_key", tbl_name, old.name());
+            let quoted_constraint = if tbl_name != &quote_reserved_word(tbl_name) {
+                format!("\"{}\"", constraint_name)
+            } else {
+                constraint_name
+            };
             stmts.push(format!(
-                "ALTER TABLE {} DROP CONSTRAINT {}_{}_key;",
+                "ALTER TABLE {} DROP CONSTRAINT {};",
                 quote_reserved_word(tbl_name),
-                tbl_name,
-                &old.name()
+                quoted_constraint
             ));
         }
     }
@@ -850,11 +863,17 @@ fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String>
     if old.reference() != new.reference() {
         if old.reference().is_some() {
             // Drop the old reference
+            // Constraint name needs quoting if table name needs quoting
+            let constraint_name = format!("{}_{}_fkey", tbl_name, old.name());
+            let quoted_constraint = if tbl_name != &quote_reserved_word(tbl_name) {
+                format!("\"{}\"", constraint_name)
+            } else {
+                constraint_name
+            };
             stmts.push(format!(
-                "ALTER TABLE {} DROP CONSTRAINT {}_{}_fkey;",
+                "ALTER TABLE {} DROP CONSTRAINT {};",
                 quote_reserved_word(tbl_name),
-                tbl_name,
-                old.name()
+                quoted_constraint
             ));
         }
         if new.reference().is_some() {

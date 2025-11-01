@@ -1,7 +1,7 @@
-//! Turso database backend
+//! LibSQL database backend (remote sqld server)
 //!
-//! Turso is an in-process SQL database written in Rust, compatible with SQLite.
-//! This backend leverages the same migration SQL and query structure as SQLite.
+//! LibSQL is a fork of SQLite with additional features for remote connections.
+//! This backend connects to a remote sqld (libsql-server) instance using HTTP.
 
 use std::fmt::{Debug, Write};
 
@@ -11,9 +11,9 @@ use chrono::naive::{NaiveDate, NaiveDateTime};
 
 use super::connmethods::VecRows;
 use super::helper;
-// Migration SQL generation (reuse SQLite logic since Turso is compatible)
+// Migration SQL generation (reuse SQLite logic since LibSQL is compatible)
 use super::sqlite::{
-    add_column, change_column, drop_table, remove_column, sql_insert_or_update, sqltype,
+    add_column, change_column, create_table, drop_table, remove_column, sql_insert_or_update,
     SQLitePlaceholderSource,
 };
 use crate::db::{
@@ -21,43 +21,43 @@ use crate::db::{
     BackendTransactionAsync as BackendTransaction, Column, ConnectionAsync,
     ConnectionMethodsAsync as ConnectionMethods, RawQueryResult, TransactionAsync as Transaction,
 };
-use crate::migrations::adb::{AColumn, ARef, ATable, Operation, TypeIdentifier, ADB};
+use crate::migrations::adb::{Operation, ADB};
 use crate::query::{BoolExpr, Order};
 use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 
 #[cfg(feature = "datetime")]
-const TURSO_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
+const LIBSQL_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
 
 #[cfg(feature = "datetime")]
-const TURSO_DATE_FORMAT: &str = "%Y-%m-%d";
+const LIBSQL_DATE_FORMAT: &str = "%Y-%m-%d";
 
-/// Backend name identifier for Turso.
-pub const BACKEND_NAME: &str = "turso";
+/// Backend name identifier for LibSQL.
+pub const BACKEND_NAME: &str = "libsql";
 
-/// Row ID column name used by Turso (same as SQLite).
+/// Row ID column name used by LibSQL (same as SQLite).
 pub const ROW_ID_COLUMN_NAME: &str = "rowid";
 
 // Trait similar to PgConnectionLike for sharing behavior between Connection and Transaction
-trait TursoConnectionLike {
-    fn conn(&self) -> Result<&turso::Connection>;
+trait LibsqlConnectionLike {
+    fn conn(&self) -> Result<&libsql::Connection>;
 }
 
-impl TursoConnectionLike for TursoConnection {
-    fn conn(&self) -> Result<&turso::Connection> {
+impl LibsqlConnectionLike for LibsqlConnection {
+    fn conn(&self) -> Result<&libsql::Connection> {
         Ok(&self.conn)
     }
 }
 
-/// Turso backend.
+/// LibSQL backend for remote sqld connections.
 ///
-/// Provides an async-first database backend using Turso/libSQL, which is SQLite-compatible.
-/// Turso is written in Rust and designed for modern async I/O operations.
+/// Provides an async-first database backend using LibSQL for remote connections to sqld servers.
+/// LibSQL is SQLite-compatible and designed for modern async I/O operations.
 ///
 /// # Features
 ///
 /// - **Async-only**: All operations are asynchronous
 /// - **SQLite-compatible**: Uses the same SQL dialect as SQLite
-/// - **Memory and file-based**: Supports both `:memory:` and file-based databases
+/// - **Remote connections**: Connects to sqld (libsql-server) via HTTP
 /// - **Foreign key support**: Enforces foreign key constraints by default
 /// - **Subquery transformation**: Automatically handles subqueries in WHERE clauses
 ///
@@ -66,44 +66,43 @@ impl TursoConnectionLike for TursoConnection {
 /// - No synchronous operations (use SQLite backend if sync is required)
 /// - Subqueries in WHERE clauses are transformed into multiple queries
 /// - Table renames within transactions have limitations (see documentation)
+/// - Requires a remote sqld server (use LibSQL backend for local/in-memory databases)
 ///
 /// # Example
 ///
 /// ```no_run
-/// use butane_core::db::{Backend, turso::TursoBackend};
+/// use butane_core::db::{Backend, libsql::LibsqlBackend};
 ///
 /// # async fn example() -> Result<(), butane_core::Error> {
-/// let backend = TursoBackend::new();
-/// let mut conn = backend.connect(":memory:");
+/// let backend = LibsqlBackend::new();
+/// let mut conn = backend.connect_async("http://127.0.0.1:8080").await?;
 /// # Ok(())
 /// # }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub struct TursoBackend;
-impl TursoBackend {
-    /// Create a Turso backend instance.
+pub struct LibsqlBackend;
+impl LibsqlBackend {
+    /// Create a LibSQL backend instance.
     ///
     /// # Example
     ///
     /// ```
-    /// use butane_core::db::turso::TursoBackend;
+    /// use butane_core::db::libsql::LibsqlBackend;
     ///
-    /// let backend = TursoBackend::new();
+    /// let backend = LibsqlBackend::new();
     /// ```
-    pub fn new() -> TursoBackend {
-        TursoBackend {}
+    pub fn new() -> LibsqlBackend {
+        LibsqlBackend {}
     }
 
-    async fn connect(&self, path: &str) -> Result<TursoConnection> {
-        let connection = TursoConnection::open(path).await?;
-        // Note: Turso/libsql doesn't support PRAGMA commands
-        // Foreign keys are enabled by default in libsql
+    async fn connect(&self, url: &str) -> Result<LibsqlConnection> {
+        let connection = LibsqlConnection::open(url).await?;
         Ok(connection)
     }
 }
 
 #[async_trait]
-impl Backend for TursoBackend {
+impl Backend for LibsqlBackend {
     fn name(&self) -> &'static str {
         BACKEND_NAME
     }
@@ -113,7 +112,7 @@ impl Backend for TursoBackend {
     }
 
     fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {
-        // Turso is SQLite-compatible, so we can reuse SQLite's migration logic
+        // LibSQL is SQLite-compatible, so we can reuse SQLite's migration logic
         let mut current: ADB = (*current).clone();
         let mut lines = ops
             .into_iter()
@@ -127,32 +126,49 @@ impl Backend for TursoBackend {
         Ok(lines.join("\n"))
     }
 
-    async fn connect_async(&self, path: &str) -> Result<ConnectionAsync> {
-        let conn = self.connect(path).await?;
+    async fn connect_async(&self, url: &str) -> Result<ConnectionAsync> {
+        let conn = self.connect(url).await?;
         Ok(ConnectionAsync {
             conn: Box::new(conn),
         })
     }
 
-    fn connect(&self, _path: &str) -> Result<super::Connection> {
-        // Turso is async-only, so sync connect is not supported
+    fn connect(&self, _url: &str) -> Result<super::Connection> {
+        // LibSQL remote backend is async-only, so sync connect is not supported
         Err(Error::Internal(
-            "Turso backend only supports async operations. Use connect_async instead.".to_string(),
+            "LibSQL backend only supports async operations. Use connect_async instead.".to_string(),
         ))
     }
 }
 
-/// Turso database connection.
-#[derive(Debug)]
-pub struct TursoConnection {
-    conn: turso::Connection,
+/// LibSQL database connection to remote sqld server.
+pub struct LibsqlConnection {
+    conn: libsql::Connection,
 }
 
-impl TursoConnection {
-    async fn open(path: impl AsRef<str>) -> Result<Self> {
-        let path_str = path.as_ref();
+impl std::fmt::Debug for LibsqlConnection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LibsqlConnection").finish_non_exhaustive()
+    }
+}
 
-        let db = turso::Builder::new_local(path_str)
+impl LibsqlConnection {
+    async fn open(url: impl AsRef<str>) -> Result<Self> {
+        let url_str = url.as_ref();
+
+        // Convert libsql:// and libsql+http:// schemes to http:// for the libsql crate
+        let http_url = if url_str.starts_with("libsql+http://") {
+            url_str.replace("libsql+http://", "http://")
+        } else if url_str.starts_with("libsql://") {
+            url_str.replace("libsql://", "http://")
+        } else if url_str.starts_with("http://") || url_str.starts_with("https://") {
+            url_str.to_string()
+        } else {
+            // Assume it's a host:port without scheme
+            format!("http://{}", url_str)
+        };
+
+        let db = libsql::Builder::new_remote(http_url, "".to_string())
             .build()
             .await
             .map_err(|e| Error::Internal(e.to_string()))?;
@@ -160,15 +176,15 @@ impl TursoConnection {
         let conn = db.connect().map_err(|e| Error::Internal(e.to_string()))?;
 
         // Enable foreign key constraints using the SQL command
-        conn.execute("PRAGMA foreign_keys = 1", Vec::<turso::Value>::new())
+        conn.execute("PRAGMA foreign_keys = 1", ())
             .await
             .map_err(|e| Error::Internal(e.to_string()))?;
 
-        Ok(TursoConnection { conn })
+        Ok(LibsqlConnection { conn })
     }
 
     /// Transform Subquery expressions into In expressions by executing the subquery first.
-    /// This is necessary because Turso/libSQL doesn't support subqueries in WHERE clauses.
+    /// This is necessary because LibSQL doesn't support subqueries in WHERE clauses.
     async fn transform_subqueries(&self, expr: BoolExpr) -> Result<BoolExpr> {
         use crate::query::BoolExpr::*;
 
@@ -263,9 +279,9 @@ impl TursoConnection {
         sql: &str,
         values: Vec<SqlVal>,
     ) -> Result<Vec<SqlVal>> {
-        let params: Vec<turso::Value> = values
+        let params: Vec<libsql::Value> = values
             .iter()
-            .map(|v| sqlval_to_turso(&v.as_ref()))
+            .map(|v| sqlval_to_libsql(&v.as_ref()))
             .collect();
 
         let mut rows = self
@@ -283,7 +299,7 @@ impl TursoConnection {
             let val = row
                 .get_value(0)
                 .map_err(|e| Error::Internal(e.to_string()))?;
-            result_values.push(turso_value_to_sqlval_untyped(&val)?);
+            result_values.push(libsql_value_to_sqlval_untyped(&val)?);
         }
 
         Ok(result_values)
@@ -312,12 +328,12 @@ impl TursoConnection {
 }
 
 #[async_trait]
-impl ConnectionMethods for TursoConnection {
+impl ConnectionMethods for LibsqlConnection {
     async fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
             debug!("execute sql {sql}");
         }
-        // Turso doesn't have execute_batch, so we need to execute statements one by one
+        // LibSQL doesn't have execute_batch, so we need to execute statements one by one
         // Split on semicolons and execute each statement separately
         for statement in sql.split(';').map(str::trim).filter(|s| !s.is_empty()) {
             self.conn()?
@@ -337,7 +353,7 @@ impl ConnectionMethods for TursoConnection {
         offset: Option<i32>,
         order: Option<&[Order]>,
     ) -> Result<RawQueryResult<'c>> {
-        // Transform Subquery expressions since Turso doesn't support them
+        // Transform Subquery expressions since LibSQL doesn't support them
         let expr = if let Some(expr) = expr {
             Some(self.transform_subqueries(expr).await?)
         } else {
@@ -367,7 +383,7 @@ impl ConnectionMethods for TursoConnection {
 
         if let Some(offset) = offset {
             if limit.is_none() {
-                // Turso/SQLite only supports offset in conjunction with
+                // LibSQL/SQLite only supports offset in conjunction with
                 // limit, so add a max limit if we don't have one already.
                 helper::sql_limit(i32::MAX, &mut sqlquery)
             }
@@ -378,9 +394,9 @@ impl ConnectionMethods for TursoConnection {
         #[cfg(feature = "debug")]
         debug!("values {values:?}");
 
-        let params: Vec<turso::Value> = values
+        let params: Vec<libsql::Value> = values
             .iter()
-            .map(|v| sqlval_to_turso(&v.as_ref()))
+            .map(|v| sqlval_to_libsql(&v.as_ref()))
             .collect();
         let mut rows = self
             .conn()?
@@ -399,11 +415,11 @@ impl ConnectionMethods for TursoConnection {
             let mut values = Vec::new();
             for (i, col) in columns.iter().enumerate() {
                 let val = row
-                    .get_value(i)
+                    .get_value(i as i32)
                     .map_err(|e| Error::Internal(e.to_string()))?;
-                values.push(turso_value_to_sqlval_typed(&val, col.ty())?);
+                values.push(libsql_value_to_sqlval_typed(&val, col.ty())?);
             }
-            vec_rows.push(TursoRow { values });
+            vec_rows.push(LibSQLRow { values });
         }
 
         Ok(Box::new(VecRows::new(vec_rows)))
@@ -423,23 +439,23 @@ impl ConnectionMethods for TursoConnection {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
+        // Add RETURNING clause to get the primary key value
+        sql.push_str(&format!(
+            " RETURNING {}",
+            helper::quote_reserved_word(pkcol.name())
+        ));
+
         if cfg!(feature = "log") {
             debug!("insert sql {sql}");
             #[cfg(feature = "debug")]
             debug!("values {values:?}");
         }
 
-        let params: Vec<turso::Value> = values.iter().map(|v| sqlval_to_turso(v)).collect();
-        self.conn()?
-            .execute(&sql, params)
-            .await
-            .map_err(|e| Error::Internal(e.to_string()))?;
+        let params: Vec<libsql::Value> = values.iter().map(|v| sqlval_to_libsql(v)).collect();
 
-        // Get the last inserted rowid
-        let query = "SELECT last_insert_rowid()".to_string();
         let mut rows = self
             .conn()?
-            .query(&query, ())
+            .query(&sql, params)
             .await
             .map_err(|e| Error::Internal(e.to_string()))?;
 
@@ -452,10 +468,10 @@ impl ConnectionMethods for TursoConnection {
                 .get_value(0)
                 .map_err(|e| Error::Internal(e.to_string()))?;
             // Use the pkcol type to ensure correct SqlVal type
-            Ok(turso_value_to_sqlval_typed(&val, pkcol.ty())?)
+            Ok(libsql_value_to_sqlval_typed(&val, pkcol.ty())?)
         } else {
             Err(Error::Internal(
-                "Failed to retrieve last insert rowid".to_string(),
+                "Failed to retrieve inserted primary key".to_string(),
             ))
         }
     }
@@ -473,7 +489,7 @@ impl ConnectionMethods for TursoConnection {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
-        let params: Vec<turso::Value> = values.iter().map(|v| sqlval_to_turso(v)).collect();
+        let params: Vec<libsql::Value> = values.iter().map(|v| sqlval_to_libsql(v)).collect();
         self.conn()?
             .execute(&sql, params)
             .await
@@ -490,7 +506,7 @@ impl ConnectionMethods for TursoConnection {
     ) -> Result<()> {
         let mut sql = String::new();
         sql_insert_or_update(table, columns, pkcol, &mut sql);
-        let params: Vec<turso::Value> = values.iter().map(|v| sqlval_to_turso(v)).collect();
+        let params: Vec<libsql::Value> = values.iter().map(|v| sqlval_to_libsql(v)).collect();
         self.conn()?
             .execute(&sql, params)
             .await
@@ -514,8 +530,8 @@ impl ConnectionMethods for TursoConnection {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
-        let mut params: Vec<turso::Value> = values.iter().map(|v| sqlval_to_turso(v)).collect();
-        params.push(sqlval_to_turso(&pk));
+        let mut params: Vec<libsql::Value> = values.iter().map(|v| sqlval_to_libsql(v)).collect();
+        params.push(sqlval_to_libsql(&pk));
         self.conn()?
             .execute(&sql, params)
             .await
@@ -529,7 +545,7 @@ impl ConnectionMethods for TursoConnection {
             helper::quote_reserved_word(table),
             helper::quote_reserved_word(pkcol)
         );
-        let params = vec![sqlval_to_turso(&pk.as_ref())];
+        let params = vec![sqlval_to_libsql(&pk.as_ref())];
         self.conn()?
             .execute(&sql, params)
             .await
@@ -547,9 +563,9 @@ impl ConnectionMethods for TursoConnection {
             &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
-        let params: Vec<turso::Value> = values
+        let params: Vec<libsql::Value> = values
             .iter()
-            .map(|v| sqlval_to_turso(&v.as_ref()))
+            .map(|v| sqlval_to_libsql(&v.as_ref()))
             .collect();
         let rows_affected = self
             .conn()?
@@ -561,7 +577,7 @@ impl ConnectionMethods for TursoConnection {
 
     async fn has_table(&self, table: &str) -> Result<bool> {
         let sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=?";
-        let params = vec![turso::Value::Text(table.to_string())];
+        let params = vec![libsql::Value::Text(table.to_string())];
         let mut rows = self
             .conn()?
             .query(sql, params)
@@ -576,16 +592,16 @@ impl ConnectionMethods for TursoConnection {
 }
 
 #[async_trait]
-impl BackendConnection for TursoConnection {
+impl BackendConnection for LibsqlConnection {
     async fn transaction(&mut self) -> Result<Transaction<'_>> {
         // Begin transaction
         self.execute("BEGIN TRANSACTION").await?;
-        let trans = Box::new(TursoTransaction::new(self));
+        let trans = Box::new(LibSQLTransaction::new(self));
         Ok(Transaction::new(trans))
     }
 
     fn backend(&self) -> Box<dyn Backend> {
-        Box::new(TursoBackend {})
+        Box::new(LibsqlBackend {})
     }
 
     fn backend_name(&self) -> &'static str {
@@ -597,22 +613,22 @@ impl BackendConnection for TursoConnection {
     }
 }
 
-/// Turso transaction.
+/// LibSQL transaction.
 #[derive(Debug)]
-struct TursoTransaction<'c> {
-    conn: Option<&'c TursoConnection>,
+struct LibSQLTransaction<'c> {
+    conn: Option<&'c LibsqlConnection>,
     committed: bool,
 }
 
-impl<'c> TursoTransaction<'c> {
-    fn new(conn: &'c TursoConnection) -> Self {
-        TursoTransaction {
+impl<'c> LibSQLTransaction<'c> {
+    fn new(conn: &'c LibsqlConnection) -> Self {
+        LibSQLTransaction {
             conn: Some(conn),
             committed: false,
         }
     }
 
-    fn get(&self) -> Result<&'c TursoConnection> {
+    fn get(&self) -> Result<&'c LibsqlConnection> {
         self.conn.ok_or_else(Self::already_consumed)
     }
 
@@ -621,14 +637,14 @@ impl<'c> TursoTransaction<'c> {
     }
 }
 
-impl<'c> TursoConnectionLike for TursoTransaction<'c> {
-    fn conn(&self) -> Result<&turso::Connection> {
+impl<'c> LibsqlConnectionLike for LibSQLTransaction<'c> {
+    fn conn(&self) -> Result<&libsql::Connection> {
         Ok(&self.get()?.conn)
     }
 }
 
 #[async_trait]
-impl<'c> ConnectionMethods for TursoTransaction<'c> {
+impl<'c> ConnectionMethods for LibSQLTransaction<'c> {
     async fn execute(&self, sql: &str) -> Result<()> {
         self.get()?.execute(sql).await
     }
@@ -701,7 +717,7 @@ impl<'c> ConnectionMethods for TursoTransaction<'c> {
 }
 
 #[async_trait]
-impl<'c> BackendTransaction<'c> for TursoTransaction<'c> {
+impl<'c> BackendTransaction<'c> for LibSQLTransaction<'c> {
     async fn commit(&mut self) -> Result<()> {
         let conn = self.conn.take().ok_or_else(Self::already_consumed)?;
         conn.execute("COMMIT").await?;
@@ -720,7 +736,7 @@ impl<'c> BackendTransaction<'c> for TursoTransaction<'c> {
     }
 }
 
-impl<'c> Drop for TursoTransaction<'c> {
+impl<'c> Drop for LibSQLTransaction<'c> {
     fn drop(&mut self) {
         if let Some(conn) = self.conn.take() {
             if !self.committed {
@@ -729,15 +745,12 @@ impl<'c> Drop for TursoTransaction<'c> {
                 if tokio::runtime::Handle::try_current().is_ok() {
                     let conn_clone = conn.conn.clone();
                     let _ = tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async move {
-                            conn_clone
-                                .execute("ROLLBACK", Vec::<turso::Value>::new())
-                                .await
-                        })
+                        tokio::runtime::Handle::current()
+                            .block_on(async move { conn_clone.execute("ROLLBACK", ()).await })
                     });
                 } else {
                     eprintln!(
-                        "Warning: TursoTransaction dropped without commit or rollback and no tokio runtime available"
+                        "Warning: LibSQLTransaction dropped without commit or rollback and no tokio runtime available"
                     );
                 }
             }
@@ -746,42 +759,42 @@ impl<'c> Drop for TursoTransaction<'c> {
 }
 
 // Value conversion functions
-fn sqlval_to_turso(val: &SqlValRef<'_>) -> turso::Value {
+fn sqlval_to_libsql(val: &SqlValRef<'_>) -> libsql::Value {
     use SqlValRef::*;
     match val {
-        Bool(b) => turso::Value::Integer(*b as i64),
-        Int(i) => turso::Value::Integer(*i as i64),
-        BigInt(i) => turso::Value::Integer(*i),
-        Real(r) => turso::Value::Real(*r),
-        Text(t) => turso::Value::Text(t.to_string()),
-        Blob(b) => turso::Value::Blob(b.to_vec()),
+        Bool(b) => libsql::Value::Integer(*b as i64),
+        Int(i) => libsql::Value::Integer(*i as i64),
+        BigInt(i) => libsql::Value::Integer(*i),
+        Real(r) => libsql::Value::Real(*r),
+        Text(t) => libsql::Value::Text(t.to_string()),
+        Blob(b) => libsql::Value::Blob(b.to_vec()),
         #[cfg(feature = "json")]
-        Json(v) => turso::Value::Text(serde_json::to_string(v).unwrap()),
+        Json(v) => libsql::Value::Text(serde_json::to_string(v).unwrap()),
         #[cfg(feature = "datetime")]
         Date(date) => {
-            let f = date.format(TURSO_DATE_FORMAT);
-            turso::Value::Text(f.to_string())
+            let f = date.format(LIBSQL_DATE_FORMAT);
+            libsql::Value::Text(f.to_string())
         }
         #[cfg(feature = "datetime")]
         Timestamp(dt) => {
-            let f = dt.format(TURSO_DT_FORMAT);
-            turso::Value::Text(f.to_string())
+            let f = dt.format(LIBSQL_DT_FORMAT);
+            libsql::Value::Text(f.to_string())
         }
-        Null => turso::Value::Null,
+        Null => libsql::Value::Null,
         #[cfg(feature = "pg")]
         Custom(_) => panic!("Custom types not supported in turso"),
     }
 }
 
-fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVal> {
-    if matches!(val, turso::Value::Null) {
+fn libsql_value_to_sqlval_typed(val: &libsql::Value, ty: &SqlType) -> Result<SqlVal> {
+    if matches!(val, libsql::Value::Null) {
         return Ok(SqlVal::Null);
     }
 
     Ok(match ty {
         SqlType::Bool => {
             let i = match val {
-                turso::Value::Integer(i) => *i,
+                libsql::Value::Integer(i) => *i,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected integer for Bool, got {:?}",
@@ -793,7 +806,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::Int => {
             let i = match val {
-                turso::Value::Integer(i) => *i,
+                libsql::Value::Integer(i) => *i,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected integer for Int, got {:?}",
@@ -805,7 +818,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::BigInt => {
             let i = match val {
-                turso::Value::Integer(i) => *i,
+                libsql::Value::Integer(i) => *i,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected integer for BigInt, got {:?}",
@@ -817,7 +830,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::Real => {
             let r = match val {
-                turso::Value::Real(r) => *r,
+                libsql::Value::Real(r) => *r,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected real for Real, got {:?}",
@@ -829,7 +842,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::Text => {
             let t = match val {
-                turso::Value::Text(t) => t,
+                libsql::Value::Text(t) => t,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected text for Text, got {:?}",
@@ -842,7 +855,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         #[cfg(feature = "json")]
         SqlType::Json => {
             let t = match val {
-                turso::Value::Text(t) => t,
+                libsql::Value::Text(t) => t,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected text for Json, got {:?}",
@@ -855,7 +868,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         #[cfg(feature = "datetime")]
         SqlType::Date => {
             let t = match val {
-                turso::Value::Text(t) => t,
+                libsql::Value::Text(t) => t,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected text for Date, got {:?}",
@@ -863,12 +876,12 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
                     )))
                 }
             };
-            SqlVal::Date(NaiveDate::parse_from_str(t, TURSO_DATE_FORMAT)?)
+            SqlVal::Date(NaiveDate::parse_from_str(t, LIBSQL_DATE_FORMAT)?)
         }
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => {
             let t = match val {
-                turso::Value::Text(t) => t,
+                libsql::Value::Text(t) => t,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected text for Timestamp, got {:?}",
@@ -876,11 +889,11 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
                     )))
                 }
             };
-            SqlVal::Timestamp(NaiveDateTime::parse_from_str(t, TURSO_DT_FORMAT)?)
+            SqlVal::Timestamp(NaiveDateTime::parse_from_str(t, LIBSQL_DT_FORMAT)?)
         }
         SqlType::Blob => {
             let b = match val {
-                turso::Value::Blob(b) => b.to_vec(),
+                libsql::Value::Blob(b) => b.to_vec(),
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected blob for Blob, got {:?}",
@@ -895,24 +908,24 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
     })
 }
 
-/// Convert a Turso value to SqlVal without type information.
-/// This infers the SqlVal type from the Turso value type.
-fn turso_value_to_sqlval_untyped(val: &turso::Value) -> Result<SqlVal> {
+/// Convert a LibSQL value to SqlVal without type information.
+/// This infers the SqlVal type from the LibSQL value type.
+fn libsql_value_to_sqlval_untyped(val: &libsql::Value) -> Result<SqlVal> {
     Ok(match val {
-        turso::Value::Null => SqlVal::Null,
-        turso::Value::Integer(i) => SqlVal::BigInt(*i),
-        turso::Value::Real(r) => SqlVal::Real(*r),
-        turso::Value::Text(t) => SqlVal::Text(t.clone()),
-        turso::Value::Blob(b) => SqlVal::Blob(b.clone()),
+        libsql::Value::Null => SqlVal::Null,
+        libsql::Value::Integer(i) => SqlVal::BigInt(*i),
+        libsql::Value::Real(r) => SqlVal::Real(*r),
+        libsql::Value::Text(t) => SqlVal::Text(t.clone()),
+        libsql::Value::Blob(b) => SqlVal::Blob(b.clone()),
     })
 }
 
-// Turso row wrapper that stores owned SqlVal values
-struct TursoRow {
+// LibSQL row wrapper that stores owned SqlVal values
+struct LibSQLRow {
     values: Vec<SqlVal>,
 }
 
-impl BackendRow for TursoRow {
+impl BackendRow for LibSQLRow {
     fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>> {
         self.values
             .get(idx)
@@ -932,104 +945,6 @@ impl BackendRow for TursoRow {
     }
 }
 
-// Turso-specific table creation functions
-// These maintain the 120-character line length formatting from the original turso implementation
-
-fn create_table(table: &ATable, if_not_exists: bool) -> String {
-    let table_name = &table.name;
-    let sql = if if_not_exists {
-        format!(
-            "CREATE TABLE IF NOT EXISTS {} (",
-            helper::quote_reserved_word(table_name)
-        )
-    } else {
-        format!("CREATE TABLE {} (", helper::quote_reserved_word(table_name))
-    };
-
-    let mut defs: Vec<String> = table.columns.iter().map(define_column).collect();
-
-    for col in &table.columns {
-        if col.reference().is_some() {
-            defs.push(define_constraint(col));
-        }
-    }
-
-    // Check if total length would exceed 120 characters
-    let single_line = format!("{}{});", sql, defs.join(", "));
-    if single_line.len() <= 120 {
-        single_line
-    } else {
-        // Format with newlines and indentation
-        let formatted_defs = defs
-            .iter()
-            .map(|def| format!("    {}", def))
-            .collect::<Vec<_>>()
-            .join(",\n");
-        format!("{}\n{}\n);", sql, formatted_defs)
-    }
-}
-
-fn define_column(col: &AColumn) -> String {
-    let mut constraints: Vec<String> = Vec::new();
-    if !col.nullable() {
-        constraints.push("NOT NULL".to_string());
-    }
-    if col.is_pk() {
-        constraints.push("PRIMARY KEY".to_string());
-    }
-    if col.is_auto() && !col.is_pk() {
-        // integer primary key is automatically an alias for ROWID,
-        // and we only allow auto on integer types
-        constraints.push("AUTOINCREMENT".to_string());
-    }
-    if col.unique() {
-        constraints.push("UNIQUE".to_string());
-    }
-    if constraints.is_empty() {
-        format!(
-            "{} {}",
-            helper::quote_reserved_word(col.name()),
-            col_sqltype(col),
-        )
-    } else {
-        format!(
-            "{} {} {}",
-            helper::quote_reserved_word(col.name()),
-            col_sqltype(col),
-            constraints.join(" ")
-        )
-    }
-}
-
-fn define_constraint(column: &AColumn) -> String {
-    let reference = column
-        .reference()
-        .as_ref()
-        .expect("must have a references value");
-    match reference {
-        ARef::Literal(literal) => {
-            format!(
-                "FOREIGN KEY ({}) REFERENCES {}({})",
-                helper::quote_reserved_word(column.name()),
-                helper::quote_reserved_word(literal.table_name()),
-                helper::quote_reserved_word(literal.column_name()),
-            )
-        }
-        _ => panic!(),
-    }
-}
-
-fn col_sqltype(col: &AColumn) -> std::borrow::Cow<'_, str> {
-    use std::borrow::Cow;
-    match col.typeid() {
-        Ok(TypeIdentifier::Ty(ty)) => Cow::Borrowed(sqltype(&ty)),
-        Ok(TypeIdentifier::Name(name)) => Cow::Owned(name),
-        // sqlite doesn't actually require that the column type be
-        // specified
-        Err(_) => Cow::Borrowed(""),
-    }
-}
-
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
         Operation::AddTable(table) => Ok(create_table(table, false)),
@@ -1039,7 +954,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::RemoveColumn(tbl, name) => remove_column(current, tbl, name),
         Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new))),
         Operation::AddTableConstraints(_) | Operation::RemoveTableConstraints(_) => {
-            // Turso/SQLite doesn't support adding/removing constraints separately
+            // LibSQL/SQLite doesn't support adding/removing constraints separately
             // They must be included when creating the table
             Ok(String::new())
         }

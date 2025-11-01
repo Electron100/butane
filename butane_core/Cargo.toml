@@ -22,6 +22,7 @@ sqlite = ["rusqlite"]
 sqlite-bundled = ["rusqlite/bundled"]
 tls = ["native-tls", "postgres-native-tls"]
 turso = ["async", "dep:turso"]
+libsql = ["async", "dep:libsql"]
 
 [dependencies]
 async-trait = { workspace = true}
@@ -57,12 +58,13 @@ sqlparser = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 turso = { workspace = true, optional = true }
+libsql = { workspace = true, optional = true }
 url.workspace = true
 uuid = { workspace = true, optional = true }
 
 [dev-dependencies]
 assert_matches = "1.5"
-butane_test_helper = { workspace = true, default-features = false, features = ["pg", "sqlite", "turso"] }
+butane_test_helper = { workspace = true, default-features = false, features = ["pg", "sqlite", "turso", "libsql"] }
 butane_test_macros.workspace = true
 env_logger = { workspace = true }
 paste = { workspace = true }

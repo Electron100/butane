@@ -58,6 +58,10 @@ pub mod sqlite;
 #[cfg(feature = "turso")]
 pub mod turso;
 
+/// LibSQL remote database backend.
+#[cfg(feature = "libsql")]
+pub mod libsql;
+
 // Macros are always exported at the root of the crate
 use crate::connection_method_wrapper;
 
@@ -658,11 +662,10 @@ impl TryFrom<&str> for ConnectionSpec {
                         backend_name: "pg".to_string(),
                         conn_str: value.to_string(),
                     }),
-                    "libsql" => {
-                        // libsql:// is an alias for turso://
-                        let value = value.replacen("libsql:", "turso:", 1);
+                    "libsql+http" => {
+                        let value = value.replacen("libsql+http:", "http:", 1);
                         Ok(ConnectionSpec {
-                            backend_name: "turso".to_string(),
+                            backend_name: "libsql".to_string(),
                             conn_str: value,
                         })
                     }
@@ -754,6 +757,8 @@ pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
         #[cfg(feature = "turso")]
         turso::BACKEND_NAME => Some(Box::new(turso::TursoBackend)),
+        #[cfg(feature = "libsql")]
+        libsql::BACKEND_NAME => Some(Box::new(libsql::LibsqlBackend)),
         _ => None,
     }
 }

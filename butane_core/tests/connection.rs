@@ -843,6 +843,8 @@ async fn debug_connection(conn: ConnectionAsync) {
         assert!(debug_str.contains("conn: true"));
     } else if backend_name == "turso" {
         assert!(debug_str.contains("TursoConnection"));
+    } else if backend_name == "libsql" {
+        assert!(debug_str.contains("LibsqlConnection"));
     } else {
         assert!(debug_str.contains("path: Some(\"\")"));
     }
@@ -906,16 +908,6 @@ fn uri_turso_scheme() {
 }
 
 #[cfg(feature = "turso")]
-#[test]
-fn uri_turso_libsql_scheme() {
-    let uri = "libsql://localhost:8080/test";
-    let spec = ConnectionSpec::try_from(uri).unwrap();
-    assert_eq!(spec.backend_name(), "turso");
-    // libsql:// should be mapped to turso://
-    assert_eq!(spec.connection_string(), "turso://localhost:8080/test");
-}
-
-#[cfg(feature = "turso")]
 #[butane_test(nomigrate)]
 async fn turso_connection_not_closed(conn: ConnectionAsync) {
     if conn.backend_name() == "turso" {
@@ -930,4 +922,22 @@ async fn turso_debug_connection(conn: ConnectionAsync) {
         let debug_str = format!("{conn:?}");
         assert!(debug_str.contains("TursoConnection"));
     }
+}
+
+#[cfg(feature = "libsql")]
+#[test]
+fn uri_tlibsql_scheme() {
+    let uri = "libsql://localhost:8080/test";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name(), "libsql");
+    assert_eq!(spec.connection_string(), "libsql://localhost:8080/test");
+}
+
+#[cfg(feature = "libsql")]
+#[test]
+fn uri_libsql_http_scheme() {
+    let uri = "libsql+http://localhost:8080/test";
+    let spec = ConnectionSpec::try_from(uri).unwrap();
+    assert_eq!(spec.backend_name(), "libsql");
+    assert_eq!(spec.connection_string(), "http://localhost:8080/test");
 }

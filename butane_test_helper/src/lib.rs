@@ -37,10 +37,6 @@ use butane_core::db::pg::PgBackend;
 use butane_core::db::sqlite;
 #[cfg(feature = "sqlite")]
 use butane_core::db::sqlite::SQLiteBackend;
-#[cfg(feature = "turso")]
-use butane_core::db::turso;
-#[cfg(feature = "turso")]
-use butane_core::db::turso::TursoBackend;
 #[cfg(feature = "pg")]
 use butane_core::db::{connect, connect_async};
 use butane_core::db::{get_backend, Backend, ConnectionSpec};
@@ -57,10 +53,27 @@ pub use maybe_async_cfg;
 #[cfg(feature = "pg")]
 pub mod pg;
 
+#[cfg(feature = "turso")]
+pub mod turso;
+
+#[cfg(feature = "libsql")]
+pub mod libsql;
+
 // Re-export types from pg module
 #[cfg(feature = "pg")]
 pub use crate::pg::{pg_tmp_server_create_ephemeralpg, PgTemporaryServerError};
 
+// Re-export types from turso module (in-memory support) - only when libsql is not enabled
+#[cfg(feature = "turso")]
+pub use crate::turso::{
+    turso_connspec, turso_setup, turso_teardown, TursoSetupData, TursoTestInstance,
+};
+
+// Re-export types from libsql module (sqld server support)
+#[cfg(feature = "libsql")]
+pub use crate::libsql::{
+    libsql_connspec, libsql_setup, libsql_teardown, LibsqlSetupData, LibsqlTestInstance, SqldServer,
+};
 /// Trait for running a test.
 #[allow(async_fn_in_trait)] // Not truly public, only used in butane for testing.
 pub trait BackendTestInstance {
@@ -146,36 +159,6 @@ impl BackendTestInstance for SQLiteTestInstance {
             setup_db_async(&mut conn).await;
         }
         log::info!("running sqlite test");
-        test(conn).await;
-    }
-}
-
-/// Instance of a Turso test.
-#[cfg(feature = "turso")]
-#[derive(Default)]
-pub struct TursoTestInstance {}
-
-#[cfg(feature = "turso")]
-impl BackendTestInstance for TursoTestInstance {
-    fn run_test_sync(_test: impl FnOnce(Connection), _migrate: bool) {
-        // Turso doesn't support sync connections - skip the test silently
-        // The test framework will still count this as passed
-    }
-
-    async fn run_test_async<Fut>(test: impl FnOnce(ConnectionAsync) -> Fut, migrate: bool)
-    where
-        Fut: Future<Output = ()>,
-    {
-        common_setup();
-        log::info!("connecting to turso memory database...");
-        let mut conn = TursoBackend::new()
-            .connect_async(":memory:")
-            .await
-            .expect("Could not connect turso backend");
-        if migrate {
-            setup_db_async(&mut conn).await;
-        }
-        log::info!("running turso test");
         test(conn).await;
     }
 }
@@ -637,33 +620,6 @@ pub async fn sqlite_setup() -> SQLiteSetupData {
 #[cfg(feature = "sqlite")]
 pub fn sqlite_teardown(_: SQLiteSetupData) {}
 
-/// Create a turso [`ConnectionSpec`].
-#[cfg(feature = "turso")]
-pub fn turso_connspec() -> ConnectionSpec {
-    ConnectionSpec::new(turso::BACKEND_NAME, ":memory:")
-}
-
-/// Concrete [SetupData] for Turso.
-#[cfg(feature = "turso")]
-pub struct TursoSetupData {}
-
-#[cfg(feature = "turso")]
-impl SetupData for TursoSetupData {
-    fn connection_string(&self) -> &str {
-        ":memory:"
-    }
-}
-
-/// Setup the test turso database.
-#[cfg(feature = "turso")]
-pub async fn turso_setup() -> TursoSetupData {
-    TursoSetupData {}
-}
-
-/// Tear down the test turso database.
-#[cfg(feature = "turso")]
-pub fn turso_teardown(_: TursoSetupData) {}
-
 fn common_setup() {
     env_logger::try_init().ok();
 }
@@ -710,8 +666,8 @@ macro_rules! maketest {
                     "pg" => PgTestInstance::run_test_async($fname, $migrate).await,
                     #[cfg(feature = "sqlite")]
                     "sqlite" => SQLiteTestInstance::run_test_async($fname, $migrate).await,
-                    #[cfg(feature = "turso")]
-                    "turso" => TursoTestInstance::run_test_async($fname, $migrate).await,
+                    #[cfg(feature = "libsql")]
+                    "turso" => LibsqlTestInstance::run_test_async($fname, $migrate).await,
                     _ => panic!("Unknown backend $backend")
                 };
             }

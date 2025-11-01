@@ -672,38 +672,39 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     }
 }
 
-fn create_table(table: &ATable, allow_exists: bool) -> String {
-    let coldefs = table
-        .columns
-        .iter()
-        .map(define_column)
-        .collect::<Vec<String>>()
-        .join(",\n");
-    let modifier = if allow_exists { "IF NOT EXISTS " } else { "" };
-    let mut constraints = create_table_constraints(table);
-    if !constraints.is_empty() {
-        constraints = ",\n".to_owned() + &constraints;
+pub(crate) fn create_table(table: &ATable, allow_exists: bool) -> String {
+    let mut constraints: Vec<String> = Vec::new();
+    let mut defs: Vec<String> = table.columns.iter().map(define_column).collect();
+    for column in &table.columns {
+        if column.reference().is_some() {
+            constraints.push(define_constraint(column));
+        }
     }
-    format!(
-        "CREATE TABLE {}{} (\n{}{}\n) STRICT;",
-        modifier,
-        helper::quote_reserved_word(&table.name),
-        coldefs,
-        constraints
-    )
+    defs.append(&mut constraints);
+
+    let table_name = helper::quote_reserved_word(&table.name);
+    let prefix = if allow_exists {
+        format!("CREATE TABLE IF NOT EXISTS {table_name} (")
+    } else {
+        format!("CREATE TABLE {table_name} (")
+    };
+
+    // Format with newlines if it would be longer than 120 characters
+    let single_line = format!("{}{}) STRICT;", prefix, defs.join(", "));
+    if single_line.len() <= 120 {
+        single_line
+    } else {
+        // Multi-line format with 4-space indentation
+        let formatted_defs = defs
+            .iter()
+            .map(|def| format!("    {}", def))
+            .collect::<Vec<_>>()
+            .join(",\n");
+        format!("{}\n{}\n) STRICT;", prefix, formatted_defs)
+    }
 }
 
-fn create_table_constraints(table: &ATable) -> String {
-    table
-        .columns
-        .iter()
-        .filter(|column| column.reference().is_some())
-        .map(define_constraint)
-        .collect::<Vec<String>>()
-        .join("\n")
-}
-
-fn define_column(col: &AColumn) -> String {
+pub(crate) fn define_column(col: &AColumn) -> String {
     let mut constraints: Vec<String> = Vec::new();
     if !col.nullable() {
         constraints.push("NOT NULL".to_string());
@@ -735,7 +736,7 @@ fn define_column(col: &AColumn) -> String {
     }
 }
 
-fn define_constraint(column: &AColumn) -> String {
+pub(crate) fn define_constraint(column: &AColumn) -> String {
     let reference = column
         .reference()
         .as_ref()
@@ -753,7 +754,7 @@ fn define_constraint(column: &AColumn) -> String {
     }
 }
 
-fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
+pub(crate) fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
     match col.typeid() {
         Ok(TypeIdentifier::Ty(ty)) => Cow::Borrowed(sqltype(&ty)),
         Ok(TypeIdentifier::Name(name)) => Cow::Owned(name),
@@ -763,7 +764,7 @@ fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
     }
 }
 
-fn sqltype(ty: &SqlType) -> &'static str {
+pub(crate) fn sqltype(ty: &SqlType) -> &'static str {
     match ty {
         SqlType::Bool => "INTEGER",
         SqlType::Int => "INTEGER",
@@ -782,11 +783,11 @@ fn sqltype(ty: &SqlType) -> &'static str {
     }
 }
 
-fn drop_table(name: &str) -> String {
+pub(crate) fn drop_table(name: &str) -> String {
     format!("DROP TABLE {};", helper::quote_reserved_word(name))
 }
 
-fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
+pub(crate) fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     let default: SqlVal = helper::column_default(col)?;
     Ok(format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
@@ -796,7 +797,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     ))
 }
 
-fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String> {
+pub(crate) fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String> {
     let current_clone = current.clone();
     let table = current_clone
         .get_table(tbl_name)
@@ -817,26 +818,41 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String
     }
 }
 
-fn copy_table(old: &ATable, new: &ATable) -> String {
-    let column_names = new
+pub(crate) fn copy_table(old: &ATable, new: &ATable) -> String {
+    let column_names: Vec<Cow<str>> = new
         .columns
         .iter()
         .map(|col| helper::quote_reserved_word(col.name()))
-        .collect::<Vec<Cow<str>>>()
-        .join(", ");
-    format!(
+        .collect();
+
+    let column_list = column_names.join(", ");
+    let single_line = format!(
         "INSERT INTO {} SELECT {} FROM {};",
         helper::quote_reserved_word(&new.name),
-        column_names,
+        column_list,
         helper::quote_reserved_word(&old.name)
-    )
+    );
+
+    // If the single line is too long, format with line breaks
+    if single_line.len() <= 120 {
+        single_line
+    } else {
+        // Multi-line format
+        let formatted_columns = column_names.join(",\n    ");
+        format!(
+            "INSERT INTO {} SELECT\n    {}\nFROM {};",
+            helper::quote_reserved_word(&new.name),
+            formatted_columns,
+            helper::quote_reserved_word(&old.name)
+        )
+    }
 }
 
-fn tmp_table_name(name: &str) -> String {
+pub(crate) fn tmp_table_name(name: &str) -> String {
     format!("{name}__butane_tmp")
 }
 
-fn change_column(
+pub(crate) fn change_column(
     current: &mut ADB,
     tbl_name: &str,
     old: &AColumn,
@@ -908,9 +924,9 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: 
 }
 
 #[derive(Debug)]
-struct SQLitePlaceholderSource;
+pub(crate) struct SQLitePlaceholderSource;
 impl SQLitePlaceholderSource {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         SQLitePlaceholderSource {}
     }
 }

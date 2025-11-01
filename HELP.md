@@ -1,35 +1,35 @@
-# Command-Line Help for `butane_cli`
+# Command-Line Help for `butane`
 
-This document contains the help content for the `butane_cli` command-line program.
+This document contains the help content for the `butane` command-line program.
 
 **Command Overview:**
 
-* [`butane_cli`↴](#butane_cli)
-* [`butane_cli init`↴](#butane_cli-init)
-* [`butane_cli backend`↴](#butane_cli-backend)
-* [`butane_cli backend add`↴](#butane_cli-backend-add)
-* [`butane_cli backend remove`↴](#butane_cli-backend-remove)
-* [`butane_cli backend list`↴](#butane_cli-backend-list)
-* [`butane_cli make-migration`↴](#butane_cli-make-migration)
-* [`butane_cli detach-migration`↴](#butane_cli-detach-migration)
-* [`butane_cli migrate`↴](#butane_cli-migrate)
-* [`butane_cli regenerate`↴](#butane_cli-regenerate)
-* [`butane_cli describe-migration`↴](#butane_cli-describe-migration)
-* [`butane_cli list`↴](#butane_cli-list)
-* [`butane_cli collapse`↴](#butane_cli-collapse)
-* [`butane_cli embed`↴](#butane_cli-embed)
-* [`butane_cli unmigrate`↴](#butane_cli-unmigrate)
-* [`butane_cli clear`↴](#butane_cli-clear)
-* [`butane_cli clear data`↴](#butane_cli-clear-data)
-* [`butane_cli delete`↴](#butane_cli-delete)
-* [`butane_cli delete table`↴](#butane_cli-delete-table)
-* [`butane_cli clean`↴](#butane_cli-clean)
+* [`butane`↴](#butane)
+* [`butane init`↴](#butane-init)
+* [`butane backend`↴](#butane-backend)
+* [`butane backend add`↴](#butane-backend-add)
+* [`butane backend remove`↴](#butane-backend-remove)
+* [`butane backend list`↴](#butane-backend-list)
+* [`butane make-migration`↴](#butane-make-migration)
+* [`butane detach-migration`↴](#butane-detach-migration)
+* [`butane migrate`↴](#butane-migrate)
+* [`butane regenerate`↴](#butane-regenerate)
+* [`butane describe-migration`↴](#butane-describe-migration)
+* [`butane list`↴](#butane-list)
+* [`butane collapse`↴](#butane-collapse)
+* [`butane embed`↴](#butane-embed)
+* [`butane unmigrate`↴](#butane-unmigrate)
+* [`butane clear`↴](#butane-clear)
+* [`butane clear data`↴](#butane-clear-data)
+* [`butane delete`↴](#butane-delete)
+* [`butane delete table`↴](#butane-delete-table)
+* [`butane clean`↴](#butane-clean)
 
-## `butane_cli`
+## `butane`
 
 Manages butane database migrations.
 
-**Usage:** `butane_cli [OPTIONS] <COMMAND>`
+**Usage:** `butane [OPTIONS] <COMMAND>`
 
 ###### **Subcommands:**
 
@@ -58,11 +58,11 @@ Manages butane database migrations.
 
 
 
-## `butane_cli init`
+## `butane init`
 
 Initialize the database
 
-**Usage:** `butane_cli init [OPTIONS] <BACKEND> <CONNECTION>`
+**Usage:** `butane init [OPTIONS] <BACKEND> <CONNECTION>`
 
 ###### **Arguments:**
 
@@ -78,11 +78,11 @@ Initialize the database
 
 
 
-## `butane_cli backend`
+## `butane backend`
 
 Backends
 
-**Usage:** `butane_cli backend <COMMAND>`
+**Usage:** `butane backend <COMMAND>`
 
 ###### **Subcommands:**
 
@@ -92,11 +92,11 @@ Backends
 
 
 
-## `butane_cli backend add`
+## `butane backend add`
 
 Add a backend to existing migrations
 
-**Usage:** `butane_cli backend add <NAME>`
+**Usage:** `butane backend add <NAME>`
 
 ###### **Arguments:**
 
@@ -104,11 +104,11 @@ Add a backend to existing migrations
 
 
 
-## `butane_cli backend remove`
+## `butane backend remove`
 
 Remove a backend from existing migrations
 
-**Usage:** `butane_cli backend remove <NAME>`
+**Usage:** `butane backend remove <NAME>`
 
 ###### **Arguments:**
 
@@ -116,19 +116,19 @@ Remove a backend from existing migrations
 
 
 
-## `butane_cli backend list`
+## `butane backend list`
 
 List backends present in existing migrations
 
-**Usage:** `butane_cli backend list`
+**Usage:** `butane backend list`
 
 
 
-## `butane_cli make-migration`
+## `butane make-migration`
 
 Create a new migration
 
-**Usage:** `butane_cli make-migration <NAME>`
+**Usage:** `butane make-migration <NAME>`
 
 ###### **Arguments:**
 
@@ -136,11 +136,11 @@ Create a new migration
 
 
 
-## `butane_cli detach-migration`
+## `butane detach-migration`
 
 Detach the latest migration
 
-**Usage:** `butane_cli detach-migration`
+**Usage:** `butane detach-migration`
 
 This command removes the latest migration from the list of migrations and sets butane state to before the latest migration was created.
 
@@ -155,11 +155,11 @@ However if the migration has been manually edited, it will need to be manually r
 
 
 
-## `butane_cli migrate`
+## `butane migrate`
 
 Apply migrations
 
-**Usage:** `butane_cli migrate [NAME]`
+**Usage:** `butane migrate [NAME]`
 
 ###### **Arguments:**
 
@@ -167,17 +167,17 @@ Apply migrations
 
 
 
-## `butane_cli regenerate`
+## `butane regenerate`
 
 Regenerate migrations in place
 
-**Usage:** `butane_cli regenerate`
+**Usage:** `butane regenerate`
 
 
 
-## `butane_cli describe-migration`
+## `butane describe-migration`
 
-**Usage:** `butane_cli describe-migration <NAME>`
+**Usage:** `butane describe-migration <NAME>`
 
 ###### **Arguments:**
 
@@ -185,19 +185,19 @@ Regenerate migrations in place
 
 
 
-## `butane_cli list`
+## `butane list`
 
 List migrations
 
-**Usage:** `butane_cli list`
+**Usage:** `butane list`
 
 
 
-## `butane_cli collapse`
+## `butane collapse`
 
 Replace all migrations with a single migration representing the current model state
 
-**Usage:** `butane_cli collapse <NAME>`
+**Usage:** `butane collapse <NAME>`
 
 ###### **Arguments:**
 
@@ -205,19 +205,19 @@ Replace all migrations with a single migration representing the current model st
 
 
 
-## `butane_cli embed`
+## `butane embed`
 
 Embed migrations in the source code
 
-**Usage:** `butane_cli embed`
+**Usage:** `butane embed`
 
 
 
-## `butane_cli unmigrate`
+## `butane unmigrate`
 
 Undo migrations. With no arguments, undoes the latest migration. If the name of a migration is specified, rolls back until that migration is the latest applied migration
 
-**Usage:** `butane_cli unmigrate [NAME]`
+**Usage:** `butane unmigrate [NAME]`
 
 ###### **Arguments:**
 
@@ -225,11 +225,11 @@ Undo migrations. With no arguments, undoes the latest migration. If the name of 
 
 
 
-## `butane_cli clear`
+## `butane clear`
 
 Clear
 
-**Usage:** `butane_cli clear <COMMAND>`
+**Usage:** `butane clear <COMMAND>`
 
 ###### **Subcommands:**
 
@@ -237,19 +237,19 @@ Clear
 
 
 
-## `butane_cli clear data`
+## `butane clear data`
 
 Clear all data from the database. The schema is left intact, but all instances of all models (i.e. all rows of all tables defined by the models) are deleted
 
-**Usage:** `butane_cli clear data`
+**Usage:** `butane clear data`
 
 
 
-## `butane_cli delete`
+## `butane delete`
 
 Delete
 
-**Usage:** `butane_cli delete <COMMAND>`
+**Usage:** `butane delete <COMMAND>`
 
 ###### **Subcommands:**
 
@@ -257,11 +257,11 @@ Delete
 
 
 
-## `butane_cli delete table`
+## `butane delete table`
 
 Clear all data from the database. The schema is left intact, but all instances of all models (i.e. all rows of all tables defined by the models) are deleted
 
-**Usage:** `butane_cli delete table <NAME>`
+**Usage:** `butane delete table <NAME>`
 
 ###### **Arguments:**
 
@@ -269,11 +269,11 @@ Clear all data from the database. The schema is left intact, but all instances o
 
 
 
-## `butane_cli clean`
+## `butane clean`
 
 Clean current migration state. Deletes the current migration working state which is generated on each build. This can be used as a workaround to remove stale tables from the schema, as Butane does not currently auto-detect model removals. The next build will recreate with only tables for the extant models
 
-**Usage:** `butane_cli clean`
+**Usage:** `butane clean`
 
 
 

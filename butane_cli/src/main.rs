@@ -11,7 +11,7 @@ use butane_cli::{
 use clap::{ArgAction, Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(author, version, about = "Manages butane database migrations.")]
+#[command(author, version, name = "butane", about = "Manages butane database migrations.")]
 #[command(propagate_version = true, max_term_width = 80)]
 struct Cli {
     #[command(subcommand)]

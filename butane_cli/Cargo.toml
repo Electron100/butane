@@ -31,6 +31,7 @@ butane.workspace = true
 cargo_metadata = "0.23"
 chrono = { workspace = true }
 clap = { version = "4.1", features = ["derive", "string", "wrap_help"] }
+clap-markdown = { git = "https://github.com/jayvdb/clap-markdown", branch = "allow-passing-instance", optional = true }
 clap-verbosity-flag = "3.0"
 env_logger.workspace = true
 log.workspace = true

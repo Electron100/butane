@@ -15,7 +15,7 @@ build :
 lint :
 	$(CARGO) clippy --all-features -- -D warnings
 
-lint-ci : doclint lint spellcheck check-fmt
+lint-ci : doclint lint spellcheck check-fmt update-help-md check-help-md
 
 check : build doclint lint spellcheck check-fmt test
 
@@ -35,6 +35,12 @@ fmt :
 check-fmt :
 	$(CARGO_NIGHTLY) fmt --check
 	editorconfig-checker
+
+update-help-md :
+	$(CARGO) run -p butane_cli --features clap-markdown,sqlite-bundled -q -- --markdown-help list > HELP.md
+
+check-help-md :
+	git diff --exit-code HELP.md
 
 spellcheck :
 	typos

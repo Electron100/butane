@@ -4,23 +4,30 @@
 use std::path::PathBuf;
 
 use butane_cli::{
-    add_backend, base_dir, clean, clear_data, collapse_migrations, delete_table,
-    describe_migration, detach_latest_migration, embed, get_migrations, handle_error, init,
-    list_backends, list_migrations, make_migration, migrate, regenerate_migrations, remove_backend,
-    unmigrate,
+    add_backend, clean, clear_data, collapse_migrations, delete_table, describe_migration,
+    detach_latest_migration, embed, get_migrations, handle_error, init, list_backends,
+    list_migrations, make_migration, migrate, regenerate_migrations, remove_backend, unmigrate,
 };
 use clap::{ArgAction, Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(author, version, about = "Manages butane database migrations.")]
+#[command(
+    author,
+    version,
+    name = "butane",
+    about = "Manages butane database migrations."
+)]
 #[command(propagate_version = true, max_term_width = 80)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    #[arg(short = 'p', long, default_value=base_dir().into_os_string())]
+    #[arg(short = 'p', long, default_value=butane_cli::base_dir().into_os_string())]
     path: PathBuf,
     #[command(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
+    #[cfg(feature = "clap-markdown")]
+    #[arg(long, hide = true)]
+    markdown_help: bool,
 }
 
 #[derive(Subcommand)]
@@ -137,6 +144,18 @@ enum DeleteCommands {
 
 fn main() {
     let cli = Cli::parse();
+
+    #[cfg(feature = "clap-markdown")]
+    if cli.markdown_help {
+        use clap::CommandFactory;
+        let command = Cli::command();
+
+        let command = command.mut_arg("path", |arg| {
+            arg.default_value("<detected project containing .butane directory>")
+        });
+        clap_markdown::print_help_markdown_command(&command);
+        std::process::exit(0);
+    }
 
     env_logger::Builder::new()
         .filter_level(cli.verbose.log_level_filter())

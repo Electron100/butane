@@ -92,7 +92,7 @@ impl Backend for SQLiteBackend {
             })
             .collect::<Result<Vec<String>>>()?;
         lines.retain(|s| !s.is_empty());
-        Ok(lines.join("\n"))
+        Ok(format!("{}\n", lines.join("\n")))
     }
 
     fn connect(&self, path: &str) -> Result<Connection> {

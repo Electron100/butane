@@ -121,7 +121,7 @@ impl Backend for TursoBackend {
             })
             .collect::<Result<Vec<String>>>()?;
         lines.retain(|s| !s.is_empty());
-        Ok(lines.join("\n"))
+        Ok(format!("{}\n", lines.join("\n")))
     }
 
     async fn connect_async(&self, path: &str) -> Result<ConnectionAsync> {

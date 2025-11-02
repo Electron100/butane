@@ -1,0 +1,1 @@
+ALTER TABLE Foo ADD UNIQUE (bar);

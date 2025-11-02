@@ -2,7 +2,7 @@ use butane_core::db::ConnectionAsync;
 use butane_core::migrations::adb::*;
 use butane_core::SqlType;
 use butane_test_helper::*;
-use butane_test_macros::butane_test;
+use butane_test_macros::{butane_backend_name_test, butane_test};
 
 #[test]
 fn empty_diff() {
@@ -363,21 +363,12 @@ async fn add_table_fkey_back_reference(conn: ConnectionAsync) {
 
     let backend = conn.backend();
     let sql = backend.create_migration_sql(&new, ops).unwrap();
-    let sql_lines: Vec<&str> = sql.lines().collect();
-    if backend.name() == "sqlite" {
-        assert_eq!(
-            sql_lines,
-            vec![
-                "CREATE TABLE a (",
-                "fkey INTEGER NOT NULL PRIMARY KEY,",
-                "FOREIGN KEY (fkey) REFERENCES b(\"id\")",
-                ") STRICT;",
-                "CREATE TABLE b (",
-                "\"id\" INTEGER NOT NULL PRIMARY KEY",
-                ") STRICT;",
-            ]
-        );
-    }
+
+    let expectation_file = format!(
+        "tests/expectations/adb_add_table_fkey_back_reference_{}.sql",
+        backend.name()
+    );
+    expectorate::assert_contents(&expectation_file, &sql);
 
     conn.execute(&sql).await.unwrap();
     conn.execute("SELECT * from a").await.unwrap();
@@ -574,46 +565,18 @@ fn add_renamed_table_fkey() {
     );
 }
 
-#[test]
-fn add_renamed_table_fkey_ddl_sqlite() {
+#[butane_backend_name_test]
+fn add_renamed_table_fkey_ddl(backend_name: &str) {
     let (ops, new, ..) = create_add_renamed_table_fkey_ops();
 
-    let backend = butane_core::db::get_backend("sqlite").unwrap();
+    let backend = butane_core::db::get_backend(backend_name).unwrap();
     let sql = backend.create_migration_sql(&new, ops).unwrap();
-    let sql_lines: Vec<&str> = sql.lines().collect();
-    assert_eq!(
-        sql_lines,
-        vec![
-            "CREATE TABLE a_table (",
-            "\"id\" INTEGER NOT NULL PRIMARY KEY",
-            ") STRICT;",
-            "CREATE TABLE b (",
-            "b INTEGER NOT NULL PRIMARY KEY,",
-            "FOREIGN KEY (b) REFERENCES a_table(\"id\")",
-            ") STRICT;",
-        ]
-    );
-}
 
-#[test]
-fn add_renamed_table_fkey_ddl_pg() {
-    let (ops, new, ..) = create_add_renamed_table_fkey_ops();
-
-    let backend = butane_core::db::get_backend("pg").unwrap();
-    let sql = backend.create_migration_sql(&new, ops).unwrap();
-    let sql_lines: Vec<&str> = sql.lines().collect();
-    assert_eq!(
-        sql_lines,
-        vec![
-            "CREATE TABLE a_table (",
-            "\"id\" INTEGER NOT NULL PRIMARY KEY",
-            ");",
-            "CREATE TABLE b (",
-            "b INTEGER NOT NULL PRIMARY KEY",
-            ");",
-            "ALTER TABLE b ADD FOREIGN KEY (b) REFERENCES a_table(\"id\");",
-        ]
+    let expectation_file = format!(
+        "tests/expectations/adb_add_renamed_table_fkey_ddl_{}.sql",
+        backend_name
     );
+    expectorate::assert_contents(&expectation_file, &sql);
 }
 
 /// Creates the test case for adding a many table, returning the migration operations,
@@ -708,54 +671,16 @@ fn add_table_many() {
     );
 }
 
-#[test]
-fn add_table_many_ddl_sqlite() {
+#[butane_backend_name_test]
+fn add_table_many_ddl(backend_name: &str) {
     let (ops, new, ..) = create_add_table_many_ops();
 
-    let backend = butane_core::db::get_backend("sqlite").unwrap();
+    let backend = butane_core::db::get_backend(backend_name).unwrap();
     let sql = backend.create_migration_sql(&new, ops).unwrap();
-    let sql_lines: Vec<&str> = sql.lines().collect();
-    assert_eq!(
-        sql_lines,
-        vec![
-            "CREATE TABLE a (",
-            "\"id\" INTEGER NOT NULL PRIMARY KEY",
-            ") STRICT;",
-            "CREATE TABLE b (",
-            "\"id\" INTEGER NOT NULL PRIMARY KEY",
-            ") STRICT;",
-            "CREATE TABLE b_many_a_Many (",
-            "\"owner\" INTEGER NOT NULL,",
-            "has INTEGER NOT NULL,",
-            "FOREIGN KEY (\"owner\") REFERENCES b(\"id\")",
-            "FOREIGN KEY (has) REFERENCES a(\"id\")",
-            ") STRICT;",
-        ]
-    );
-}
 
-#[test]
-fn add_table_many_ddl_pg() {
-    let (ops, new, ..) = create_add_table_many_ops();
-
-    let backend = butane_core::db::get_backend("pg").unwrap();
-    let sql = backend.create_migration_sql(&new, ops).unwrap();
-    let sql_lines: Vec<&str> = sql.lines().collect();
-    assert_eq!(
-        sql_lines,
-        vec![
-            "CREATE TABLE a (",
-            "\"id\" INTEGER NOT NULL PRIMARY KEY",
-            ");",
-            "CREATE TABLE b (",
-            "\"id\" INTEGER NOT NULL PRIMARY KEY",
-            ");",
-            "CREATE TABLE b_many_a_Many (",
-            "\"owner\" INTEGER NOT NULL,",
-            "has INTEGER NOT NULL",
-            ");",
-            "ALTER TABLE b_many_a_Many ADD FOREIGN KEY (\"owner\") REFERENCES b(\"id\");",
-            "ALTER TABLE b_many_a_Many ADD FOREIGN KEY (has) REFERENCES a(\"id\");",
-        ]
+    let expectation_file = format!(
+        "tests/expectations/adb_add_table_many_ddl_{}.sql",
+        backend_name
     );
+    expectorate::assert_contents(&expectation_file, &sql);
 }

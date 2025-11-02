@@ -54,7 +54,7 @@ impl Backend for PgBackend {
             .map(|o| sql_for_op(&mut current, o))
             .collect::<Result<Vec<String>>>()?;
         lines.retain(|s| !s.is_empty());
-        Ok(lines.join("\n"))
+        Ok(format!("{}\n", lines.join("\n")))
     }
 
     fn connect(&self, path: &str) -> Result<Connection> {

@@ -1,0 +1,8 @@
+CREATE TABLE Foo__butane_tmp (bar INTEGER NOT NULL, baz INTEGER NOT NULL);
+INSERT INTO Foo__butane_tmp SELECT bar, baz FROM Foo;
+DROP TABLE Foo;
+ALTER TABLE Foo__butane_tmp RENAME TO Foo;
+CREATE TABLE Foo__butane_tmp (bar INTEGER NOT NULL, baz INTEGER NOT NULL PRIMARY KEY);
+INSERT INTO Foo__butane_tmp SELECT bar, baz FROM Foo;
+DROP TABLE Foo;
+ALTER TABLE Foo__butane_tmp RENAME TO Foo;

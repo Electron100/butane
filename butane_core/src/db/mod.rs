@@ -748,10 +748,10 @@ impl Backend for Box<dyn Backend> {
 /// Find a backend by name.
 pub fn get_backend(name: &str) -> Option<Box<dyn Backend>> {
     match name {
-        #[cfg(feature = "sqlite")]
-        sqlite::BACKEND_NAME => Some(Box::new(sqlite::SQLiteBackend::new())),
         #[cfg(feature = "pg")]
         pg::BACKEND_NAME => Some(Box::new(pg::PgBackend::new())),
+        #[cfg(feature = "sqlite")]
+        sqlite::BACKEND_NAME => Some(Box::new(sqlite::SQLiteBackend::new())),
         #[cfg(feature = "turso")]
         turso::BACKEND_NAME => Some(Box::new(turso::TursoBackend)),
         _ => None,

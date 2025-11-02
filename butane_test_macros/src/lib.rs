@@ -240,3 +240,90 @@ impl IntoIterator for Stmts {
         self.stmts.into_iter()
     }
 }
+
+/// Macro to generate a test for each backend name, passing the backend name as an argument.
+///
+/// Usage:
+/// ```ignore
+/// #[butane_backend_name_test]
+/// fn my_test_fn(backend_name: &str) {
+///     // test logic here
+/// }
+/// ```
+///
+/// For async tests, use the `async` argument:
+/// ```ignore
+/// #[butane_backend_name_test(async)]
+/// async fn my_async_test(backend_name: &str) {
+///     // async test logic here
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn butane_backend_name_test(args: TokenStream, input: TokenStream) -> TokenStream {
+    let func = parse_macro_input!(input as ItemFn);
+    let func_name = &func.sig.ident;
+
+    // Check if async flag is provided
+    let is_async = !args.is_empty() && args.to_string().contains("async");
+
+    let pg_test_name = Ident::new(&format!("{}_pg", func_name), Span::call_site());
+    let sqlite_test_name = Ident::new(&format!("{}_sqlite", func_name), Span::call_site());
+
+    let test_attribute = if is_async {
+        quote! { #[tokio::test] }
+    } else {
+        quote! { #[test] }
+    };
+
+    let await_token = if is_async {
+        quote! { .await }
+    } else {
+        quote! {}
+    };
+
+    let async_token = if is_async {
+        quote! { async }
+    } else {
+        quote! {}
+    };
+
+    let expanded = if is_async {
+        // Include turso only for async tests (turso is async-only)
+        let turso_test_name = Ident::new(&format!("{}_turso", func_name), Span::call_site());
+        quote! {
+            #func
+
+            #test_attribute
+            #async_token fn #pg_test_name() {
+                #func_name("pg")#await_token;
+            }
+
+            #test_attribute
+            #async_token fn #sqlite_test_name() {
+                #func_name("sqlite")#await_token;
+            }
+
+            #test_attribute
+            #async_token fn #turso_test_name() {
+                #func_name("turso")#await_token;
+            }
+        }
+    } else {
+        // Omit turso for sync tests
+        quote! {
+            #func
+
+            #test_attribute
+            #async_token fn #pg_test_name() {
+                #func_name("pg")#await_token;
+            }
+
+            #test_attribute
+            #async_token fn #sqlite_test_name() {
+                #func_name("sqlite")#await_token;
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}

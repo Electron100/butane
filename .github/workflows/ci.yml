@@ -96,6 +96,8 @@ jobs:
       with:
         tool: cargo-deny,editorconfig-checker,mise,typos
     - name: Install ephemeral-postgres via mise
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: runner.os != 'Windows'
       run: |
         mise install ephemeral-postgres

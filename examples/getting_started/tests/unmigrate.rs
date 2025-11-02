@@ -35,7 +35,7 @@ fn insert_data(connection: &Connection) {
     post.save(connection).unwrap();
 }
 
-#[butane_test(sync, nomigrate, pg)]
+#[butane_test(sync, nomigrate)]
 fn migrate_and_unmigrate(mut connection: Connection) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");

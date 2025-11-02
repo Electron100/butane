@@ -17,6 +17,7 @@ doc = false
 name = "butane"
 path = "src/main.rs"
 doc = false
+test = false
 
 [features]
 default = ["pg", "sqlite", "turso"]

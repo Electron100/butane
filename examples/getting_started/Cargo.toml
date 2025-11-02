@@ -9,14 +9,23 @@ publish = false
 [[bin]]
 name = "show_posts"
 doc = false
+test = false
 
 [[bin]]
 name = "write_post"
 doc = false
+test = false
 
 [[bin]]
 name = "delete_post"
 doc = false
+test = false
+
+[[bin]]
+name = "publish_post_async"
+path = "src/bin/publish_post.rs"
+doc = false
+test = false
 
 [lib]
 doc = false

@@ -10,21 +10,25 @@ publish = false
 name = "show_posts_async"
 path = "src/bin/show_posts.rs"
 doc = false
+test = false
 
 [[bin]]
 name = "write_post_async"
 path = "src/bin/write_post.rs"
 doc = false
+test = false
 
 [[bin]]
 name = "delete_post_async"
 path = "src/bin/delete_post.rs"
 doc = false
+test = false
 
 [[bin]]
 name = "publish_post_async"
 path = "src/bin/publish_post.rs"
 doc = false
+test = false
 
 [lib]
 doc = false

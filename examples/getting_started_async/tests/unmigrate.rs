@@ -1,4 +1,4 @@
-use butane::db::{BackendConnectionAsync, ConnectionAsync};
+use butane::db::ConnectionAsync;
 use butane::migrations::Migrations;
 use butane::DataObjectOpsAsync;
 use butane_test_helper::*;
@@ -35,11 +35,15 @@ async fn insert_data(connection: &ConnectionAsync) {
     post.save(connection).await.unwrap();
 }
 
-#[butane_test(async, nomigrate, pg)]
+#[butane_test(async, nomigrate)]
 async fn migrate_and_unmigrate(mut connection: ConnectionAsync) {
     // Migrate forward.
     let base_dir = std::path::PathBuf::from(".butane");
     let migrations = butane_cli::get_migrations(&base_dir).unwrap();
+
+    if connection.backend_name() == "turso" {
+        return;
+    }
 
     migrations.migrate_async(&mut connection).await.unwrap();
 

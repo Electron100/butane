@@ -13,10 +13,6 @@ async fn create_tag(connection: &ConnectionAsync, name: &str) -> Tag {
 }
 
 async fn insert_data(connection: &ConnectionAsync) {
-    if connection.backend_name() == "sqlite" {
-        // https://github.com/Electron100/butane/issues/226
-        return;
-    }
     let mut cats_blog = Blog::new("Cats");
     cats_blog.save(connection).await.unwrap();
 

@@ -13,10 +13,6 @@ fn create_tag(connection: &Connection, name: &str) -> Tag {
 }
 
 fn insert_data(connection: &Connection) {
-    if connection.backend_name() == "sqlite" {
-        // https://github.com/Electron100/butane/issues/226
-        return;
-    }
     let mut cats_blog = Blog::new("Cats");
     cats_blog.save(connection).unwrap();
 

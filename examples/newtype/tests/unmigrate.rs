@@ -15,6 +15,10 @@ use newtype::models::{Blog, Post, Tags};
 )]
 async fn insert_data(connection: &Connection) {
     use butane::DataObjectOps;
+    if connection.backend_name() == "sqlite" {
+        // https://github.com/Electron100/butane/issues/226
+        return;
+    }
     // Turso: Skip due to table rename migration issue
     // See docs/turso-backend.md - Known Issues - Table Rename Migration
     if connection.backend_name() == "turso" || connection.backend_name() == "libsql" {

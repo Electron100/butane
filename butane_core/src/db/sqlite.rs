@@ -858,7 +858,9 @@ fn change_column(
         Some(col) => new_table.replace_column(col.clone()),
         None => new_table.remove_column(old.name()),
     }
-    let stmts: [&str; 4] = [
+    // Wrap in PRAGMA defer_foreign_keys to allow dropping tables that are referenced
+    let stmts: [&str; 6] = [
+        "PRAGMA defer_foreign_keys = ON;",
         &create_table(&new_table, false),
         &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
@@ -867,6 +869,7 @@ fn change_column(
             helper::quote_reserved_word(&new_table.name),
             helper::quote_reserved_word(tbl_name)
         ),
+        "PRAGMA defer_foreign_keys = OFF;",
     ];
     let result = stmts.join("\n");
     new_table.name.clone_from(&old_table.name);

@@ -365,7 +365,7 @@ async fn add_table_fkey_back_reference(conn: ConnectionAsync) {
     let sql = backend.create_migration_sql(&new, ops).unwrap();
 
     let expectation_file = format!(
-        "tests/expectations/adb_add_table_fkey_back_reference_{}.sql",
+        "tests/expectations/adb/add_table_fkey_back_reference/{}.sql",
         backend.name()
     );
     expectorate::assert_contents(&expectation_file, &sql);
@@ -573,7 +573,7 @@ fn add_renamed_table_fkey_ddl(backend_name: &str) {
     let sql = backend.create_migration_sql(&new, ops).unwrap();
 
     let expectation_file = format!(
-        "tests/expectations/adb_add_renamed_table_fkey_ddl_{}.sql",
+        "tests/expectations/adb/add_renamed_table_fkey_ddl/{}.sql",
         backend_name
     );
     expectorate::assert_contents(&expectation_file, &sql);
@@ -679,7 +679,7 @@ fn add_table_many_ddl(backend_name: &str) {
     let sql = backend.create_migration_sql(&new, ops).unwrap();
 
     let expectation_file = format!(
-        "tests/expectations/adb_add_table_many_ddl_{}.sql",
+        "tests/expectations/adb/add_table_many_ddl/{}.sql",
         backend_name
     );
     expectorate::assert_contents(&expectation_file, &sql);

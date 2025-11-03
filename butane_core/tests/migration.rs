@@ -249,7 +249,7 @@ fn verify_sql(conn: &ConnectionAsync, ms: &impl Migrations, test_name: &str) {
 
     let actual_up_sql = v2_migration.up_sql(backend.name()).unwrap().unwrap();
     let up_expectation_file = format!(
-        "tests/expectations/migration_{}_{}_up.sql",
+        "tests/expectations/migration/{}/{}_up.sql",
         test_name,
         backend.name()
     );
@@ -257,7 +257,7 @@ fn verify_sql(conn: &ConnectionAsync, ms: &impl Migrations, test_name: &str) {
 
     let actual_down_sql = v2_migration.down_sql(backend.name()).unwrap().unwrap();
     let down_expectation_file = format!(
-        "tests/expectations/migration_{}_{}_down.sql",
+        "tests/expectations/migration/{}/{}_down.sql",
         test_name,
         backend.name()
     );

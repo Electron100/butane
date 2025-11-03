@@ -1,0 +1,58 @@
+name: WASM Build
+
+on:
+  push:
+    branches:
+      - master
+      - wasm-*
+  pull_request:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  wasm-build:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Add Rust stable toolchain with wasm32 target
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+        target: wasm32-unknown-unknown
+
+    - name: Check butane_core for wasm32
+      run: |
+        cd butane_core
+        cargo check --target wasm32-unknown-unknown --no-default-features --features datetime,json,uuid
+
+    - name: Build butane_core for wasm32
+      run: |
+        cd butane_core
+        cargo build --target wasm32-unknown-unknown --no-default-features --features datetime,json,uuid
+
+    - name: Build butane for wasm32
+      run: |
+        cargo build -p butane --target wasm32-unknown-unknown --no-default-features
+
+    - name: Build getting_started for wasm32
+      run: |
+        cargo build -p getting_started --target wasm32-unknown-unknown --no-default-features

@@ -3,8 +3,6 @@
 
 #![allow(missing_docs)]
 
-use std::path::Path;
-
 use async_trait::async_trait;
 use fallible_iterator::FallibleIterator;
 use nonempty::NonEmpty;
@@ -21,9 +19,12 @@ use adb::{AColumn, ATable, DeferredSqlType, Operation, TypeIdentifier, ADB};
 mod migration;
 pub use migration::{Migration, MigrationMut};
 
+#[cfg(feature = "fs")]
 mod fs;
 
+#[cfg(feature = "fs")]
 mod fsmigrations;
+#[cfg(feature = "fs")]
 pub use fsmigrations::{FsMigration, FsMigrations};
 mod memmigrations;
 pub use memmigrations::{MemMigration, MemMigrations};
@@ -316,7 +317,8 @@ pub fn migrations_table() -> ATable {
 ///
 /// The `#[model]` attribute will write migration information to a
 /// `.butane/migrations` directory under the project directory.
-pub fn from_root<P: AsRef<Path>>(path: P) -> FsMigrations {
+#[cfg(feature = "fs")]
+pub fn from_root<P: AsRef<std::path::Path>>(path: P) -> FsMigrations {
     FsMigrations::new(path.as_ref().to_path_buf())
 }
 

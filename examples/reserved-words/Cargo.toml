@@ -16,7 +16,7 @@ sqlite-bundled = ["butane/sqlite-bundled"]
 turso = ["butane/turso"]
 
 [dependencies]
-butane = {workspace = true, features = ["async", "async-adapter", "log"] }
+butane = { workspace = true, features = ["async", "async-adapter", "fs", "log"] }
 
 [dev-dependencies]
 butane_cli.workspace = true

@@ -48,3 +48,11 @@ jobs:
       run: |
         cd butane_core
         cargo build --target wasm32-unknown-unknown --no-default-features --features datetime,json,uuid
+
+    - name: Build butane for wasm32
+      run: |
+        cargo build -p butane --target wasm32-unknown-unknown --no-default-features
+
+    - name: Build getting_started for wasm32
+      run: |
+        cargo build -p getting_started --target wasm32-unknown-unknown --no-default-features

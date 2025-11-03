@@ -17,8 +17,9 @@ rust-version.workspace = true
 async = ["butane_core/async", "butane_codegen/async"]
 async-adapter = ["butane_core/async-adapter"]
 deadpool = ["dep:deadpool", "async"]
-default = ["datetime", "json", "uuid"]
+default = ["datetime", "fs", "json", "uuid"]
 fake = ["butane_core/fake"]
+fs = ["butane_core/fs"]
 json = ["butane_codegen/json", "butane_core/json"]
 sqlite = ["butane_core/sqlite"]
 sqlite-bundled = ["butane_core/sqlite-bundled"]
@@ -35,8 +36,8 @@ uuid = ["butane_codegen/uuid", "butane_core/uuid"]
 _auto_delete_dot_butane = []
 
 [dependencies]
-butane_codegen = { workspace = true }
-butane_core = { workspace = true }
+butane_codegen = { workspace = true, default-features = false }
+butane_core = { workspace = true, default-features = false }
 r2d2 = { optional = true, workspace = true }
 deadpool = { optional = true, workspace = true }
 

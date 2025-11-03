@@ -5,7 +5,10 @@
 #![deny(missing_docs)]
 extern crate proc_macro;
 
+#[cfg(feature = "fs")]
 use std::path::PathBuf;
+#[cfg(not(feature = "fs"))]
+use std::sync::{Mutex, OnceLock};
 
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier};
 use butane_core::{codegen, make_compile_error, migrations, SqlType};
@@ -56,7 +59,15 @@ mod test_field_type;
 /// [`Many`]: butane_core::many::Many
 #[proc_macro_attribute]
 pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
-    codegen::model_with_migrations(input.into(), &mut migrations_for_dir()).into()
+    #[cfg(feature = "fs")]
+    {
+        codegen::model_with_migrations(input.into(), &mut migrations_for_dir()).into()
+    }
+    #[cfg(not(feature = "fs"))]
+    {
+        let mut migrations = mem_migrations().lock().unwrap();
+        codegen::model_with_migrations(input.into(), &mut *migrations).into()
+    }
 }
 
 /// Attribute macro which generates an implementation of
@@ -211,14 +222,24 @@ pub fn filter(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn butane_type(args: TokenStream, input: TokenStream) -> TokenStream {
-    codegen::butane_type_with_migrations(args.into(), input.into(), &mut migrations_for_dir())
-        .into()
+    #[cfg(feature = "fs")]
+    {
+        codegen::butane_type_with_migrations(args.into(), input.into(), &mut migrations_for_dir())
+            .into()
+    }
+    #[cfg(not(feature = "fs"))]
+    {
+        let mut migrations = mem_migrations().lock().unwrap();
+        codegen::butane_type_with_migrations(args.into(), input.into(), &mut *migrations).into()
+    }
 }
 
+#[cfg(feature = "fs")]
 fn migrations_for_dir() -> migrations::FsMigrations {
     migrations::from_root(migrations_dir())
 }
 
+#[cfg(feature = "fs")]
 fn migrations_dir() -> PathBuf {
     let mut dir = PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR expected to be set"),
@@ -226,6 +247,14 @@ fn migrations_dir() -> PathBuf {
     dir.push(".butane");
     dir.push("migrations");
     dir
+}
+
+#[cfg(not(feature = "fs"))]
+static MEM_MIGRATIONS: OnceLock<Mutex<migrations::MemMigrations>> = OnceLock::new();
+
+#[cfg(not(feature = "fs"))]
+fn mem_migrations() -> &'static Mutex<migrations::MemMigrations> {
+    MEM_MIGRATIONS.get_or_init(|| Mutex::new(migrations::MemMigrations::new()))
 }
 
 /// Derive macro for `FieldType`.
@@ -280,13 +309,26 @@ fn derive_field_type_for_newtype(ident: &Ident, sqltype: SqlType) -> TokenStream
     let sqltype_name = serde_variant::to_variant_name(&sqltype).unwrap();
     let sqltype_ident = syn::Ident::new(sqltype_name, proc_macro2::Span::call_site());
 
-    let mut migrations = migrations_for_dir();
-    codegen::add_custom_type(
-        &mut migrations,
-        ident.to_string(),
-        DeferredSqlType::KnownId(TypeIdentifier::Ty(sqltype)),
-    )
-    .unwrap();
+    #[cfg(feature = "fs")]
+    {
+        let mut migrations = migrations_for_dir();
+        codegen::add_custom_type(
+            &mut migrations,
+            ident.to_string(),
+            DeferredSqlType::KnownId(TypeIdentifier::Ty(sqltype)),
+        )
+        .unwrap();
+    }
+    #[cfg(not(feature = "fs"))]
+    {
+        let mut migrations = mem_migrations().lock().unwrap();
+        codegen::add_custom_type(
+            &mut *migrations,
+            ident.to_string(),
+            DeferredSqlType::KnownId(TypeIdentifier::Ty(sqltype)),
+        )
+        .unwrap();
+    }
 
     quote!(
         impl butane::ToSql for #ident
@@ -323,14 +365,26 @@ fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenS
         return derive_field_type_with_json(ident);
     }
 
-    let mut migrations = migrations_for_dir();
-
-    codegen::add_custom_type(
-        &mut migrations,
-        ident.to_string(),
-        DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Text)),
-    )
-    .unwrap();
+    #[cfg(feature = "fs")]
+    {
+        let mut migrations = migrations_for_dir();
+        codegen::add_custom_type(
+            &mut migrations,
+            ident.to_string(),
+            DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Text)),
+        )
+        .unwrap();
+    }
+    #[cfg(not(feature = "fs"))]
+    {
+        let mut migrations = mem_migrations().lock().unwrap();
+        codegen::add_custom_type(
+            &mut *migrations,
+            ident.to_string(),
+            DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Text)),
+        )
+        .unwrap();
+    }
 
     let match_arms_to_string: Vec<TokenStream2> = data_enum
         .variants
@@ -396,14 +450,26 @@ fn derive_field_type_for_enum(ident: &Ident, data_enum: syn::DataEnum) -> TokenS
 
 #[cfg(feature = "json")]
 fn derive_field_type_with_json(struct_name: &Ident) -> TokenStream2 {
-    let mut migrations = migrations_for_dir();
-
-    codegen::add_custom_type(
-        &mut migrations,
-        struct_name.to_string(),
-        DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Json)),
-    )
-    .unwrap();
+    #[cfg(feature = "fs")]
+    {
+        let mut migrations = migrations_for_dir();
+        codegen::add_custom_type(
+            &mut migrations,
+            struct_name.to_string(),
+            DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Json)),
+        )
+        .unwrap();
+    }
+    #[cfg(not(feature = "fs"))]
+    {
+        let mut migrations = mem_migrations().lock().unwrap();
+        codegen::add_custom_type(
+            &mut *migrations,
+            struct_name.to_string(),
+            DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Json)),
+        )
+        .unwrap();
+    }
     quote!(
         impl butane::ToSql for #struct_name
         {

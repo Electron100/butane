@@ -31,7 +31,8 @@ test = false
 doc = false
 
 [features]
-default = ["pg", "sqlite", "sqlite-bundled", "turso"]
+default = ["fs", "pg", "sqlite", "sqlite-bundled", "turso"]
+fs = ["butane/fs"]
 pg = ["butane/pg"]
 sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]

@@ -21,6 +21,21 @@ impl Blog {
     }
 }
 
+/// Tags to be associated with a [Post].
+#[model]
+#[derive(Debug, Default)]
+pub struct Tag {
+    /// Tag name.
+    #[pk]
+    pub tag: String,
+}
+impl Tag {
+    /// Create a new Tag.
+    pub fn new(tag: impl Into<String>) -> Self {
+        Tag { tag: tag.into() }
+    }
+}
+
 /// Post details, including a [ForeignKey] to [Blog]
 /// and a [Many] relationship to [Tag]s.
 #[model]
@@ -55,20 +70,5 @@ impl Post {
             byline: None,
             likes: 0,
         }
-    }
-}
-
-/// Tags to be associated with a [Post].
-#[model]
-#[derive(Debug, Default)]
-pub struct Tag {
-    /// Tag name.
-    #[pk]
-    pub tag: String,
-}
-impl Tag {
-    /// Create a new Tag.
-    pub fn new(tag: impl Into<String>) -> Self {
-        Tag { tag: tag.into() }
     }
 }

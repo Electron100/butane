@@ -28,7 +28,7 @@ turso = ["butane/turso"]
 
 [dependencies]
 anyhow = "1.0"
-butane.workspace = true
+butane = { workspace = true, features = ["fs"] }
 cargo_metadata = "0.23"
 chrono = { workspace = true }
 clap = { version = "4.1", features = ["derive", "string", "wrap_help"] }

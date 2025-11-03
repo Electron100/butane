@@ -22,7 +22,7 @@ turso = ["butane_core/turso"]
 
 [dependencies]
 block-id = "0.2"
-butane_core = { workspace = true }
+butane_core = { workspace = true, features = ["fs"] }
 ctrlc = { version = "3.4", optional = true }
 env_logger.workspace = true
 libc = "0.2"
@@ -52,7 +52,6 @@ required-features = ["pg"]
 name = "initdb"
 path = "tests/initdb.rs"
 required-features = ["pg"]
-
 
 [[test]]
 name = "macos_shared_memory"

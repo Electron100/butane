@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
+use arrayvec::ArrayString;
 #[cfg(feature = "datetime")]
 use chrono::{
     naive::{NaiveDate, NaiveDateTime},
@@ -454,6 +455,46 @@ impl FieldType for String {
     type RefType = str;
 }
 impl PrimaryKeyType for String {}
+
+// ArrayString implementations
+impl<const CAP: usize> FromSql for ArrayString<CAP> {
+    fn from_sql_ref(valref: SqlValRef) -> Result<Self> {
+        if let SqlValRef::Text(val) = valref {
+            ArrayString::from(val).map_err(|_| {
+                crate::Error::CannotConvertSqlVal(SqlType::Text, SqlVal::Text(val.to_string()))
+            })
+        } else {
+            sql_conv_err!(valref, Text)
+        }
+    }
+    fn from_sql(val: SqlVal) -> Result<Self> {
+        match val {
+            SqlVal::Text(text_val) => ArrayString::from(&text_val).map_err(|_| {
+                crate::Error::CannotConvertSqlVal(SqlType::Text, SqlVal::Text(text_val.clone()))
+            }),
+            _ => sql_conv_err!(val, Text),
+        }
+    }
+}
+
+impl<const CAP: usize> ToSql for ArrayString<CAP> {
+    fn to_sql(&self) -> SqlVal {
+        SqlVal::Text(self.to_string())
+    }
+    fn to_sql_ref(&self) -> SqlValRef<'_> {
+        SqlValRef::Text(self.as_str())
+    }
+    fn into_sql(self) -> SqlVal {
+        SqlVal::Text(self.to_string())
+    }
+}
+
+impl<const CAP: usize> FieldType for ArrayString<CAP> {
+    const SQLTYPE: SqlType = SqlType::Text;
+    type RefType = str;
+}
+
+impl<const CAP: usize> PrimaryKeyType for ArrayString<CAP> {}
 
 impl FromSql for Vec<u8> {
     fn from_sql_ref(valref: SqlValRef) -> Result<Self> {

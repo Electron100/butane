@@ -196,14 +196,21 @@ impl BackendRows for Box<dyn BackendRows + '_> {
     }
 }
 
-#[cfg(feature = "async-adapter")]
+#[cfg(feature = "async")]
 #[derive(Debug)]
 pub(crate) struct VecRow {
     values: Vec<SqlVal>,
 }
 
-#[cfg(feature = "async-adapter")]
+#[cfg(feature = "async")]
 impl VecRow {
+    #[allow(unused)] // Not used with all feature combinations
+    /// Create a new `VecRow` from a vector of [`SqlVal`].
+    pub fn new_from_values(values: Vec<SqlVal>) -> Self {
+        Self { values }
+    }
+
+    #[cfg(feature = "async-adapter")]
     fn new(original: &dyn BackendRow, columns: &[Column]) -> Result<Self> {
         if original.len() != columns.len() {
             return Err(crate::Error::BoundsError(
@@ -222,7 +229,7 @@ impl VecRow {
     }
 }
 
-#[cfg(feature = "async-adapter")]
+#[cfg(feature = "async")]
 impl BackendRow for VecRow {
     fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>> {
         self.values

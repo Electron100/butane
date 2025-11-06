@@ -28,10 +28,14 @@ async fn debug_transaction_before_consuming(mut conn: ConnectionAsync) {
 
     let tr = conn.transaction().await.unwrap();
 
+    eprintln!("DEBUG: {:?}", tr);
+
     if backend_name == "pg" {
         assert!(format!("{:?}", tr).contains("{ trans: true }"));
     } else if backend_name == "turso" {
         assert!(format!("{:?}", tr).contains("TursoTransaction"));
+    } else if backend_name == "libsql" {
+        assert!(format!("{:?}", tr).contains("LibsqlTransaction"));
     } else {
         assert!(format!("{:?}", tr).contains("path: Some(\"\")"));
     }

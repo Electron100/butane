@@ -14,10 +14,11 @@ rust-version.workspace = true
 
 [features]
 bin = ["ctrlc"]
-default = ["sqlite", "pg"]
-sqlite = ["butane_core/sqlite", "butane_core/async-adapter"]
-sqlite-bundled = ["butane_core/sqlite-bundled"]
+default = ["pg", "sqlite"]
+libsql = ["butane_core/libsql", "reqwest", "tokio"]
 pg = ["butane_core/pg", "tokio-postgres"]
+sqlite = ["butane_core/async-adapter", "butane_core/sqlite"]
+sqlite-bundled = ["butane_core/sqlite-bundled"]
 turso = ["butane_core/turso"]
 
 [dependencies]
@@ -28,17 +29,31 @@ env_logger.workspace = true
 libc = "0.2"
 log.workspace = true
 maybe-async-cfg.workspace = true
+reqwest = { version = "0.12", optional = true }
+tokio = { workspace = true, optional = true, features = [
+  "io-std",
+  "io-util",
+  "net",
+  "process",
+  "rt",
+  "rt-multi-thread",
+  "time",
+] }
 nonempty.workspace = true
 thiserror.workspace = true
-tokio-postgres = { features = ["with-geo-types-0_7"], optional = true, workspace = true }
+tokio-postgres = { features = [
+  "with-geo-types-0_7",
+], optional = true, workspace = true }
 rand.workspace = true
 tempfile.workspace = true
 uuid = { features = ["v4"], workspace = true }
-which = "8.0"
+which.workspace = true
 
 [dev-dependencies]
 pollster = "0.4"
 temp-env = "0.3"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+libsql.workspace = true
 
 [package.metadata.release]
 release = false
@@ -65,9 +80,9 @@ path = "tests/sqlite.rs"
 required-features = ["sqlite"]
 
 [[test]]
-name = "turso"
-path = "tests/turso.rs"
-required-features = ["turso"]
+name = "libsql"
+path = "tests/libsql.rs"
+required-features = ["libsql"]
 
 [[bin]]
 bench = false

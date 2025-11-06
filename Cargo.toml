@@ -1,5 +1,4 @@
 [workspace]
-resolver = "2"
 members = [
   "butane",
   "butane_cli",
@@ -9,25 +8,26 @@ members = [
   "butane_test_macros",
   "example",
   "examples/custom_pg",
-  "examples/newtype",
   "examples/getting_started",
   "examples/getting_started_async",
+  "examples/newtype",
   "examples/reserved-words",
 ]
+resolver = "2"
 
 [workspace.package]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Electron100/butane"
-version = "0.8.1"
 rust-version = "1.80.0"
+version = "0.8.1"
 
 [workspace.dependencies]
 async-trait = "0.1"
 butane = { version = "0.8", path = "butane" }
 butane_cli = { path = "butane_cli" }
-butane_core = { version = "0.8", path = "butane_core" }
 butane_codegen = { version = "0.8", path = "butane_codegen" }
+butane_core = { version = "0.8", path = "butane_core" }
 butane_test_helper = { path = "butane_test_helper", default-features = false }
 butane_test_macros = { path = "butane_test_macros" }
 cfg-if = "1"
@@ -41,11 +41,16 @@ desynt = "0.1"
 env_logger = "0.11"
 expectorate = "1.1"
 fake = "4.2"
+libsql = { version = "0.9.26", default-features = false, features = [
+  "core",
+  "remote",
+  "tls",
+] }
 log = "0.4"
 maybe-async-cfg = { version = "0.2.5", default-features = false }
 nonempty = "0.12"
-phf = { version = "0.13", features = ['macros'] }
 paste = "1.0.11"
+phf = { version = "0.13", features = ['macros'] }
 postgres-native-tls = "0.5"
 pretty_assertions = "1.4"
 proc-macro2 = { version = "1.0", default-features = false }
@@ -66,6 +71,7 @@ tokio-test = { version = "0.4" }
 turso = "0.3"
 url = "2.5"
 uuid = "1.2"
+which = "8.0"
 
 [workspace.metadata.release]
 allow-branch = ["master"]

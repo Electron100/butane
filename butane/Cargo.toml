@@ -19,16 +19,17 @@ async-adapter = ["butane_core/async-adapter"]
 deadpool = ["dep:deadpool", "async"]
 default = ["datetime", "json", "uuid"]
 fake = ["butane_core/fake"]
-json = ["butane_codegen/json", "butane_core/json"]
-sqlite = ["butane_core/sqlite"]
-sqlite-bundled = ["butane_core/sqlite-bundled"]
-pg = ["async", "butane_core/pg"]
 datetime = ["butane_codegen/datetime", "butane_core/datetime"]
 debug = ["butane_core/debug"]
+json = ["butane_codegen/json", "butane_core/json"]
+libsql = ["butane_core/libsql"]
 log = ["butane_core/log"]
+pg = ["async", "butane_core/pg"]
 r2d2 = ["dep:r2d2"]
-turso = ["butane_core/turso"]
+sqlite = ["butane_core/sqlite"]
+sqlite-bundled = ["butane_core/sqlite-bundled"]
 tls = ["butane_core/tls"]
+turso = ["butane_core/turso"]
 uuid = ["butane_codegen/uuid", "butane_core/uuid"]
 # This feature is for testing only. It will delete the .butane directory inside the butane crate, which only
 # exists when running tests.  It has no effect when running butane as a dependency.
@@ -42,7 +43,7 @@ deadpool = { optional = true, workspace = true }
 
 [dev-dependencies]
 butane = { features = ["_auto_delete_dot_butane"], path = "." }
-butane_test_helper = { workspace = true, default-features = false, features = ["pg", "sqlite", "turso"] }
+butane_test_helper = { workspace = true, default-features = false, features = ["libsql", "pg", "sqlite", "turso"] }
 butane_test_macros = { workspace = true }
 cfg-if = { workspace = true }
 paste = { workspace = true }

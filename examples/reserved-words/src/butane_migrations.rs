@@ -59,11 +59,13 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       },
       "from": null,
       "up": {
+        "libsql": "CREATE TABLE \"User\" (\n\"id\" TEXT NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL,\nemail TEXT NOT NULL\n) STRICT;\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n) STRICT;\n",
         "pg": "CREATE TABLE \"User\" (\n\"id\" TEXT NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL,\nemail TEXT NOT NULL\n);\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n);\n",
         "sqlite": "CREATE TABLE \"User\" (\n\"id\" TEXT NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL,\nemail TEXT NOT NULL\n) STRICT;\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n) STRICT;\n",
-        "turso": "CREATE TABLE \"User\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"name\" TEXT NOT NULL, email TEXT NOT NULL);\nCREATE TABLE IF NOT EXISTS butane_migrations (\"name\" TEXT NOT NULL PRIMARY KEY);\n"
+        "turso": "CREATE TABLE \"User\" (\n\"id\" TEXT NOT NULL PRIMARY KEY,\n\"name\" TEXT NOT NULL,\nemail TEXT NOT NULL\n);\nCREATE TABLE IF NOT EXISTS butane_migrations (\n\"name\" TEXT NOT NULL PRIMARY KEY\n);\n"
       },
       "down": {
+        "libsql": "DROP TABLE \"User\";\n",
         "pg": "DROP TABLE \"User\";\n",
         "sqlite": "DROP TABLE \"User\";\n",
         "turso": "DROP TABLE \"User\";\n"
@@ -198,11 +200,13 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       },
       "from": "20250503_065948927_init",
       "up": {
+        "libsql": "CREATE TABLE Post (\n\"id\" INTEGER NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished INTEGER NOT NULL,\nbyline TEXT,\nFOREIGN KEY (byline) REFERENCES \"User\"(\"id\")\n) STRICT;\n",
         "pg": "CREATE TABLE Post (\n\"id\" SERIAL NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished BOOLEAN NOT NULL,\nbyline TEXT\n);\nALTER TABLE Post ADD FOREIGN KEY (byline) REFERENCES \"User\"(\"id\");\n",
         "sqlite": "CREATE TABLE Post (\n\"id\" INTEGER NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished INTEGER NOT NULL,\nbyline TEXT,\nFOREIGN KEY (byline) REFERENCES \"User\"(\"id\")\n) STRICT;\n",
-        "turso": "CREATE TABLE Post (\n    \"id\" INTEGER NOT NULL PRIMARY KEY,\n    title TEXT NOT NULL,\n    body TEXT NOT NULL,\n    published INTEGER NOT NULL,\n    byline TEXT,\n    FOREIGN KEY (byline) REFERENCES \"User\"(\"id\")\n);\n"
+        "turso": "CREATE TABLE Post (\n\"id\" INTEGER NOT NULL PRIMARY KEY,\ntitle TEXT NOT NULL,\nbody TEXT NOT NULL,\npublished INTEGER NOT NULL,\nbyline TEXT,\nFOREIGN KEY (byline) REFERENCES \"User\"(\"id\")\n);\n"
       },
       "down": {
+        "libsql": "DROP TABLE Post;\n",
         "pg": "ALTER TABLE Post DROP CONSTRAINT Post_byline_fkey;\nDROP TABLE Post;\n",
         "sqlite": "DROP TABLE Post;\n",
         "turso": "DROP TABLE Post;\n"
@@ -380,11 +384,13 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       },
       "from": "20250504_001654915_add-fkey",
       "up": {
+        "libsql": "CREATE TABLE Post_likes_Many (\n\"owner\" INTEGER NOT NULL,\nhas TEXT NOT NULL,\nFOREIGN KEY (\"owner\") REFERENCES Post(\"id\")\nFOREIGN KEY (has) REFERENCES \"User\"(\"id\")\n) STRICT;\n",
         "pg": "CREATE TABLE Post_likes_Many (\n\"owner\" INTEGER NOT NULL,\nhas TEXT NOT NULL\n);\nALTER TABLE Post_likes_Many ADD FOREIGN KEY (\"owner\") REFERENCES Post(\"id\");\nALTER TABLE Post_likes_Many ADD FOREIGN KEY (has) REFERENCES \"User\"(\"id\");\n",
         "sqlite": "CREATE TABLE Post_likes_Many (\n\"owner\" INTEGER NOT NULL,\nhas TEXT NOT NULL,\nFOREIGN KEY (\"owner\") REFERENCES Post(\"id\")\nFOREIGN KEY (has) REFERENCES \"User\"(\"id\")\n) STRICT;\n",
-        "turso": "CREATE TABLE Post_likes_Many (\n    \"owner\" INTEGER NOT NULL,\n    has TEXT NOT NULL,\n    FOREIGN KEY (\"owner\") REFERENCES Post(\"id\"),\n    FOREIGN KEY (has) REFERENCES \"User\"(\"id\")\n);\n"
+        "turso": "CREATE TABLE Post_likes_Many (\n\"owner\" INTEGER NOT NULL,\nhas TEXT NOT NULL,\nFOREIGN KEY (\"owner\") REFERENCES Post(\"id\")\nFOREIGN KEY (has) REFERENCES \"User\"(\"id\")\n);\n"
       },
       "down": {
+        "libsql": "DROP TABLE Post_likes_Many;\n",
         "pg": "ALTER TABLE Post_likes_Many DROP CONSTRAINT Post_likes_Many_owner_fkey;\nALTER TABLE Post_likes_Many DROP CONSTRAINT Post_likes_Many_has_fkey;\nDROP TABLE Post_likes_Many;\n",
         "sqlite": "DROP TABLE Post_likes_Many;\n",
         "turso": "DROP TABLE Post_likes_Many;\n"
@@ -580,11 +586,13 @@ pub fn get_migrations() -> Result<MemMigrations, butane::Error> {
       },
       "from": "20250504_002109086_add-many",
       "up": {
+        "libsql": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n) STRICT;\n",
         "pg": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n);\n",
         "sqlite": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n) STRICT;\n",
-        "turso": "CREATE TABLE RowidTest (\"rowid\" INTEGER NOT NULL PRIMARY KEY);\n"
+        "turso": "CREATE TABLE RowidTest (\n\"rowid\" INTEGER NOT NULL PRIMARY KEY\n);\n"
       },
       "down": {
+        "libsql": "DROP TABLE RowidTest;\n",
         "pg": "DROP TABLE RowidTest;\n",
         "sqlite": "DROP TABLE RowidTest;\n",
         "turso": "DROP TABLE RowidTest;\n"

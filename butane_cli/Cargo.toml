@@ -20,7 +20,8 @@ doc = false
 test = false
 
 [features]
-default = ["pg", "sqlite", "turso"]
+default = ["libsql", "pg", "sqlite", "turso"]
+libsql = ["butane/libsql"]
 pg = ["butane/pg"]
 sqlite = ["butane/sqlite"]
 sqlite-bundled = ["butane/sqlite-bundled"]

@@ -3,36 +3,34 @@
 //! Turso is an in-process SQL database written in Rust, compatible with SQLite.
 //! This backend leverages the same migration SQL and query structure as SQLite.
 
-use std::borrow::Cow;
 use std::fmt::{Debug, Write};
 
 use async_trait::async_trait;
 #[cfg(feature = "datetime")]
 use chrono::naive::{NaiveDate, NaiveDateTime};
 
+#[cfg(feature = "async")]
+use super::connmethods::VecRow;
 use super::connmethods::VecRows;
 use super::helper;
+// Migration SQL generation (reuse SQLite logic since Turso is compatible)
+use super::sqlite::{
+    sql_for_expr, sql_for_op, sql_insert_or_update, SQLitePlaceholderSource, HAS_TABLE_SQL,
+    ROW_ID_COLUMN_NAME,
+};
+#[cfg(feature = "datetime")]
+use super::sqlite::{SQLITE_DATE_FORMAT, SQLITE_DT_FORMAT};
 use crate::db::{
-    Backend, BackendConnectionAsync as BackendConnection, BackendRow,
+    Backend, BackendConnectionAsync as BackendConnection,
     BackendTransactionAsync as BackendTransaction, Column, ConnectionAsync,
     ConnectionMethodsAsync as ConnectionMethods, RawQueryResult, TransactionAsync as Transaction,
 };
-use crate::migrations::adb::ARef;
-use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
+use crate::migrations::adb::{Operation, ADB};
 use crate::query::{BoolExpr, Order};
 use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 
-#[cfg(feature = "datetime")]
-const TURSO_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
-
-#[cfg(feature = "datetime")]
-const TURSO_DATE_FORMAT: &str = "%Y-%m-%d";
-
 /// Backend name identifier for Turso.
 pub const BACKEND_NAME: &str = "turso";
-
-/// Row ID column name used by Turso (same as SQLite).
-pub const ROW_ID_COLUMN_NAME: &str = "rowid";
 
 // Trait similar to PgConnectionLike for sharing behavior between Connection and Transaction
 trait TursoConnectionLike {
@@ -115,7 +113,7 @@ impl Backend for TursoBackend {
         let mut lines = ops
             .into_iter()
             .map(|o| {
-                let sql = sql_for_op(&mut current, &o);
+                let sql = sql_for_op(&mut current, &o, false);
                 current.transform_with(o);
                 sql
             })
@@ -149,23 +147,14 @@ impl TursoConnection {
     async fn open(path: impl AsRef<str>) -> Result<Self> {
         let path_str = path.as_ref();
 
-        let db = if path_str == ":memory:" {
-            turso::Builder::new_local(":memory:")
-                .build()
-                .await
-                .map_err(|e| Error::Internal(e.to_string()))?
-        } else {
-            turso::Builder::new_local(path_str)
-                .build()
-                .await
-                .map_err(|e| Error::Internal(e.to_string()))?
-        };
+        let db = turso::Builder::new_local(path_str)
+            .build()
+            .await
+            .map_err(|e| Error::Internal(e.to_string()))?;
 
         let conn = db.connect().map_err(|e| Error::Internal(e.to_string()))?;
 
         // Enable foreign key constraints using the SQL command
-        // Note: Turso uses libsql which is a fork of SQLite and should support
-        // foreign_keys pragma via regular SQL, not PRAGMA syntax
         conn.execute("PRAGMA foreign_keys = 1", Vec::<turso::Value>::new())
             .await
             .map_err(|e| Error::Internal(e.to_string()))?;
@@ -227,7 +216,7 @@ impl TursoConnection {
         sql_for_expr(
             query::Expr::Condition(inner_expr),
             &mut values,
-            &mut TursoPlaceholderSource::new(),
+            &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
 
@@ -255,7 +244,7 @@ impl TursoConnection {
         sql_for_expr(
             query::Expr::Condition(inner_expr),
             &mut values,
-            &mut TursoPlaceholderSource::new(),
+            &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
 
@@ -358,7 +347,7 @@ impl ConnectionMethods for TursoConnection {
             sql_for_expr(
                 query::Expr::Condition(Box::new(expr)),
                 &mut values,
-                &mut TursoPlaceholderSource::new(),
+                &mut SQLitePlaceholderSource::new(),
                 &mut sqlquery,
             );
         }
@@ -409,7 +398,7 @@ impl ConnectionMethods for TursoConnection {
                     .map_err(|e| Error::Internal(e.to_string()))?;
                 values.push(turso_value_to_sqlval_typed(&val, col.ty())?);
             }
-            vec_rows.push(TursoRow { values });
+            vec_rows.push(VecRow::new_from_values(values));
         }
 
         Ok(Box::new(VecRows::new(vec_rows)))
@@ -426,9 +415,10 @@ impl ConnectionMethods for TursoConnection {
         helper::sql_insert_with_placeholders(
             table,
             columns,
-            &mut TursoPlaceholderSource::new(),
+            &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
+
         if cfg!(feature = "log") {
             debug!("insert sql {sql}");
             #[cfg(feature = "debug")]
@@ -441,7 +431,10 @@ impl ConnectionMethods for TursoConnection {
             .await
             .map_err(|e| Error::Internal(e.to_string()))?;
 
-        // Get the last inserted rowid
+        // Get the last inserted row ID using last_insert_rowid().
+        // Note: Unlike libSQL, turso's RETURNING clause doesn't work correctly for auto-increment
+        // primary keys - it returns the same value (1) for all inserts. Using last_insert_rowid()
+        // works correctly.
         let query = "SELECT last_insert_rowid()".to_string();
         let mut rows = self
             .conn()?
@@ -476,7 +469,7 @@ impl ConnectionMethods for TursoConnection {
         helper::sql_insert_with_placeholders(
             table,
             columns,
-            &mut TursoPlaceholderSource::new(),
+            &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
         let params: Vec<turso::Value> = values.iter().map(|v| sqlval_to_turso(v)).collect();
@@ -517,7 +510,7 @@ impl ConnectionMethods for TursoConnection {
             table,
             pkcol,
             columns,
-            &mut TursoPlaceholderSource::new(),
+            &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
         let mut params: Vec<turso::Value> = values.iter().map(|v| sqlval_to_turso(v)).collect();
@@ -550,7 +543,7 @@ impl ConnectionMethods for TursoConnection {
         sql_for_expr(
             query::Expr::Condition(Box::new(expr)),
             &mut values,
-            &mut TursoPlaceholderSource::new(),
+            &mut SQLitePlaceholderSource::new(),
             &mut sql,
         );
         let params: Vec<turso::Value> = values
@@ -566,11 +559,10 @@ impl ConnectionMethods for TursoConnection {
     }
 
     async fn has_table(&self, table: &str) -> Result<bool> {
-        let sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=?";
         let params = vec![turso::Value::Text(table.to_string())];
         let mut rows = self
             .conn()?
-            .query(sql, params)
+            .query(HAS_TABLE_SQL, params)
             .await
             .map_err(|e| Error::Internal(e.to_string()))?;
         Ok(rows
@@ -765,12 +757,12 @@ fn sqlval_to_turso(val: &SqlValRef<'_>) -> turso::Value {
         Json(v) => turso::Value::Text(serde_json::to_string(v).unwrap()),
         #[cfg(feature = "datetime")]
         Date(date) => {
-            let f = date.format(TURSO_DATE_FORMAT);
+            let f = date.format(SQLITE_DATE_FORMAT);
             turso::Value::Text(f.to_string())
         }
         #[cfg(feature = "datetime")]
         Timestamp(dt) => {
-            let f = dt.format(TURSO_DT_FORMAT);
+            let f = dt.format(SQLITE_DT_FORMAT);
             turso::Value::Text(f.to_string())
         }
         Null => turso::Value::Null,
@@ -869,7 +861,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
                     )))
                 }
             };
-            SqlVal::Date(NaiveDate::parse_from_str(t, TURSO_DATE_FORMAT)?)
+            SqlVal::Date(NaiveDate::parse_from_str(t, SQLITE_DATE_FORMAT)?)
         }
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => {
@@ -882,7 +874,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
                     )))
                 }
             };
-            SqlVal::Timestamp(NaiveDateTime::parse_from_str(t, TURSO_DT_FORMAT)?)
+            SqlVal::Timestamp(NaiveDateTime::parse_from_str(t, SQLITE_DT_FORMAT)?)
         }
         SqlType::Blob => {
             let b = match val {
@@ -911,322 +903,4 @@ fn turso_value_to_sqlval_untyped(val: &turso::Value) -> Result<SqlVal> {
         turso::Value::Text(t) => SqlVal::Text(t.clone()),
         turso::Value::Blob(b) => SqlVal::Blob(b.clone()),
     })
-}
-
-// Turso row wrapper that stores owned SqlVal values
-struct TursoRow {
-    values: Vec<SqlVal>,
-}
-
-impl BackendRow for TursoRow {
-    fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>> {
-        self.values
-            .get(idx)
-            .ok_or_else(|| Error::Internal(format!("Column index {} out of bounds", idx)))
-            .and_then(|val| {
-                if val.is_compatible(&ty, true) {
-                    Ok(val)
-                } else {
-                    Err(Error::CannotConvertSqlVal(ty.clone(), val.clone()))
-                }
-            })
-            .map(|val| val.as_ref())
-    }
-
-    fn len(&self) -> usize {
-        self.values.len()
-    }
-}
-
-// Migration SQL generation (reuse SQLite logic since Turso is compatible)
-fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
-    match op {
-        Operation::AddTable(tbl) => Ok(create_table(tbl, false)),
-        Operation::AddTableIfNotExists(tbl) => Ok(create_table(tbl, true)),
-        Operation::RemoveTable(name) => Ok(drop_table(name)),
-        Operation::AddColumn(tname, col) => add_column(tname, col),
-        Operation::RemoveColumn(tname, colname) => remove_column(current, tname, colname),
-        Operation::ChangeColumn(tname, old, new) => {
-            Ok(change_column(current, tname, old, Some(new)))
-        }
-        Operation::AddTableConstraints(_) | Operation::RemoveTableConstraints(_) => {
-            // Turso/SQLite doesn't support adding/removing constraints separately
-            // They must be included when creating the table
-            Ok(String::new())
-        }
-    }
-}
-
-fn create_table(table: &ATable, if_not_exists: bool) -> String {
-    let mut constraints: Vec<String> = Vec::new();
-    let mut defs: Vec<String> = table.columns.iter().map(define_column).collect();
-    for column in &table.columns {
-        if column.reference().is_some() {
-            constraints.push(define_constraint(column));
-        }
-    }
-    defs.append(&mut constraints);
-
-    let table_name = helper::quote_reserved_word(&table.name);
-    let prefix = if if_not_exists {
-        format!("CREATE TABLE IF NOT EXISTS {table_name} (")
-    } else {
-        format!("CREATE TABLE {table_name} (")
-    };
-
-    // Format with newlines if it would be longer than 120 characters
-    let single_line = format!("{}{});", prefix, defs.join(", "));
-    if single_line.len() <= 120 {
-        single_line
-    } else {
-        // Multi-line format with 4-space indentation
-        let formatted_defs = defs
-            .iter()
-            .map(|def| format!("    {}", def))
-            .collect::<Vec<_>>()
-            .join(",\n");
-        format!("{}\n{}\n);", prefix, formatted_defs)
-    }
-}
-
-fn define_column(col: &AColumn) -> String {
-    let mut constraints: Vec<String> = Vec::new();
-    if !col.nullable() {
-        constraints.push("NOT NULL".to_string());
-    }
-    if col.is_pk() {
-        constraints.push("PRIMARY KEY".to_string());
-    }
-    if col.is_auto() && !col.is_pk() {
-        constraints.push("AUTOINCREMENT".to_string());
-    }
-    if col.unique() {
-        constraints.push("UNIQUE".to_string());
-    }
-    if constraints.is_empty() {
-        format!(
-            "{} {}",
-            helper::quote_reserved_word(col.name()),
-            col_sqltype(col),
-        )
-    } else {
-        format!(
-            "{} {} {}",
-            helper::quote_reserved_word(col.name()),
-            col_sqltype(col),
-            constraints.join(" ")
-        )
-    }
-}
-
-fn define_constraint(column: &AColumn) -> String {
-    let reference = column
-        .reference()
-        .as_ref()
-        .expect("must have a references value");
-    match reference {
-        ARef::Literal(literal) => {
-            format!(
-                "FOREIGN KEY ({}) REFERENCES {}({})",
-                helper::quote_reserved_word(column.name()),
-                helper::quote_reserved_word(literal.table_name()),
-                helper::quote_reserved_word(literal.column_name()),
-            )
-        }
-        _ => panic!(),
-    }
-}
-
-fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
-    match col.typeid() {
-        Ok(TypeIdentifier::Ty(ty)) => Cow::Borrowed(sqltype(&ty)),
-        Ok(TypeIdentifier::Name(name)) => Cow::Owned(name),
-        Err(_) => Cow::Borrowed(""),
-    }
-}
-
-fn sqltype(ty: &SqlType) -> &'static str {
-    match ty {
-        SqlType::Bool => "INTEGER",
-        SqlType::Int => "INTEGER",
-        SqlType::BigInt => "INTEGER",
-        SqlType::Real => "REAL",
-        SqlType::Text => "TEXT",
-        SqlType::Blob => "BLOB",
-        #[cfg(feature = "json")]
-        SqlType::Json => "TEXT",
-        #[cfg(feature = "datetime")]
-        SqlType::Date => "TEXT",
-        #[cfg(feature = "datetime")]
-        SqlType::Timestamp => "TEXT",
-        #[cfg(feature = "pg")]
-        SqlType::Custom(_) => panic!("Custom types not supported by turso backend"),
-    }
-}
-
-fn drop_table(name: &str) -> String {
-    format!("DROP TABLE {};", helper::quote_reserved_word(name))
-}
-
-fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
-    let default: SqlVal = helper::column_default(col)?;
-    Ok(format!(
-        "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
-        helper::quote_reserved_word(tbl_name),
-        define_column(col),
-        helper::sql_literal_value(&default)?
-    ))
-}
-
-fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String> {
-    let current_clone = current.clone();
-    let table = current_clone
-        .get_table(tbl_name)
-        .ok_or_else(|| Error::TableNotFound(tbl_name.to_string()))?;
-    let col = table
-        .column(name)
-        .ok_or_else(|| Error::ColumnNotFound(tbl_name.to_string(), name.to_string()))?;
-    if col.reference().is_some() {
-        Ok(change_column(current, tbl_name, col, None))
-    } else {
-        Ok(format!(
-            "ALTER TABLE {} DROP COLUMN {};",
-            helper::quote_reserved_word(tbl_name),
-            helper::quote_reserved_word(name),
-        ))
-    }
-}
-
-fn copy_table(old: &ATable, new: &ATable) -> String {
-    let column_names: Vec<Cow<str>> = new
-        .columns
-        .iter()
-        .map(|col| helper::quote_reserved_word(col.name()))
-        .collect();
-
-    let column_list = column_names.join(", ");
-    let single_line = format!(
-        "INSERT INTO {} SELECT {} FROM {};",
-        helper::quote_reserved_word(&new.name),
-        column_list,
-        helper::quote_reserved_word(&old.name)
-    );
-
-    // If the single line is too long, format with line breaks
-    if single_line.len() <= 120 {
-        single_line
-    } else {
-        // Multi-line format
-        let formatted_columns = column_names.join(",\n    ");
-        format!(
-            "INSERT INTO {} SELECT\n    {}\nFROM {};",
-            helper::quote_reserved_word(&new.name),
-            formatted_columns,
-            helper::quote_reserved_word(&old.name)
-        )
-    }
-}
-
-fn tmp_table_name(name: &str) -> String {
-    format!("{name}__butane_tmp")
-}
-
-fn change_column(
-    current: &mut ADB,
-    tbl_name: &str,
-    old: &AColumn,
-    new: Option<&AColumn>,
-) -> String {
-    let table = current.get_table(tbl_name);
-    if table.is_none() {
-        crate::warn!(
-            "Cannot alter column {} from table {} that does not exist",
-            &old.name(),
-            tbl_name
-        );
-        return "".to_string();
-    }
-    let old_table = table.unwrap();
-    let mut new_table = old_table.clone();
-    new_table.name = tmp_table_name(&new_table.name);
-    match new {
-        Some(col) => new_table.replace_column(col.clone()),
-        None => new_table.remove_column(old.name()),
-    }
-    // NOTE: Turso has a known limitation with ALTER TABLE RENAME operations within transactions
-    // The error "table being renamed should be in schema" occurs because libSQL's schema
-    // tracking doesn't properly register tables created in the same transaction.
-    // For migrations that require column changes, consider skipping unmigrate for Turso.
-    // See docs/turso-backend.md for details.
-    let stmts: Vec<String> = vec![
-        create_table(&new_table, false),
-        copy_table(old_table, &new_table),
-        drop_table(&old_table.name),
-        format!(
-            "ALTER TABLE {} RENAME TO {};",
-            helper::quote_reserved_word(&new_table.name),
-            helper::quote_reserved_word(tbl_name)
-        ),
-    ];
-    let result = stmts.join("\n");
-    new_table.name.clone_from(&old_table.name);
-    current.replace_table(new_table);
-    result
-}
-
-/// Write SQL that performs an insert or update.
-pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: &mut impl Write) {
-    write!(w, "INSERT ").unwrap();
-    write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();
-    helper::list_columns(columns, w);
-    write!(w, ") VALUES (").unwrap();
-    columns.iter().fold("", |sep, _| {
-        write!(w, "{sep}?").unwrap();
-        ", "
-    });
-    write!(w, ")").unwrap();
-    write!(w, " ON CONFLICT ({}) DO ", pkcol.name()).unwrap();
-    if columns.len() > 1 {
-        write!(w, "UPDATE SET (").unwrap();
-        helper::list_columns(columns, w);
-        write!(w, ") = (").unwrap();
-        columns.iter().fold("", |sep, c| {
-            write!(
-                w,
-                "{}excluded.{}",
-                sep,
-                helper::quote_reserved_word(c.name())
-            )
-            .unwrap();
-            ", "
-        });
-        write!(w, ")").unwrap();
-    } else {
-        write!(w, "NOTHING").unwrap();
-    }
-}
-
-fn sql_for_expr(
-    expr: query::Expr,
-    values: &mut Vec<SqlVal>,
-    placeholder_source: &mut TursoPlaceholderSource,
-    out: &mut impl Write,
-) {
-    // Subqueries should already be transformed by transform_subqueries before reaching here
-    // So we can just use the default helper implementation
-    helper::sql_for_expr(expr, sql_for_expr, values, placeholder_source, out)
-}
-
-#[derive(Debug)]
-struct TursoPlaceholderSource;
-impl TursoPlaceholderSource {
-    fn new() -> Self {
-        TursoPlaceholderSource {}
-    }
-}
-impl helper::PlaceholderSource for TursoPlaceholderSource {
-    fn next_placeholder(&mut self) -> Cow<'_, str> {
-        // Turso placeholder is always a question mark (SQLite-compatible)
-        Cow::Borrowed("?")
-    }
 }

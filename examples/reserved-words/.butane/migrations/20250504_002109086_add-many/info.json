@@ -7,6 +7,7 @@
   "backends": [
     "sqlite",
     "pg",
-    "turso"
+    "turso",
+    "libsql"
   ]
 }

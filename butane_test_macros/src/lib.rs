@@ -86,6 +86,10 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut backends: Vec<(&'static str, &'static str)> = Vec::new();
     backends.push(("pg", "PgTestInstance"));
     if !options.contains(&TestOption::PgOnly) {
+        // Only include libsql if sqld is available
+        if which::which("sqld").is_ok() {
+            backends.push(("libsql", "LibsqlTestInstance"));
+        }
         backends.push(("sqlite", "SQLiteTestInstance"));
         backends.push(("turso", "TursoTestInstance"));
     }
@@ -288,8 +292,9 @@ pub fn butane_backend_name_test(args: TokenStream, input: TokenStream) -> TokenS
     };
 
     let expanded = if is_async {
-        // Include turso only for async tests (turso is async-only)
+        // Include turso and libsql only for async tests (both are async-only)
         let turso_test_name = Ident::new(&format!("{}_turso", func_name), Span::call_site());
+        let libsql_test_name = Ident::new(&format!("{}_libsql", func_name), Span::call_site());
         quote! {
             #func
 
@@ -301,6 +306,11 @@ pub fn butane_backend_name_test(args: TokenStream, input: TokenStream) -> TokenS
             #test_attribute
             #async_token fn #sqlite_test_name() {
                 #func_name("sqlite")#await_token;
+            }
+
+            #test_attribute
+            #async_token fn #libsql_test_name() {
+                #func_name("libsql")#await_token;
             }
 
             #test_attribute

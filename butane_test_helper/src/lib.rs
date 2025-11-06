@@ -604,6 +604,50 @@ pub fn setup_db(conn: &mut Connection) {
     mem_migrations.migrate(conn).unwrap();
 }
 
+/// Get a synchronous connection by backend name.
+///
+/// Panics for turso backend (async only).
+pub fn get_sync_connection(backend_name: &str) -> Connection {
+    match backend_name {
+        #[cfg(feature = "sqlite")]
+        "sqlite" => sqlite_connection(),
+        #[cfg(feature = "pg")]
+        "pg" => {
+            let (conn, _data) = pg_connection();
+            conn
+        }
+        #[cfg(feature = "turso")]
+        "turso" => panic!("turso not supported for synchronous connections (async only)"),
+        _ => panic!("Unsupported backend: {}", backend_name),
+    }
+}
+
+/// Get an asynchronous connection by backend name.
+pub async fn get_async_connection(backend_name: &str) -> ConnectionAsync {
+    match backend_name {
+        #[cfg(feature = "sqlite")]
+        "sqlite" => {
+            let backend = get_backend(sqlite::BACKEND_NAME).unwrap();
+            backend.connect_async(":memory:").await.unwrap()
+        }
+        #[cfg(feature = "pg")]
+        "pg" => {
+            let backend = get_backend(butane_core::db::pg::BACKEND_NAME).unwrap();
+            let data = pg_setup().await;
+            backend
+                .connect_async(data.connection_string())
+                .await
+                .unwrap()
+        }
+        #[cfg(feature = "turso")]
+        "turso" => {
+            let backend = get_backend(turso::BACKEND_NAME).unwrap();
+            backend.connect_async(":memory:").await.unwrap()
+        }
+        _ => panic!("Unsupported backend: {}", backend_name),
+    }
+}
+
 /// Create a sqlite [`Connection`].
 #[cfg(feature = "sqlite")]
 pub fn sqlite_connection() -> Connection {
@@ -636,6 +680,13 @@ pub async fn sqlite_setup() -> SQLiteSetupData {
 /// Tear down the test sqlite database.
 #[cfg(feature = "sqlite")]
 pub fn sqlite_teardown(_: SQLiteSetupData) {}
+
+/// Create a turso connection.
+#[cfg(feature = "turso")]
+pub fn turso_connection() -> Connection {
+    let backend = get_backend(turso::BACKEND_NAME).unwrap();
+    backend.connect(":memory:").unwrap()
+}
 
 /// Create a turso [`ConnectionSpec`].
 #[cfg(feature = "turso")]

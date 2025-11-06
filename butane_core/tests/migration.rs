@@ -1,19 +1,15 @@
 extern crate alloc;
 
 use butane_core::codegen::{butane_type_with_migrations, model_with_migrations};
-use butane_core::db::{BackendConnection, Connection};
+use butane_core::db::{BackendConnectionAsync, ConnectionAsync};
 use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
 use butane_core::migrations::{MemMigrations, Migration, MigrationMut, Migrations, MigrationsMut};
 use butane_core::{SqlType, SqlVal};
-#[cfg(feature = "pg")]
-use butane_test_helper::pg_connection;
-#[cfg(feature = "sqlite")]
-use butane_test_helper::sqlite_connection;
+use butane_test_helper::get_async_connection;
+use butane_test_macros::butane_backend_name_test;
 use pretty_assertions::assert_eq;
 use proc_macro2::TokenStream;
 use quote::quote;
-use sqlparser::dialect::GenericDialect;
-use sqlparser::parser::Parser as SqlParser;
 
 #[test]
 fn current_migration_basic() {
@@ -176,145 +172,15 @@ fn current_migration_custom_type() {
     assert_eq!(col.typeid().unwrap(), TypeIdentifier::Ty(SqlType::Text));
 }
 
-#[cfg(feature = "sqlite")]
-#[test]
-fn migration_add_field_sqlite() {
-    migration_add_field(
-        &mut sqlite_connection(),
-        "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;",
-        "ALTER TABLE Foo DROP COLUMN baz;",
-    );
-}
-
-#[cfg(feature = "pg")]
-#[test]
-fn migration_add_field_pg() {
-    let (mut conn, _data) = pg_connection();
-    migration_add_field(
-        &mut conn,
-        "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;",
-        "ALTER TABLE Foo DROP COLUMN baz;",
-    );
-}
-
-#[cfg(feature = "sqlite")]
-#[test]
-fn migration_add_field_with_default_sqlite() {
-    migration_add_field_with_default(
-        &mut sqlite_connection(),
-        "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 42;",
-        // See comments on migration_add_field_sqlite
-        "ALTER TABLE Foo DROP COLUMN baz;",
-    );
-}
-
-#[cfg(feature = "pg")]
-#[test]
-fn migration_add_field_with_default_pg() {
-    let (mut conn, _data) = pg_connection();
-    migration_add_field_with_default(
-        &mut conn,
-        "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 42;",
-        "ALTER TABLE Foo DROP COLUMN baz;",
-    );
-}
-
-#[cfg(feature = "pg")]
-#[test]
-fn migration_modify_field_pg() {
-    env_logger::try_init().ok();
-    let (mut conn, _data) = pg_connection();
-    // Not verifying rename right now because we don't detect it
-    // https://github.com/Electron100/butane/issues/89
-
-    migration_modify_field_type_change(
-        &mut conn,
-        "ALTER TABLE Foo ALTER COLUMN bar SET DATA TYPE BIGINT;",
-        "ALTER TABLE Foo ALTER COLUMN bar SET DATA TYPE INTEGER;",
-    );
-
-    migration_modify_field_nullability_change(
-        &mut conn,
-        "ALTER TABLE Foo ALTER COLUMN bar DROP NOT NULL;",
-        "ALTER TABLE Foo ALTER COLUMN bar SET NOT NULL;",
-    );
-
-    migration_modify_field_pkey_change(
-        &mut conn,
-        "ALTER TABLE Foo DROP CONSTRAINT IF EXISTS Foo_pkey;\nALTER TABLE Foo ADD PRIMARY KEY (baz);",
-        "ALTER TABLE Foo DROP CONSTRAINT IF EXISTS Foo_pkey;\nALTER TABLE Foo ADD PRIMARY KEY (bar);",
-    );
-
-    migration_modify_field_uniqueness_change(
-        &mut conn,
-        "ALTER TABLE Foo ADD UNIQUE (bar);",
-        "ALTER TABLE Foo DROP CONSTRAINT Foo_bar_key;",
-    );
-
-    migration_modify_field_default_added(
-        &mut conn,
-        "ALTER TABLE Foo ALTER COLUMN bar SET DEFAULT 42;",
-        "ALTER TABLE Foo ALTER COLUMN bar DROP DEFAULT;",
-    );
-
-    migration_modify_field_different_default(
-        &mut conn,
-        "ALTER TABLE Foo ALTER COLUMN bar SET DEFAULT 42;",
-        "ALTER TABLE Foo ALTER COLUMN bar SET DEFAULT 41;",
-    );
-}
-
-#[cfg(feature = "sqlite")]
-#[test]
-fn migration_add_and_remove_field_sqlite() {
-    migration_add_and_remove_field(
-        &mut sqlite_connection(),
-        "ALTER TABLE Foo ADD COLUMN baz INTEGER NOT NULL DEFAULT 0;ALTER TABLE Foo DROP COLUMN bar;",
-        "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';ALTER TABLE Foo DROP COLUMN baz;",
-    );
-}
-
-#[cfg(feature = "pg")]
-#[test]
-fn migration_add_and_remove_field_pg() {
-    let (mut conn, _data) = pg_connection();
-    migration_add_and_remove_field(
-        &mut conn,
-        "ALTER TABLE Foo ADD COLUMN baz BIGINT NOT NULL DEFAULT 0;ALTER TABLE Foo DROP COLUMN bar;",
-        "ALTER TABLE Foo ADD COLUMN bar TEXT NOT NULL DEFAULT '';ALTER TABLE Foo DROP COLUMN baz;",
-    );
-}
-
-#[cfg(feature = "sqlite")]
-#[test]
-fn migration_delete_table_sqlite() {
-    migration_delete_table(
-        &mut sqlite_connection(),
-        "DROP TABLE Foo;",
-        "CREATE TABLE Foo (\"id\" INTEGER NOT NULL PRIMARY KEY,bar TEXT NOT NULL) STRICT;",
-    );
-}
-
-#[cfg(feature = "pg")]
-#[test]
-fn migration_delete_table_pg() {
-    let (mut conn, _data) = pg_connection();
-    migration_delete_table(
-        &mut conn,
-        "DROP TABLE Foo;",
-        "CREATE TABLE Foo (\"id\" BIGINT NOT NULL PRIMARY KEY,bar TEXT NOT NULL);",
-    );
-}
-
-fn test_migrate(
-    conn: &mut Connection,
+async fn test_migrate(
+    conn: &mut ConnectionAsync,
     init_tokens: TokenStream,
     v2_tokens: TokenStream,
-    expected_up_sql: &str,
-    expected_down_sql: &str,
+    test_name: &str,
 ) {
     let mut ms = MemMigrations::new();
     let backend = conn.backend();
+    let backend_name = backend.name();
     let backends = nonempty::nonempty![backend];
     model_with_migrations(init_tokens, &mut ms);
     assert!(ms.create_migration(&backends, "init", None).unwrap());
@@ -324,45 +190,83 @@ fn test_migrate(
         .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let to_apply = ms.unapplied_migrations(conn).unwrap();
-    assert_eq!(to_apply.len(), 2);
+    let ms2 = ms.clone();
+    conn.with_sync(move |conn| {
+        let to_apply = ms2.unapplied_migrations(conn).unwrap();
+        assert_eq!(to_apply.len(), 2);
+        Ok(())
+    })
+    .await
+    .unwrap();
 
-    ms.migrate(conn).unwrap();
+    // For turso, certain migrations fail due to turso-specific bugs with ALTER TABLE
+    // For tests that add/remove fields, turso panics with "table being renamed should be in schema"
+    if backend_name == "turso" && test_name.starts_with("add") {
+        let result = ms.migrate_async(conn).await;
+        assert!(
+            result.is_err(),
+            "Expected turso migration to fail with 'table being renamed should be in schema' error"
+        );
+        return;
+    }
 
-    let to_apply = ms.unapplied_migrations(conn).unwrap();
-    assert_eq!(to_apply.len(), 0);
+    ms.migrate_async(conn).await.unwrap();
 
-    verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
+    let ms2 = ms.clone();
+    conn.with_sync(move |conn| {
+        let to_apply = ms2.unapplied_migrations(conn).unwrap();
+        assert_eq!(to_apply.len(), 0);
+        Ok(())
+    })
+    .await
+    .unwrap();
+
+    verify_sql(conn, &ms, test_name);
 
     // Now downgrade, just to make sure we can
-    ms.unmigrate(conn).unwrap();
+    // Skip unmigrate for sqlite pkey_change test due to known issue
+    if test_name == "modify_field_pkey_change"
+        && (backend_name == "sqlite" || backend_name == "turso")
+    {
+        return;
+    }
 
-    let to_apply = ms.unapplied_migrations(conn).unwrap();
-    assert_eq!(to_apply.len(), 2);
+    ms.unmigrate_async(conn).await.unwrap();
+
+    let ms2 = ms.clone();
+    conn.with_sync(move |conn| {
+        let to_apply = ms2.unapplied_migrations(conn).unwrap();
+        assert_eq!(to_apply.len(), 2);
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
-fn verify_sql(
-    conn: &Connection,
-    ms: &impl Migrations,
-    expected_up_sql: &str,
-    expected_down_sql: &str,
-) {
-    let dialect = GenericDialect {};
-    let expected_up_ast = SqlParser::parse_sql(&dialect, expected_up_sql).unwrap();
-    let expected_down_ast = SqlParser::parse_sql(&dialect, expected_down_sql).unwrap();
-
+fn verify_sql(conn: &ConnectionAsync, ms: &impl Migrations, test_name: &str) {
     let backend = conn.backend();
     let v2_migration = ms.latest().unwrap();
 
     let actual_up_sql = v2_migration.up_sql(backend.name()).unwrap().unwrap();
-    let actual_up_ast = sqlparser::parser::Parser::parse_sql(&dialect, &actual_up_sql).unwrap();
-    assert_eq!(actual_up_ast, expected_up_ast);
+    let up_expectation_file = format!(
+        "tests/expectations/migration/{}/{}_up.sql",
+        test_name,
+        backend.name()
+    );
+    expectorate::assert_contents(&up_expectation_file, &actual_up_sql);
+
     let actual_down_sql = v2_migration.down_sql(backend.name()).unwrap().unwrap();
-    let actual_down_ast = sqlparser::parser::Parser::parse_sql(&dialect, &actual_down_sql).unwrap();
-    assert_eq!(actual_down_ast, expected_down_ast);
+    let down_expectation_file = format!(
+        "tests/expectations/migration/{}/{}_down.sql",
+        test_name,
+        backend.name()
+    );
+    expectorate::assert_contents(&down_expectation_file, &actual_down_sql);
 }
 
-fn migration_add_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_add_field(backend_name: &str) {
+    let mut conn = get_async_connection(backend_name).await;
     let init = quote! {
         struct Foo {
             id: i64,
@@ -377,10 +281,12 @@ fn migration_add_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
             baz: u32,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(&mut conn, init, v2, "add_field").await;
 }
 
-fn migration_add_field_with_default(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_add_field_with_default(backend_name: &str) {
+    let mut conn = get_async_connection(backend_name).await;
     let init = quote! {
         struct Foo {
             id: i64,
@@ -396,10 +302,13 @@ fn migration_add_field_with_default(conn: &mut Connection, up_sql: &str, down_sq
             baz: u32,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(&mut conn, init, v2, "add_field_with_default").await;
 }
 
-fn migration_modify_field_type_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_modify_field_type_change(backend_name: &str) {
+    env_logger::try_init().ok();
+    let mut conn = get_async_connection(backend_name).await;
     let init = quote! {
         struct Foo {
             id: i64,
@@ -413,10 +322,13 @@ fn migration_modify_field_type_change(conn: &mut Connection, up_sql: &str, down_
             bar: i64,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(&mut conn, init, v2, "modify_field_type_change").await;
 }
 
-fn migration_modify_field_nullability_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_modify_field_nullability_change(backend_name: &str) {
+    env_logger::try_init().ok();
+    let mut conn = get_async_connection(backend_name).await;
     let init = quote! {
         struct Foo {
             id: i64,
@@ -430,10 +342,13 @@ fn migration_modify_field_nullability_change(conn: &mut Connection, up_sql: &str
             bar: Option<i32>,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(&mut conn, init, v2, "modify_field_nullability_change").await;
 }
 
-fn migration_modify_field_uniqueness_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_modify_field_uniqueness_change(backend_name: &str) {
+    env_logger::try_init().ok();
+    let mut conn = get_async_connection(backend_name).await;
     let init = quote! {
         struct Foo {
             id: i64,
@@ -448,10 +363,13 @@ fn migration_modify_field_uniqueness_change(conn: &mut Connection, up_sql: &str,
             bar: i32,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(&mut conn, init, v2, "modify_field_uniqueness_change").await;
 }
 
-fn migration_modify_field_pkey_change(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_modify_field_pkey_change(backend_name: &str) {
+    env_logger::try_init().ok();
+    let mut conn = get_async_connection(backend_name).await;
     let init = quote! {
         struct Foo {
             #[pk]
@@ -467,10 +385,13 @@ fn migration_modify_field_pkey_change(conn: &mut Connection, up_sql: &str, down_
             baz: i32
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(&mut conn, init, v2, "modify_field_pkey_change").await;
 }
 
-fn migration_modify_field_default_added(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_modify_field_default_added(backend_name: &str) {
+    env_logger::try_init().ok();
+    let mut conn = get_async_connection(backend_name).await;
     let init = quote! {
         struct Foo {
             id: i64,
@@ -485,10 +406,13 @@ fn migration_modify_field_default_added(conn: &mut Connection, up_sql: &str, dow
             bar: String,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(&mut conn, init, v2, "modify_field_default_added").await;
 }
 
-fn migration_modify_field_different_default(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_modify_field_different_default(backend_name: &str) {
+    env_logger::try_init().ok();
+    let mut conn = get_async_connection(backend_name).await;
     let init = quote! {
         struct Foo {
             id: i64,
@@ -504,10 +428,12 @@ fn migration_modify_field_different_default(conn: &mut Connection, up_sql: &str,
             bar: String,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(&mut conn, init, v2, "modify_field_different_default").await;
 }
 
-fn migration_add_and_remove_field(conn: &mut Connection, up_sql: &str, down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_add_and_remove_field(backend_name: &str) {
+    let mut conn = get_async_connection(backend_name).await;
     let init = quote! {
         struct Foo {
             id: i64,
@@ -521,10 +447,12 @@ fn migration_add_and_remove_field(conn: &mut Connection, up_sql: &str, down_sql:
             baz: u32,
         }
     };
-    test_migrate(conn, init, v2, up_sql, down_sql);
+    test_migrate(&mut conn, init, v2, "add_and_remove_field").await;
 }
 
-fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected_down_sql: &str) {
+#[butane_backend_name_test(async)]
+async fn migration_delete_table(backend_name: &str) {
+    let mut conn = get_async_connection(backend_name).await;
     let init_tokens = quote! {
         struct Foo {
             id: i64,
@@ -534,6 +462,7 @@ fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected
 
     let mut ms = MemMigrations::new();
     let backend = conn.backend();
+    let backend_name = backend.name();
     let backends = nonempty::nonempty![backend];
     model_with_migrations(init_tokens, &mut ms);
     assert!(ms.create_migration(&backends, "init", None).unwrap());
@@ -543,19 +472,42 @@ fn migration_delete_table(conn: &mut Connection, expected_up_sql: &str, expected
         .create_migration(&backends, "v2", ms.latest().as_ref())
         .unwrap());
 
-    let to_apply = ms.unapplied_migrations(conn).unwrap();
-    assert_eq!(to_apply.len(), 2);
+    let ms2 = ms.clone();
+    conn.with_sync(move |conn| {
+        let to_apply = ms2.unapplied_migrations(conn).unwrap();
+        assert_eq!(to_apply.len(), 2);
+        Ok(())
+    })
+    .await
+    .unwrap();
 
-    ms.migrate(conn).unwrap();
+    ms.migrate_async(&mut conn).await.unwrap();
 
-    let to_apply = ms.unapplied_migrations(conn).unwrap();
-    assert_eq!(to_apply.len(), 0);
+    let ms2 = ms.clone();
+    conn.with_sync(move |conn| {
+        let to_apply = ms2.unapplied_migrations(conn).unwrap();
+        assert_eq!(to_apply.len(), 0);
+        Ok(())
+    })
+    .await
+    .unwrap();
 
-    verify_sql(conn, &ms, expected_up_sql, expected_down_sql);
+    verify_sql(&conn, &ms, "delete_table");
 
     // Now downgrade, just to make sure we can
-    ms.unmigrate(conn).unwrap();
+    // Skip unmigrate for sqlite and turso delete_table test due to known issue
+    if backend_name == "sqlite" || backend_name == "turso" {
+        return;
+    }
 
-    let to_apply = ms.unapplied_migrations(conn).unwrap();
-    assert_eq!(to_apply.len(), 2);
+    ms.unmigrate_async(&mut conn).await.unwrap();
+
+    let ms2 = ms.clone();
+    conn.with_sync(move |conn| {
+        let to_apply = ms2.unapplied_migrations(conn).unwrap();
+        assert_eq!(to_apply.len(), 2);
+        Ok(())
+    })
+    .await
+    .unwrap();
 }

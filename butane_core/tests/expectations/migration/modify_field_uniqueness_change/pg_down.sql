@@ -1,0 +1,1 @@
+ALTER TABLE Foo DROP CONSTRAINT Foo_bar_key;

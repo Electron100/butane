@@ -10,11 +10,13 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
+default = ["fs"]
 async-adapter = ["async", "crossbeam-channel"]
 async = ["tokio"]
 datetime = ["chrono", "tokio-postgres?/with-chrono-0_4"]
 debug = ["log"]
 fake = ["dep:fake", "rand"]
+fs = ["dep:fs2"]
 json = ["tokio-postgres?/with-serde_json-1", "rusqlite?/serde_json"]
 log = ["dep:log", "rusqlite?/trace"]
 pg = ["async", "bytes", "tokio-postgres"]
@@ -34,7 +36,7 @@ dyn-clone = { version = "1.0" }
 fake = { workspace = true, optional = true }
 fallible-iterator = "0.3"
 fallible-streaming-iterator = "0.1"
-fs2 = "0.4" # for file locks
+fs2 = { version = "0.4", optional = true } # for file locks
 futures-util = "0.3"
 hex = "0.4"
 log = { optional = true, workspace = true }

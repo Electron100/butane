@@ -79,5 +79,9 @@ uuid.workspace = true
 whoami = "1.6"
 
 [[test]]
+name = "autopk"
+required-features = ["async"]
+
+[[test]]
 name = "uuid"
 required-features = ["uuid"]

@@ -22,7 +22,7 @@ doc = false
 test = false
 
 [[bin]]
-name = "publish_post_async"
+name = "publish_post"
 path = "src/bin/publish_post.rs"
 doc = false
 test = false

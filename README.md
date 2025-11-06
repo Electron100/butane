@@ -21,6 +21,7 @@ implementation detail to the API consumer.
 * SQLite and PostgreSQL backends
 * Turso (Sqlite compatible) backend - experimental
 * Write entirely or nearly entirely the same code regardless of database backend
+* Experimental WASM support for `butane_core` only currently.
 
 ## Getting Started
 
@@ -70,14 +71,22 @@ For a detailed tutorial, see the [Getting Started Guide](https://electron100.git
 Butane exposes several features to Cargo. By default, no backends are
 enabled: you will want to enable `sqlite` and/or `pg`:
 
-* `default`: Turns on `datetime`, `json` and `uuid`.
+The `default` features are:
+
+* `datetime`: Support for timestamps (using [`chrono`](https://crates.io/crates/chrono) crate).
+* `fs`: Support for using the filesystem for storing state during compilation.
+  This feature is mandatory for normal usage.
+  Disabling this feature allows building for WASM, however this mode has many limitations.
+* `json`: Support for storing structs as JSON, including using postgres' `JSONB` field type.
+* `uuid`: Support for UUIDs (using the [`uuid`](https://crates.io/crates/uuid) crate).
+
+Other features:
+
 * `async`: Turns on async support. This is automatically enabled for the `pg` backend, which is implemented on the `tokio-postgres` crate.
 * `async-adapter`: Enables the use of `async` with the `sqlite` backend, which is not natively async.
 * `debug`: Used in developing Butane, not expected to be enabled by consumers.
 * `deadpool`: Connection pooling using [`deadpool`](https://crates.io/crates/deadpool).
-* `datetime`: Support for timestamps (using [`chrono`](https://crates.io/crates/chrono) crate).
 * `fake`: Support for the [`fake`](https://crates.io/crates/fake) crate's generation of fake data.
-* `json`: Support for storing structs as JSON, including using postgres' `JSONB` field type.
 * `log`: Log certain warnings to the [`log`](https://crates.io/crates/log) crate facade (target "butane").
 * `pg`: Support for PostgreSQL using [`postgres`](https://crates.io/crates/postgres) crate.
 * `r2d2`: Connection pooling using [`r2d2`](https://crates.io/crates/r2d2).
@@ -86,7 +95,6 @@ enabled: you will want to enable `sqlite` and/or `pg`:
 * `sqlite-bundled`: Bundles sqlite instead of using the system version.
 * `tls`: Support for TLS when using PostgreSQL, using
   [`postgres-native-tls`](https://crates.io/crates/postgres-native-tls) crate.
-* `uuid`: Support for UUIDs (using the [`uuid`](https://crates.io/crates/uuid) crate).
 
 ## Limitations
 
@@ -98,6 +106,10 @@ enabled: you will want to enable `sqlite` and/or `pg`:
   Butane is slow, but that when given a choice between a simple,
   straightforward API and eking out the smallest possible overhead,
   the API will win.
+* WASM support has many limitations.
+  Most notable is that `ForeignKey` and `Many` can only refer to
+  types that have been already declared earlier in the source code.
+  This prevents schemas with circular references.
 
 ## Migration of Breaking Changes
 ### 0.8

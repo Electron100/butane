@@ -13,7 +13,7 @@ use std::sync::Once;
 
 #[cfg(feature = "rusqlite")]
 use async_trait::async_trait;
-#[cfg(feature = "datetime")]
+#[cfg(all(feature = "rusqlite", feature = "datetime"))]
 use chrono::naive::{NaiveDate, NaiveDateTime};
 #[cfg(feature = "rusqlite")]
 use fallible_streaming_iterator::FallibleStreamingIterator;

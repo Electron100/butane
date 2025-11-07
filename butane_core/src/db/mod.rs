@@ -51,6 +51,7 @@ mod macros;
 #[cfg(feature = "pg")]
 pub mod pg;
 
+#[cfg(any(feature = "sqlite", feature = "turso"))]
 pub mod sqlite;
 
 /// Turso database backend.

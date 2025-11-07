@@ -1,33 +1,49 @@
 //! SQLite database backend
 use std::borrow::Cow;
 use std::fmt::{Debug, Write};
+
+#[cfg(feature = "rusqlite")]
 use std::ops::Deref;
+#[cfg(feature = "rusqlite")]
 use std::path::Path;
+#[cfg(feature = "rusqlite")]
 use std::pin::Pin;
-#[cfg(feature = "log")]
+#[cfg(all(feature = "rusqlite", feature = "log"))]
 use std::sync::Once;
 
+#[cfg(feature = "rusqlite")]
 use async_trait::async_trait;
 #[cfg(feature = "datetime")]
 use chrono::naive::{NaiveDate, NaiveDateTime};
+#[cfg(feature = "rusqlite")]
 use fallible_streaming_iterator::FallibleStreamingIterator;
+#[cfg(feature = "rusqlite")]
 use pin_project::pin_project;
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "rusqlite", feature = "async"))]
 use super::ConnectionAsync;
-use super::{helper, Backend, BackendRow, Column, RawQueryResult};
+use super::{helper, Column};
+#[cfg(feature = "rusqlite")]
+use super::{Backend, BackendRow, RawQueryResult};
+#[cfg(feature = "rusqlite")]
 use super::{BackendConnection, BackendTransaction, Connection, ConnectionMethods, Transaction};
+#[cfg(feature = "rusqlite")]
 use crate::db::connmethods::BackendRows;
 use crate::migrations::adb::ARef;
-use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
+use crate::migrations::adb::{AColumn, ATable, TypeIdentifier, ADB};
+#[cfg(feature = "rusqlite")]
+use crate::migrations::adb::Operation;
+#[cfg(feature = "rusqlite")]
 use crate::query::{BoolExpr, Order};
-use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
+use crate::{Error, Result, SqlType, SqlVal};
+#[cfg(feature = "rusqlite")]
+use crate::{debug, query, SqlValRef};
 
 #[cfg(feature = "datetime")]
-const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
+pub(crate) const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
 
 #[cfg(feature = "datetime")]
-const SQLITE_DATE_FORMAT: &str = "%Y-%m-%d";
+pub(crate) const SQLITE_DATE_FORMAT: &str = "%Y-%m-%d";
 
 /// Minimum required SQLite version.
 pub const SQLITE_MIN_VERSION: i32 = 3035000;
@@ -35,9 +51,9 @@ pub const SQLITE_MIN_VERSION: i32 = 3035000;
 /// Sqlite backend name.
 pub const BACKEND_NAME: &str = "sqlite";
 /// Internal row ordering field name.
-pub const ROW_ID_COLUMN_NAME: &str = "rowid";
+pub(crate) const ROW_ID_COLUMN_NAME: &str = "rowid";
 
-#[cfg(feature = "log")]
+#[cfg(all(feature = "rusqlite", feature = "log"))]
 fn log_callback(error_code: std::ffi::c_int, message: &str) {
     match error_code {
         rusqlite::ffi::SQLITE_NOTICE => {
@@ -56,14 +72,16 @@ fn log_callback(error_code: std::ffi::c_int, message: &str) {
 }
 
 /// SQLite [`Backend`] implementation.
+#[cfg(feature = "rusqlite")]
 #[derive(Debug, Default, Clone)]
 pub struct SQLiteBackend;
+
+#[cfg(feature = "rusqlite")]
 impl SQLiteBackend {
     pub fn new() -> SQLiteBackend {
         SQLiteBackend {}
     }
-}
-impl SQLiteBackend {
+
     fn connect(&self, path: &str) -> Result<SQLiteConnection> {
         let connection = SQLiteConnection::open(Path::new(path))?;
         connection.execute("PRAGMA foreign_keys = ON")?;
@@ -71,6 +89,7 @@ impl SQLiteBackend {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 #[async_trait]
 impl Backend for SQLiteBackend {
     fn name(&self) -> &'static str {
@@ -113,10 +132,12 @@ impl Backend for SQLiteBackend {
 }
 
 /// SQLite database connection.
+#[cfg(feature = "rusqlite")]
 #[derive(Debug)]
 pub struct SQLiteConnection {
     conn: rusqlite::Connection,
 }
+#[cfg(feature = "rusqlite")]
 impl SQLiteConnection {
     fn open(path: impl AsRef<Path>) -> Result<Self> {
         if rusqlite::version_number() < SQLITE_MIN_VERSION {
@@ -145,6 +166,7 @@ impl SQLiteConnection {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl ConnectionMethods for SQLiteConnection {
     fn execute(&self, sql: &str) -> Result<()> {
         ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
@@ -207,6 +229,7 @@ impl ConnectionMethods for SQLiteConnection {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl BackendConnection for SQLiteConnection {
     fn transaction(&mut self) -> Result<Transaction<'_>> {
         let trans: rusqlite::Transaction<'_> = self.conn.transaction()?;
@@ -224,6 +247,7 @@ impl BackendConnection for SQLiteConnection {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl ConnectionMethods for rusqlite::Connection {
     fn execute(&self, sql: &str) -> Result<()> {
         if cfg!(feature = "log") {
@@ -396,10 +420,12 @@ impl ConnectionMethods for rusqlite::Connection {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 #[derive(Debug)]
 struct SqliteTransaction<'c> {
     trans: Option<rusqlite::Transaction<'c>>,
 }
+#[cfg(feature = "rusqlite")]
 impl<'c> SqliteTransaction<'c> {
     fn new(trans: rusqlite::Transaction<'c>) -> Self {
         SqliteTransaction { trans: Some(trans) }
@@ -417,6 +443,7 @@ impl<'c> SqliteTransaction<'c> {
         Error::Internal("transaction has already been consumed".to_string())
     }
 }
+#[cfg(feature = "rusqlite")]
 impl ConnectionMethods for SqliteTransaction<'_> {
     fn execute(&self, sql: &str) -> Result<()> {
         ConnectionMethods::execute(self.wrapped_connection_methods()?, sql)
@@ -479,6 +506,7 @@ impl ConnectionMethods for SqliteTransaction<'_> {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
     fn commit(&mut self) -> Result<()> {
         match self.trans.take() {
@@ -498,18 +526,21 @@ impl<'c> BackendTransaction<'c> for SqliteTransaction<'c> {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl rusqlite::ToSql for SqlVal {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         Ok(sqlvalref_to_sqlite(&self.as_ref()))
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl<'a> rusqlite::ToSql for SqlValRef<'a> {
     fn to_sql<'b>(&'b self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'a>> {
         Ok(sqlvalref_to_sqlite(self))
     }
 }
 
+#[cfg(feature = "rusqlite")]
 fn sqlvalref_to_sqlite<'a>(valref: &SqlValRef<'a>) -> rusqlite::types::ToSqlOutput<'a> {
     use rusqlite::types::{ToSqlOutput::Borrowed, ToSqlOutput::Owned, Value, ValueRef};
     use SqlValRef::*;
@@ -540,6 +571,7 @@ fn sqlvalref_to_sqlite<'a>(valref: &SqlValRef<'a>) -> rusqlite::types::ToSqlOutp
     }
 }
 
+#[cfg(feature = "rusqlite")]
 #[pin_project]
 // Debug can not be derived because rusqlite::Rows doesn't implement it.
 struct QueryAdapterInner<'a> {
@@ -549,6 +581,7 @@ struct QueryAdapterInner<'a> {
     rows: Option<rusqlite::Rows<'a>>,
 }
 
+#[cfg(feature = "rusqlite")]
 impl<'a> QueryAdapterInner<'a> {
     fn new(stmt: rusqlite::Statement<'a>, params: impl rusqlite::Params) -> Result<Pin<Box<Self>>> {
         let mut q = Box::pin(QueryAdapterInner { stmt, rows: None });
@@ -576,10 +609,12 @@ impl<'a> QueryAdapterInner<'a> {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 // Debug can not be derived because QueryAdapterInner above doesn't implement it.
 struct QueryAdapter<'a> {
     inner: Pin<Box<QueryAdapterInner<'a>>>,
 }
+#[cfg(feature = "rusqlite")]
 impl<'a> QueryAdapter<'a> {
     fn new(stmt: rusqlite::Statement<'a>, params: impl rusqlite::Params) -> Result<Self> {
         Ok(QueryAdapter {
@@ -588,6 +623,7 @@ impl<'a> QueryAdapter<'a> {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl BackendRows for QueryAdapter<'_> {
     fn next<'b>(&'b mut self) -> Result<Option<&'b (dyn BackendRow + 'b)>> {
         Ok(self
@@ -604,6 +640,7 @@ impl BackendRows for QueryAdapter<'_> {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl BackendRow for rusqlite::Row<'_> {
     fn get(&self, idx: usize, ty: SqlType) -> Result<SqlValRef<'_>> {
         sql_valref_from_rusqlite(self.get_ref(idx)?, &ty)
@@ -613,7 +650,8 @@ impl BackendRow for rusqlite::Row<'_> {
     }
 }
 
-fn sql_for_expr<W>(
+#[cfg(feature = "rusqlite")]
+pub(crate) fn sql_for_expr<W>(
     expr: query::Expr,
     values: &mut Vec<SqlVal>,
     pls: &mut SQLitePlaceholderSource,
@@ -624,10 +662,12 @@ fn sql_for_expr<W>(
     helper::sql_for_expr(expr, sql_for_expr, values, pls, w)
 }
 
+#[cfg(feature = "rusqlite")]
 fn sql_val_from_rusqlite(val: rusqlite::types::ValueRef, col: &Column) -> Result<SqlVal> {
     sql_valref_from_rusqlite(val, col.ty()).map(|v| v.into())
 }
 
+#[cfg(feature = "rusqlite")]
 fn sql_valref_from_rusqlite<'a>(
     val: rusqlite::types::ValueRef<'a>,
     ty: &SqlType,
@@ -659,20 +699,21 @@ fn sql_valref_from_rusqlite<'a>(
     })
 }
 
-fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
+#[cfg(feature = "rusqlite")]
+pub(crate) fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
-        Operation::AddTable(table) => Ok(create_table(table, false)),
+        Operation::AddTable(table) => Ok(create_table(table, false, true)),
         Operation::AddTableConstraints(_table) => Ok("".to_owned()),
-        Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)),
+        Operation::AddTableIfNotExists(table) => Ok(create_table(table, true, true)),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
         Operation::RemoveTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
-        Operation::RemoveColumn(tbl, name) => remove_column(current, tbl, name),
-        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new))),
+        Operation::RemoveColumn(tbl, name) => remove_column(current, tbl, name, true),
+        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new), true)),
     }
 }
 
-fn create_table(table: &ATable, allow_exists: bool) -> String {
+pub(crate) fn create_table(table: &ATable, allow_exists: bool, strict: bool) -> String {
     let coldefs = table
         .columns
         .iter()
@@ -684,12 +725,14 @@ fn create_table(table: &ATable, allow_exists: bool) -> String {
     if !constraints.is_empty() {
         constraints = ",\n".to_owned() + &constraints;
     }
+    let strict_suffix = if strict { " STRICT" } else { "" };
     format!(
-        "CREATE TABLE {}{} (\n{}{}\n) STRICT;",
+        "CREATE TABLE {}{} (\n{}{}\n){};",
         modifier,
         helper::quote_reserved_word(&table.name),
         coldefs,
-        constraints
+        constraints,
+        strict_suffix
     )
 }
 
@@ -735,7 +778,7 @@ fn define_column(col: &AColumn) -> String {
     }
 }
 
-fn define_constraint(column: &AColumn) -> String {
+pub(crate) fn define_constraint(column: &AColumn) -> String {
     let reference = column
         .reference()
         .as_ref()
@@ -753,7 +796,7 @@ fn define_constraint(column: &AColumn) -> String {
     }
 }
 
-fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
+pub(crate) fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
     match col.typeid() {
         Ok(TypeIdentifier::Ty(ty)) => Cow::Borrowed(sqltype(&ty)),
         Ok(TypeIdentifier::Name(name)) => Cow::Owned(name),
@@ -763,7 +806,7 @@ fn col_sqltype(col: &AColumn) -> Cow<'_, str> {
     }
 }
 
-fn sqltype(ty: &SqlType) -> &'static str {
+pub(crate) fn sqltype(ty: &SqlType) -> &'static str {
     match ty {
         SqlType::Bool => "INTEGER",
         SqlType::Int => "INTEGER",
@@ -782,11 +825,11 @@ fn sqltype(ty: &SqlType) -> &'static str {
     }
 }
 
-fn drop_table(name: &str) -> String {
+pub(crate) fn drop_table(name: &str) -> String {
     format!("DROP TABLE {};", helper::quote_reserved_word(name))
 }
 
-fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
+pub(crate) fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     let default: SqlVal = helper::column_default(col)?;
     Ok(format!(
         "ALTER TABLE {} ADD COLUMN {} DEFAULT {};",
@@ -796,7 +839,7 @@ fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     ))
 }
 
-fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String> {
+pub(crate) fn remove_column(current: &mut ADB, tbl_name: &str, name: &str, strict: bool) -> Result<String> {
     let current_clone = current.clone();
     let table = current_clone
         .get_table(tbl_name)
@@ -807,7 +850,7 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String
     // "ALTER TABLE b DROP COLUMN fkey;" fails due to sqlite not being
     // able to remove the attached constraint.
     if col.reference().is_some() {
-        Ok(change_column(current, tbl_name, col, None))
+        Ok(change_column(current, tbl_name, col, None, strict))
     } else {
         Ok(format!(
             "ALTER TABLE {} DROP COLUMN {};",
@@ -817,7 +860,7 @@ fn remove_column(current: &mut ADB, tbl_name: &str, name: &str) -> Result<String
     }
 }
 
-fn copy_table(old: &ATable, new: &ATable) -> String {
+pub(crate) fn copy_table(old: &ATable, new: &ATable) -> String {
     let column_names = new
         .columns
         .iter()
@@ -832,15 +875,16 @@ fn copy_table(old: &ATable, new: &ATable) -> String {
     )
 }
 
-fn tmp_table_name(name: &str) -> String {
+pub(crate) fn tmp_table_name(name: &str) -> String {
     format!("{name}__butane_tmp")
 }
 
-fn change_column(
+pub(crate) fn change_column(
     current: &mut ADB,
     tbl_name: &str,
     old: &AColumn,
     new: Option<&AColumn>,
+    strict: bool,
 ) -> String {
     let table = current.get_table(tbl_name);
     if table.is_none() {
@@ -859,7 +903,7 @@ fn change_column(
         None => new_table.remove_column(old.name()),
     }
     let stmts: [&str; 4] = [
-        &create_table(&new_table, false),
+        &create_table(&new_table, false, strict),
         &copy_table(old_table, &new_table),
         &drop_table(&old_table.name),
         &format!(
@@ -908,9 +952,9 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: 
 }
 
 #[derive(Debug)]
-struct SQLitePlaceholderSource;
+pub(crate) struct SQLitePlaceholderSource;
 impl SQLitePlaceholderSource {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         SQLitePlaceholderSource {}
     }
 }

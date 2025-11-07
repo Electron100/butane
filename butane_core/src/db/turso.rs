@@ -475,7 +475,7 @@ impl ConnectionMethods for TursoConnection {
         &self,
         table: &str,
         columns: &[Column],
-        _pkcol: &Column,
+        pkcol: &Column,
         values: &[SqlValRef<'_>],
     ) -> Result<SqlVal> {
         let mut sql = String::new();
@@ -520,10 +520,17 @@ impl ConnectionMethods for TursoConnection {
             }
         }
 
-        // Get the last inserted rowid
+        // Get the last inserted primary key value
+        // We query the actual column to get the correct type, not just the rowid
+        let query_sql = format!(
+            "SELECT {} FROM {} WHERE ROWID = last_insert_rowid()",
+            helper::quote_reserved_word(pkcol.name()),
+            helper::quote_reserved_word(table),
+        );
+
         let mut rowid_stmt = self
             .conn()?
-            .prepare("SELECT last_insert_rowid()")
+            .prepare(&query_sql)
             .map_err(|e| Error::Internal(e.to_string()))?;
 
         match rowid_stmt
@@ -532,7 +539,7 @@ impl ConnectionMethods for TursoConnection {
         {
             StepResult::Row => {
                 let val = rowid_stmt.row().unwrap().get_values().next().unwrap();
-                turso_value_to_sqlval(val)
+                turso_value_to_sqlval_typed(val, pkcol.ty())
             }
             _ => Err(Error::Internal(
                 "Failed to get last insert rowid".to_string(),

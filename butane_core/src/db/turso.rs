@@ -5,8 +5,11 @@
 
 use std::borrow::Cow;
 use std::fmt::{Debug, Write};
+use std::num::{NonZero, NonZeroUsize};
+use std::sync::Arc;
 
 use async_trait::async_trait;
+use turso_core::{self, StepResult};
 #[cfg(feature = "datetime")]
 use chrono::naive::{NaiveDate, NaiveDateTime};
 
@@ -23,8 +26,6 @@ use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::query::{BoolExpr, Order};
 use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 
-use turso_core as turso;
-
 #[cfg(feature = "datetime")]
 const TURSO_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
 
@@ -39,11 +40,11 @@ pub const ROW_ID_COLUMN_NAME: &str = "rowid";
 
 // Trait similar to PgConnectionLike for sharing behavior between Connection and Transaction
 trait TursoConnectionLike {
-    fn conn(&self) -> Result<&std::sync::Arc<turso::Connection>>;
+    fn conn(&self) -> Result<&Arc<turso_core::Connection>>;
 }
 
 impl TursoConnectionLike for TursoConnection {
-    fn conn(&self) -> Result<&std::sync::Arc<turso::Connection>> {
+    fn conn(&self) -> Result<&Arc<turso_core::Connection>> {
         Ok(&self.conn)
     }
 }
@@ -140,7 +141,7 @@ impl Backend for TursoBackend {
 
 /// Turso database connection.
 pub struct TursoConnection {
-    conn: std::sync::Arc<turso::Connection>,
+    conn: Arc<turso_core::Connection>,
 }
 
 impl std::fmt::Debug for TursoConnection {
@@ -154,17 +155,18 @@ impl TursoConnection {
         let path_str = path.as_ref();
 
         // Create the IO layer for turso_core
-        let io: std::sync::Arc<dyn turso::IO> = if path_str == ":memory:" {
-            std::sync::Arc::new(turso::MemoryIO::new())
+        let io: Arc<dyn turso_core::IO> = if path_str == ":memory:" {
+            Arc::new(turso_core::MemoryIO::new())
         } else {
-            std::sync::Arc::new(
-                turso::PlatformIO::new()
+            Arc::new(
+                turso_core::PlatformIO::new()
                     .map_err(|e| Error::Internal(e.to_string()))?
             )
         };
 
-        // Create the turso_core database with experimental indexes enabled
-        let db = turso::Database::open_file(io, path_str, false, true)  // last param enables experimental indexes
+        // Create the database with experimental indexes enabled,
+        // which is what `turso` crate does.
+        let db = turso_core::Database::open_file(io, path_str, false, true)
             .map_err(|e| Error::Internal(e.to_string()))?;
 
         let conn = db.connect()
@@ -174,11 +176,11 @@ impl TursoConnection {
         let mut stmt = conn.prepare("PRAGMA foreign_keys = 1")?;
         loop {
             match stmt.step()? {
-                turso::StepResult::Done => break,
-                turso::StepResult::Row => {
+                StepResult::Done => break,
+                StepResult::Row => {
                     // Just consume the row
                 }
-                turso::StepResult::IO => {
+                StepResult::IO => {
                     // Handle IO case if needed
                 }
                 _ => {
@@ -229,7 +231,7 @@ impl TursoConnection {
     fn execute_simple_subquery(
         &self,
         col: &'static str,
-        tbl2: std::borrow::Cow<'static, str>,
+        tbl2: Cow<'static, str>,
         tbl2_col: &'static str,
         inner_expr: Box<BoolExpr>,
     ) -> Result<BoolExpr> {
@@ -254,7 +256,7 @@ impl TursoConnection {
     fn execute_join_subquery(
         &self,
         col: &'static str,
-        tbl2: std::borrow::Cow<'static, str>,
+        tbl2: Cow<'static, str>,
         col2: query::Column,
         joins: Vec<query::Join>,
         inner_expr: Box<BoolExpr>,
@@ -291,7 +293,7 @@ impl TursoConnection {
         // Bind parameters
         for (i, val) in values.iter().enumerate() {
             let turso_val = sqlval_to_turso(&val.as_ref());
-            stmt.bind_at(std::num::NonZero::new(i + 1).unwrap(), turso_val);
+            stmt.bind_at(NonZero::new(i + 1).unwrap(), turso_val);
         }
 
         let mut result_values = Vec::new();
@@ -299,7 +301,7 @@ impl TursoConnection {
         // Execute and collect results
         loop {
             match stmt.step().map_err(|e| Error::Internal(e.to_string()))? {
-                turso::StepResult::Row => {
+                StepResult::Row => {
                     let val = stmt.row().unwrap().get_values().next().unwrap();
                     // Convert turso_core value back to SqlVal - we'll need the column type
                     // For now, we'll use a generic conversion
@@ -308,15 +310,15 @@ impl TursoConnection {
                         Err(_) => return Err(Error::Internal("Failed to convert value".to_string())),
                     }
                 }
-                turso::StepResult::Done => break,
-                turso::StepResult::IO => {
+                StepResult::Done => break,
+                StepResult::IO => {
                     // Handle async IO - this might need special handling
                     continue;
                 }
-                turso::StepResult::Busy => {
+                StepResult::Busy => {
                     return Err(Error::Internal("Database is busy".to_string()));
                 }
-                turso::StepResult::Interrupt => {
+                StepResult::Interrupt => {
                     return Err(Error::Internal("Query interrupted".to_string()));
                 }
             }
@@ -358,11 +360,11 @@ impl ConnectionMethods for TursoConnection {
             let mut stmt = self.conn()?.prepare(statement)?;
             loop {
                 match stmt.step()? {
-                    turso::StepResult::Done => break,
-                    turso::StepResult::Row => {
+                    StepResult::Done => break,
+                    StepResult::Row => {
                         // Just consume the row for execute
                     }
-                    turso::StepResult::IO => {
+                    StepResult::IO => {
                         // Handle IO case if needed
                     }
                     _ => {
@@ -433,17 +435,17 @@ impl ConnectionMethods for TursoConnection {
         // Bind parameters
         for (i, val) in values.iter().enumerate() {
             let turso_val = sqlval_to_turso(&val.as_ref());
-            stmt.bind_at(std::num::NonZero::new(i + 1).unwrap(), turso_val);
+            stmt.bind_at(NonZero::new(i + 1).unwrap(), turso_val);
         }
 
         // Execute and collect rows
         let mut vec_rows = Vec::new();
         loop {
             match stmt.step().map_err(|e| Error::Internal(e.to_string()))? {
-                turso::StepResult::Row => {
+                StepResult::Row => {
                     // Convert turso row to VecRow
                     let mut row_values = Vec::new();
-                    let row_data: Vec<turso::Value> = stmt.row().unwrap().get_values().cloned().collect();
+                    let row_data: Vec<turso_core::Value> = stmt.row().unwrap().get_values().cloned().collect();
                     for (i, col) in columns.iter().enumerate() {
                         if let Some(val) = row_data.get(i) {
                             let sql_val = turso_value_to_sqlval_typed(val, col.ty())?;
@@ -454,15 +456,15 @@ impl ConnectionMethods for TursoConnection {
                     }
                     vec_rows.push(row_values);
                 }
-                turso::StepResult::Done => break,
-                turso::StepResult::IO => {
+                StepResult::Done => break,
+                StepResult::IO => {
                     // Handle async IO if needed
                     continue;
                 }
-                turso::StepResult::Busy => {
+                StepResult::Busy => {
                     return Err(Error::Internal("Database is busy".to_string()));
                 }
-                turso::StepResult::Interrupt => {
+                StepResult::Interrupt => {
                     return Err(Error::Internal("Query interrupted".to_string()));
                 }
             }
@@ -502,21 +504,21 @@ impl ConnectionMethods for TursoConnection {
         // Bind parameters
         for (i, val) in values.iter().enumerate() {
             let turso_val = sqlval_to_turso(val);
-            stmt.bind_at(std::num::NonZero::new(i + 1).unwrap(), turso_val);
+            stmt.bind_at(NonZero::new(i + 1).unwrap(), turso_val);
         }
 
         // Execute the statement
         loop {
             match stmt.step().map_err(|e| Error::Internal(e.to_string()))? {
-                turso::StepResult::Done => break,
-                turso::StepResult::IO => continue,
-                turso::StepResult::Busy => {
+                StepResult::Done => break,
+                StepResult::IO => continue,
+                StepResult::Busy => {
                     return Err(Error::Internal("Database is busy".to_string()));
                 }
-                turso::StepResult::Interrupt => {
+                StepResult::Interrupt => {
                     return Err(Error::Internal("Query interrupted".to_string()));
                 }
-                turso::StepResult::Row => {
+                StepResult::Row => {
                     return Err(Error::Internal("Unexpected row in insert".to_string()));
                 }
             }
@@ -529,7 +531,7 @@ impl ConnectionMethods for TursoConnection {
             .map_err(|e| Error::Internal(e.to_string()))?;
 
         match rowid_stmt.step().map_err(|e| Error::Internal(e.to_string()))? {
-            turso::StepResult::Row => {
+            StepResult::Row => {
                 let val = rowid_stmt.row().unwrap().get_values().next().unwrap();
                 turso_value_to_sqlval(&val)
             }
@@ -559,21 +561,21 @@ impl ConnectionMethods for TursoConnection {
         // Bind parameters
         for (i, val) in values.iter().enumerate() {
             let turso_val = sqlval_to_turso(val);
-            stmt.bind_at(std::num::NonZero::new(i + 1).unwrap(), turso_val);
+            stmt.bind_at(NonZero::new(i + 1).unwrap(), turso_val);
         }
 
         // Execute the statement
         loop {
             match stmt.step().map_err(|e| Error::Internal(e.to_string()))? {
-                turso::StepResult::Done => break,
-                turso::StepResult::IO => continue,
-                turso::StepResult::Busy => {
+                StepResult::Done => break,
+                StepResult::IO => continue,
+                StepResult::Busy => {
                     return Err(Error::Internal("Database is busy".to_string()));
                 }
-                turso::StepResult::Interrupt => {
+                StepResult::Interrupt => {
                     return Err(Error::Internal("Query interrupted".to_string()));
                 }
-                turso::StepResult::Row => {
+                StepResult::Row => {
                     return Err(Error::Internal("Unexpected row in insert".to_string()));
                 }
             }
@@ -601,21 +603,21 @@ impl ConnectionMethods for TursoConnection {
         // Bind parameters
         for (i, val) in values.iter().enumerate() {
             let turso_val = sqlval_to_turso(val);
-            stmt.bind_at(std::num::NonZero::new(i + 1).unwrap(), turso_val);
+            stmt.bind_at(NonZero::new(i + 1).unwrap(), turso_val);
         }
 
         // Execute the statement
         loop {
             match stmt.step().map_err(|e| Error::Internal(e.to_string()))? {
-                turso::StepResult::Done => break,
-                turso::StepResult::IO => continue,
-                turso::StepResult::Busy => {
+                StepResult::Done => break,
+                StepResult::IO => continue,
+                StepResult::Busy => {
                     return Err(Error::Internal("Database is busy".to_string()));
                 }
-                turso::StepResult::Interrupt => {
+                StepResult::Interrupt => {
                     return Err(Error::Internal("Query interrupted".to_string()));
                 }
-                turso::StepResult::Row => {
+                StepResult::Row => {
                     return Err(Error::Internal("Unexpected row in insert_or_replace".to_string()));
                 }
             }
@@ -647,24 +649,24 @@ impl ConnectionMethods for TursoConnection {
             .map_err(|e| Error::Internal(e.to_string()))?;
 
         // Bind parameters (values + pk)
-        let mut params: Vec<turso::Value> = values.iter().map(|v| sqlval_to_turso(v)).collect();
+        let mut params: Vec<turso_core::Value> = values.iter().map(|v| sqlval_to_turso(v)).collect();
         params.push(sqlval_to_turso(&pk));
         for (i, val) in params.iter().enumerate() {
-            stmt.bind_at(std::num::NonZero::new(i + 1).unwrap(), val.clone());
+            stmt.bind_at(NonZero::new(i + 1).unwrap(), val.clone());
         }
 
         // Execute the statement
         loop {
             match stmt.step().map_err(|e| Error::Internal(e.to_string()))? {
-                turso::StepResult::Done => break,
-                turso::StepResult::IO => continue,
-                turso::StepResult::Busy => {
+                StepResult::Done => break,
+                StepResult::IO => continue,
+                StepResult::Busy => {
                     return Err(Error::Internal("Database is busy".to_string()));
                 }
-                turso::StepResult::Interrupt => {
+                StepResult::Interrupt => {
                     return Err(Error::Internal("Query interrupted".to_string()));
                 }
-                turso::StepResult::Row => {
+                StepResult::Row => {
                     return Err(Error::Internal("Unexpected row in update".to_string()));
                 }
             }
@@ -688,20 +690,20 @@ impl ConnectionMethods for TursoConnection {
 
         // Bind the primary key parameter
         let pk_val = sqlval_to_turso(&pk.as_ref());
-        stmt.bind_at(std::num::NonZero::new(1).unwrap(), pk_val);
+        stmt.bind_at(NonZero::new(1).unwrap(), pk_val);
 
         // Execute the statement
         loop {
             match stmt.step().map_err(|e| Error::Internal(e.to_string()))? {
-                turso::StepResult::Done => break,
-                turso::StepResult::IO => continue,
-                turso::StepResult::Busy => {
+                StepResult::Done => break,
+                StepResult::IO => continue,
+                StepResult::Busy => {
                     return Err(Error::Internal("Database is busy".to_string()));
                 }
-                turso::StepResult::Interrupt => {
+                StepResult::Interrupt => {
                     return Err(Error::Internal("Query interrupted".to_string()));
                 }
-                turso::StepResult::Row => {
+                StepResult::Row => {
                     return Err(Error::Internal("Unexpected row in delete".to_string()));
                 }
             }
@@ -729,21 +731,21 @@ impl ConnectionMethods for TursoConnection {
         // Bind parameters
         for (i, val) in values.iter().enumerate() {
             let turso_val = sqlval_to_turso(&val.as_ref());
-            stmt.bind_at(std::num::NonZero::new(i + 1).unwrap(), turso_val);
+            stmt.bind_at(NonZero::new(i + 1).unwrap(), turso_val);
         }
 
         // Execute the statement and count affected rows
         loop {
             match stmt.step().map_err(|e| Error::Internal(e.to_string()))? {
-                turso::StepResult::Done => break,
-                turso::StepResult::IO => continue,
-                turso::StepResult::Busy => {
+                StepResult::Done => break,
+                StepResult::IO => continue,
+                StepResult::Busy => {
                     return Err(Error::Internal("Database is busy".to_string()));
                 }
-                turso::StepResult::Interrupt => {
+                StepResult::Interrupt => {
                     return Err(Error::Internal("Query interrupted".to_string()));
                 }
-                turso::StepResult::Row => {
+                StepResult::Row => {
                     return Err(Error::Internal("Unexpected row in delete_where".to_string()));
                 }
             }
@@ -759,15 +761,15 @@ impl ConnectionMethods for TursoConnection {
     fn has_table(&self, table: &str) -> Result<bool> {
         let sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=?";
         let mut stmt = self.conn()?.prepare(sql)?;
-        stmt.bind_at(std::num::NonZeroUsize::new(1).unwrap(), turso::Value::Text(table.to_string().into()));
+        stmt.bind_at(NonZeroUsize::new(1).unwrap(), turso_core::Value::Text(table.to_string().into()));
 
         loop {
             match stmt.step()? {
-                turso::StepResult::Done => return Ok(false),
-                turso::StepResult::Row => {
+                StepResult::Done => return Ok(false),
+                StepResult::Row => {
                     return Ok(true); // Found a row, table exists
                 }
-                turso::StepResult::IO => {
+                StepResult::IO => {
                     // Handle IO case if needed
                 }
                 _ => {
@@ -824,7 +826,7 @@ impl<'c> TursoTransaction<'c> {
 }
 
 impl<'c> TursoConnectionLike for TursoTransaction<'c> {
-    fn conn(&self) -> Result<&std::sync::Arc<turso::Connection>> {
+    fn conn(&self) -> Result<&Arc<turso_core::Connection>> {
         Ok(&self.get()?.conn)
     }
 }
@@ -930,52 +932,55 @@ impl<'c> Drop for TursoTransaction<'c> {
 }
 
 // Value conversion functions
-fn sqlval_to_turso(val: &SqlValRef<'_>) -> turso::Value {
+fn sqlval_to_turso(val: &SqlValRef<'_>) -> turso_core::Value {
     use SqlValRef::*;
     match val {
-        Bool(b) => turso::Value::Integer(*b as i64),
-        Int(i) => turso::Value::Integer(*i as i64),
-        BigInt(i) => turso::Value::Integer(*i),
-        Real(r) => turso::Value::Float(*r),
-        Text(t) => turso::Value::Text(t.to_string().into()),
-        Blob(b) => turso::Value::Blob(b.to_vec()),
+        Bool(b) => turso_core::Value::Integer(*b as i64),
+        Int(i) => turso_core::Value::Integer(*i as i64),
+        BigInt(i) => turso_core::Value::Integer(*i),
+        Real(r) => turso_core::Value::Float(*r),
+        Text(t) => turso_core::Value::Text(t.to_string().into()),
+        Blob(b) => turso_core::Value::Blob(b.to_vec()),
         #[cfg(feature = "json")]
-        Json(v) => turso::Value::Text(serde_json::to_string(v).unwrap().into()),
+        Json(v) => turso_core::Value::Text(serde_json::to_string(v).unwrap().into()),
         #[cfg(feature = "datetime")]
         Date(date) => {
             let f = date.format(TURSO_DATE_FORMAT);
-            turso::Value::Text(f.to_string().into())
+            turso_core::Value::Text(f.to_string().into())
         }
         #[cfg(feature = "datetime")]
         Timestamp(dt) => {
             let f = dt.format(TURSO_DT_FORMAT);
-            turso::Value::Text(f.to_string().into())
+            turso_core::Value::Text(f.to_string().into())
         }
-        Null => turso::Value::Null,
+        Null => turso_core::Value::Null,
         #[cfg(feature = "pg")]
         Custom(_) => panic!("Custom types not supported in turso"),
     }
 }
 
-fn turso_value_to_sqlval(val: &turso::Value) -> Result<SqlVal> {
+/// Convert a Turso value to SqlVal without type information.
+///
+/// This infers the SqlVal type from the Turso value type.
+fn turso_value_to_sqlval(val: &turso_core::Value) -> Result<SqlVal> {
     match val {
-        turso::Value::Null => Ok(SqlVal::Null),
-        turso::Value::Integer(i) => Ok(SqlVal::BigInt(*i)),
-        turso::Value::Float(r) => Ok(SqlVal::Real(*r)),
-        turso::Value::Text(t) => Ok(SqlVal::Text(t.to_string())),
-        turso::Value::Blob(b) => Ok(SqlVal::Blob(b.clone())),
+        turso_core::Value::Null => Ok(SqlVal::Null),
+        turso_core::Value::Integer(i) => Ok(SqlVal::BigInt(*i)),
+        turso_core::Value::Float(r) => Ok(SqlVal::Real(*r)),
+        turso_core::Value::Text(t) => Ok(SqlVal::Text(t.to_string())),
+        turso_core::Value::Blob(b) => Ok(SqlVal::Blob(b.clone())),
     }
 }
 
-fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVal> {
-    if matches!(val, turso::Value::Null) {
+fn turso_value_to_sqlval_typed(val: &turso_core::Value, ty: &SqlType) -> Result<SqlVal> {
+    if matches!(val, turso_core::Value::Null) {
         return Ok(SqlVal::Null);
     }
 
     Ok(match ty {
         SqlType::Bool => {
             let i = match val {
-                turso::Value::Integer(i) => *i,
+                turso_core::Value::Integer(i) => *i,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected integer for Bool, got {:?}",
@@ -987,7 +992,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::Int => {
             let i = match val {
-                turso::Value::Integer(i) => *i,
+                turso_core::Value::Integer(i) => *i,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected integer for Int, got {:?}",
@@ -999,7 +1004,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::BigInt => {
             let i = match val {
-                turso::Value::Integer(i) => *i,
+                turso_core::Value::Integer(i) => *i,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected integer for BigInt, got {:?}",
@@ -1011,7 +1016,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::Real => {
             let r = match val {
-                turso::Value::Float(r) => *r,
+                turso_core::Value::Float(r) => *r,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected float for Real, got {:?}",
@@ -1023,7 +1028,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::Text => {
             let t = match val {
-                turso::Value::Text(t) => t.to_string(),
+                turso_core::Value::Text(t) => t.to_string(),
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected text for Text, got {:?}",
@@ -1036,7 +1041,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         #[cfg(feature = "json")]
         SqlType::Json => {
             let t = match val {
-                turso::Value::Text(t) => t,
+                turso_core::Value::Text(t) => t,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected text for Json, got {:?}",
@@ -1049,7 +1054,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         #[cfg(feature = "datetime")]
         SqlType::Date => {
             let t = match val {
-                turso::Value::Text(t) => t,
+                turso_core::Value::Text(t) => t,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected text for Date, got {:?}",
@@ -1062,7 +1067,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         #[cfg(feature = "datetime")]
         SqlType::Timestamp => {
             let t = match val {
-                turso::Value::Text(t) => t,
+                turso_core::Value::Text(t) => t,
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected text for Timestamp, got {:?}",
@@ -1074,7 +1079,7 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
         }
         SqlType::Blob => {
             let b = match val {
-                turso::Value::Blob(b) => b.to_vec(),
+                turso_core::Value::Blob(b) => b.to_vec(),
                 _ => {
                     return Err(Error::Internal(format!(
                         "Expected blob for Blob, got {:?}",
@@ -1089,18 +1094,6 @@ fn turso_value_to_sqlval_typed(val: &turso::Value, ty: &SqlType) -> Result<SqlVa
     })
 }
 
-/// Convert a Turso value to SqlVal without type information.
-/// This infers the SqlVal type from the Turso value type.
-#[allow(dead_code)]
-fn turso_value_to_sqlval_untyped(val: &turso::Value) -> Result<SqlVal> {
-    Ok(match val {
-        turso::Value::Null => SqlVal::Null,
-        turso::Value::Integer(i) => SqlVal::BigInt(*i),
-        turso::Value::Float(r) => SqlVal::Real(*r),
-        turso::Value::Text(t) => SqlVal::Text(t.to_string()),
-        turso::Value::Blob(b) => SqlVal::Blob(b.clone()),
-    })
-}
 
 // Turso row wrapper that stores owned SqlVal values
 struct TursoRow {

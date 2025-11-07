@@ -28,6 +28,7 @@ debug = ["butane_core/debug"]
 log = ["butane_core/log"]
 r2d2 = ["dep:r2d2"]
 turso = ["butane_core/turso"]
+turso-async = ["async", "async-adapter", "butane_core/turso-async"]
 tls = ["butane_core/tls"]
 uuid = ["butane_codegen/uuid", "butane_core/uuid"]
 # This feature is for testing only. It will delete the .butane directory inside the butane crate, which only

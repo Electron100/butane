@@ -87,7 +87,9 @@ pub fn butane_test(args: TokenStream, input: TokenStream) -> TokenStream {
     backends.push(("pg", "PgTestInstance"));
     if !options.contains(&TestOption::PgOnly) {
         backends.push(("sqlite", "SQLiteTestInstance"));
-        backends.push(("turso", "TursoTestInstance"));
+        if !options.contains(&TestOption::NoTurso) {
+            backends.push(("turso", "TursoTestInstance"));
+        }
     }
 
     let tests = backends
@@ -186,6 +188,7 @@ enum TestOption {
     Async,
     NoMigrate,
     PgOnly,
+    NoTurso,
 }
 
 impl Parse for TestOption {
@@ -201,6 +204,8 @@ impl Parse for TestOption {
                 Ok(TestOption::NoMigrate)
             } else if name == "pg" {
                 Ok(TestOption::PgOnly)
+            } else if name == "noturso" {
+                Ok(TestOption::NoTurso)
             } else {
                 Err(syn::Error::new(
                     name.span(),
@@ -258,16 +263,27 @@ impl IntoIterator for Stmts {
 ///     // async test logic here
 /// }
 /// ```
+///
+/// To exclude turso backend (e.g., for tests with unsupported features):
+/// ```ignore
+/// #[butane_backend_name_test(async, noturso)]
+/// async fn my_test_without_turso(backend_name: &str) {
+///     // test logic here
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn butane_backend_name_test(args: TokenStream, input: TokenStream) -> TokenStream {
     let func = parse_macro_input!(input as ItemFn);
     let func_name = &func.sig.ident;
 
-    // Check if async flag is provided
-    let is_async = !args.is_empty() && args.to_string().contains("async");
+    // Parse arguments
+    let args_str = args.to_string();
+    let is_async = args_str.contains("async");
+    let skip_turso = args_str.contains("noturso");
 
     let pg_test_name = Ident::new(&format!("{}_pg", func_name), Span::call_site());
     let sqlite_test_name = Ident::new(&format!("{}_sqlite", func_name), Span::call_site());
+    let turso_test_name = Ident::new(&format!("{}_turso", func_name), Span::call_site());
 
     let test_attribute = if is_async {
         quote! { #[tokio::test] }
@@ -287,42 +303,31 @@ pub fn butane_backend_name_test(args: TokenStream, input: TokenStream) -> TokenS
         quote! {}
     };
 
-    let expanded = if is_async {
-        // Include turso only for async tests (turso is async-only)
-        let turso_test_name = Ident::new(&format!("{}_turso", func_name), Span::call_site());
+    let turso_test = if !skip_turso {
         quote! {
-            #func
-
-            #test_attribute
-            #async_token fn #pg_test_name() {
-                #func_name("pg")#await_token;
-            }
-
-            #test_attribute
-            #async_token fn #sqlite_test_name() {
-                #func_name("sqlite")#await_token;
-            }
-
             #test_attribute
             #async_token fn #turso_test_name() {
                 #func_name("turso")#await_token;
             }
         }
     } else {
-        // Omit turso for sync tests
-        quote! {
-            #func
+        quote! {}
+    };
 
-            #test_attribute
-            #async_token fn #pg_test_name() {
-                #func_name("pg")#await_token;
-            }
+    let expanded = quote! {
+        #func
 
-            #test_attribute
-            #async_token fn #sqlite_test_name() {
-                #func_name("sqlite")#await_token;
-            }
+        #test_attribute
+        #async_token fn #pg_test_name() {
+            #func_name("pg")#await_token;
         }
+
+        #test_attribute
+        #async_token fn #sqlite_test_name() {
+            #func_name("sqlite")#await_token;
+        }
+
+        #turso_test
     };
 
     TokenStream::from(expanded)

@@ -63,7 +63,7 @@ thiserror = "2.0"
 tokio = { version = "1" }
 tokio-postgres = "0.7"
 tokio-test = { version = "0.4" }
-turso = "0.3"
+turso_core = { version = "0.3", default-features = false, features = ["fs"] }
 url = "2.5"
 uuid = "1.2"
 

@@ -325,7 +325,7 @@ async fn migration_modify_field_type_change(backend_name: &str) {
     test_migrate(&mut conn, init, v2, "modify_field_type_change").await;
 }
 
-#[butane_backend_name_test(async)]
+#[butane_backend_name_test(async, noturso)]
 async fn migration_modify_field_nullability_change(backend_name: &str) {
     env_logger::try_init().ok();
     let mut conn = get_async_connection(backend_name).await;
@@ -366,7 +366,7 @@ async fn migration_modify_field_uniqueness_change(backend_name: &str) {
     test_migrate(&mut conn, init, v2, "modify_field_uniqueness_change").await;
 }
 
-#[butane_backend_name_test(async)]
+#[butane_backend_name_test(async, noturso)]
 async fn migration_modify_field_pkey_change(backend_name: &str) {
     env_logger::try_init().ok();
     let mut conn = get_async_connection(backend_name).await;
@@ -388,7 +388,7 @@ async fn migration_modify_field_pkey_change(backend_name: &str) {
     test_migrate(&mut conn, init, v2, "modify_field_pkey_change").await;
 }
 
-#[butane_backend_name_test(async)]
+#[butane_backend_name_test(async, noturso)]
 async fn migration_modify_field_default_added(backend_name: &str) {
     env_logger::try_init().ok();
     let mut conn = get_async_connection(backend_name).await;
@@ -409,7 +409,7 @@ async fn migration_modify_field_default_added(backend_name: &str) {
     test_migrate(&mut conn, init, v2, "modify_field_default_added").await;
 }
 
-#[butane_backend_name_test(async)]
+#[butane_backend_name_test(async, noturso)]
 async fn migration_modify_field_different_default(backend_name: &str) {
     env_logger::try_init().ok();
     let mut conn = get_async_connection(backend_name).await;
@@ -450,7 +450,7 @@ async fn migration_add_and_remove_field(backend_name: &str) {
     test_migrate(&mut conn, init, v2, "add_and_remove_field").await;
 }
 
-#[butane_backend_name_test(async)]
+#[butane_backend_name_test(async, noturso)]
 async fn migration_delete_table(backend_name: &str) {
     let mut conn = get_async_connection(backend_name).await;
     let init_tokens = quote! {

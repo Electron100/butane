@@ -365,6 +365,13 @@ impl From<crossbeam_channel::RecvError> for Error {
     }
 }
 
+#[cfg(feature = "turso")]
+impl From<turso_core::LimboError> for Error {
+    fn from(e: turso_core::LimboError) -> Self {
+        Error::Internal(e.to_string())
+    }
+}
+
 /// Enumeration of the types a database value may take.
 ///
 /// See also [`SqlVal`].

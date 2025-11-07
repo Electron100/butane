@@ -23,8 +23,6 @@ use crate::migrations::adb::{AColumn, ATable, Operation, TypeIdentifier, ADB};
 use crate::query::{BoolExpr, Order};
 use crate::{debug, query, Error, Result, SqlType, SqlVal, SqlValRef};
 
-// Import turso_core for database functionality
-#[cfg(feature = "turso")]
 use turso_core as turso;
 
 #[cfg(feature = "datetime")]
@@ -165,8 +163,8 @@ impl TursoConnection {
             )
         };
 
-        // Create the turso_core database
-        let db = turso::Database::open_file(io, path_str, false, false)
+        // Create the turso_core database with experimental indexes enabled
+        let db = turso::Database::open_file(io, path_str, false, true)  // last param enables experimental indexes
             .map_err(|e| Error::Internal(e.to_string()))?;
 
         let conn = db.connect()
@@ -1151,9 +1149,43 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
 fn create_table(table: &ATable, if_not_exists: bool) -> String {
     let mut constraints: Vec<String> = Vec::new();
     let mut defs: Vec<String> = table.columns.iter().map(define_column).collect();
+    let mut index_statements: Vec<String> = Vec::new();
+
     for column in &table.columns {
         if column.reference().is_some() {
             constraints.push(define_constraint(column));
+        }
+
+        // Turso requires explicit indexes for UNIQUE constraints
+        if column.unique() {
+            let index_name = format!("{}_{}_unique_idx", table.name, column.name());
+            let index_stmt = format!(
+                "CREATE UNIQUE INDEX {} ON {} ({});",
+                helper::quote_reserved_word(&index_name),
+                helper::quote_reserved_word(&table.name),
+                helper::quote_reserved_word(column.name())
+            );
+            index_statements.push(index_stmt);
+        }
+
+        // Turso requires explicit indexes for non-INTEGER PRIMARY KEY constraints
+        if column.is_pk() {
+            let sqltype = match column.typeid() {
+                Ok(TypeIdentifier::Ty(ty)) => sqltype(&ty),
+                Ok(TypeIdentifier::Name(_)) => "", // Custom types
+                Err(_) => "",
+            };
+            // Only INTEGER PRIMARY KEY is allowed inline
+            if sqltype != "INTEGER" {
+                let index_name = format!("{}_{}_pk_idx", table.name, column.name());
+                let index_stmt = format!(
+                    "CREATE UNIQUE INDEX {} ON {} ({});",
+                    helper::quote_reserved_word(&index_name),
+                    helper::quote_reserved_word(&table.name),
+                    helper::quote_reserved_word(column.name())
+                );
+                index_statements.push(index_stmt);
+            }
         }
     }
     defs.append(&mut constraints);
@@ -1167,7 +1199,7 @@ fn create_table(table: &ATable, if_not_exists: bool) -> String {
 
     // Format with newlines if it would be longer than 120 characters
     let single_line = format!("{}{});", prefix, defs.join(", "));
-    if single_line.len() <= 120 {
+    let create_table_stmt = if single_line.len() <= 120 {
         single_line
     } else {
         // Multi-line format with 4-space indentation
@@ -1177,6 +1209,13 @@ fn create_table(table: &ATable, if_not_exists: bool) -> String {
             .collect::<Vec<_>>()
             .join(",\n");
         format!("{}\n{}\n);", prefix, formatted_defs)
+    };
+
+    // Append index creation statements
+    if !index_statements.is_empty() {
+        format!("{}\n{}", create_table_stmt, index_statements.join("\n"))
+    } else {
+        create_table_stmt
     }
 }
 
@@ -1185,15 +1224,25 @@ fn define_column(col: &AColumn) -> String {
     if !col.nullable() {
         constraints.push("NOT NULL".to_string());
     }
+    // Only add PRIMARY KEY inline for INTEGER types
+    // Non-INTEGER PRIMARY KEY constraints need separate indexes in Turso
     if col.is_pk() {
-        constraints.push("PRIMARY KEY".to_string());
+        let sqltype = match col.typeid() {
+            Ok(TypeIdentifier::Ty(ty)) => sqltype(&ty),
+            Ok(TypeIdentifier::Name(_)) => "", // Custom types
+            Err(_) => "",
+        };
+        if sqltype == "INTEGER" {
+            constraints.push("PRIMARY KEY".to_string());
+        }
     }
     if col.is_auto() && !col.is_pk() {
         constraints.push("AUTOINCREMENT".to_string());
     }
-    if col.unique() {
-        constraints.push("UNIQUE".to_string());
-    }
+    // Note: UNIQUE constraints are not added inline for Turso
+    // because Turso requires explicit indexes for UNIQUE constraints.
+    // Instead, we create separate CREATE UNIQUE INDEX statements in create_table()
+
     if constraints.is_empty() {
         format!(
             "{} {}",

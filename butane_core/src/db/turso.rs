@@ -20,6 +20,7 @@ use super::sqlite::{
     add_column as sqlite_add_column, change_column as sqlite_change_column,
     col_sqltype as sqlite_col_sqltype, define_constraint as sqlite_define_constraint,
     drop_table as sqlite_drop_table, remove_column as sqlite_remove_column,
+    sql_for_expr as sqlite_sql_for_expr, sql_insert_or_update as sqlite_sql_insert_or_update,
     sqltype as sqlite_sqltype, SQLitePlaceholderSource, ROW_ID_COLUMN_NAME,
 };
 #[cfg(feature = "datetime")]
@@ -1278,34 +1279,7 @@ fn change_column(
 
 /// Write SQL that performs an insert or update.
 pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: &mut impl Write) {
-    write!(w, "INSERT ").unwrap();
-    write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();
-    helper::list_columns(columns, w);
-    write!(w, ") VALUES (").unwrap();
-    columns.iter().fold("", |sep, _| {
-        write!(w, "{sep}?").unwrap();
-        ", "
-    });
-    write!(w, ")").unwrap();
-    write!(w, " ON CONFLICT ({}) DO ", pkcol.name()).unwrap();
-    if columns.len() > 1 {
-        write!(w, "UPDATE SET (").unwrap();
-        helper::list_columns(columns, w);
-        write!(w, ") = (").unwrap();
-        columns.iter().fold("", |sep, c| {
-            write!(
-                w,
-                "{}excluded.{}",
-                sep,
-                helper::quote_reserved_word(c.name())
-            )
-            .unwrap();
-            ", "
-        });
-        write!(w, ")").unwrap();
-    } else {
-        write!(w, "NOTHING").unwrap();
-    }
+    sqlite_sql_insert_or_update(table, columns, pkcol, w)
 }
 
 fn sql_for_expr(
@@ -1314,7 +1288,5 @@ fn sql_for_expr(
     placeholder_source: &mut SQLitePlaceholderSource,
     out: &mut impl Write,
 ) {
-    // Subqueries should already be transformed by transform_subqueries before reaching here
-    // So we can just use the default helper implementation
-    helper::sql_for_expr(expr, sql_for_expr, values, placeholder_source, out)
+    sqlite_sql_for_expr(expr, values, placeholder_source, out)
 }

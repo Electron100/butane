@@ -30,14 +30,14 @@ use super::{BackendConnection, BackendTransaction, Connection, ConnectionMethods
 #[cfg(feature = "rusqlite")]
 use crate::db::connmethods::BackendRows;
 use crate::migrations::adb::ARef;
-use crate::migrations::adb::{AColumn, ATable, TypeIdentifier, ADB};
 #[cfg(feature = "rusqlite")]
 use crate::migrations::adb::Operation;
+use crate::migrations::adb::{AColumn, ATable, TypeIdentifier, ADB};
 #[cfg(feature = "rusqlite")]
 use crate::query::{BoolExpr, Order};
-use crate::{Error, Result, SqlType, SqlVal};
 #[cfg(feature = "rusqlite")]
 use crate::{debug, query, SqlValRef};
+use crate::{Error, Result, SqlType, SqlVal};
 
 #[cfg(feature = "datetime")]
 pub(crate) const SQLITE_DT_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f";
@@ -709,7 +709,9 @@ pub(crate) fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::RemoveTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
         Operation::RemoveColumn(tbl, name) => remove_column(current, tbl, name, true),
-        Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new), true)),
+        Operation::ChangeColumn(tbl, old, new) => {
+            Ok(change_column(current, tbl, old, Some(new), true))
+        }
     }
 }
 
@@ -839,7 +841,12 @@ pub(crate) fn add_column(tbl_name: &str, col: &AColumn) -> Result<String> {
     ))
 }
 
-pub(crate) fn remove_column(current: &mut ADB, tbl_name: &str, name: &str, strict: bool) -> Result<String> {
+pub(crate) fn remove_column(
+    current: &mut ADB,
+    tbl_name: &str,
+    name: &str,
+    strict: bool,
+) -> Result<String> {
     let current_clone = current.clone();
     let table = current_clone
         .get_table(tbl_name)
@@ -919,7 +926,12 @@ pub(crate) fn change_column(
 }
 
 /// Write SQL that performs an insert or update.
-pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: &mut impl Write) {
+pub(crate) fn sql_insert_or_update(
+    table: &str,
+    columns: &[Column],
+    pkcol: &Column,
+    w: &mut impl Write,
+) {
     write!(w, "INSERT ").unwrap();
     write!(w, "INTO {} (", helper::quote_reserved_word(table)).unwrap();
     helper::list_columns(columns, w);

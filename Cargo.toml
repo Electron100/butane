@@ -1,18 +1,26 @@
 [workspace]
 resolver = "2"
 members = [
-  "butane",
-  "butane_cli",
-  "butane_codegen",
-  "butane_core",
   "butane_test_helper",
   "butane_test_macros",
+  "butane_core",
+  "butane_codegen",
+  "butane",
+  "butane_cli",
   "example",
   "examples/custom_pg",
   "examples/newtype",
   "examples/getting_started",
   "examples/getting_started_async",
   "examples/reserved-words",
+]
+default-members = [
+  "butane_test_helper",
+  "butane_test_macros",
+  "butane_core",
+  "butane_codegen",
+  "butane",
+  "butane_cli",
 ]
 
 [workspace.package]

@@ -24,10 +24,13 @@ jobs:
   build:
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
+        include:
+          - os: ubuntu-latest
+            mise_tools: ephemeral-postgres
+          - os: macos-latest
+            mise_tools: ephemeral-postgres
+          - os: windows-latest
+            mise_tools: ''
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -95,16 +98,18 @@ jobs:
       uses: taiki-e/install-action@v2
       with:
         tool: cargo-deny,editorconfig-checker,mise,typos
-    - name: Install ephemeral-postgres via mise
+    - name: Install mise tools - ${{ matrix.mise_tools }}
+      if: matrix.mise_tools != ''
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: runner.os != 'Windows'
       run: |
-        mise install ephemeral-postgres
-        echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
-    - name: Verify ephemeralpg installation
-      if: runner.os != 'Windows'
-      run: which pg_tmp
+        mise install ${{ matrix.mise_tools }}
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          echo "$USERPROFILE\\.local\\share\\mise\\shims" >> $GITHUB_PATH
+        else
+          echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
+        fi
+
     - name: Run editorconfig-checker
       run: editorconfig-checker
     - name: Build
@@ -113,20 +118,14 @@ jobs:
       run: make lint-ci
     - name: Run cargo-deny
       run: cargo deny check all
-    - name: Test Butane test helper with ephemeral-postgres
-      if: runner.os != 'Windows'
-      run: cd butane_test_helper && mise exec ephemeral-postgres -- cargo +stable test --all-features
-    - name: Test Butane test helper without ephemeral-postgres
-      if: runner.os == 'Windows'
-      run: cd butane_test_helper && cargo +stable test --all-features
-    - name: Test Core
-      run: cd butane_core && cargo +stable test --all-features
-    - name: Test Codegen
-      run: cd butane_codegen && cargo +stable test --all-features
-    - name: Test CLI
-      run: cd butane_cli && cargo +stable test --all-features
-    - name: Test
-      run: cd butane && cargo +stable test --all-features
+
+    - name: Run tests for default workspace members using mise
+      if: matrix.mise_tools != ''
+      run: mise exec ${{ matrix.mise_tools }} -- cargo +stable test --all-features
+    - name: Run tests for default workspace members without mise
+      if: matrix.mise_tools == ''
+      run: cargo +stable test --all-features
+
     - name: Check example migrations have been updated
       run: |
         set -ex

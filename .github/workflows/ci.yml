@@ -96,7 +96,7 @@ jobs:
     - name: Install tool binaries
       uses: taiki-e/install-action@v2
       with:
-        tool: cargo-deny,editorconfig-checker,mise,typos
+        tool: cargo-deny,cargo-nextest,editorconfig-checker,mise,typos
     - name: Install ephemeral-postgres via mise
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -115,24 +115,13 @@ jobs:
       run: make lint-ci
     - name: Run cargo-deny
       run: cargo deny check all
-    - name: Test Butane test helper with ephemeral-postgres
+    - name: Test with mise tools
       if: runner.os != 'Windows'
-      run: cd butane_test_helper && mise exec ephemeral-postgres -- cargo +stable test --all-features
-    - name: Test Butane test helper without ephemeral-postgres
+      run: ise exec ephemeral-postgres -- cargo +stable nextest run --all-features
+    - name: Test without mise
       if: runner.os == 'Windows'
-      run: cd butane_test_helper && cargo +stable test --all-features
-    - name: Test Core
-      run: cd butane_core && cargo +stable test --all-features
-    - name: Test CLI
-      run: cd butane_cli && cargo +stable test --all-features
-    - name: Test
-      run: cargo +stable test -p butane_tests --all-features
-    - name: Test using trybuild
-      run: cargo +stable test -p trybuild_tests
-    - name: Test doctests
-      run: |
-        cargo +stable test -p butane_codegen --all-features
-        cargo +stable test -p butane --all-features
+      run: cargo +stable nextest run --all-features
+
     - name: Check example migrations have been updated
       run: |
         set -ex
@@ -144,8 +133,8 @@ jobs:
     - name: Run tests in examples
       run: |
         set -ex
-        cargo +stable test -p example --all-features
+        cargo +stable nextest run -p example --all-features
         cd examples
         for dir in *; do
-          cargo +stable test -p $dir --all-features
+          cargo +stable nextest run -p $dir --all-features
         done

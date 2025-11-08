@@ -254,6 +254,9 @@ where
 
         for op in &ops {
             match op {
+                Operation::DisableConstraints | Operation::EnableConstraints => {
+                    // These don't modify tables
+                }
                 Operation::AddTable(table)
                 | Operation::AddTableConstraints(table)
                 | Operation::AddTableIfNotExists(table) => modified_tables.push(table.name.clone()),

@@ -941,6 +941,7 @@ impl BackendRow for TursoRow {
 // Migration SQL generation (reuse SQLite logic since Turso is compatible)
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
+        Operation::DisableConstraints => Ok("PRAGMA defer_foreign_keys = ON;".to_string()),
         Operation::AddTable(tbl) => Ok(create_table(tbl, false)),
         Operation::AddTableIfNotExists(tbl) => Ok(create_table(tbl, true)),
         Operation::RemoveTable(name) => Ok(drop_table(name)),
@@ -954,6 +955,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
             // They must be included when creating the table
             Ok(String::new())
         }
+        Operation::EnableConstraints => Ok("PRAGMA defer_foreign_keys = OFF;".to_string()),
     }
 }
 

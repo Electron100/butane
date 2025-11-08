@@ -1,3 +1,4 @@
+PRAGMA defer_foreign_keys = ON;
 CREATE TABLE Foo__butane_tmp (
 bar INTEGER NOT NULL PRIMARY KEY,
 baz INTEGER NOT NULL PRIMARY KEY
@@ -12,3 +13,4 @@ baz INTEGER NOT NULL
 INSERT INTO Foo__butane_tmp SELECT bar, baz FROM Foo;
 DROP TABLE Foo;
 ALTER TABLE Foo__butane_tmp RENAME TO Foo;
+PRAGMA defer_foreign_keys = OFF;

@@ -34,8 +34,13 @@ mod test_field_type;
 /// * `#[pk]` on a field to specify that it is the primary key.
 /// * `#[unique]` on a field indicates that the field's value must be unique
 ///   (perhaps implemented as the SQL UNIQUE constraint by some backends).
-/// * `#[default]` should be used on fields added by later migrations to avoid errors on existing objects.
-///   Unnecessary if the new field is an `Option<>`
+/// * `#[default]` or `#[default = value]` should be used on fields added by later migrations to avoid errors on existing objects.
+///   - `#[default = value]`: Explicitly specify a default value (e.g., `#[default = false]`, `#[default = "draft"]`)
+///   - `#[serde(default)]`: For fields with primitive types or custom types backed by primitive SQL types,
+///     Butane will automatically infer the appropriate default value for migrations. This works for:
+///     bool, integers, floats, String, Vec<u8>, and custom types that wrap these primitives.
+///   - For custom types not backed by primitives, use an explicit `#[default = value]` instead.
+///   - Unnecessary if the new field is an `Option<>`
 ///
 /// For example
 /// ```ignore

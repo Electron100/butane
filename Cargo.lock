@@ -298,33 +298,10 @@ checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 name = "butane"
 version = "0.8.1"
 dependencies = [
- "butane",
  "butane_codegen",
  "butane_core",
- "butane_test_helper",
- "butane_test_macros",
- "cfg-if",
- "chrono",
  "deadpool",
- "env_logger",
- "fake",
- "geo-types",
- "log",
- "maybe-async-cfg",
- "nonempty",
- "paste",
- "proc-macro2",
- "quote",
  "r2d2",
- "rand 0.9.2",
- "rusqlite",
- "serde",
- "serde_json",
- "sqlparser",
- "tokio",
- "tokio-postgres",
- "tokio-test",
- "uuid",
 ]
 
 [[package]]
@@ -437,6 +414,38 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.108",
+]
+
+[[package]]
+name = "butane_tests"
+version = "0.8.1"
+dependencies = [
+ "butane",
+ "butane_core",
+ "butane_test_helper",
+ "butane_test_macros",
+ "cfg-if",
+ "chrono",
+ "deadpool",
+ "env_logger",
+ "fake",
+ "geo-types",
+ "log",
+ "maybe-async-cfg",
+ "nonempty",
+ "paste",
+ "proc-macro2",
+ "quote",
+ "r2d2",
+ "rand 0.9.2",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sqlparser",
+ "tokio",
+ "tokio-postgres",
+ "tokio-test",
+ "uuid",
 ]
 
 [[package]]

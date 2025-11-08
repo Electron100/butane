@@ -1,8 +1,9 @@
 [tools]
+"cargo:cargo-expand" = "latest"
+"cargo:pep257" = "latest"
+"cargo:timeout-cli" = "latest"
 editorconfig-checker = "latest"
 ephemeral-postgres = "latest"
 osv-scanner = "latest"
 rust = "stable"
-"cargo:pep257" = "latest"
-"cargo:timeout-cli" = "latest"
 typos = "latest"

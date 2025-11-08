@@ -82,7 +82,35 @@ static PATH_MAPPINGS: Map<&'static str, &'static str> = phf_map! {
 const PATH_RESOLVER: PathResolver<&'static Map<&'static str, &'static str>> =
     create_static_resolver(&PATH_MAPPINGS, true);
 
-/// Implementation of `#[butane::model]`.
+/// Core implementation shared by both `#[model]` attribute macro and `#[derive(DataObject)]` derive macro.
+///
+/// Generates the `DataObject` trait implementation and field expression helpers.
+/// Also writes migration information to disk.
+///
+/// Returns a tuple of (trait implementations, field expressions).
+fn dataobject_impl<M>(
+    ast_struct: &ItemStruct,
+    ms: &mut impl MigrationsMut<M = M>,
+) -> (TokenStream2, TokenStream2)
+where
+    M: MigrationMut,
+{
+    let config: dbobj::Config = config_from_attributes(ast_struct);
+    migration::write_table_to_disk(ms, ast_struct, &config).unwrap();
+    let impltraits = dbobj::impl_dbobject(ast_struct, &config);
+    let fieldexprs = dbobj::add_fieldexprs(ast_struct, &config);
+    (impltraits, fieldexprs)
+}
+
+/// Implementation of the `#[model]` attribute macro.
+///
+/// This attribute macro transforms a struct into a database model by:
+/// 1. Generating `DataObject` trait implementations
+/// 2. Generating field expression helpers
+/// 3. Recording migration information
+/// 4. Re-emitting the struct definition with helper attributes removed
+///
+/// The macro accepts helper attributes like `#[table]`, `#[pk]`, `#[unique]`, etc.
 pub fn model_with_migrations<M>(
     input: TokenStream2,
     ms: &mut impl MigrationsMut<M = M>,
@@ -94,17 +122,12 @@ where
     // attributes but proc macro attributes can't yet (nor can they
     // create field attributes)
     let mut ast_struct: ItemStruct = syn::parse2(input).unwrap();
-    let config: dbobj::Config = config_from_attributes(&ast_struct);
 
     // Filter out our helper attributes
     let attrs: Vec<Attribute> = filter_helper_attributes(&ast_struct);
-
     let vis = &ast_struct.vis;
 
-    migration::write_table_to_disk(ms, &ast_struct, &config).unwrap();
-
-    let impltraits = dbobj::impl_dbobject(&ast_struct, &config);
-    let fieldexprs = dbobj::add_fieldexprs(&ast_struct, &config);
+    let (impltraits, fieldexprs) = dataobject_impl(&ast_struct, ms);
 
     let fields: Punctuated<Field, syn::token::Comma> =
         match remove_helper_field_attributes(&mut ast_struct.fields) {
@@ -119,6 +142,31 @@ where
         #vis struct #ident {
             #fields
         }
+        #impltraits
+        #fieldexprs
+    )
+}
+
+/// Implementation of the `#[derive(DataObject)]` derive macro.
+///
+/// This derive macro generates the same `DataObject` trait implementations and helpers
+/// as the `#[model]` attribute macro, but follows derive macro conventions:
+/// - Only generates additional code (trait impls, helpers)
+/// - Does NOT re-emit the struct definition
+/// - Requires the struct to already exist with all fields defined
+///
+/// Functionally equivalent to `#[model]` but with derive syntax.
+pub fn derive_dataobject_with_migrations<M>(
+    input: TokenStream2,
+    ms: &mut impl MigrationsMut<M = M>,
+) -> TokenStream2
+where
+    M: MigrationMut,
+{
+    let ast_struct: ItemStruct = syn::parse2(input).unwrap();
+    let (impltraits, fieldexprs) = dataobject_impl(&ast_struct, ms);
+
+    quote!(
         #impltraits
         #fieldexprs
     )

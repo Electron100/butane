@@ -43,6 +43,24 @@ struct Post {
 }
 ```
 
+Alternatively, you can use the `#[derive(DataObject)]` syntax:
+
+``` rust
+#[derive(DataObject, Default)]
+struct Post {
+    id: AutoPk<i32>,
+    title: String,
+    body: String,
+    published: bool,
+    likes: i32,
+    tags: Many<Tag>,
+    blog: ForeignKey<Blog>,
+    byline: Option<String>,
+}
+```
+
+Both syntaxes are functionally equivalent.
+
 An _object_ is an instance of a _model_. An object is created like a
 normal struct instance, but must be saved in order to be persisted.
 

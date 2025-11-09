@@ -59,6 +59,47 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
     codegen::model_with_migrations(input.into(), &mut migrations_for_dir()).into()
 }
 
+/// Derive macro which marks a struct as being a data model.
+///
+/// It generates an implementation of [`DataObject`](butane_core::DataObject).
+///
+/// This is functionally equivalent to the `#[model]` attribute macro and can be
+/// used interchangeably. Use `#[derive(DataObject)]` when you prefer the derive syntax
+/// or are already using other derive macros on your struct.
+///
+/// ## Restrictions on model types:
+/// 1. The type of each field must implement [`FieldType`] or be [`Many`].
+/// 2. There must be a primary key field. This must be either annotated with a `#[pk]` attribute or named `id`.
+///
+/// ## Helper Attributes
+/// * `#[table = "NAME"]` used on the struct to specify the name of the table (defaults to struct name)
+/// * `#[pk]` on a field to specify that it is the primary key.
+/// * `#[unique]` on a field indicates that the field's value must be unique
+///   (perhaps implemented as the SQL UNIQUE constraint by some backends).
+/// * `#[default]` should be used on fields added by later migrations to avoid errors on existing objects.
+///   Unnecessary if the new field is an `Option<>`
+///
+/// For example
+/// ```ignore
+/// #[derive(DataObject, Debug)]
+/// #[table = "posts"]
+/// pub struct Post {
+///   #[pk] // unnecessary if identifier were named id instead
+///   pub identifier: AutoPk<i32>,
+///   pub title: String,
+///   pub content: String,
+///   #[default = false]
+///   pub published: bool,
+/// }
+/// ```
+///
+/// [`FieldType`]: crate::FieldType
+/// [`Many`]: butane_core::many::Many
+#[proc_macro_derive(DataObject, attributes(table, pk, unique, default, auto))]
+pub fn derive_data_object(input: TokenStream) -> TokenStream {
+    codegen::derive_dataobject_with_migrations(input.into(), &mut migrations_for_dir()).into()
+}
+
 /// Attribute macro which generates an implementation of
 /// [`DataResult`](butane_core::DataResult). Continuing with our blog
 /// post example from [model](macro@model), we could create a `DataResult` with

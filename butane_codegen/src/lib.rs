@@ -95,7 +95,7 @@ pub fn model(_args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// [`FieldType`]: crate::FieldType
 /// [`Many`]: butane_core::many::Many
-#[proc_macro_derive(DataObject, attributes(table, pk, unique, default, auto))]
+#[proc_macro_derive(DataObject, attributes(table, pk, unique, default))]
 pub fn derive_data_object(input: TokenStream) -> TokenStream {
     codegen::derive_dataobject_with_migrations(input.into(), &mut migrations_for_dir()).into()
 }

@@ -1,7 +1,7 @@
 use butane::FieldType;
 
 #[derive(FieldType)]
-pub enum Status {
+enum Status {
     Draft,
     Published,
     Archived,

@@ -1,4 +1,3 @@
-
 [package]
 name = "trybuild_tests"
 edition.workspace = true

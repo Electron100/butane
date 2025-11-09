@@ -7,6 +7,7 @@ butane.code_workspace.code-workspace
 .vscode/tasks.json
 butane_codegen/.butane
 butane/tests/.butane
+trybuild_tests/tests/Cargo.toml
 db.sqlite
 tmp_pg
 *.db

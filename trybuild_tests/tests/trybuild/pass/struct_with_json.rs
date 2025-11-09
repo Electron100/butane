@@ -2,9 +2,9 @@ use butane::FieldType;
 use serde::{Deserialize,Serialize};
 
 #[derive(Deserialize, FieldType, Serialize)]
-pub struct Metadata {
-    pub title: String,
-    pub version: i32,
+struct Metadata {
+    title: String,
+    version: i32,
 }
 
 fn main() {}

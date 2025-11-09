@@ -1,6 +1,6 @@
 use butane::FieldType;
 
 #[derive(FieldType)]
-pub struct Name(pub String);
+struct Name(String);
 
 fn main() {}

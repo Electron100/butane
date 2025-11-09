@@ -46,3 +46,7 @@ indent_style = unset
 [HELP.md]
 max_line_length = 400
 trim_trailing_whitespace = false
+
+[*.stderr]
+indent_size = unset
+max_line_length = unset

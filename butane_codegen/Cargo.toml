@@ -24,3 +24,5 @@ syn = { workspace = true }
 
 [lib]
 proc-macro = true
+# `cargo nextest run` without any `-p` fails when `test = true`.
+test = false

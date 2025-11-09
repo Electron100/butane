@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/trybuild/fail/dataresult_tuple_struct.rs:4:1
+  |
+4 | #[dataresult(Post)]
+  | ^^^^^^^^^^^^^^^^^^^
+  |
+  = help: message: called `Option::unwrap()` on a `None` value

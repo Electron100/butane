@@ -1,0 +1,7 @@
+error: No SqlType value with the given name
+ --> tests/trybuild/fail/butane_type_custom_no_name.rs:4:1
+  |
+4 | #[butane_type(Custom)]
+  | ^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `butane_type` (in Nightly builds, run with -Z macro-backtrace for more info)

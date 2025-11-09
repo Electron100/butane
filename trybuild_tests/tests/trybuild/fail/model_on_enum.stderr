@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/trybuild/fail/model_on_enum.rs:4:1
+  |
+4 | #[model]
+  | ^^^^^^^^
+  |
+  = help: message: called `Result::unwrap()` on an `Err` value: Error("expected `struct`")

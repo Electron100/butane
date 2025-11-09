@@ -1,0 +1,7 @@
+error: Unexpected binary expression as parameter to like
+  --> tests/trybuild/fail/filter_like_invalid_param.rs:11:14
+   |
+11 |     let _f = filter!(Post, title.like(1 + 2));
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `filter` (in Nightly builds, run with -Z macro-backtrace for more info)

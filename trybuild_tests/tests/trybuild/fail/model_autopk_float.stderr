@@ -1,0 +1,5 @@
+error: Auto is only supported for integer types
+ --> tests/trybuild/fail/model_autopk_float.rs:6:5
+  |
+6 |     #[pk]
+  |     ^

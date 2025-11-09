@@ -1,0 +1,5 @@
+error: Auto is only supported for integer types
+ --> tests/trybuild/fail/model_auto_non_integer.rs:6:5
+  |
+6 |     #[pk]
+  |     ^

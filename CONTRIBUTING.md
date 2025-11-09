@@ -94,9 +94,17 @@ cargo test
 Run tests for a specific package:
 
 ```bash
-cargo test -p butane
 cargo test -p butane_core
+cargo test -p butane  # doctests only
+cargo test -p butane_tests
+cargo test -p trybuild_tests
 ```
+
+There is a cyclic test dependency between `butane_test_helper` and `butane_core`.
+
+`butane_test_helper` uses `butane_core` in its library.
+
+`butane_core` uses `butane_test_helper` in its tests.
 
 ## Code Quality
 

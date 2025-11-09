@@ -28,6 +28,7 @@ path = "common/mod.rs"
 
 [dependencies]
 butane = { workspace = true }
+butane_codegen.workspace = true
 butane_core = { workspace = true }
 butane_test_helper = { workspace = true, default-features = false, features = ["pg", "sqlite", "turso"] }
 butane_test_macros = { workspace = true }

@@ -121,12 +121,12 @@ jobs:
       run: cd butane_test_helper && cargo +stable test --all-features
     - name: Test Core
       run: cd butane_core && cargo +stable test --all-features
-    - name: Test Codegen
-      run: cd butane_codegen && cargo +stable test --all-features
     - name: Test CLI
       run: cd butane_cli && cargo +stable test --all-features
     - name: Test
       run: cargo +stable test -p butane_tests --all-features
+    - name: Test using trybuild
+      run: cargo +stable test -p trybuild_tests
     - name: Check example migrations have been updated
       run: |
         set -ex

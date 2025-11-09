@@ -127,6 +127,10 @@ jobs:
       run: cargo +stable test -p butane_tests --all-features
     - name: Test using trybuild
       run: cargo +stable test -p trybuild_tests
+    - name: Test doctests
+      run: |
+        cargo +stable test -p butane_codegen --all-features
+        cargo +stable test -p butane --all-features
     - name: Check example migrations have been updated
       run: |
         set -ex

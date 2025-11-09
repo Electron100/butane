@@ -70,6 +70,11 @@ path = "custom_type.rs"
 required-features = ["async"]
 
 [[test]]
+name = "derive_model"
+path = "derive_model.rs"
+required-features = ["async"]
+
+[[test]]
 name = "fake"
 path = "fake.rs"
 required-features = ["fake"]

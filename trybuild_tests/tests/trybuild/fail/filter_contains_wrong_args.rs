@@ -4,10 +4,10 @@ use butane::{filter, model};
 struct Post {
     id: i64,
     title: String,
-    tags: Vec<String>,
+    tags: Vec<u8>,
 }
 
 fn main() {
     // This should fail - contains expects exactly one argument
-    let _f = filter!(Post, tags.contains("a", "b"));
+    let _f = filter!(Post, tags.contains(1, 2));
 }

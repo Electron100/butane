@@ -1,11 +1,11 @@
 use butane::model;
 
-// This should fail - Vec of non-Many type
+// Vec<u8> is supported for BLOB data
 #[model]
 struct Post {
     #[pk]
     id: i64,
-    tags: Vec<String>,
+    tags: Vec<u8>,
 }
 
 fn main() {}

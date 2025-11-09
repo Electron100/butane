@@ -421,7 +421,6 @@ name = "butane_tests"
 version = "0.8.1"
 dependencies = [
  "butane",
- "butane_codegen",
  "butane_core",
  "butane_test_helper",
  "butane_test_macros",

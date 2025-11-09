@@ -1,5 +1,0 @@
-error: expected one of `!`, `(`, `)`, `+`, `,`, `::`, or `<`, found `:`
- --> tests/trybuild/fail/fieldtype_hybrid_tuple.rs:6:24
-  |
-6 | struct Hybrid(i32, name: String);
-  |                        ^ expected one of 7 possible tokens

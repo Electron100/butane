@@ -1,4 +1,4 @@
-//! Test that #[derive(DataObject)] works the same as #[model]
+//! Test that `#[derive(DataObject)]` works the same as #[model].
 
 use butane::db::ConnectionAsync;
 use butane::{query, AutoPk, DataObject};

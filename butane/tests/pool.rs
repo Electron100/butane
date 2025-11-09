@@ -2,7 +2,6 @@
 use butane::db::ConnectionManager;
 use butane_test_helper::*;
 #[cfg(any(feature = "pg", feature = "sqlite"))]
-#[cfg(any(feature = "pg", feature = "sqlite"))]
 use r2d2;
 use std::ops::DerefMut;
 

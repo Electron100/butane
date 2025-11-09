@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "butane",
+  "butane/tests",
   "butane_cli",
   "butane_codegen",
   "butane_core",

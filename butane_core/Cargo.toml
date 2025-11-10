@@ -11,19 +11,22 @@ rust-version.workspace = true
 
 [features]
 default = ["fs"]
-async-adapter = ["async", "crossbeam-channel"]
+async-adapter = ["crossbeam-channel"]
 async = ["tokio"]
-datetime = ["chrono", "tokio-postgres?/with-chrono-0_4"]
+datetime = ["chrono", "tokio-postgres?/with-chrono-0_4", "turso_core?/time"]
 debug = ["log"]
 fake = ["dep:fake", "rand"]
 fs = ["dep:fs2"]
-json = ["tokio-postgres?/with-serde_json-1", "rusqlite?/serde_json"]
+json = ["tokio-postgres?/with-serde_json-1", "rusqlite?/serde_json", "turso_core?/json"]
 log = ["dep:log", "rusqlite?/trace"]
 pg = ["async", "bytes", "tokio-postgres"]
+rusqlite = ["dep:rusqlite"]
 sqlite = ["rusqlite"]
 sqlite-bundled = ["rusqlite/bundled"]
 tls = ["native-tls", "postgres-native-tls"]
-turso = ["async", "dep:turso"]
+turso = ["dep:turso_core"]
+turso-async = ["turso", "async", "async-adapter"]
+uuid = ["dep:uuid"]
 
 [dependencies]
 async-trait = { workspace = true}
@@ -58,7 +61,7 @@ serde_json = { workspace = true }
 sqlparser = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
-turso = { workspace = true, optional = true }
+turso_core = { workspace = true, optional = true, features = ["serde", "fs", "uuid"] }
 url.workspace = true
 uuid = { workspace = true, optional = true }
 

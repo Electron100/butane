@@ -885,7 +885,12 @@ pub fn sql_insert_or_update(table: &str, columns: &[Column], pkcol: &Column, w: 
         ", "
     });
     write!(w, ")").unwrap();
-    write!(w, " ON CONFLICT ({}) DO ", pkcol.name()).unwrap();
+    write!(
+        w,
+        " ON CONFLICT ({}) DO ",
+        helper::quote_reserved_word(pkcol.name())
+    )
+    .unwrap();
     if columns.len() > 1 {
         write!(w, "UPDATE SET (").unwrap();
         helper::list_columns(columns, w);

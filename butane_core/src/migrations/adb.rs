@@ -267,6 +267,9 @@ impl ADB {
     pub fn transform_with(&mut self, op: Operation) {
         use Operation::*;
         match op {
+            DisableConstraints => {
+                // No-op for ADB transformation
+            }
             AddTable(table) => {
                 self.tables.insert(table.name.clone(), table);
             }
@@ -290,6 +293,9 @@ impl ADB {
                 if let Some(t) = self.tables.get_mut(&table) {
                     t.replace_column(new);
                 }
+            }
+            EnableConstraints => {
+                // No-op for ADB transformation
             }
         }
     }
@@ -584,6 +590,9 @@ pub fn create_many_table(
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum Operation {
     //future improvement: support column renames
+    /// Disable constraint enforcement before migration operations.
+    /// Used when operations require temporarily disabling foreign key checks or other constraints.
+    DisableConstraints,
     /// Add a table.
     AddTable(ATable),
     /// Add a table, if it doesnt already exist.
@@ -600,6 +609,9 @@ pub enum Operation {
     ChangeColumn(String, AColumn, AColumn),
     /// Add table constraints referring to other tables, if the backend supports it.
     AddTableConstraints(ATable),
+    /// Re-enable constraint enforcement after migration operations.
+    /// Paired with DisableConstraints to restore normal constraint checking.
+    EnableConstraints,
 }
 
 /// Determine the operations necessary to move the database schema from `old` to `new`.
@@ -607,6 +619,12 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
     let mut ops: Vec<Operation> = Vec::new();
     let new_names: BTreeSet<&String> = new.tables.keys().collect();
     let old_names: BTreeSet<&String> = old.tables.keys().collect();
+
+    // Check if we need to disable constraints
+    let needs_constraint_deferral = will_need_constraint_deferral(old, new);
+    if needs_constraint_deferral {
+        ops.push(Operation::DisableConstraints);
+    }
 
     // Add new tables
     let new_tables = new_names.difference(&old_names);
@@ -643,7 +661,50 @@ pub fn diff(old: &ADB, new: &ADB) -> Vec<Operation> {
             ops.push(Operation::AddTableConstraints(table.clone()));
         }
     }
+
+    // Re-enable constraints if we disabled them
+    if needs_constraint_deferral {
+        ops.push(Operation::EnableConstraints);
+    }
+
     ops
+}
+
+/// Check if any operations will require constraint deferral.
+fn will_need_constraint_deferral(old: &ADB, new: &ADB) -> bool {
+    let new_names: BTreeSet<&String> = new.tables.keys().collect();
+    let old_names: BTreeSet<&String> = old.tables.keys().collect();
+
+    // Check if any existing tables will have column changes
+    for table_name in new_names.intersection(&old_names) {
+        let table_name: &str = table_name.as_ref();
+        let old_table = old.tables.get(table_name).expect("no table");
+        let new_table = new.tables.get(table_name).expect("no table");
+
+        let new_col_names: BTreeSet<&String> = new_table.columns.iter().map(|c| &c.name).collect();
+        let old_col_names: BTreeSet<&String> = old_table.columns.iter().map(|c| &c.name).collect();
+
+        // Check for column removals with foreign keys
+        for removed_col_name in old_col_names.difference(&new_col_names) {
+            if let Some(col) = col_by_name(&old_table.columns, removed_col_name) {
+                if col.reference.is_some() {
+                    return true;
+                }
+            }
+        }
+
+        // Check for column changes
+        for col_name in new_col_names.intersection(&old_col_names) {
+            let col_name: &str = col_name.as_ref();
+            let old_col = col_by_name(&old_table.columns, col_name).expect("no column");
+            let new_col = col_by_name(&new_table.columns, col_name).expect("no column");
+            if old_col != new_col {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 fn col_by_name<'a>(columns: &'a [AColumn], name: &str) -> Option<&'a AColumn> {

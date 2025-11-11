@@ -587,6 +587,7 @@ where
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
+        Operation::DisableConstraints => Ok("".to_string()), // PostgreSQL doesn't need this
         Operation::AddTable(table) => Ok(create_table(table, false)?),
         Operation::AddTableConstraints(table) => Ok(create_table_fkey_constraints(table)),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)?),
@@ -607,6 +608,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
                 Ok(String::new())
             }
         }
+        Operation::EnableConstraints => Ok("".to_string()), // PostgreSQL doesn't need this
     }
 }
 

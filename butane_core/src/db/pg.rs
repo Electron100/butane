@@ -882,13 +882,24 @@ pub fn sql_insert_or_replace_with_placeholders(
         n + 1
     });
     write!(w, ")").unwrap();
-    write!(w, " ON CONFLICT ({}) DO ", pkcol.name()).unwrap();
+    write!(
+        w,
+        " ON CONFLICT ({}) DO ",
+        helper::quote_reserved_word(pkcol.name())
+    )
+    .unwrap();
     if columns.len() > 1 {
         write!(w, "UPDATE SET (").unwrap();
         helper::list_columns(columns, w);
         write!(w, ") = (").unwrap();
         columns.iter().fold("", |sep, c| {
-            write!(w, "{}excluded.{}", sep, c.name()).unwrap();
+            write!(
+                w,
+                "{}excluded.{}",
+                sep,
+                helper::quote_reserved_word(c.name())
+            )
+            .unwrap();
             ", "
         });
         write!(w, ")").unwrap();

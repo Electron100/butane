@@ -866,6 +866,7 @@ fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String>
     Ok(result)
 }
 
+/// Write SQL that performs an insert or update.
 pub fn sql_insert_or_replace_with_placeholders(
     table: &str,
     columns: &[Column],

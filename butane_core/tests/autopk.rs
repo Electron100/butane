@@ -127,8 +127,7 @@ async fn reserved_word(conn: ConnectionAsync) {
 
     conn.execute(&create_sql).await.unwrap();
 
-    // Now test insert_or_replace which uses sql_insert_or_update internally
-    // This should properly quote the "order" column in the ON CONFLICT clause
+    // Now test insert_or_replace which should properly quote the "order" column in the ON CONFLICT clause
     let columns = [pkcol.clone(), bar_column.clone()];
     let values = [SqlValRef::BigInt(1), SqlValRef::Text("first")];
 

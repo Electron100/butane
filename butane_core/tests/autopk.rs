@@ -143,12 +143,21 @@ async fn reserved_word(conn: ConnectionAsync) {
         .await
         .unwrap();
 
-    // Verify only one row exists
-    let _result = conn
-        .execute("SELECT COUNT(*) FROM reserved_pkey_test")
+    // Verify only one row exists after the upsert.
+    // TODO: There is a bug in turso that fails when using COUNT(anything) on this table.
+    let query_columns = [pkcol.clone(), bar_column.clone()];
+    let mut result = conn
+        .query("reserved_pkey_test", &query_columns, None, None, None, None)
         .await
         .unwrap();
 
-    // The test passes if we get here without SQL syntax errors
-    // The bug would cause a syntax error like "near ORDER: syntax error"
+    let mut count = 0;
+    while result.next().unwrap().is_some() {
+        count += 1;
+    }
+    assert_eq!(
+        count, 1,
+        "Expected exactly 1 row after upsert, found {}",
+        count
+    );
 }

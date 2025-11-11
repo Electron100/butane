@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/trybuild/fail/model_tuple_struct.rs:4:1
+  |
+4 | #[model]
+  | ^^^^^^^^
+  |
+  = help: message: No primary key found. Expected 'id' field or field with #[pk] attribute.

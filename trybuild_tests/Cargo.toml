@@ -1,0 +1,26 @@
+# This project member only contains tests that built using `trybuild`.
+# These tests allow snapshotting of compiler errors and warnings to ensure that
+# incorrect usage of macros fails as expected, and provides useful error messages.
+# See the README.md in this directory for more information.
+[package]
+name = "trybuild_tests"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+rust-version.workspace = true
+autobenches = false
+autobins = false
+autoexamples = false
+
+[lib]
+doctest = false
+test = false
+
+[dependencies]
+
+[dev-dependencies]
+butane.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+trybuild = "1.0"

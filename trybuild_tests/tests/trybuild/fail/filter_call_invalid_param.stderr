@@ -1,0 +1,7 @@
+error: Unexpected call expression as parameter to like
+  --> tests/trybuild/fail/filter_call_invalid_param.rs:11:14
+   |
+11 |     let _f = filter!(Post, title.like(some_function()));
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `filter` (in Nightly builds, run with -Z macro-backtrace for more info)

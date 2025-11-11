@@ -1,0 +1,5 @@
+error: expected one argument to 'contains'
+  --> tests/trybuild/fail/filter_contains_wrong_args.rs:12:28
+   |
+12 |     let _f = filter!(Post, tags.contains(1, 2));
+   |                            ^^^^

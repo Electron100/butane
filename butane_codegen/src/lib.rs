@@ -17,8 +17,8 @@ use syn::{Expr, Ident};
 
 mod filter;
 
-#[cfg(test)]
-mod test_field_type;
+// Note: butane_codegen is a proc-macro crate and cannot have unit tests
+// Tests for derive macros should be in butane_core or integration tests
 
 /// Attribute macro which marks a struct as being a data model and
 /// generates an implementation of [`DataObject`](butane_core::DataObject). This

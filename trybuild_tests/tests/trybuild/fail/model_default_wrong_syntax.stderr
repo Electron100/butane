@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/trybuild/fail/model_default_wrong_syntax.rs:4:1
+  |
+4 | #[model]
+  | ^^^^^^^^
+  |
+  = help: message: Malformed default attribute: CompilerErrorMsg { ts: TokenStream [Ident { ident: "compile_error", span: #6 bytes(86..94) }, Punct { ch: '!', spacing: Alone, span: #6 bytes(86..94) }, Group { delimiter: Parenthesis, stream: TokenStream [Literal { kind: Str, symbol: "malformed default value", suffix: None, span: #6 bytes(86..94) }], span: #6 bytes(86..94) }] }

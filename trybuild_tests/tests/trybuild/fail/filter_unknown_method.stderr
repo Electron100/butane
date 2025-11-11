@@ -1,0 +1,7 @@
+error: Unknown method call starts_with
+  --> tests/trybuild/fail/filter_unknown_method.rs:11:14
+   |
+11 |     let _f = filter!(Post, title.starts_with("test"));
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `filter` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,0 +1,7 @@
+error: The #[butane_type] macro wasn't expected to be used here
+ --> tests/trybuild/fail/butane_type_on_impl.rs:4:1
+  |
+4 | #[butane_type(Text)]
+  | ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `butane_type` (in Nightly builds, run with -Z macro-backtrace for more info)

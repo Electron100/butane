@@ -1,0 +1,15 @@
+error[E0107]: missing generics for struct `Many`
+ --> tests/trybuild/fail/model_many_no_type.rs:8:11
+  |
+8 |     tags: Many,
+  |           ^^^^ expected 1 generic argument
+  |
+note: struct defined here, with 1 generic parameter: `T`
+ --> $WORKSPACE/butane_core/src/many.rs
+  |
+  | pub struct Many<T>
+  |            ^^^^ -
+help: add missing generic argument
+  |
+8 |     tags: Many<T>,
+  |               +++

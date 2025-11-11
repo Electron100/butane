@@ -1,0 +1,14 @@
+error[E0004]: non-exhaustive patterns: type `&EmptyEnum` is non-empty
+ --> tests/trybuild/fail/fieldtype_empty_enum.rs:4:10
+  |
+4 | #[derive(FieldType)]
+  |          ^^^^^^^^^
+  |
+note: `EmptyEnum` defined here
+ --> tests/trybuild/fail/fieldtype_empty_enum.rs:5:6
+  |
+5 | enum EmptyEnum {}
+  |      ^^^^^^^^^
+  = note: the matched value is of type `&EmptyEnum`
+  = note: references are always considered inhabited
+  = note: this error originates in the derive macro `FieldType` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,0 +1,7 @@
+error: Unsupported binary operator
+  --> tests/trybuild/fail/filter_unsupported_operator.rs:11:14
+   |
+11 |     let _f = filter!(Post, title ^ "test");
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `filter` (in Nightly builds, run with -Z macro-backtrace for more info)

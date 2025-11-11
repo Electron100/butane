@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/trybuild/fail/model_unit.rs:5:1
+  |
+5 | #[model]
+  | ^^^^^^^^
+  |
+  = help: message: No primary key found. Expected 'id' field or field with #[pk] attribute.

@@ -1,0 +1,8 @@
+error: Unsupported filter expression 'loop { break true; }'
+       debug info: Expr::Loop { attrs: [], label: None, loop_token: Loop, body: Block { brace_token: Brace, stmts: [Stmt::Expr(Expr::Break { attrs: [], break_token: Break, label: None, expr: Some(Expr::Lit { attrs: [], lit: Lit::Bool { value: true } }) }, Some(Semi))] } }
+  --> tests/trybuild/fail/filter_unsupported_expression.rs:11:14
+   |
+11 |     let _f = filter!(Post, loop { break true; });
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `filter` (in Nightly builds, run with -Z macro-backtrace for more info)

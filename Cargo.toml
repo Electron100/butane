@@ -14,6 +14,7 @@ members = [
   "examples/getting_started",
   "examples/getting_started_async",
   "examples/reserved-words",
+  "trybuild_tests",
 ]
 
 [workspace.package]

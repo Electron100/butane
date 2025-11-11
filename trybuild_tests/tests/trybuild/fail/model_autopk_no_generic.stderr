@@ -1,0 +1,15 @@
+error[E0107]: missing generics for struct `AutoPk`
+ --> tests/trybuild/fail/model_autopk_no_generic.rs:7:9
+  |
+7 |     id: AutoPk,
+  |         ^^^^^^ expected 1 generic argument
+  |
+note: struct defined here, with 1 generic parameter: `T`
+ --> $WORKSPACE/butane_core/src/autopk.rs
+  |
+  | pub struct AutoPk<T: PrimaryKeyType> {
+  |            ^^^^^^ -
+help: add missing generic argument
+  |
+7 |     id: AutoPk<T>,
+  |               +++

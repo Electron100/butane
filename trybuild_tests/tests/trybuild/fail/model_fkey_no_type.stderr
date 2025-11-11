@@ -1,0 +1,15 @@
+error[E0107]: missing generics for struct `ForeignKey`
+ --> tests/trybuild/fail/model_fkey_no_type.rs:8:11
+  |
+8 |     blog: ForeignKey,
+  |           ^^^^^^^^^^ expected 1 generic argument
+  |
+note: struct defined here, with 1 generic parameter: `T`
+ --> $WORKSPACE/butane_core/src/fkey.rs
+  |
+  | pub struct ForeignKey<T>
+  |            ^^^^^^^^^^ -
+help: add missing generic argument
+  |
+8 |     blog: ForeignKey<T>,
+  |                     +++

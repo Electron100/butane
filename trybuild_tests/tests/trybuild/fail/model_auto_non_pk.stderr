@@ -1,0 +1,21 @@
+error: macros that expand to items must be delimited with braces or followed by a semicolon
+ --> tests/trybuild/fail/model_auto_non_pk.rs:9:5
+  |
+9 |     version: AutoPk<i32>,
+  |     ^^^^^^^
+  |
+help: change the delimiters to curly braces
+  |
+9 -     version: AutoPk<i32>,
+9 +     {}: AutoPk<i32>,
+  |
+help: add a semicolon
+  |
+9 |     version;: AutoPk<i32>,
+  |            +
+
+error: Auto is currently only supported for the primary key
+ --> tests/trybuild/fail/model_auto_non_pk.rs:9:5
+  |
+9 |     version: AutoPk<i32>,
+  |     ^^^^^^^

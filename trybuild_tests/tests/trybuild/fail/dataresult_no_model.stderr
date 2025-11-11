@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/trybuild/fail/dataresult_no_model.rs:4:1
+  |
+4 | #[dataresult]
+  | ^^^^^^^^^^^^^
+  |
+  = help: message: Model type must be specified as argument to dataresult attribute: Error("unexpected end of input, expected identifier")

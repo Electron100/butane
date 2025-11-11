@@ -1,0 +1,7 @@
+error: Expected butane_type(sqltype)
+ --> tests/trybuild/fail/butane_type_no_args.rs:4:1
+  |
+4 | #[butane_type]
+  | ^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `butane_type` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,0 +1,7 @@
+error: Expected filter!(Type, expression)
+  --> tests/trybuild/fail/filter_missing_expression.rs:11:14
+   |
+11 |     let _f = filter!(Post);
+   |              ^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `filter` (in Nightly builds, run with -Z macro-backtrace for more info)

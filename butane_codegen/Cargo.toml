@@ -24,3 +24,7 @@ syn = { workspace = true }
 
 [lib]
 proc-macro = true
+# When `cargo test` & `cargo nextest run` are run at the top of the workspace,
+# they fail if `test = true` here.
+# See https://github.com/Electron100/butane/issues/419
+test = false

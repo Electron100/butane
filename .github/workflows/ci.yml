@@ -117,7 +117,7 @@ jobs:
       run: cargo deny check all
     - name: Test with mise tools
       if: runner.os != 'Windows'
-      run: ise exec ephemeral-postgres -- cargo +stable nextest run --all-features
+      run: mise exec ephemeral-postgres -- cargo +stable nextest run --all-features
     - name: Test without mise
       if: runner.os == 'Windows'
       run: cargo +stable nextest run --all-features

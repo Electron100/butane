@@ -91,6 +91,12 @@ Run all tests:
 cargo test
 ```
 
+It is also recommended to use cargo-nextest which provides many benefits, especially when running all tests:
+
+```bash
+cargo nextest run
+```
+
 Run tests for a specific package:
 
 ```bash

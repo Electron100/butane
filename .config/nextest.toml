@@ -33,7 +33,7 @@ filter = 'package(butane_cli)'
 priority = 60
 
 [[profile.default.overrides]]
-filter = 'package(butane) and not package(butane_cli) and not package(butane_core) and not package(butane_codegen) and not package(butane_test_helper) and not package(butane_test_macros)'
+filter = 'package(butane_tests)'
 priority = 40
 
 [[profile.default.overrides]]

@@ -120,7 +120,7 @@ jobs:
       run: mise exec ephemeral-postgres -- cargo +stable nextest run --all-features --no-fail-fast
     - name: Test without mise
       if: runner.os == 'Windows'
-      run: cargo +stable nextest run --all-features --no-fail-fast --verbose --cargo-verbose --workspace
+      run: cargo +stable test --all-features
 
     - name: Test doctests
       run: |

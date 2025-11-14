@@ -8,10 +8,6 @@
 # Default filter runs all tests on non-Windows platforms
 default-filter = 'all()'
 
-[profile.ci]
-# Default filter runs all tests on non-Windows platforms
-default-filter = 'all()'
-
 # Platform-specific override to exclude butane_codegen on Windows
 [[profile.default.overrides]]
 platform = "cfg(windows)"
@@ -23,12 +19,48 @@ platform = "cfg(macos)"
 filter = 'test(cleanup_on_drop)'
 retries = 3
 
-[[profile.ci.overrides]]
-platform = "cfg(windows)"
-default-filter = 'not package(butane_codegen)'
+# Test priority configuration - run tests in order of importance
+[[profile.default.overrides]]
+filter = 'package(butane_test_helper)'
+priority = 100
 
-# Retry flaky test on macOS
-[[profile.ci.overrides]]
-platform = "cfg(macos)"
-filter = 'test(cleanup_on_drop)'
-retries = 3
+[[profile.default.overrides]]
+filter = 'package(butane_core)'
+priority = 80
+
+[[profile.default.overrides]]
+filter = 'package(butane_cli)'
+priority = 60
+
+[[profile.default.overrides]]
+filter = 'package(butane) and not package(butane_cli) and not package(butane_core) and not package(butane_codegen) and not package(butane_test_helper) and not package(butane_test_macros)'
+priority = 40
+
+[[profile.default.overrides]]
+filter = 'package(trybuild_tests)'
+priority = 20
+
+# Example packages - all at same priority level
+[[profile.default.overrides]]
+filter = 'package(example)'
+priority = 10
+
+[[profile.default.overrides]]
+filter = 'package(custom_pg)'
+priority = 10
+
+[[profile.default.overrides]]
+filter = 'package(newtype)'
+priority = 10
+
+[[profile.default.overrides]]
+filter = 'package(getting_started)'
+priority = 10
+
+[[profile.default.overrides]]
+filter = 'package(getting_started_async)'
+priority = 10
+
+[[profile.default.overrides]]
+filter = 'package(reserved-words)'
+priority = 10

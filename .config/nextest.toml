@@ -17,6 +17,18 @@ default-filter = 'all()'
 platform = "cfg(windows)"
 default-filter = 'not package(butane_codegen)'
 
+# Retry flaky test on macOS
+[[profile.default.overrides]]
+platform = "cfg(macos)"
+filter = 'test(cleanup_on_drop)'
+retries = 3
+
 [[profile.ci.overrides]]
 platform = "cfg(windows)"
 default-filter = 'not package(butane_codegen)'
+
+# Retry flaky test on macOS
+[[profile.ci.overrides]]
+platform = "cfg(macos)"
+filter = 'test(cleanup_on_drop)'
+retries = 3

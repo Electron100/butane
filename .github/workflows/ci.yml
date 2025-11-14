@@ -87,10 +87,12 @@ jobs:
       with:
         toolchain: nightly
         components: rustfmt
-    - name: Add Rust nightly toolchain
+        cache: false
+    - name: Add Rust stable toolchain
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
         toolchain: stable
+        cache-workspaces: ". -> target"
     - name: Install tool binaries
       uses: taiki-e/install-action@v2
       with:

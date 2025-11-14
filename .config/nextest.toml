@@ -1,0 +1,22 @@
+# Skip testing the butane_codegen workspace member on Windows only.
+# It is a proc-macro crate that has test = false in its Cargo.toml
+# due to issues with workspace-level testing
+# See [issue #419](https://github.com/Electron100/butane/issues/419)
+# and PR [#420](https://github.com/Electron100/butane/pull/420).
+
+[profile.default]
+# Default filter runs all tests on non-Windows platforms
+default-filter = 'all()'
+
+[profile.ci]
+# Default filter runs all tests on non-Windows platforms
+default-filter = 'all()'
+
+# Platform-specific override to exclude butane_codegen on Windows
+[[profile.default.overrides]]
+platform = "cfg(windows)"
+default-filter = 'not package(butane_codegen)'
+
+[[profile.ci.overrides]]
+platform = "cfg(windows)"
+default-filter = 'not package(butane_codegen)'

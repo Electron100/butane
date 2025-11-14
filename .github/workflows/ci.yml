@@ -117,10 +117,15 @@ jobs:
       run: cargo deny check all
     - name: Test with mise tools
       if: runner.os != 'Windows'
-      run: mise exec ephemeral-postgres -- cargo +stable nextest run --all-features
+      run: mise exec ephemeral-postgres -- cargo +stable nextest run --all-features --no-fail-fast
     - name: Test without mise
       if: runner.os == 'Windows'
-      run: cargo +stable nextest run --all-features
+      run: cargo +stable nextest run --all-features --no-fail-fast
+
+    - name: Test doctests
+      run: |
+        cargo +stable test -p butane_codegen --doc
+        cargo +stable test -p butane --doc --features async
 
     - name: Check example migrations have been updated
       run: |

@@ -10,12 +10,12 @@ default-filter = 'all()'
 
 # Platform-specific override to exclude butane_codegen on Windows
 [[profile.default.overrides]]
-platform = "cfg(windows)"
+platform = 'cfg(target_os = "windows")'
 default-filter = 'not package(butane_codegen)'
 
 # Retry flaky test on macOS
 [[profile.default.overrides]]
-platform = "cfg(macos)"
+platform = 'cfg(target_os = "macos")'
 filter = 'test(cleanup_on_drop)'
 retries = 3
 

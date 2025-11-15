@@ -1,5 +1,6 @@
 [tools]
 "cargo:cargo-expand" = "latest"
+"cargo:cargo-nextest" = "latest"
 "cargo:pep257" = "latest"
 "cargo:timeout-cli" = "latest"
 editorconfig-checker = "latest"

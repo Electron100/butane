@@ -91,12 +91,26 @@ Run all tests:
 cargo test
 ```
 
+It is also recommended to use cargo-nextest which provides many benefits, especially when running all tests:
+
+```bash
+cargo nextest run
+```
+
+Note cargo-nextest does not support doctests, [yet](https://github.com/nextest-rs/nextest/issues/16).
+
+To check those:
+
+```bash
+cargo test -p butane --doc --features async
+cargo test -p butane_codegen --doc  # all doctest are ignored
+```
+
 Run tests for a specific package:
 
 ```bash
-cargo test -p butane_core
-cargo test -p butane  # doctests only
-cargo test -p butane_tests
+cargo test -p butane_core --all-features
+cargo test -p butane_tests --all-features
 cargo test -p trybuild_tests
 ```
 

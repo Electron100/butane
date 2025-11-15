@@ -1,0 +1,30 @@
+[profile.default]
+# Default filter runs all tests on non-Windows platforms
+default-filter = 'all()'
+
+# Retry flaky test on macOS
+[[profile.default.overrides]]
+platform = 'cfg(target_os = "macos")'
+filter = 'test(cleanup_on_drop)'
+retries = 3
+
+# Test priority configuration - run tests in order of importance
+[[profile.default.overrides]]
+filter = 'package(butane_test_helper)'
+priority = 100
+
+[[profile.default.overrides]]
+filter = 'package(butane_core)'
+priority = 80
+
+[[profile.default.overrides]]
+filter = 'package(butane_cli)'
+priority = 60
+
+[[profile.default.overrides]]
+filter = 'package(butane_tests)'
+priority = 40
+
+[[profile.default.overrides]]
+filter = 'package(trybuild_tests)'
+priority = 20

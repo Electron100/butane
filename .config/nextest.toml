@@ -1,17 +1,6 @@
-# Skip testing the butane_codegen workspace member on Windows only.
-# It is a proc-macro crate that has test = false in its Cargo.toml
-# due to issues with workspace-level testing
-# See [issue #419](https://github.com/Electron100/butane/issues/419)
-# and PR [#420](https://github.com/Electron100/butane/pull/420).
-
 [profile.default]
 # Default filter runs all tests on non-Windows platforms
 default-filter = 'all()'
-
-# Platform-specific override to exclude butane_codegen on Windows
-[[profile.default.overrides]]
-platform = 'cfg(target_os = "windows")'
-default-filter = 'not package(butane_codegen)'
 
 # Retry flaky test on macOS
 [[profile.default.overrides]]
@@ -39,28 +28,3 @@ priority = 40
 [[profile.default.overrides]]
 filter = 'package(trybuild_tests)'
 priority = 20
-
-# Example packages - all at same priority level
-[[profile.default.overrides]]
-filter = 'package(example)'
-priority = 10
-
-[[profile.default.overrides]]
-filter = 'package(custom_pg)'
-priority = 10
-
-[[profile.default.overrides]]
-filter = 'package(newtype)'
-priority = 10
-
-[[profile.default.overrides]]
-filter = 'package(getting_started)'
-priority = 10
-
-[[profile.default.overrides]]
-filter = 'package(getting_started_async)'
-priority = 10
-
-[[profile.default.overrides]]
-filter = 'package(reserved-words)'
-priority = 10

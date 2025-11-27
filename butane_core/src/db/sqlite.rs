@@ -1,4 +1,5 @@
 //! SQLite database backend
+use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::{Debug, Write};
 use std::ops::Deref;
@@ -68,6 +69,34 @@ impl SQLiteBackend {
         let connection = SQLiteConnection::open(Path::new(path))?;
         connection.execute("PRAGMA foreign_keys = ON")?;
         Ok(connection)
+    }
+
+    /// Extract the underlying `rusqlite::Connection` from a butane Connection.
+    ///
+    /// Returns `None` if the connection is not a SQLite connection.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use butane::db::{connect, ConnectionSpec, sqlite::SQLiteBackend};
+    ///
+    /// let mut conn = connect(&ConnectionSpec::new("sqlite", "my.db"))?;
+    /// if let Some(raw_conn) = SQLiteBackend::as_raw(&conn) {
+    ///     raw_conn.execute("PRAGMA optimize", [])?;
+    /// }
+    /// ```
+    pub fn as_raw(conn: &Connection) -> Option<&rusqlite::Connection> {
+        conn.as_raw()
+            .downcast_ref::<SQLiteConnection>()
+            .map(|c| &c.conn)
+    }
+
+    /// Extract the underlying `rusqlite::Connection` mutably from a butane Connection.
+    ///
+    /// Returns `None` if the connection is not a SQLite connection.
+    pub fn as_raw_mut(conn: &mut Connection) -> Option<&mut rusqlite::Connection> {
+        conn.as_raw_mut()
+            .downcast_mut::<SQLiteConnection>()
+            .map(|c| &mut c.conn)
     }
 }
 
@@ -221,6 +250,12 @@ impl BackendConnection for SQLiteConnection {
     }
     fn is_closed(&self) -> bool {
         false
+    }
+    fn as_raw(&self) -> &dyn Any {
+        self
+    }
+    fn as_raw_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 

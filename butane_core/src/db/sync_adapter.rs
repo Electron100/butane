@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -166,6 +167,12 @@ where
     }
     fn is_closed(&self) -> bool {
         self.inner.is_closed()
+    }
+    fn as_raw(&self) -> &dyn Any {
+        self.inner.as_raw()
+    }
+    fn as_raw_mut(&mut self) -> &mut dyn Any {
+        self.inner.as_raw_mut()
     }
 }
 

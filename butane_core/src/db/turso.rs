@@ -3,6 +3,7 @@
 //! Turso is an in-process SQL database written in Rust, compatible with SQLite.
 //! This backend leverages the same migration SQL and query structure as SQLite.
 
+use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::{Debug, Write};
 
@@ -89,6 +90,34 @@ impl TursoBackend {
     /// ```
     pub fn new() -> TursoBackend {
         TursoBackend {}
+    }
+
+    /// Extract the underlying `turso::Connection` from a butane ConnectionAsync.
+    ///
+    /// Returns `None` if the connection is not a Turso connection.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use butane::db::{connect_async, ConnectionSpec, turso::TursoBackend};
+    ///
+    /// let mut conn = connect_async(&ConnectionSpec::new("turso", ":memory:")).await?;
+    /// if let Some(raw_conn) = TursoBackend::as_raw(&conn) {
+    ///     // Access raw turso::Connection
+    /// }
+    /// ```
+    pub fn as_raw(conn: &ConnectionAsync) -> Option<&turso::Connection> {
+        conn.as_raw()
+            .downcast_ref::<TursoConnection>()
+            .map(|c| &c.conn)
+    }
+
+    /// Extract the underlying `turso::Connection` mutably from a butane ConnectionAsync.
+    ///
+    /// Returns `None` if the connection is not a Turso connection.
+    pub fn as_raw_mut(conn: &mut ConnectionAsync) -> Option<&mut turso::Connection> {
+        conn.as_raw_mut()
+            .downcast_mut::<TursoConnection>()
+            .map(|c| &mut c.conn)
     }
 
     async fn connect(&self, path: &str) -> Result<TursoConnection> {
@@ -600,6 +629,14 @@ impl BackendConnection for TursoConnection {
 
     fn is_closed(&self) -> bool {
         false
+    }
+
+    fn as_raw(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_raw_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 

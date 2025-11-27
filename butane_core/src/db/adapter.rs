@@ -4,11 +4,13 @@
 //! running the blocking operations on a dedicated thread and communicating
 //! between threads.
 
-use super::*;
-use crate::query::Order;
+use std::any::Any;
 use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
+
+use super::*;
+use crate::query::Order;
 
 enum Command {
     Func(Box<dyn FnOnce() + Send>),
@@ -370,7 +372,7 @@ where
 #[async_trait]
 impl<T> BackendConnectionAsync for AsyncAdapter<T>
 where
-    T: BackendConnection,
+    T: BackendConnection + 'static,
 {
     async fn transaction<'c>(&'c mut self) -> Result<TransactionAsync<'c>> {
         let transaction_ptr: SyncSendPtrMut<dyn BackendTransaction> = self
@@ -397,6 +399,17 @@ where
     /// Backends which do not support this check should return `false`.
     fn is_closed(&self) -> bool {
         ok_or_panic_with_adapter_error(self.invoke_blocking(|conn| Ok(conn.is_closed())))
+    }
+
+    fn as_raw(&self) -> &dyn Any {
+        // The AsyncAdapter wraps a sync connection, but we can't easily
+        // provide direct access to the underlying connection from async context.
+        // Return self to indicate this is an adapted connection.
+        self
+    }
+
+    fn as_raw_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 

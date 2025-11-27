@@ -2,6 +2,8 @@
 //! (see also [super::ConnectionAsync]'s `with_sync` method).
 #![allow(unused)]
 
+use std::any::Any;
+
 use async_trait::async_trait;
 
 use super::*;
@@ -136,5 +138,11 @@ impl BackendConnection for DummyConnection {
     }
     fn is_closed(&self) -> bool {
         true
+    }
+    fn as_raw(&self) -> &dyn Any {
+        self
+    }
+    fn as_raw_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }

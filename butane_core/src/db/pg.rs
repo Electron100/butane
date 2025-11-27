@@ -1,4 +1,5 @@
 //! Postgresql database backend
+use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::{Debug, Write};
 
@@ -34,6 +35,36 @@ pub struct PgBackend;
 impl PgBackend {
     pub fn new() -> PgBackend {
         PgBackend {}
+    }
+
+    /// Extract the underlying `tokio_postgres::Client` from a butane ConnectionAsync.
+    ///
+    /// Returns `None` if the connection is not a native Postgres async connection.
+    /// Note: Connections created via the sync adapter will not be able to be
+    /// downcast directly to `PgConnection`.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use butane::db::{connect_async, ConnectionSpec, pg::PgBackend};
+    ///
+    /// let mut conn = connect_async(&ConnectionSpec::new("pg", "host=localhost")).await?;
+    /// if let Some(raw_conn) = PgBackend::as_raw(&conn) {
+    ///     // Access raw tokio_postgres::Client
+    /// }
+    /// ```
+    pub fn as_raw(conn: &ConnectionAsync) -> Option<&postgres::Client> {
+        conn.as_raw()
+            .downcast_ref::<PgConnection>()
+            .map(|c| &c.client)
+    }
+
+    /// Extract the underlying `tokio_postgres::Client` mutably from a butane ConnectionAsync.
+    ///
+    /// Returns `None` if the connection is not a native Postgres async connection.
+    pub fn as_raw_mut(conn: &mut ConnectionAsync) -> Option<&mut postgres::Client> {
+        conn.as_raw_mut()
+            .downcast_mut::<PgConnection>()
+            .map(|c| &mut c.client)
     }
 }
 
@@ -127,6 +158,12 @@ impl BackendConnection for PgConnection {
     }
     fn is_closed(&self) -> bool {
         self.client.is_closed()
+    }
+    fn as_raw(&self) -> &dyn Any {
+        self
+    }
+    fn as_raw_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 impl Debug for PgConnection {

@@ -14,6 +14,7 @@
 
 #![allow(missing_docs)]
 
+use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fs;
@@ -107,6 +108,23 @@ pub trait BackendConnection: ConnectionMethods + Debug + Send {
     /// Tests if the connection has been closed. Backends which do not
     /// support this check should return false.
     fn is_closed(&self) -> bool;
+    /// Returns the underlying connection as an `Any` reference for downcasting.
+    ///
+    /// This provides an "escape hatch" to access the raw database connection
+    /// when you need functionality not exposed by butane's abstractions.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use butane::db::sqlite::SQLiteBackend;
+    /// let conn = butane::db::connect(&spec)?;
+    /// if let Some(raw) = SQLiteBackend::as_raw(&conn) {
+    ///     // Use rusqlite-specific features
+    ///     raw.execute("PRAGMA optimize", [])?;
+    /// }
+    /// ```
+    fn as_raw(&self) -> &dyn Any;
+    /// Returns the underlying connection as a mutable `Any` reference for downcasting.
+    fn as_raw_mut(&mut self) -> &mut dyn Any;
 }
 
 #[maybe_async_cfg::maybe(
@@ -132,6 +150,12 @@ impl BackendConnection for Box<dyn BackendConnection> {
     }
     fn is_closed(&self) -> bool {
         self.deref().is_closed()
+    }
+    fn as_raw(&self) -> &dyn Any {
+        self.deref().as_raw()
+    }
+    fn as_raw_mut(&mut self) -> &mut dyn Any {
+        self.deref_mut().as_raw_mut()
     }
 }
 
@@ -318,6 +342,12 @@ impl BackendConnection for Connection {
     }
     fn is_closed(&self) -> bool {
         self.conn.is_closed()
+    }
+    fn as_raw(&self) -> &dyn Any {
+        self.conn.as_raw()
+    }
+    fn as_raw_mut(&mut self) -> &mut dyn Any {
+        self.conn.as_raw_mut()
     }
 }
 connection_method_wrapper!(Connection);

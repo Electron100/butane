@@ -295,6 +295,8 @@ pub enum Error {
     PoisonedConnection,
     #[error("Connect connect_async for synchronous backend {0}. To support this, enable the async-adapter feature.")]
     NoAsyncAdapter(&'static str),
+    #[error("Retrieving a raw connection is unsupported for {0}")]
+    RawConnectionUnsupported(&'static str),
     #[error("(De)serialization error {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("IO error {0}")]

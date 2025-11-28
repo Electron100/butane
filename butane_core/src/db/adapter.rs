@@ -401,15 +401,15 @@ where
         ok_or_panic_with_adapter_error(self.invoke_blocking(|conn| Ok(conn.is_closed())))
     }
 
-    fn as_raw(&self) -> &dyn Any {
-        // The AsyncAdapter wraps a sync connection, but we can't easily
-        // provide direct access to the underlying connection from async context.
-        // Return self to indicate this is an adapted connection.
-        self
+    fn as_raw(&self) -> Result<&dyn Any> {
+        // The AsyncAdapter wraps a sync connection, but we can't
+        // provide direct access to the underlying connection because it is living on a different
+        // thread and may not be Sync (e.g. rusqlite::Connection is not) and therefore its references are not Send
+        Err(Error::RawConnectionUnsupported("async wrapper around synchronous backend"))
     }
 
-    fn as_raw_mut(&mut self) -> &mut dyn Any {
-        self
+    fn as_raw_mut(&mut self) -> Result<&mut dyn Any> {
+        Err(Error::RawConnectionUnsupported("async wrapper around synchronous backend"))
     }
 }
 

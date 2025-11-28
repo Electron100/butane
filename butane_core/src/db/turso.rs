@@ -106,18 +106,20 @@ impl TursoBackend {
     /// }
     /// ```
     pub fn as_raw(conn: &ConnectionAsync) -> Option<&turso::Connection> {
-        conn.as_raw()
-            .downcast_ref::<TursoConnection>()
-            .map(|c| &c.conn)
+        match conn.as_raw() {
+            Ok(c) => c.downcast_ref::<turso::Connection>(),
+            Err(_) => None
+        }
     }
 
     /// Extract the underlying `turso::Connection` mutably from a butane ConnectionAsync.
     ///
     /// Returns `None` if the connection is not a Turso connection.
     pub fn as_raw_mut(conn: &mut ConnectionAsync) -> Option<&mut turso::Connection> {
-        conn.as_raw_mut()
-            .downcast_mut::<TursoConnection>()
-            .map(|c| &mut c.conn)
+         match conn.as_raw_mut() {
+            Ok(c) => c.downcast_mut::<turso::Connection>(),
+            Err(_) => None
+        }
     }
 
     async fn connect(&self, path: &str) -> Result<TursoConnection> {
@@ -631,12 +633,12 @@ impl BackendConnection for TursoConnection {
         false
     }
 
-    fn as_raw(&self) -> &dyn Any {
-        self
+    fn as_raw(&self) -> Result<&dyn Any> {
+        Ok(&self.conn)
     }
 
-    fn as_raw_mut(&mut self) -> &mut dyn Any {
-        self
+    fn as_raw_mut(&mut self) -> Result<&mut dyn Any> {
+        Ok(&mut self.conn)
     }
 }
 

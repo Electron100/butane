@@ -80,23 +80,25 @@ impl SQLiteBackend {
     /// use butane::db::{connect, ConnectionSpec, sqlite::SQLiteBackend};
     ///
     /// let mut conn = connect(&ConnectionSpec::new("sqlite", "my.db"))?;
-    /// if let Some(raw_conn) = SQLiteBackend::as_raw(&conn) {
+    /// if let Some(raw_conn) = SQLiteBackend::get_raw_connection(&conn) {
     ///     raw_conn.execute("PRAGMA optimize", [])?;
     /// }
     /// ```
-    pub fn as_raw(conn: &Connection) -> Option<&rusqlite::Connection> {
-        conn.as_raw()
-            .downcast_ref::<SQLiteConnection>()
-            .map(|c| &c.conn)
+    pub fn get_raw_connection(conn: &Connection) -> Option<&rusqlite::Connection> {
+        match conn.as_raw() {
+            Ok(c) => c.downcast_ref::<rusqlite::Connection>(),
+            Err(_) => None
+        }
     }
 
     /// Extract the underlying `rusqlite::Connection` mutably from a butane Connection.
     ///
     /// Returns `None` if the connection is not a SQLite connection.
-    pub fn as_raw_mut(conn: &mut Connection) -> Option<&mut rusqlite::Connection> {
-        conn.as_raw_mut()
-            .downcast_mut::<SQLiteConnection>()
-            .map(|c| &mut c.conn)
+    pub fn get_raw_connection_mut(conn: &mut Connection) -> Option<&mut rusqlite::Connection> {
+        match conn.as_raw_mut() {
+            Ok(c) => c.downcast_mut::<rusqlite::Connection>(),
+            Err(_) => None
+        }
     }
 }
 
@@ -251,11 +253,11 @@ impl BackendConnection for SQLiteConnection {
     fn is_closed(&self) -> bool {
         false
     }
-    fn as_raw(&self) -> &dyn Any {
-        self
+    fn as_raw(&self) -> Result<&dyn Any> {
+        Ok(&self.conn)
     }
-    fn as_raw_mut(&mut self) -> &mut dyn Any {
-        self
+    fn as_raw_mut(&mut self) -> Result<&mut dyn Any> {
+        Ok(&mut self.conn)
     }
 }
 

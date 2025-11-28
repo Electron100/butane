@@ -109,22 +109,28 @@ pub trait BackendConnection: ConnectionMethods + Debug + Send {
     /// support this check should return false.
     fn is_closed(&self) -> bool;
     /// Returns the underlying connection as an `Any` reference for downcasting.
+    /// For the pg backend this will be `tokio_postgres::Client`, for
+    /// sqlite it will be `rusqlite::Connection, etc`
     ///
     /// This provides an "escape hatch" to access the raw database connection
     /// when you need functionality not exposed by butane's abstractions.
+    /// Note that this method is NOT supported for an async wrapper around
+    /// a connection for an otherwise-synchronous backend (such as SQLite).
+    /// 
+    /// Instead of using this method, prefer convenience methods on the backend.
     ///
     /// # Example
     /// ```ignore
     /// use butane::db::sqlite::SQLiteBackend;
     /// let conn = butane::db::connect(&spec)?;
-    /// if let Some(raw) = SQLiteBackend::as_raw(&conn) {
+    /// if let Some(raw) = SQLiteBackend::get_raw_connection(&conn) {
     ///     // Use rusqlite-specific features
     ///     raw.execute("PRAGMA optimize", [])?;
     /// }
     /// ```
-    fn as_raw(&self) -> &dyn Any;
-    /// Returns the underlying connection as a mutable `Any` reference for downcasting.
-    fn as_raw_mut(&mut self) -> &mut dyn Any;
+    fn as_raw(&self) -> Result<&dyn Any>;
+    /// Like [as_raw] but mutable.
+    fn as_raw_mut(&mut self) -> Result<&mut dyn Any>;
 }
 
 #[maybe_async_cfg::maybe(
@@ -151,10 +157,10 @@ impl BackendConnection for Box<dyn BackendConnection> {
     fn is_closed(&self) -> bool {
         self.deref().is_closed()
     }
-    fn as_raw(&self) -> &dyn Any {
+    fn as_raw(&self) -> Result<&dyn Any> {
         self.deref().as_raw()
     }
-    fn as_raw_mut(&mut self) -> &mut dyn Any {
+    fn as_raw_mut(&mut self) -> Result<&mut dyn Any> {
         self.deref_mut().as_raw_mut()
     }
 }
@@ -343,10 +349,10 @@ impl BackendConnection for Connection {
     fn is_closed(&self) -> bool {
         self.conn.is_closed()
     }
-    fn as_raw(&self) -> &dyn Any {
+    fn as_raw(&self) -> Result<&dyn Any> {
         self.conn.as_raw()
     }
-    fn as_raw_mut(&mut self) -> &mut dyn Any {
+    fn as_raw_mut(&mut self) -> Result<&mut dyn Any> {
         self.conn.as_raw_mut()
     }
 }

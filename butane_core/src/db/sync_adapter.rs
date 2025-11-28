@@ -168,10 +168,10 @@ where
     fn is_closed(&self) -> bool {
         self.inner.is_closed()
     }
-    fn as_raw(&self) -> &dyn Any {
+    fn as_raw(&self) -> Result<&dyn Any> {
         self.inner.as_raw()
     }
-    fn as_raw_mut(&mut self) -> &mut dyn Any {
+    fn as_raw_mut(&mut self) -> Result<&mut dyn Any> {
         self.inner.as_raw_mut()
     }
 }

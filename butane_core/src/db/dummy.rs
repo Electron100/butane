@@ -139,10 +139,10 @@ impl BackendConnection for DummyConnection {
     fn is_closed(&self) -> bool {
         true
     }
-    fn as_raw(&self) -> &dyn Any {
-        self
+    fn as_raw(&self) -> Result<&dyn Any> {
+        Err(Error::RawConnectionUnsupported("dummy connection"))
     }
-    fn as_raw_mut(&mut self) -> &mut dyn Any {
-        self
+    fn as_raw_mut(&mut self) -> Result<&mut dyn Any> {
+        Err(Error::RawConnectionUnsupported("dummy connection"))
     }
 }

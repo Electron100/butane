@@ -442,13 +442,10 @@ fn get_type_argument<'a>(ty: &'a syn::Type, tyname: &'static str) -> Option<&'a 
 ///
 /// E.g. for `Foo<T>``, returns `T`.
 fn get_path_argument<'a>(path: &'a syn::Path, tyname: &str) -> Option<&'a syn::Path> {
-    if let Some(resolved) = PATH_RESOLVER.resolve(path) {
-        if resolved != tyname {
-            return None;
-        }
-    } else {
+    let resolved = PATH_RESOLVER.resolve(path)?;
+    if resolved != tyname {
         return None;
-    };
+    }
 
     let seg = path.segments.last().unwrap();
     let args = match &seg.arguments {

@@ -57,8 +57,15 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         set -ex
+        # `postgresql` is an alias to the latest versioned formula (e.g. postgresql@18).
         brew install postgresql
-        brew services start postgresql@14
+        # Resolve and start whichever version the alias installed. The formula is
+        # keg-only, so also expose its bin on PATH.
+        PG_FORMULA=$(brew info --json=v2 postgresql | jq -r '.formulae[0].name')
+        echo "Installed formula: $PG_FORMULA"
+        echo "$(brew --prefix "$PG_FORMULA")/bin" >> "$GITHUB_PATH"
+        export PATH="$(brew --prefix "$PG_FORMULA")/bin:$PATH"
+        brew services start "$PG_FORMULA"
         sleep 3
         createuser -s postgres
         echo BUTANE_PG_CONNSTR="host=localhost user=postgres sslmode=disable port=5432" >> $GITHUB_ENV
@@ -99,8 +106,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: runner.os != 'Windows'
       run: |
-        mise install ephemeral-postgres
-        echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
+        mise install "asdf:mise-plugins/mise-ephemeral-postgres@latest"
+        echo "$HOME/.local/share/mise/shims" >> "$GITHUB_PATH"
     - name: Verify ephemeralpg installation
       if: runner.os != 'Windows'
       run: which pg_tmp
@@ -114,7 +121,9 @@ jobs:
       run: cargo deny check all
     - name: Test with mise tools
       if: runner.os != 'Windows'
-      run: mise exec ephemeral-postgres -- cargo +stable nextest run --all-features --no-fail-fast
+      run: |
+        mise exec "asdf:mise-plugins/mise-ephemeral-postgres@latest" -- \
+          cargo +stable nextest run --all-features --no-fail-fast
     - name: Test without mise
       if: runner.os == 'Windows'
       run: cargo +stable nextest run --all-features --no-fail-fast

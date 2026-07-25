@@ -57,10 +57,8 @@ fn handle_bin_op(fields: &impl ToTokens, binop: &ExprBinary) -> TokenStream2 {
 fn handle_call(fields: &impl ToTokens, mcall: &ExprMethodCall) -> TokenStream2 {
     let method = mcall.method.to_string();
     match method.as_str() {
-        "contains" | "matches" => {
-            if mcall.args.len() != 1 {
-                return make_compile_error!(mcall.span()=> "expected one argument to '{}'", method);
-            };
+        "contains" | "matches" if mcall.args.len() != 1 => {
+            return make_compile_error!(mcall.span()=> "expected one argument to '{}'", method);
         }
         _ => (),
     };

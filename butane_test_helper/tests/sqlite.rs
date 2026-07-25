@@ -1,4 +1,5 @@
 //! Integration tests for SQLite support
+#![cfg(test)]
 #![cfg(feature = "sqlite")]
 
 use butane_test_helper::{

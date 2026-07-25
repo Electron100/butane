@@ -846,7 +846,7 @@ fn change_column(
     if table.is_none() {
         crate::warn!(
             "Cannot alter column {} from table {} that does not exist",
-            &old.name(),
+            old.name(),
             tbl_name
         );
         return "".to_string();

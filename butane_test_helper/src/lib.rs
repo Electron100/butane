@@ -489,7 +489,7 @@ pub fn pg_setup_sync() -> PgSetupData {
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
-    log::info!("new db is `{}`", &new_dbname);
+    log::info!("new db is `{}`", new_dbname);
 
     let conn = connect(&connection_spec).unwrap();
     log::debug!("closed is {}", BackendConnection::is_closed(&conn));
@@ -530,7 +530,7 @@ pub async fn pg_setup() -> PgSetupData {
         }
     };
     let new_dbname = format!("butane_test_{}", Uuid::new_v4().simple());
-    log::info!("new db is `{}`", &new_dbname);
+    log::info!("new db is `{}`", new_dbname);
 
     let conn = connect_async(&connection_spec).await.unwrap();
     log::debug!(

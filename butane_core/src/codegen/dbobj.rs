@@ -381,7 +381,7 @@ fn many_table_lit(ast_struct: &ItemStruct, field: &Field, config: &Config) -> Li
         Some(s) => s,
         None => &binding,
     };
-    make_lit(&format!("{}_{}{MANY_SUFFIX}", &tyname, &ident.strip_raw()))
+    make_lit(&format!("{}_{}{MANY_SUFFIX}", tyname, ident.strip_raw()))
 }
 
 fn verify_fields(ast_struct: &ItemStruct) -> Option<TokenStream2> {

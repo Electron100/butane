@@ -578,7 +578,7 @@ where
             col: col.name().to_string(),
             detail: format!(
                 "{:?} is not compatible with expected column type {}",
-                &sqlval,
+                sqlval,
                 col.ty()
             ),
         })
@@ -601,7 +601,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
             } else {
                 crate::warn!(
                     "Cannot alter column {} from table {} that does not exist",
-                    &old.name(),
+                    old.name(),
                     tbl
                 );
                 Ok(String::new())
@@ -826,7 +826,7 @@ fn change_column(table: &ATable, old: &AColumn, new: &AColumn) -> Result<String>
                 "ALTER TABLE {} DROP CONSTRAINT {}_{}_key;",
                 quote_reserved_word(tbl_name),
                 tbl_name,
-                &old.name()
+                old.name()
             ));
         }
     }

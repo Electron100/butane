@@ -1,4 +1,5 @@
 //! Integration tests for Turso support
+#![cfg(test)]
 #![cfg(feature = "turso")]
 
 use butane_test_helper::{turso_connspec, turso_setup, turso_teardown, SetupData};

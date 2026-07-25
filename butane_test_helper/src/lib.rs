@@ -59,7 +59,10 @@ pub mod pg;
 
 // Re-export types from pg module
 #[cfg(feature = "pg")]
-pub use crate::pg::{pg_tmp_server_create_ephemeralpg, PgTemporaryServerError};
+pub use crate::pg::{
+    is_initdb_available, is_pg_tmp_available, is_postgres_available,
+    pg_tmp_server_create_ephemeralpg, PgTemporaryServerError,
+};
 
 /// Trait for running a test.
 #[allow(async_fn_in_trait)] // Not truly public, only used in butane for testing.
@@ -269,13 +272,22 @@ impl Drop for PgServerState {
         // Clean up shared memory segments (macOS-specific issue)
         #[cfg(target_os = "macos")]
         if !self.dir.as_os_str().is_empty() {
-            pg::cleanup_macos_postgres_shared_memory(&self.dir);
+            if let Err(e) = pg::cleanup_macos_postgres_shared_memory(&self.dir) {
+                log::warn!("shared memory cleanup failed: {e}");
+            }
         }
 
         // Only delete directory for custom postgres, not for ephemeralpg
         if self.ephemeralpg_uri.is_none() && !self.dir.as_os_str().is_empty() {
             log::info!("Deleting {}", self.dir.display());
             std::fs::remove_dir_all(&self.dir).unwrap();
+
+            // Remove the shared `tmp_pg/` parent too; only succeeds once it is empty.
+            if let Some(parent) = self.dir.parent() {
+                if parent.file_name() == Some(std::ffi::OsStr::new("tmp_pg")) {
+                    let _ = std::fs::remove_dir(parent);
+                }
+            }
         }
     }
 }
@@ -298,6 +310,9 @@ impl SetupData for PgSetupData {
 ///
 /// This function automatically detects and prefers `pg_tmp` (ephemeralpg) if available,
 /// otherwise falls back to using `initdb` and `postgres` directly.
+///
+/// When the current process is root (Unix), PostgreSQL subprocesses are run as an
+/// unprivileged user (`postgres` or `nobody`) because PostgreSQL refuses to run as root.
 ///
 /// Fails on Windows CI due to:
 /// > The server must be started under an unprivileged user ID to prevent
@@ -322,10 +337,29 @@ pub fn pg_tmp_server_create(
 }
 
 /// Create and start a temporary PostgreSQL server instance using initdb.
+///
+/// When running as root on Unix, `initdb` and `postgres` are executed as an unprivileged
+/// user because PostgreSQL refuses to run as root; the data and socket directories are
+/// chown'd accordingly. The cluster is created with UTF-8 encoding (`-E UTF8`); `LC_ALL=C`
+/// is supplied to the subprocesses when the locale environment is unset (see
+/// [`pg::ensure_pg_locale_env`]).
 #[cfg(feature = "pg")]
 pub fn pg_tmp_server_create_using_initdb(
     options: PgServerOptions,
 ) -> Result<PgServerState, PgTemporaryServerError> {
+    let initdb = pg::find_pg_binary("initdb").ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "initdb program not found (is PostgreSQL installed?)",
+        )
+    })?;
+    let postgres = pg::find_pg_binary("postgres").ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "postgres program not found (is PostgreSQL installed?)",
+        )
+    })?;
+
     // Otherwise use the custom postgres implementation
     let seed: u128 = rand::random::<u64>() as u128;
     let instance_id = BlockId::new(Alphabet::alphanumeric(), seed, 8)
@@ -338,19 +372,51 @@ pub fn pg_tmp_server_create_using_initdb(
         .join(instance_id);
     std::fs::create_dir_all(&dir).unwrap();
 
+    // PostgreSQL cannot run as root; drop privileges for subprocesses when needed.
+    #[cfg(unix)]
+    let run_as = pg::require_run_as_if_root()?;
+    #[cfg(unix)]
+    if let Some(ref os_user) = run_as {
+        log::info!(
+            "running as root: executing initdb/postgres as user {} (uid {})",
+            os_user.name,
+            os_user.uid
+        );
+        pg::chown_path(&dir, os_user).map_err(PgTemporaryServerError::Io)?;
+    }
+
     let user = options
         .user
         .clone()
         .unwrap_or_else(|| "postgres".to_string());
 
-    // Run initdb to create a postgres cluster in our temporary director
-    let result = Command::new("initdb")
+    // Run initdb to create a postgres cluster in our temporary directory.
+    // -E UTF8: create the cluster with UTF-8 encoding.
+    // -A trust: use trust authentication for local connections.
+    // --nosync: do not wait for writes to be flushed to disk.
+    let mut initdb_cmd = Command::new(&initdb);
+    initdb_cmd
         .arg("-D")
         .arg(&dir)
         .arg("-U")
-        .arg(user)
-        .output();
+        .arg(&user)
+        .arg("-E")
+        .arg("UTF8")
+        .arg("-A")
+        .arg("trust")
+        .arg("--nosync");
+    pg::configure_pg_command_env(&mut initdb_cmd);
+    #[cfg(unix)]
+    if let Some(ref os_user) = run_as {
+        pg::apply_run_as(&mut initdb_cmd, os_user);
+    }
+    let result = initdb_cmd.output();
     if let Err(e) = result {
+        #[cfg(unix)]
+        if let Some(hint) = pg::privilege_drop_spawn_hint(&e, &initdb, run_as.as_ref()) {
+            eprintln!("{hint}");
+            return Err(PgTemporaryServerError::PrivilegeDrop(hint));
+        }
         eprintln!("failed to run initdb; PostgreSQL may not be installed");
         return Err(e.into());
     }
@@ -364,6 +430,10 @@ pub fn pg_tmp_server_create_using_initdb(
     }
 
     let sockdir = tempfile::TempDir::new().unwrap();
+    #[cfg(unix)]
+    if let Some(ref os_user) = run_as {
+        pg::chown_path(sockdir.path(), os_user).map_err(PgTemporaryServerError::Io)?;
+    }
 
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     let socket_directory_arg = if options.abstract_namespace {
@@ -380,7 +450,7 @@ pub fn pg_tmp_server_create_using_initdb(
     // See https://www.postgresql.org/docs/current/app-postgres.html for CLI args.
     // PGOPTIONS can be used to set args.
     // PGDATA can be used instead of -D
-    let mut command = Command::new("postgres");
+    let mut command = Command::new(&postgres);
     command
         .arg("-c")
         .arg("logging_collector=false")
@@ -401,8 +471,18 @@ pub fn pg_tmp_server_create_using_initdb(
         // Set host='' to prevent postgres from trying to use TCP/IP
         command.arg("-h").arg("");
     }
+    pg::configure_pg_command_env(&mut command);
+    #[cfg(unix)]
+    if let Some(ref os_user) = run_as {
+        pg::apply_run_as(&mut command, os_user);
+    }
     let result = command.spawn();
     if let Err(e) = result {
+        #[cfg(unix)]
+        if let Some(hint) = pg::privilege_drop_spawn_hint(&e, &postgres, run_as.as_ref()) {
+            eprintln!("{hint}");
+            return Err(PgTemporaryServerError::PrivilegeDrop(hint));
+        }
         eprintln!("failed to run postgres");
         return Err(e.into());
     }

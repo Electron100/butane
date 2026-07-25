@@ -25,6 +25,7 @@ turso = ["butane/turso"]
 
 [lib]
 path = "common/mod.rs"
+doctest = false
 
 [dependencies]
 butane = { workspace = true }

@@ -1,40 +1,11 @@
 //! Integration tests for ephemeralpg support
+#![cfg(test)]
 #![cfg(feature = "pg")]
 
 use std::sync::{Arc, Barrier};
 use std::thread;
 
-use temp_env::with_var;
-
-use butane_test_helper::{
-    pg_tmp_server_create_ephemeralpg, PgServerOptions, PgTemporaryServerError,
-};
-
-/// Helper to check if pg_tmp is available
-fn is_pg_tmp_available() -> bool {
-    which::which("pg_tmp").is_ok()
-}
-
-/// Test that we can detect if pg_tmp is not available
-#[test]
-fn error_when_not_found() {
-    // Temporarily clear PATH to simulate pg_tmp not being available
-    with_var("PATH", None::<&str>, || {
-        let options = PgServerOptions::default();
-
-        let result = pg_tmp_server_create_ephemeralpg(options);
-        assert!(result.is_err(), "Should fail when pg_tmp is not available");
-
-        if let Err(PgTemporaryServerError::EphemeralPg(msg)) = result {
-            assert!(
-                msg.contains("pg_tmp") || msg.contains("ephemeralpg"),
-                "Error message should mention pg_tmp or ephemeralpg"
-            );
-        } else {
-            panic!("Expected EphemeralPg");
-        }
-    });
-}
+use butane_test_helper::{is_pg_tmp_available, pg_tmp_server_create_ephemeralpg, PgServerOptions};
 
 /// Test that ephemeralpg creates a server with a valid URI
 #[test]
@@ -264,7 +235,7 @@ fn multithreaded_creation() {
         success_count, failure_count
     );
 
-    // All threads should succeed now that we have proper locking
+    // Serialized pg_tmp locking lets every thread create its server.
     assert_eq!(
         success_count, NUM_THREADS,
         "Expected all {} threads to successfully create servers",

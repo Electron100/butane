@@ -4,7 +4,7 @@
 "cargo:pep257" = "latest"
 "cargo:timeout-cli" = "latest"
 editorconfig-checker = "latest"
-ephemeral-postgres = "latest"
+"asdf:mise-plugins/mise-ephemeral-postgres" = "latest"
 osv-scanner = "latest"
 rust = "stable"
 typos = "latest"

@@ -303,10 +303,10 @@ impl<T: DataObject> ManyOps<T> for Many<T> {
     {
         let query = self.query();
         // If not initialised then there are no values
-        let vals: Result<Vec<&T>> = if query.is_err() {
-            Ok(Vec::new())
+        let vals: Result<Vec<&T>> = if let Ok(query) = query {
+            Ok(load_query(self, conn, query).await?.collect())
         } else {
-            Ok(load_query(self, conn, query.unwrap()).await?.collect())
+            Ok(Vec::new())
         };
         vals.map(|v| v.into_iter())
     }
@@ -321,14 +321,12 @@ impl<T: DataObject> ManyOps<T> for Many<T> {
     {
         let query = self.query();
         // If not initialised then there are no values
-        let vals: Result<Vec<&T>> = if query.is_err() {
-            Ok(Vec::new())
+        let vals: Result<Vec<&T>> = if let Ok(query) = query {
+            Ok(load_query(self, conn, query.order(T::PKCOL, order))
+                .await?
+                .collect())
         } else {
-            Ok(
-                load_query(self, conn, query.unwrap().order(T::PKCOL, order))
-                    .await?
-                    .collect(),
-            )
+            Ok(Vec::new())
         };
         vals.map(|v| v.into_iter())
     }

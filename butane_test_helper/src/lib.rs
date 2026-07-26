@@ -229,6 +229,11 @@ pub struct PgServerOptions {
     /// Wait time in seconds before automatic cleanup (for ephemeralpg).
     /// If None, uses pg_tmp's default (60 seconds).
     pub ephemeralpg_wait_seconds: Option<u32>,
+    /// Base directory under which the instance directory is created (initdb backend only).
+    ///
+    /// Defaults to `tmp_pg/` under the current directory. Set it to an isolated path to avoid
+    /// sharing that directory with other concurrent tests.
+    pub instance_root: Option<std::path::PathBuf>,
 }
 
 /// Server state for a test PostgreSQL server.
@@ -393,10 +398,11 @@ pub fn pg_tmp_server_create_using_initdb(
         .encode_string(0)
         .unwrap();
     // create a temporary directory
-    let dir = std::env::current_dir()
-        .unwrap()
-        .join("tmp_pg")
-        .join(instance_id);
+    let instance_root = options
+        .instance_root
+        .clone()
+        .unwrap_or_else(|| std::env::current_dir().unwrap().join("tmp_pg"));
+    let dir = instance_root.join(instance_id);
     std::fs::create_dir_all(&dir).unwrap();
     let mut dir_guard = InstanceDirGuard(Some(dir.clone()));
 

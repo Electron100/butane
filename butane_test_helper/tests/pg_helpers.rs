@@ -82,15 +82,19 @@ fn locale_env_forced_when_configured_locale_is_unavailable() {
     );
 }
 
-/// An existing locale is left untouched.
+/// A usable, installed locale is left untouched.
+///
+/// `LC_ALL=C` is used deliberately: `C` is present on every system (unlike e.g. `en_US.UTF-8`,
+/// which a minimal install may not generate), and `LC_ALL` overrides any inherited `LC_*`/`LANG`,
+/// so this exercises the "locale is usable -> do not force" branch on any machine.
 #[test]
 fn locale_env_not_overridden_when_set() {
-    temp_env::with_var("LANG", Some("en_US.UTF-8"), || {
+    temp_env::with_var("LC_ALL", Some("C"), || {
         let mut cmd = Command::new("true");
         ensure_pg_locale_env(&mut cmd);
         assert!(
             cmd.get_envs().all(|(k, _)| k != OsStr::new("LC_ALL")),
-            "LC_ALL should not be forced when a locale is already set"
+            "LC_ALL should not be forced when a usable locale is already set"
         );
     });
 }

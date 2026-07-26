@@ -133,13 +133,16 @@ fn failed_creation_leaves_no_tmp_pg() {
         return;
     }
 
-    let tmp_pg = std::env::current_dir().unwrap().join("tmp_pg");
-    let before = read_instance_dirs(&tmp_pg);
+    // Isolate the instance dir under a private root so concurrent tests writing the shared
+    // `tmp_pg/` cannot perturb the before/after comparison.
+    let root = tempfile::TempDir::new().unwrap();
+    let before = read_instance_dirs(root.path());
 
     temp_env::with_vars(cleared_locale_env(), || {
         // An empty `-U` value makes initdb fail after the instance dir has been created.
         let options = PgServerOptions {
             user: Some(String::new()),
+            instance_root: Some(root.path().to_path_buf()),
             ..Default::default()
         };
         let hook = std::panic::take_hook();
@@ -152,7 +155,7 @@ fn failed_creation_leaves_no_tmp_pg() {
         );
     });
 
-    let after = read_instance_dirs(&tmp_pg);
+    let after = read_instance_dirs(root.path());
     assert_eq!(after, before, "a failed creation leaked an instance dir");
 }
 

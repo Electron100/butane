@@ -282,12 +282,7 @@ impl Drop for PgServerState {
             log::info!("Deleting {}", self.dir.display());
             std::fs::remove_dir_all(&self.dir).unwrap();
 
-            // Remove the shared `tmp_pg/` parent too; only succeeds once it is empty.
-            if let Some(parent) = self.dir.parent() {
-                if parent.file_name() == Some(std::ffi::OsStr::new("tmp_pg")) {
-                    let _ = std::fs::remove_dir(parent);
-                }
-            }
+            remove_tmp_pg_parent(&self.dir);
         }
     }
 }
@@ -336,6 +331,38 @@ pub fn pg_tmp_server_create(
     }
 }
 
+/// Remove the shared `tmp_pg/` parent of `dir`; only succeeds once it is empty.
+#[cfg(feature = "pg")]
+fn remove_tmp_pg_parent(dir: &std::path::Path) {
+    if let Some(parent) = dir.parent() {
+        if parent.file_name() == Some(std::ffi::OsStr::new("tmp_pg")) {
+            let _ = std::fs::remove_dir(parent);
+        }
+    }
+}
+
+/// Deletes the instance dir unless disarmed, so a failure before `PgServerState` exists (which
+/// owns the cleanup) does not leak the directory `create_dir_all` already made.
+#[cfg(feature = "pg")]
+struct InstanceDirGuard(Option<std::path::PathBuf>);
+
+#[cfg(feature = "pg")]
+impl InstanceDirGuard {
+    fn disarm(&mut self) {
+        self.0 = None;
+    }
+}
+
+#[cfg(feature = "pg")]
+impl Drop for InstanceDirGuard {
+    fn drop(&mut self) {
+        if let Some(dir) = self.0.take() {
+            let _ = std::fs::remove_dir_all(&dir);
+            remove_tmp_pg_parent(&dir);
+        }
+    }
+}
+
 /// Create and start a temporary PostgreSQL server instance using initdb.
 ///
 /// When running as root on Unix, `initdb` and `postgres` are executed as an unprivileged
@@ -371,6 +398,7 @@ pub fn pg_tmp_server_create_using_initdb(
         .join("tmp_pg")
         .join(instance_id);
     std::fs::create_dir_all(&dir).unwrap();
+    let mut dir_guard = InstanceDirGuard(Some(dir.clone()));
 
     // PostgreSQL cannot run as root; drop privileges for subprocesses when needed.
     #[cfg(unix)]
@@ -516,6 +544,8 @@ pub fn pg_tmp_server_create_using_initdb(
             libc::atexit(cb);
         }
     }
+
+    dir_guard.disarm();
 
     Ok(PgServerState {
         dir,

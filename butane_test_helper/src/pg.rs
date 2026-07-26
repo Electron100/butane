@@ -21,8 +21,8 @@
 //!
 //! # Locale and encoding
 //!
-//! `initdb` is invoked with `-E UTF8`. When `LC_ALL`, `LANG` and `LC_CTYPE` are all unset or
-//! empty, the subprocesses are additionally given `LC_ALL=C` (see [`ensure_pg_locale_env`]).
+//! `initdb` is invoked with `-E UTF8`. Subprocesses are given `LC_ALL=C` when the locale
+//! environment is unset or names an uninstalled locale (see [`ensure_pg_locale_env`]).
 //!
 //! # Locating binaries
 //!
@@ -262,15 +262,40 @@ pub(crate) fn apply_run_as(cmd: &mut Command, user: &PgOsUser) {
     cmd.env("LOGNAME", &user.name);
 }
 
-/// Set `LC_ALL=C` when the locale environment is unset.
+/// Whether the process locale environment actually resolves to an installed locale.
 ///
-/// Applies when `LC_ALL`, `LANG` and `LC_CTYPE` are all unset or empty in the current process
-/// environment; empty values (e.g. `LANG=`) are treated as unset.
+/// `newlocale` with an empty name resolves exactly as `initdb`'s `setlocale(LC_ALL, "")` does, and
+/// unlike `setlocale` it does not mutate global state. A minimal install commonly has `LANG` set to
+/// a locale whose data was never generated, which is what makes `initdb` abort.
+#[cfg(unix)]
+fn locale_env_is_usable() -> bool {
+    let Ok(empty) = std::ffi::CString::new("") else {
+        return true;
+    };
+    // Safety: an empty locale name reads the environment; a null base requests a fresh locale.
+    unsafe {
+        let loc = libc::newlocale(libc::LC_ALL_MASK, empty.as_ptr(), std::ptr::null_mut());
+        if loc.is_null() {
+            return false;
+        }
+        libc::freelocale(loc);
+        true
+    }
+}
+
+#[cfg(not(unix))]
+fn locale_env_is_usable() -> bool {
+    true
+}
+
+/// Set `LC_ALL=C` when the locale environment is unset, or set to a locale that is not installed.
+///
+/// Empty values (e.g. `LANG=`) count as unset. `LC_ALL` wins over an inherited bad `LANG`.
 pub fn ensure_pg_locale_env(cmd: &mut Command) {
     let has_locale = ["LC_ALL", "LANG", "LC_CTYPE"]
         .iter()
         .any(|key| std::env::var_os(key).is_some_and(|v| !v.is_empty()));
-    if !has_locale {
+    if !has_locale || !locale_env_is_usable() {
         cmd.env("LC_ALL", "C");
     }
 }

@@ -57,6 +57,31 @@ fn locale_env_added_when_unset() {
     );
 }
 
+/// A locale that is set but not installed still gets forced to `C`.
+///
+/// This is the minimal-install case: `LANG` names a locale whose data was never generated, so
+/// `initdb` aborts with "invalid locale settings; check LANG and LC_* environment variables".
+#[test]
+fn locale_env_forced_when_configured_locale_is_unavailable() {
+    temp_env::with_vars(
+        [
+            ("LC_ALL", None::<&str>),
+            ("LC_CTYPE", None),
+            ("LANG", Some("xx_YY.INVALID")),
+        ],
+        || {
+            let mut cmd = Command::new("true");
+            ensure_pg_locale_env(&mut cmd);
+            let lc_all = cmd.get_envs().find(|(k, _)| *k == OsStr::new("LC_ALL"));
+            assert_eq!(
+                lc_all,
+                Some((OsStr::new("LC_ALL"), Some(OsStr::new("C")))),
+                "an uninstalled locale must fall back to C"
+            );
+        },
+    );
+}
+
 /// An existing locale is left untouched.
 #[test]
 fn locale_env_not_overridden_when_set() {

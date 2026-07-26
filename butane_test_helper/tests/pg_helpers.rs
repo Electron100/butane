@@ -61,6 +61,10 @@ fn locale_env_added_when_unset() {
 ///
 /// This is the minimal-install case: `LANG` names a locale whose data was never generated, so
 /// `initdb` aborts with "invalid locale settings; check LANG and LC_* environment variables".
+///
+/// Unix-only: the availability check (`newlocale`) is a no-op on other platforms, so nothing is
+/// forced there.
+#[cfg(unix)]
 #[test]
 fn locale_env_forced_when_configured_locale_is_unavailable() {
     temp_env::with_vars(

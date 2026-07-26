@@ -29,6 +29,7 @@ test = false
 
 [lib]
 doc = false
+doctest = false
 
 [features]
 default = ["pg", "sqlite", "sqlite-bundled", "turso"]

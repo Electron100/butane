@@ -1,96 +1,51 @@
 //! Integration tests for initdb-based PostgreSQL server creation
+#![cfg(test)]
 #![cfg(feature = "pg")]
 #![cfg(not(target_os = "windows"))]
 
 use std::sync::{Arc, Barrier};
 use std::thread;
 
-use temp_env::with_var;
+use butane_test_helper::{
+    is_initdb_available, is_postgres_available, pg_tmp_server_create_using_initdb, PgServerOptions,
+    PgServerState, PgTemporaryServerError,
+};
 
-use butane_test_helper::{pg_tmp_server_create_using_initdb, PgServerOptions};
-
-/// Helper to check if initdb is available
-fn is_initdb_available() -> bool {
-    which::which("initdb").is_ok()
-}
-
-/// Helper to check if postgres is available
-fn is_postgres_available() -> bool {
-    which::which("postgres").is_ok()
-}
-
-/// Test that we get a proper error when initdb is not available
-#[test]
-fn error_when_initdb_not_found() {
-    // Temporarily clear PATH to simulate initdb not being available
-    with_var("PATH", None::<&str>, || {
-        let options = PgServerOptions::default();
-        let result = pg_tmp_server_create_using_initdb(options);
-
-        assert!(result.is_err(), "Should fail when initdb is not available");
-
-        let err = result.unwrap_err();
-        let err_msg = err.to_string();
-        assert!(
-            err_msg.contains("initdb")
-                || err_msg.contains("Failed to execute")
-                || err_msg.contains("No such file or directory")
-                || err_msg.contains("program not found"), // Windows error message
-            "Error message should indicate binary not found: {}",
-            err_msg
-        );
-    });
-}
-
-/// Test that we get a proper error when postgres is not available
-/// (This test requires initdb to be available but postgres to be missing)
-#[test]
-fn error_when_postgres_not_found() {
-    if !is_initdb_available() {
-        eprintln!("Skipping test: initdb not found in PATH (needed to test postgres missing)");
-        return;
+/// Unwrap a server-creation result, failing the test with the underlying error.
+///
+/// Every test here already guards on `is_initdb_available() && is_postgres_available()`, so an
+/// `Err` at this point is a genuine failure rather than a missing install. These sites previously
+/// logged and fell through, which reported `ok` while asserting nothing and discarded the one
+/// piece of information needed to diagnose the run.
+#[track_caller]
+fn expect_server(
+    result: Result<PgServerState, PgTemporaryServerError>,
+    what: &str,
+) -> PgServerState {
+    match result {
+        Ok(server) => server,
+        Err(e) => panic!("{what} failed: {e}"),
     }
+}
 
-    // Get the initdb directory
-    let initdb_path = which::which("initdb").ok().and_then(|p| {
-        p.parent()
-            .map(|parent| parent.to_string_lossy().to_string())
-    });
-
-    if initdb_path.is_none() {
-        eprintln!("Skipping test: could not determine initdb location");
-        return;
-    }
-
-    let initdb_dir = initdb_path.unwrap();
-
-    // Create a minimal PATH with just the initdb directory
-    // This assumes postgres is in a different location or can be excluded
-    with_var("PATH", Some(initdb_dir.as_str()), || {
-        // Check if postgres is still available (it might be in the same dir as initdb)
-        if which::which("postgres").is_ok() {
-            eprintln!("Skipping test: postgres is in the same directory as initdb");
-            return;
+/// Render a joined thread's outcome as `Ok(server)` or a human-readable failure string.
+///
+/// `join` returns the panic payload as `Box<dyn Any>`, whose `Debug` is just `Any { .. }`; the
+/// message only comes out by downcasting to the `&str`/`String` that `panic!` actually stored.
+fn joined(
+    outcome: std::thread::Result<Result<PgServerState, String>>,
+) -> Result<PgServerState, String> {
+    match outcome {
+        Ok(inner) => inner,
+        Err(payload) => {
+            let msg = payload
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| payload.downcast_ref::<&str>().copied())
+                .unwrap_or("<non-string panic payload>");
+            Err(format!("thread panicked: {msg}"))
         }
-
-        let options = PgServerOptions::default();
-        let result = pg_tmp_server_create_using_initdb(options);
-
-        assert!(
-            result.is_err(),
-            "Should fail when postgres is not available"
-        );
-
-        let err = result.unwrap_err();
-        let err_msg = err.to_string();
-        assert!(
-            err_msg.contains("postgres")
-                || err_msg.contains("Failed to execute")
-                || err_msg.contains("No such file or directory"),
-            "Error message should indicate postgres not found: {}",
-            err_msg
-        );
-    });
+    }
 }
 
 /// Test that we can create a custom postgres server using initdb
@@ -135,8 +90,11 @@ fn directory_structure() {
 
     let options = PgServerOptions::default();
 
-    let result = pg_tmp_server_create_using_initdb(options);
-    if let Ok(server) = result {
+    let server = expect_server(
+        pg_tmp_server_create_using_initdb(options),
+        "server creation for directory_structure",
+    );
+    {
         let dir = &server.dir;
         assert!(dir.exists(), "Server directory should exist");
         assert!(dir.is_dir(), "Server path should be a directory");
@@ -154,10 +112,6 @@ fn directory_structure() {
         );
 
         println!("Directory structure verified");
-    } else {
-        eprintln!(
-            "Server creation failed (this may be expected if postgres is not fully installed)"
-        );
     }
 }
 
@@ -172,10 +126,10 @@ fn multiple_servers() {
     let options1 = PgServerOptions::default();
     let options2 = PgServerOptions::default();
 
-    let result1 = pg_tmp_server_create_using_initdb(options1);
-    let result2 = pg_tmp_server_create_using_initdb(options2);
+    let server1 = expect_server(pg_tmp_server_create_using_initdb(options1), "first server");
+    let server2 = expect_server(pg_tmp_server_create_using_initdb(options2), "second server");
 
-    if let (Ok(server1), Ok(server2)) = (result1, result2) {
+    {
         // Each server should have a different directory
         assert_ne!(
             server1.dir, server2.dir,
@@ -188,8 +142,6 @@ fn multiple_servers() {
         // Both should exist
         assert!(server1.dir.exists());
         assert!(server2.dir.exists());
-    } else {
-        eprintln!("One or both servers failed to create");
     }
 }
 
@@ -206,13 +158,12 @@ fn custom_user() {
         ..Default::default()
     };
 
-    let result = pg_tmp_server_create_using_initdb(options);
-    if let Ok(server) = result {
-        assert_eq!(server.options.user, Some("testuser".to_string()));
-        println!("Created server with custom user: testuser");
-    } else {
-        eprintln!("Server creation with custom user failed");
-    }
+    let server = expect_server(
+        pg_tmp_server_create_using_initdb(options),
+        "server creation with custom user",
+    );
+    assert_eq!(server.options.user, Some("testuser".to_string()));
+    println!("Created server with custom user: testuser");
 }
 
 /// Test that default user is 'postgres'
@@ -228,13 +179,12 @@ fn default_user() {
         ..Default::default()
     };
 
-    let result = pg_tmp_server_create_using_initdb(options);
-    if let Ok(server) = result {
-        assert_eq!(server.options.user, None);
-        println!("Created server with default user (postgres)");
-    } else {
-        eprintln!("Server creation with default user failed");
-    }
+    let server = expect_server(
+        pg_tmp_server_create_using_initdb(options),
+        "server creation with default user",
+    );
+    assert_eq!(server.options.user, None);
+    println!("Created server with default user (postgres)");
 }
 
 /// Test that directory gets cleaned up on drop
@@ -246,9 +196,12 @@ fn cleanup_on_drop() {
     }
 
     let options = PgServerOptions::default();
-    let result = pg_tmp_server_create_using_initdb(options);
+    let server = expect_server(
+        pg_tmp_server_create_using_initdb(options),
+        "server creation for cleanup_on_drop",
+    );
 
-    if let Ok(server) = result {
+    {
         let dir_path = server.dir.clone();
         println!("Created server at: {}", dir_path.display());
 
@@ -267,8 +220,6 @@ fn cleanup_on_drop() {
             "Directory should be cleaned up after drop"
         );
         println!("Directory successfully cleaned up");
-    } else {
-        eprintln!("Server creation failed");
     }
 }
 
@@ -283,8 +234,11 @@ fn explicit_function() {
     // This function should always use initdb regardless of what's available
     let options = PgServerOptions::default();
 
-    let result = pg_tmp_server_create_using_initdb(options);
-    if let Ok(server) = result {
+    let server = expect_server(
+        pg_tmp_server_create_using_initdb(options),
+        "server creation for explicit_function",
+    );
+    {
         // Should still be using initdb (no ephemeralpg URI)
         assert!(
             server.ephemeralpg_uri.is_none(),
@@ -295,8 +249,6 @@ fn explicit_function() {
             "initdb function should create a directory"
         );
         println!("Confirmed that initdb function always uses initdb regardless of flag");
-    } else {
-        eprintln!("Server creation failed");
     }
 }
 
@@ -343,44 +295,36 @@ fn multithreaded_with_options() {
                     println!("Thread {} using initdb in {:?}", i, server.dir);
 
                     // Return the server so it stays alive until the thread completes
-                    Some(server)
+                    Ok(server)
                 }
-                Err(e) => {
-                    eprintln!("Thread {} failed to create server: {:?}", i, e);
-                    None
-                }
+                // Carry the error text out of the thread: `join` cannot return the original
+                // error type, and the reason is the only thing that makes a failure actionable.
+                Err(e) => Err(format!("thread {i}: {e}")),
             }
         });
 
         handles.push(handle);
     }
 
-    // Wait for all threads and collect results
-    let mut success_count = 0;
-
-    for (i, handle) in handles.into_iter().enumerate() {
-        match handle.join() {
-            Ok(Some(_server)) => {
-                success_count += 1;
-                println!("Thread {} completed successfully", i);
-            }
-            Ok(None) => {
-                panic!("Thread {} failed to create server", i);
-            }
-            Err(e) => {
-                panic!("Thread {} panicked: {:?}", i, e);
-            }
+    // Collect every outcome before asserting, so one failure reports all of them rather than
+    // aborting on the first. `_servers` stays bound so the clusters live until the assert.
+    let mut servers = Vec::new();
+    let mut failures = Vec::new();
+    for handle in handles {
+        match joined(handle.join()) {
+            Ok(server) => servers.push(server),
+            Err(msg) => failures.push(msg),
         }
     }
 
-    println!(
-        "All {} initdb threads completed successfully",
-        success_count
+    assert!(
+        failures.is_empty(),
+        "all {} threads should succeed with initdb, but {} failed:\n  {}",
+        NUM_THREADS,
+        failures.len(),
+        failures.join("\n  ")
     );
-    assert_eq!(
-        success_count, NUM_THREADS,
-        "All threads should succeed with initdb"
-    );
+    assert_eq!(servers.len(), NUM_THREADS);
 }
 
 /// Test that threads can create initdb servers with custom options
@@ -407,35 +351,41 @@ fn multithreaded_initdb_with_options() {
             };
 
             println!("Thread {} creating initdb server with custom user", i);
-            let result = pg_tmp_server_create_using_initdb(options);
 
-            if let Ok(server) = result {
-                println!(
-                    "Thread {} created server with custom user in {:?}",
-                    i, server.dir
-                );
-                Some(server)
-            } else {
-                eprintln!("Thread {} failed", i);
-                None
+            match pg_tmp_server_create_using_initdb(options) {
+                Ok(server) => {
+                    println!(
+                        "Thread {} created server with custom user in {:?}",
+                        i, server.dir
+                    );
+                    Ok(server)
+                }
+                // Previously this logged a bare "Thread N failed" and the assertion only compared
+                // counts, so a real failure surfaced as `left: 1, right: 2` with no cause.
+                Err(e) => Err(format!("thread {i} (testuser{i}): {e}")),
             }
         });
 
         handles.push(handle);
     }
 
-    let mut success_count = 0;
-
+    let mut servers = Vec::new();
+    let mut failures = Vec::new();
     for handle in handles {
-        if let Ok(Some(_server)) = handle.join() {
-            success_count += 1;
+        match joined(handle.join()) {
+            Ok(server) => servers.push(server),
+            Err(msg) => failures.push(msg),
         }
     }
 
-    assert_eq!(
-        success_count, NUM_THREADS,
-        "All threads should succeed with custom options"
+    assert!(
+        failures.is_empty(),
+        "all {} threads should succeed with custom options, but {} failed:\n  {}",
+        NUM_THREADS,
+        failures.len(),
+        failures.join("\n  ")
     );
+    assert_eq!(servers.len(), NUM_THREADS);
 }
 
 /// Test that sequential thread creation works reliably with initdb
@@ -458,26 +408,16 @@ fn sequential_thread_creation() {
             match result {
                 Ok(server) => {
                     println!("Sequential thread {} succeeded in {:?}", i, server.dir);
-                    Some(server)
+                    Ok(server)
                 }
-                Err(e) => {
-                    eprintln!("Sequential thread {} failed: {:?}", i, e);
-                    None
-                }
+                Err(e) => Err(format!("sequential thread {i}: {e}")),
             }
         });
 
         // Wait for this thread to complete before starting the next
-        match handle.join() {
-            Ok(Some(_server)) => {
-                println!("Sequential thread {} completed", i);
-            }
-            Ok(None) => {
-                panic!("Sequential thread {} failed to create server", i);
-            }
-            Err(e) => {
-                panic!("Sequential thread {} panicked: {:?}", i, e);
-            }
+        match joined(handle.join()) {
+            Ok(_server) => println!("Sequential thread {} completed", i),
+            Err(msg) => panic!("{msg}"),
         }
     }
 

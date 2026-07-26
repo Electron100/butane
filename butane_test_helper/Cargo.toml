@@ -12,6 +12,9 @@ repository.workspace = true
 documentation = "https://docs.rs/butane/"
 rust-version.workspace = true
 
+[lib]
+doctest = false
+
 [features]
 bin = ["ctrlc"]
 default = ["sqlite", "pg"]
@@ -53,6 +56,20 @@ name = "initdb"
 path = "tests/initdb.rs"
 required-features = ["pg"]
 
+[[test]]
+name = "pg_binary_not_found"
+path = "tests/pg_binary_not_found.rs"
+required-features = ["pg"]
+
+[[test]]
+name = "pg_helpers"
+path = "tests/pg_helpers.rs"
+required-features = ["pg"]
+
+[[test]]
+name = "locale"
+path = "tests/locale.rs"
+required-features = ["pg"]
 
 [[test]]
 name = "macos_shared_memory"

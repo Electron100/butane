@@ -83,6 +83,7 @@ impl Backend for SQLiteBackend {
 
     fn create_migration_sql(&self, current: &ADB, ops: Vec<Operation>) -> Result<String> {
         let mut current: ADB = (*current).clone();
+
         let mut lines = ops
             .into_iter()
             .map(|o| {
@@ -661,6 +662,7 @@ fn sql_valref_from_rusqlite<'a>(
 
 fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
     match op {
+        Operation::DisableConstraints => Ok("PRAGMA defer_foreign_keys = ON;".to_string()),
         Operation::AddTable(table) => Ok(create_table(table, false)),
         Operation::AddTableConstraints(_table) => Ok("".to_owned()),
         Operation::AddTableIfNotExists(table) => Ok(create_table(table, true)),
@@ -669,6 +671,7 @@ fn sql_for_op(current: &mut ADB, op: &Operation) -> Result<String> {
         Operation::AddColumn(tbl, col) => add_column(tbl, col),
         Operation::RemoveColumn(tbl, name) => remove_column(current, tbl, name),
         Operation::ChangeColumn(tbl, old, new) => Ok(change_column(current, tbl, old, Some(new))),
+        Operation::EnableConstraints => Ok("PRAGMA defer_foreign_keys = OFF;".to_string()),
     }
 }
 

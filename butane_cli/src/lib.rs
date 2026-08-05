@@ -148,6 +148,9 @@ pub fn print_ops(ops: Vec<Operation>) -> Result<()> {
     for op in &ops {
         use Operation::*;
         match op {
+            DisableConstraints | EnableConstraints => {
+                // These are internal operations handled by the backend
+            }
             AddTable(table) | AddTableIfNotExists(table) => {
                 println!("New table {}", table.name);
                 for column in &table.columns {

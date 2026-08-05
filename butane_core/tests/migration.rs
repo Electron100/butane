@@ -97,6 +97,131 @@ fn current_migration_default_attribute() {
 }
 
 #[test]
+fn current_migration_serde_default_bool() {
+    let tokens = quote! {
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        struct Foo {
+            id: i64,
+            #[serde(default)]
+            published: bool,
+        }
+    };
+
+    let mut ms = MemMigrations::new();
+    model_with_migrations(tokens, &mut ms);
+    let m = ms.current();
+    let db = m.db().unwrap();
+    let table = db.get_table("Foo").expect("No Foo table");
+    let col = table.column("published").unwrap();
+    assert_eq!(*col.default(), Some(SqlVal::Bool(false)));
+}
+
+#[test]
+fn current_migration_serde_default_int() {
+    let tokens = quote! {
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        struct Foo {
+            id: i64,
+            #[serde(default)]
+            count: i32,
+        }
+    };
+
+    let mut ms = MemMigrations::new();
+    model_with_migrations(tokens, &mut ms);
+    let m = ms.current();
+    let db = m.db().unwrap();
+    let table = db.get_table("Foo").expect("No Foo table");
+    let col = table.column("count").unwrap();
+    assert_eq!(*col.default(), Some(SqlVal::Int(0)));
+}
+
+#[test]
+fn current_migration_serde_default_string() {
+    let tokens = quote! {
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        struct Foo {
+            id: i64,
+            #[serde(default)]
+            name: String,
+        }
+    };
+
+    let mut ms = MemMigrations::new();
+    model_with_migrations(tokens, &mut ms);
+    let m = ms.current();
+    let db = m.db().unwrap();
+    let table = db.get_table("Foo").expect("No Foo table");
+    let col = table.column("name").unwrap();
+    assert_eq!(*col.default(), Some(SqlVal::Text(String::new())));
+}
+
+#[test]
+fn current_migration_explicit_default_overrides_serde() {
+    // Explicit #[default = value] should take precedence over #[serde(default)]
+    let tokens = quote! {
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        struct Foo {
+            id: i64,
+            #[serde(default)]
+            #[default = true]
+            published: bool,
+        }
+    };
+
+    let mut ms = MemMigrations::new();
+    model_with_migrations(tokens, &mut ms);
+    let m = ms.current();
+    let db = m.db().unwrap();
+    let table = db.get_table("Foo").expect("No Foo table");
+    let col = table.column("published").unwrap();
+    // Should use explicit value (true), not inferred (false)
+    assert_eq!(*col.default(), Some(SqlVal::Bool(true)));
+}
+
+#[test]
+fn current_migration_serde_default_json_custom_type() {
+    // Test that custom JSON types can have their defaults inferred
+    #[cfg(feature = "json")]
+    {
+        let tokens = quote! {
+            #[derive(PartialEq, Eq, Debug, Clone, serde::Serialize, serde::Deserialize)]
+            struct CustomData {
+                value: String,
+            }
+
+            #[derive(PartialEq, Eq, Debug, Clone)]
+            struct Foo {
+                id: i64,
+                #[serde(default)]
+                data: CustomData,
+            }
+        };
+
+        let mut ms = MemMigrations::new();
+        // Register CustomData as a JSON type
+        use butane_core::migrations::adb::{DeferredSqlType, TypeIdentifier, TypeKey};
+        use butane_core::SqlType;
+        ms.current()
+            .add_type(
+                TypeKey::CustomType("CustomData".to_string()),
+                DeferredSqlType::KnownId(TypeIdentifier::Ty(SqlType::Json)),
+            )
+            .unwrap();
+
+        // Now create the model
+        model_with_migrations(tokens, &mut ms);
+
+        let m = ms.current();
+        let db = m.db().unwrap();
+        let table = db.get_table("Foo").expect("No Foo table");
+        let col = table.column("data").unwrap();
+        // Should infer default from the underlying Json type
+        assert_eq!(*col.default(), Some(SqlVal::Json(serde_json::Value::Null)));
+    }
+}
+
+#[test]
 fn current_migration_auto_attribute() {
     let tokens = quote! {
         #[derive(PartialEq, Eq, Debug, Clone)]

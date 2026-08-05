@@ -242,6 +242,11 @@ impl MigrationMut for FsMigration {
 
     fn add_type(&mut self, key: TypeKey, sqltype: DeferredSqlType) -> Result<()> {
         let _lock = self.lock_exclusive();
+        eprintln!(
+            "add type start at {} from process {}",
+            time_now(),
+            std::process::id(),
+        );
         let typefile = self.root.join(TYPES_FILENAME);
 
         let mut types: SqlTypeMap = match self.fs.read(&typefile) {
@@ -259,6 +264,11 @@ impl MigrationMut for FsMigration {
                 })?
                 .as_bytes(),
         )?;
+        eprintln!(
+            "add type end at {} from process {}",
+            time_now(),
+            std::process::id(),
+        );
         Ok(())
     }
 
@@ -525,4 +535,22 @@ impl Drop for MigrationLock {
     fn drop(&mut self) {
         fs2::FileExt::unlock(&self.file).unwrap();
     }
+}
+
+// #[test]
+// fn cannot_lock_shared_then_exclusive() {
+//     let path = Path::new("lock_for_test");
+//     eprintln!("getting first lock shared");
+//     let _l1 = MigrationLock::new_shared(&path).unwrap();
+//     eprintln!("getting second lock");
+//     let _l2 = MigrationLock::new_exclusive(&path).unwrap();
+//     eprintln!("got second lock");
+// }
+
+fn time_now() -> u128 {
+    use std::time::SystemTime;
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
 }
